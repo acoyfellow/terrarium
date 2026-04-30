@@ -157,3 +157,7 @@ No single Terrarium process manages more than one child.
 
 A terrarium is a tiny sealed world. This one grows subagents without letting them
 overrun the room.
+
+## Why not just shell?
+
+you can. terrarium is for when the parent agent needs its context window to stay pristine across long-running sub-tasks. one fresh process, clean handoff, no pollution. depth guard stops infinite recursion. that’s it.
