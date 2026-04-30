@@ -19,9 +19,9 @@
      |___/__________________________\___|
 ```
 
-[![Deploy to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/acoyfellow/terrarium)
+[![Deploy demo to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/acoyfellow/terrarium)
 
-A tiny agent harness for one job: **orchestrate one task by spawning one subagent**.
+A tiny local agent harness for one job: **orchestrate one task by spawning one subagent**.
 
 That is the whole architecture. No fan-out. No unbounded recursion. The top-level
 agent keeps its context clean by delegating work to a child. If a workflow needs
@@ -65,7 +65,9 @@ Or set it for your shell:
 TERRARIUM_AGENT="opencode run" terra "add tests for the parser"
 ```
 
-### Deploy the tiny web demo to Cloudflare
+### Deploy the demo site to Cloudflare
+
+The Cloudflare deploy is a **demo site**, not the local orchestrator. Workers cannot spawn your local agent CLI. The deployed demo explains Terrarium and exposes `/api/run`, which returns the child prompt Terrarium would hand to a child agent.
 
 Click the button above, or run:
 
@@ -73,8 +75,6 @@ Click the button above, or run:
 npm install
 npm run deploy
 ```
-
-The Worker demo exposes `/api/run`, which returns the child prompt Terrarium would hand to an agent.
 
 ## Reference
 
@@ -95,7 +95,9 @@ Options:
 
 ## Explanation
 
-Terrarium is intentionally one level deep per process. The top agent delegates messy work to one child, preserving parent context. If the child needs another shell, it can start its own Terrarium process; each process still owns only one child.
+Terrarium is intentionally one level deep per local process. The top agent delegates messy work to one child process, preserving parent context. If the child needs another shell, it can start its own Terrarium process; each process still owns only one child.
+
+The Cloudflare Worker in this repo is only a shareable demo/docs surface. The real harness is the CLI because spawning child agents requires local process access.
 
 ## Contract
 
