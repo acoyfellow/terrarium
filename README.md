@@ -70,9 +70,12 @@ terra "task"
 terra --agent "opencode run" "task"
 terra --cwd /path/to/repo "task"
 terra --timeout-ms 600000 "task"
+terra --max-depth 3 "task"
 terra --dry-run "task"
 terra --json "task"
 terra --log ./run.log "task"
+terra status
+terra read <runId>
 terra --help
 terrarium-mcp
 ```
@@ -81,13 +84,24 @@ Options:
 
 - `--agent <cmd>`: child command. Default: `$TERRARIUM_AGENT` or `opencode run`.
 - `--cwd <path>`: child working directory. Default: current directory.
-- `--timeout-ms <n>`: kill child after `n` milliseconds. Default: no timeout.
+- `--timeout-ms <n>`: kill child after `n` milliseconds. Default: config or no timeout.
+- `--max-depth <n>`: maximum Terrarium shell depth. Default: config or `3`.
 - `--dry-run`: print the child invocation without running it.
 - `--json`: print a structured result for agents.
 - `--log <path>`: write the transcript to a specific file.
 - `--help`: show CLI help.
 
-MCP tool:
+Config lives at `~/.terrarium/config.json`:
+
+```json
+{
+  "defaultAgent": "opencode run",
+  "maxDepth": 3,
+  "timeoutMs": 900000
+}
+```
+
+MCP tools:
 
 ```json
 {
@@ -96,14 +110,22 @@ MCP tool:
     "task": "inspect this repo and summarize the test command",
     "agent": "opencode run",
     "cwd": "/Users/jcoeyman/cloudflare/terrarium",
-    "timeoutMs": 600000
+    "timeoutMs": 600000,
+    "maxDepth": 3
   }
 }
 ```
 
+Also available:
+
+- `terrarium_status`: list recent runs and metadata.
+- `terrarium_read`: read the tail of a run log by `runId` or `logPath`.
+
 ## Explanation
 
 Terrarium is intentionally one level deep per local process. The top agent delegates messy work to one child process, preserving parent context. If the child needs another shell, it can start its own Terrarium process; each process still owns only one child.
+
+Child processes inherit the parent environment and, for OpenCode, the same `~/.config/opencode/opencode.jsonc` MCP configuration. Terrarium sets `TERRARIUM_RUN_ID`, `TERRARIUM_DEPTH`, and `TERRARIUM_MAX_DEPTH` so composed children can inherit tools without recursing forever.
 
 ## Contract
 
