@@ -1,0 +1,30 @@
+{
+  "name": "terrarium",
+  "version": "0.0.1",
+  "description": "A tiny one-level orchestration harness for composable subagents.",
+  "type": "module",
+  "bin": {
+    "terrarium": "./src/cli.js",
+    "terra": "./src/cli.js"
+  },
+  "scripts": {
+    "start": "node src/cli.js",
+    "test": "node --test",
+    "demo": "node src/cli.js \"write a haiku about delegated context\" --dry-run",
+    "deploy": "wrangler deploy"
+  },
+  "keywords": [
+    "agent",
+    "orchestrator",
+    "subagent",
+    "cli"
+  ],
+  "author": "Jordan Coeyman",
+  "license": "MIT",
+  "engines": {
+    "node": ">=22"
+  },
+  "devDependencies": {
+    "wrangler": "latest"
+  }
+}

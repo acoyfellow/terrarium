@@ -1,0 +1,9 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "terrarium",
+  "main": "src/worker.js",
+  "compatibility_date": "2026-04-30",
+  "assets": {
+    "directory": "public"
+  }
+}
