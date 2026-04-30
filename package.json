@@ -5,7 +5,8 @@
   "type": "module",
   "bin": {
     "terrarium": "./src/cli.js",
-    "terra": "./src/cli.js"
+    "terra": "./src/cli.js",
+    "terrarium-mcp": "./src/mcp.js"
   },
   "scripts": {
     "start": "node src/cli.js",
@@ -22,5 +23,8 @@
   "license": "MIT",
   "engines": {
     "node": ">=22"
+  },
+  "exports": {
+    ".": "./src/core.js"
   }
 }

@@ -68,17 +68,38 @@ TERRARIUM_AGENT="opencode run" terra "add tests for the parser"
 ```sh
 terra "task"
 terra --agent "opencode run" "task"
+terra --cwd /path/to/repo "task"
+terra --timeout-ms 600000 "task"
 terra --dry-run "task"
+terra --json "task"
 terra --log ./run.log "task"
 terra --help
+terrarium-mcp
 ```
 
 Options:
 
 - `--agent <cmd>`: child command. Default: `$TERRARIUM_AGENT` or `opencode run`.
+- `--cwd <path>`: child working directory. Default: current directory.
+- `--timeout-ms <n>`: kill child after `n` milliseconds. Default: no timeout.
 - `--dry-run`: print the child invocation without running it.
+- `--json`: print a structured result for agents.
 - `--log <path>`: write the transcript to a specific file.
 - `--help`: show CLI help.
+
+MCP tool:
+
+```json
+{
+  "name": "terrarium_spawn",
+  "arguments": {
+    "task": "inspect this repo and summarize the test command",
+    "agent": "opencode run",
+    "cwd": "/Users/jcoeyman/cloudflare/terrarium",
+    "timeoutMs": 600000
+  }
+}
+```
 
 ## Explanation
 
