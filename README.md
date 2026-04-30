@@ -19,8 +19,6 @@
      |___/__________________________\___|
 ```
 
-[![Deploy demo to Cloudflare](https://deploy.workers.cloudflare.com/button)](https://deploy.workers.cloudflare.com/?url=https://github.com/acoyfellow/terrarium)
-
 A tiny local agent harness for one job: **orchestrate one task by spawning one subagent**.
 
 That is the whole architecture. No fan-out. No unbounded recursion. The top-level
@@ -65,17 +63,6 @@ Or set it for your shell:
 TERRARIUM_AGENT="opencode run" terra "add tests for the parser"
 ```
 
-### Deploy the demo site to Cloudflare
-
-The Cloudflare deploy is a **demo site**, not the local orchestrator. Workers cannot spawn your local agent CLI. The deployed demo explains Terrarium and exposes `/api/run`, which returns the child prompt Terrarium would hand to a child agent.
-
-Click the button above, or run:
-
-```sh
-npm install
-npm run deploy
-```
-
 ## Reference
 
 ```sh
@@ -96,8 +83,6 @@ Options:
 ## Explanation
 
 Terrarium is intentionally one level deep per local process. The top agent delegates messy work to one child process, preserving parent context. If the child needs another shell, it can start its own Terrarium process; each process still owns only one child.
-
-The Cloudflare Worker in this repo is only a shareable demo/docs surface. The real harness is the CLI because spawning child agents requires local process access.
 
 ## Contract
 
