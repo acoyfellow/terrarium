@@ -26,6 +26,9 @@ agent keeps its context clean by delegating work to a child. If a workflow needs
 another shell, the child may start its own Terrarium run. Each process is only
 one level deep, but the system composes into long-running work.
 
+Terrarium isolates execution. It does not provide cross-session continuity; for
+that, see Wake. The boundary is documented in `BOUNDARY.md`.
+
 ## Why
 
 Big agent runs die by context erosion. Terrarium treats context like a root plant:
@@ -33,13 +36,13 @@ keep the top alive, push messy work into smaller pots, report back.
 
 ## Proof: Wake continuity eval
 
-We tested Terrarium against the same model and harness on a concrete task: build **Wake**, a tiny CLI for durable agent-run continuity after terminal/session loss.
+We tested Terrarium on a representative side quest: designing **Wake**, a separate tiny CLI for sessionless work continuity.
 
 - Baseline: one agent built Wake directly.
-- Treatment: one agent used Terrarium once for a read-only design side quest, then implemented from the child summary.
+- Treatment: one agent used Terrarium once for read-only design, then implemented from the child summary.
 - Result: baseline scored **11/14**; treatment scored **14/14**.
 
-The concrete difference: the Terrarium child found the key continuity primitive — `wake resume` with `active` / `last` pointers — so tomorrow's agent can resume without remembering the terminal, session id, or run path.
+The point of the eval is delegation: Terrarium kept the design dig out of the parent and returned a better implementation plan.
 
 The eval also found and fixed a real Terrarium product bug: long-running MCP child calls need `background: true`, then polling via `terrarium_status` / `terrarium_read`.
 
@@ -141,7 +144,7 @@ For long-running MCP child tasks, call `terrarium_spawn` with `background: true`
 
 Terrarium is intentionally one level deep per local process. The top agent delegates messy work to one child process, preserving parent context. If the child needs another shell, it can start its own Terrarium process; each process still owns only one child.
 
-Child processes inherit the parent environment and, for OpenCode, the same `~/.config/opencode/opencode.jsonc` MCP configuration. Terrarium sets `TERRARIUM_RUN_ID`, `TERRARIUM_DEPTH`, and `TERRARIUM_MAX_DEPTH` so composed children can inherit tools without recursing forever.
+Child processes inherit the parent environment and, for OpenCode, the same `~/.config/opencode/opencode.jsonc` MCP configuration. Terrarium sets `TERRARIUM_RUN_ID`, `TERRARIUM_DEPTH`, and `TERRARIUM_MAX_DEPTH` so composed children can inherit tools without recursing forever. If `WAKE_HOME` or `WAKE_RUN_ID` are present, Terrarium passes them through but does not manage them.
 
 ## Contract
 

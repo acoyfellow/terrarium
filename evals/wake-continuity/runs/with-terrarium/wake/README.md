@@ -1,6 +1,6 @@
 # wake
 
-Tiny local CLI for **durable agent-run continuity** after terminal/session loss.
+Tiny local CLI/MCP server for **sessionless work continuity** after terminal/session loss.
 
 You sit down tomorrow. You don't remember which terminal you were in, which
 OpenCode session it was, or what the last agent was about to do. Wake fixes
@@ -45,6 +45,7 @@ wake status   [--id <run>] [--json]
 wake handoff  [--id <run>] [--summary "..."] [--next "..."]
 wake resume   [--id <run>]
 wake list
+wake-mcp
 ```
 
 ### `start`
@@ -102,7 +103,8 @@ changed files, and the next step.
 - **No diffs / patches.** We record file paths, not contents. Git is the
   source of truth for what actually changed.
 - **No edit / delete.** If you wrote a wrong note, write a correcting one.
-- **No remote sync, no auth, no MCP server, no TUI.** Local CLI only.
+- **No remote sync, no auth, no TUI.** Local continuity only.
+- **No process spawning.** Wake never starts another agent. For execution isolation, see Terrarium.
 
 ## Tests
 
@@ -116,8 +118,15 @@ simulated session loss → `wake resume` finds the run and prints every
 preserved field. It also corrupts the journal mid-write and asserts that
 resume still succeeds.
 
-## Provenance
+## MCP
 
-Wake's design came from a single read-only Terrarium side quest before
-implementation. See `examples/demo-receipt.md` for a real handoff produced
-by Wake itself shipping its own 0.0.1.
+Wake also exposes the same continuity surface over MCP:
+
+- `wake_resume`: read the current or most recent handoff. Call this first when resuming work.
+- `wake_note`: append a structured note.
+- `wake_handoff`: close a work thread and return the handoff.
+- `wake_status`: return structured state.
+
+This is for agent experience: an agent can discover `wake_resume` from the tool list without a skill or system prompt.
+
+See `examples/demo-receipt.md` for a real handoff produced by Wake itself shipping its own 0.0.1.
