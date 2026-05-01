@@ -2,6 +2,15 @@
 
 Status: complete
 
+Canonical Wake now lives at:
+
+```text
+/Users/jcoeyman/cloudflare/wake
+https://github.com/acoyfellow/wake
+```
+
+The copy under `evals/wake-continuity/runs/with-terrarium/wake` is historical eval evidence.
+
 Terrarium sidequest run:
 
 ```text
