@@ -34,6 +34,35 @@ that, see Wake. The boundary is documented in `BOUNDARY.md`.
 Big agent runs die by context erosion. Terrarium treats context like a root plant:
 keep the top alive, push messy work into smaller pots, report back.
 
+
+## Workspace isolation
+
+By default Terrarium runs the child in the requested `cwd`. That isolates the
+agent context and logs, but not filesystem writes. For parallel write-capable
+sidequests, give each child its own workspace.
+
+```sh
+terra --isolation copy "make a patch in a disposable repo copy"
+terra --isolation worktree "make a patch on an isolated git branch"
+terra --isolation copy --keep-workspace "leave the workspace for inspection"
+```
+
+Modes:
+
+- `none`: current behavior; child writes in `--cwd`.
+- `copy`: copy `--cwd` into `~/.terrarium/workspaces/<runId>-<name>` and run there. This is the universal fallback and is useful for dirty or non-Git directories.
+- `worktree`: create a Git worktree branch `terrarium/<runId>` under `~/.terrarium/workspaces/` and run there. This has the cleanest merge story for Git repos.
+
+If a workspace is a Git checkout and the child leaves a diff, Terrarium writes a patch receipt next to the run metadata:
+
+```text
+~/.terrarium/runs/<runId>.patch
+```
+
+Terrarium still does not claim security sandboxing. Workspace isolation prevents
+parallel agents from stomping on the same checkout; it does not make arbitrary
+commands safe.
+
 ## Proof: Wake continuity eval
 
 We tested Terrarium on a representative side quest: designing **Wake**, a separate tiny CLI for sessionless work continuity.

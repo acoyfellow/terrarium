@@ -12,6 +12,8 @@ Usage:
   terra --agent "opencode run" "task"
   terra --dry-run "task"
   terra --json "task"
+  terra --isolation copy "task"
+  terra --isolation worktree "task"
   terra status
   terra read <runId>
 
@@ -22,6 +24,8 @@ Options:
   --max-depth <n>    Maximum Terrarium depth. Default: config or 3
   --dry-run          Print the child invocation without running it
   --json             Print structured JSON result
+  --isolation <mode> Workspace isolation: none, copy, or worktree. Default: none
+  --keep-workspace   Do not delete isolated workspace after the run
   --log <path>       Write a transcript to this path
   --help             Show help
   --version          Show version
@@ -36,9 +40,11 @@ function parse(argv) {
     else if (a === "--version" || a === "-v") out.version = true;
     else if (a === "--dry-run") out.dryRun = true;
     else if (a === "--json") out.json = true;
+    else if (a === "--keep-workspace") out.keepWorkspace = true;
     else if (a === "--agent") out.agent = argv[++i];
     else if (a === "--cwd") out.cwd = argv[++i];
     else if (a === "--timeout-ms") out.timeoutMs = Number(argv[++i]);
+    else if (a === "--isolation") out.isolation = argv[++i];
     else if (a === "--max-depth") out.maxDepth = Number(argv[++i]);
     else if (a === "--log") out.logPath = argv[++i];
     else out.task.push(a);
