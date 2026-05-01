@@ -42,7 +42,7 @@ test("full lifecycle + simulated session loss + crash-safe journal", () => {
   const started = wake(HOME, ["start", "--objective", "refactor parser"]);
   assert.equal(started.code, 0, started.stderr);
   const runId = started.stdout.trim();
-  assert.match(runId, /^wake_\d{8}_\d{6}_[0-9a-f]{6}$/);
+  assert.match(runId, /^wake_\d{8}_\d{6}_refactor-parser_[0-9a-f]{4}$/);
   assert.ok(fs.existsSync(path.join(HOME, "active")));
   assert.equal(fs.readFileSync(path.join(HOME, "active"), "utf8").trim(), runId);
   assert.ok(fs.existsSync(path.join(HOME, "runs", runId, "run.json")));

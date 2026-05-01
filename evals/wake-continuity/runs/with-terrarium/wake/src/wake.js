@@ -67,8 +67,16 @@ function nowIso() {
   return new Date().toISOString();
 }
 
-function newRunId() {
-  // wake_YYYYMMDD_HHMMSS_<6 random hex>  — sorts lexicographically by time
+function slugify(text) {
+  return String(text || "run")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 32) || "run";
+}
+
+function newRunId(objective) {
+  // wake_YYYYMMDD_HHMMSS_slug_<4 random hex> — sorts lexicographically by time
   const d = new Date();
   const pad = (n) => String(n).padStart(2, "0");
   const stamp =
@@ -79,8 +87,8 @@ function newRunId() {
     pad(d.getUTCHours()) +
     pad(d.getUTCMinutes()) +
     pad(d.getUTCSeconds());
-  const rand = Math.random().toString(16).slice(2, 8);
-  return `wake_${stamp}_${rand}`;
+  const rand = Math.random().toString(16).slice(2, 6);
+  return `wake_${stamp}_${slugify(objective)}_${rand}`;
 }
 
 function safeGitInfo(cwd) {
@@ -214,7 +222,7 @@ export function cmdStart({ objective, cwd = process.cwd() }) {
       `wake start: run ${existing} is still active. Run \`wake handoff\` or \`wake abandon\` first.`,
     );
   }
-  const id = newRunId();
+  const id = newRunId(objective);
   ensureDir(runDir(id));
   const run = {
     id,
@@ -339,6 +347,8 @@ export function cmdHandoff({ id, summary, next }) {
   const s = summarize(target);
   const finalNext = next || s.nextStep || null;
 
+  if (finalNext && finalNext !== s.nextStep) appendEvent(target, { kind: "next", text: finalNext });
+
   const evt = { kind: "handoff" };
   if (summary) evt.summary = summary;
   if (finalNext) evt.next = finalNext;
@@ -359,6 +369,7 @@ export function cmdHandoff({ id, summary, next }) {
   return {
     id: target,
     handoffPath: path.join(runDir(target), "HANDOFF.md"),
+    text: md,
     next: finalNext,
   };
 }
@@ -415,7 +426,7 @@ Usage:
                   command:                    --cmd "..." [--exit N] [--output-tail "..."]
                   file:                       --file <path> [--text "..."]
   wake status   [--id <run>] [--json]
-  wake handoff  [--id <run>] [--summary "..."] [--next "..."]
+  wake handoff  [--id <run>] [--summary "..."] [--next "..."] [--print]
   wake resume   [--id <run>]
   wake list
 
@@ -470,8 +481,12 @@ export async function main(argv = process.argv.slice(2)) {
     }
     if (sub === "handoff") {
       const r = cmdHandoff({ id: a.id, summary: a.summary, next: a.next });
-      process.stdout.write(`${r.handoffPath}\n`);
-      if (r.next) process.stdout.write(`next: ${r.next}\n`);
+      if (a.print === true || a.print === "true") {
+        process.stdout.write(r.text);
+      } else {
+        process.stdout.write(`${r.handoffPath}\n`);
+        if (r.next) process.stdout.write(`next: ${r.next}\n`);
+      }
       return 0;
     }
     if (sub === "resume") {
@@ -499,4 +514,10 @@ export async function main(argv = process.argv.slice(2)) {
     process.stderr.write(`error: ${err.message}\n`);
     return 1;
   }
+}
+
+
+if (import.meta.url === `file://${process.argv[1]}`) {
+  const code = await main();
+  process.exit(code);
 }

@@ -4,7 +4,8 @@
   "description": "Local CLI for durable agent-run continuity after terminal/session loss.",
   "type": "module",
   "bin": {
-    "wake": "bin/wake.js"
+    "wake": "bin/wake.js",
+    "wake-mcp": "src/mcp.js"
   },
   "scripts": {
     "test": "node --test test/wake.test.js"
