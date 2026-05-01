@@ -31,6 +31,20 @@ one level deep, but the system composes into long-running work.
 Big agent runs die by context erosion. Terrarium treats context like a root plant:
 keep the top alive, push messy work into smaller pots, report back.
 
+## Proof: Wake continuity eval
+
+We tested Terrarium against the same model and harness on a concrete task: build **Wake**, a tiny CLI for durable agent-run continuity after terminal/session loss.
+
+- Baseline: one agent built Wake directly.
+- Treatment: one agent used Terrarium once for a read-only design side quest, then implemented from the child summary.
+- Result: baseline scored **11/14**; treatment scored **14/14**.
+
+The concrete difference: the Terrarium child found the key continuity primitive — `wake resume` with `active` / `last` pointers — so tomorrow's agent can resume without remembering the terminal, session id, or run path.
+
+The eval also found and fixed a real Terrarium product bug: long-running MCP child calls need `background: true`, then polling via `terrarium_status` / `terrarium_read`.
+
+See `evals/wake-continuity/RESULT.md` for the full receipt.
+
 ## Tutorial: run your first delegation
 
 Install locally:
