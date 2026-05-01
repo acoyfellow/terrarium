@@ -1,0 +1,12 @@
+{"ts":"2026-05-01T10:33:14.759Z","kind":"start","objective":"Run full operating-loop eval: disposable session resumes via Wake, branches with Terrarium, ships useful patch"}
+{"ts":"2026-05-01T10:33:14.787Z","kind":"decision","text":"Wake is now real enough to use as the continuity primitive; this eval tests Wake + Terrarium composition."}
+{"ts":"2026-05-01T10:33:14.814Z","kind":"file","path":"AGENT-OPERATING-LOOP.md"}
+{"ts":"2026-05-01T10:33:14.839Z","kind":"file","path":"BOUNDARY.md"}
+{"ts":"2026-05-01T10:33:14.873Z","kind":"file","path":"evals/operating-loop/task.md"}
+{"ts":"2026-05-01T10:34:25.862Z","kind":"artifact","path":"evals/operating-loop/runs/sidequest.json"}
+{"ts":"2026-05-01T10:34:25.888Z","kind":"next","text":"Fresh agent: call wake resume using WAKE_HOME=evals/operating-loop/.wake, read evals/operating-loop/runs/sidequest.json, implement one useful patch, run tests, update RESULT.md, and handoff."}
+{"ts":"2026-05-01T10:34:25.889Z","kind":"handoff","summary":"Operating-loop eval prepared. Sidequest produced patch recommendation; fresh agent should resume from this handoff and implement one useful repo artifact proving Wake + Terrarium composition.","next":"Fresh agent: call wake resume using WAKE_HOME=evals/operating-loop/.wake, read evals/operating-loop/runs/sidequest.json, implement one useful patch, run tests, update RESULT.md, and handoff."}
+{"ts":"2026-05-01T10:36:33.188Z","kind":"file","path":"evals/operating-loop/RESULT.md"}
+{"ts":"2026-05-01T10:36:33.218Z","kind":"decision","text":"Do not claim the operating-loop eval is complete yet; record it as prepared and use it as a future fresh-agent resume test."}
+{"ts":"2026-05-01T10:36:33.245Z","kind":"next","text":"Fresh agent should resume this eval from Wake, read sidequest.json, implement the wake-terrarium-dogfood receipt/docs patch, run npm test, update RESULT.md, and handoff."}
+{"ts":"2026-05-01T10:36:33.246Z","kind":"handoff","summary":"Operating-loop eval is prepared but not complete. Wake captured continuity and Terrarium produced a sidequest recommendation; next fresh agent should implement the recommended composition receipt.","next":"Fresh agent should resume this eval from Wake, read sidequest.json, implement the wake-terrarium-dogfood receipt/docs patch, run npm test, update RESULT.md, and handoff."}

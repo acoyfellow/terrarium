@@ -1,0 +1,18 @@
+{
+  "id": "wake_20260501_103314_run-full-operating-loop-eval-dis_9a6a",
+  "version": "0.0.1",
+  "objective": "Run full operating-loop eval: disposable session resumes via Wake, branches with Terrarium, ships useful patch",
+  "cwd": "/Users/jcoeyman/cloudflare/terrarium",
+  "git": {
+    "root": "/Users/jcoeyman/cloudflare/terrarium",
+    "head": "1dee6ad",
+    "dirtyAtStart": true
+  },
+  "startedAt": "2026-05-01T10:33:14.758Z",
+  "finishedAt": "2026-05-01T10:36:33.246Z",
+  "status": "handoff",
+  "handoff": {
+    "summary": "Operating-loop eval is prepared but not complete. Wake captured continuity and Terrarium produced a sidequest recommendation; next fresh agent should implement the recommended composition receipt.",
+    "next": "Fresh agent should resume this eval from Wake, read sidequest.json, implement the wake-terrarium-dogfood receipt/docs patch, run npm test, update RESULT.md, and handoff."
+  }
+}
