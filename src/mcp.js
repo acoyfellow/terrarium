@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 import { createInterface } from "node:readline";
-import { listRuns, readRun, runTerrarium, VERSION } from "./core.js";
+import { listRuns, readRun, runTerrarium, spawnTerrariumBackground, VERSION } from "./core.js";
 
 const tools = [
   {
     name: "terrarium_spawn",
-    description: "Spawn exactly one child agent for one delegated task. Returns structured result and log path.",
-    inputSchema: { type: "object", properties: { task: { type: "string" }, agent: { type: "string" }, cwd: { type: "string" }, timeoutMs: { type: "number" }, maxDepth: { type: "number" }, dryRun: { type: "boolean" }, logPath: { type: "string" } }, required: ["task"] }
+    description: "Spawn exactly one child agent for one delegated task. Returns structured result and log path. Use background=true for long-running agent tasks to avoid MCP timeouts.",
+    inputSchema: { type: "object", properties: { task: { type: "string" }, agent: { type: "string" }, cwd: { type: "string" }, timeoutMs: { type: "number" }, maxDepth: { type: "number" }, dryRun: { type: "boolean" }, background: { type: "boolean" }, logPath: { type: "string" } }, required: ["task"] }
   },
   {
     name: "terrarium_status",
@@ -31,7 +31,7 @@ async function handle(msg) {
     const { name, arguments: args = {} } = msg.params ?? {};
     try {
       if (name === "terrarium_spawn") {
-        const result = await runTerrarium({ ...args, stream: false });
+        const result = args.background ? await spawnTerrariumBackground(args) : await runTerrarium({ ...args, stream: false });
         return send(msg.id, content(result, !result.ok));
       }
       if (name === "terrarium_status") return send(msg.id, content(await listRuns(args)));

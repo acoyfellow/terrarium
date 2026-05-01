@@ -121,6 +121,8 @@ Also available:
 - `terrarium_status`: list recent runs and metadata.
 - `terrarium_read`: read the tail of a run log by `runId` or `logPath`.
 
+For long-running MCP child tasks, call `terrarium_spawn` with `background: true`. It returns immediately with `runId`, `pid`, and `logPath`; poll with `terrarium_status` or `terrarium_read` instead of holding the MCP call open.
+
 ## Explanation
 
 Terrarium is intentionally one level deep per local process. The top agent delegates messy work to one child process, preserving parent context. If the child needs another shell, it can start its own Terrarium process; each process still owns only one child.
