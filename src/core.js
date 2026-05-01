@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { appendFile, cp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { appendFile, cp, mkdir, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, join } from "node:path";
@@ -194,6 +194,51 @@ async function finishRun(base, patch) {
   return result;
 }
 
+
+export function isPidAlive(pid) {
+  if (!pid) return false;
+  try {
+    process.kill(Number(pid), 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function readMetadata(runId) {
+  return JSON.parse(await readFile(metadataPath(runId), "utf8"));
+}
+
+export async function reconcileRun(meta, { staleMs = 30000 } = {}) {
+  if (!meta || meta.status !== "running") return meta;
+  const now = Date.now();
+  const pids = [meta.pid, meta.childPid, meta.runnerPid, meta.supervisorPid].filter(Boolean);
+  const alive = pids.some(isPidAlive);
+  let logAgeMs = null;
+  try {
+    const st = await stat(meta.logPath);
+    logAgeMs = now - st.mtimeMs;
+  } catch {}
+  if (!alive && (logAgeMs === null || logAgeMs >= staleMs)) {
+    const next = {
+      ...meta,
+      ok: false,
+      status: "orphaned",
+      orphanedAt: new Date().toISOString(),
+      finishedAt: new Date().toISOString(),
+      note: `No live Terrarium child process found and log is stale${logAgeMs === null ? "" : ` (${Math.round(logAgeMs)}ms old)`}.`,
+    };
+    await writeMetadata(next);
+    return next;
+  }
+  return { ...meta, alive, logAgeMs };
+}
+
+export async function getRunStatus({ runId, staleMs = 30000 } = {}) {
+  if (!runId) throw new Error("runId required");
+  return await reconcileRun(await readMetadata(runId), { staleMs });
+}
+
 export async function spawnTerrariumBackground(opts = {}) {
   const { run, parts, prompt, base, workspace } = await prepareRun({ ...opts, stream: false });
   const invocation = `${parts.join(" ")} ${JSON.stringify(prompt)}\n`;
@@ -205,7 +250,7 @@ export async function spawnTerrariumBackground(opts = {}) {
 
   const env = { ...process.env, TERRARIUM_RUN_ID: run.runId, TERRARIUM_PARENT_RUN_ID: run.parentRunId ?? "", TERRARIUM_DEPTH: String(run.depth), TERRARIUM_MAX_DEPTH: String(run.maxDepth) };
   const child = spawn(parts[0], [...parts.slice(1), prompt], { stdio: ["ignore", "pipe", "pipe"], env, cwd: run.cwd, detached: true });
-  const started = { ok: true, ...base, status: "running", background: true, pid: child.pid };
+  const started = { ok: true, ...base, status: "running", background: true, pid: child.pid, childPid: child.pid, runnerPid: process.pid, lastSeenAt: new Date().toISOString() };
   await writeMetadata(started);
 
   const timer = run.timeoutMs > 0 ? setTimeout(() => child.kill("SIGTERM"), run.timeoutMs) : null;
@@ -217,14 +262,14 @@ export async function spawnTerrariumBackground(opts = {}) {
     if (timer) clearTimeout(timer);
     await log(run.logPath, `\nerror: ${e.message}\n`);
     const ws = await finalizeWorkspace(workspace, base);
-    await finishRun(base, { ok: false, status: "error", background: true, pid: child.pid, exitCode: 127, error: e.message, stdoutTail: tail(stdout), stderrTail: tail(stderr), ...ws });
+    await finishRun(base, { ok: false, status: "error", background: true, pid: child.pid, childPid: child.pid, runnerPid: process.pid, exitCode: 127, error: e.message, stdoutTail: tail(stdout), stderrTail: tail(stderr), ...ws });
   });
   child.on("close", async (code, signal) => {
     if (timer) clearTimeout(timer);
     const exitCode = code ?? (signal ? 128 : 0);
     await log(run.logPath, `\nexit: ${exitCode}${signal ? ` signal: ${signal}` : ""}\n`);
     const ws = await finalizeWorkspace(workspace, base);
-    await finishRun(base, { ok: exitCode === 0, status: exitCode === 0 ? "done" : "failed", background: true, pid: child.pid, exitCode, signal, stdoutTail: tail(stdout), stderrTail: tail(stderr), ...ws });
+    await finishRun(base, { ok: exitCode === 0, status: exitCode === 0 ? "done" : "failed", background: true, pid: child.pid, childPid: child.pid, runnerPid: process.pid, exitCode, signal, stdoutTail: tail(stdout), stderrTail: tail(stderr), ...ws });
   });
   child.unref();
   return started;
@@ -274,7 +319,7 @@ export async function listRuns({ limit = 20 } = {}) {
   await mkdir(LOG_DIR, { recursive: true });
   const files = (await readdir(LOG_DIR)).filter((f) => f.endsWith(".json")).sort().reverse().slice(0, limit);
   const runs = [];
-  for (const file of files) runs.push(JSON.parse(await readFile(join(LOG_DIR, file), "utf8")));
+  for (const file of files) runs.push(await reconcileRun(JSON.parse(await readFile(join(LOG_DIR, file), "utf8"))));
   return { version: VERSION, logDir: LOG_DIR, runs };
 }
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { listRuns, readRun, runTerrarium, VERSION } from "./core.js";
+import { getRunStatus, listRuns, readRun, runTerrarium, VERSION } from "./core.js";
 
 function help() {
   return `terrarium ${VERSION}
@@ -14,7 +14,7 @@ Usage:
   terra --json "task"
   terra --isolation copy "task"
   terra --isolation worktree "task"
-  terra status
+  terra status [runId]
   terra read <runId>
 
 Options:
@@ -56,6 +56,7 @@ const opts = parse(process.argv.slice(2));
 const [cmd, ...rest] = opts.task;
 if (opts.help) console.log(help());
 else if (opts.version) console.log(VERSION);
+else if (cmd === "status" && rest[0]) getRunStatus({ runId: rest[0] }).then((r) => console.log(JSON.stringify(r, null, 2)));
 else if (cmd === "status") listRuns({ limit: Number(rest[0] || 20) }).then((r) => console.log(JSON.stringify(r, null, 2)));
 else if (cmd === "read") readRun({ runId: rest[0], tailBytes: Number(rest[1] || 20000) }).then((r) => console.log(r.text));
 else runTerrarium({ ...opts, task: opts.task.join(" ").trim(), stream: !opts.json }).then((result) => {

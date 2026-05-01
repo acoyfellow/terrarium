@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { createInterface } from "node:readline";
-import { listRuns, readRun, runTerrarium, spawnTerrariumBackground, VERSION } from "./core.js";
+import { getRunStatus, listRuns, readRun, runTerrarium, spawnTerrariumBackground, VERSION } from "./core.js";
 
 const tools = [
   {
@@ -11,7 +11,7 @@ const tools = [
   {
     name: "terrarium_status",
     description: "List recent Terrarium runs with metadata.",
-    inputSchema: { type: "object", properties: { limit: { type: "number" } } }
+    inputSchema: { type: "object", properties: { limit: { type: "number" }, runId: { type: "string" } } }
   },
   {
     name: "terrarium_read",
@@ -34,7 +34,7 @@ async function handle(msg) {
         const result = args.background ? await spawnTerrariumBackground(args) : await runTerrarium({ ...args, stream: false });
         return send(msg.id, content(result, !result.ok));
       }
-      if (name === "terrarium_status") return send(msg.id, content(await listRuns(args)));
+      if (name === "terrarium_status") return send(msg.id, content(args.runId ? await getRunStatus(args) : await listRuns(args)));
       if (name === "terrarium_read") return send(msg.id, content(await readRun(args)));
       return error(msg.id, -32602, `unknown tool: ${name}`);
     } catch (e) {

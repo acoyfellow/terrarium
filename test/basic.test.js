@@ -4,7 +4,7 @@ import { execSync } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { capturePatch, childPrompt, finalizeWorkspace, prepareWorkspace, splitCommand } from "../src/core.js";
+import { capturePatch, childPrompt, finalizeWorkspace, isPidAlive, prepareWorkspace, reconcileRun, splitCommand } from "../src/core.js";
 
 test("builds a constrained child prompt", () => {
   assert.match(childPrompt("ship it", { depth: 1, maxDepth: 3 }), /Do not fan out/);
@@ -92,5 +92,23 @@ test("capturePatch includes untracked new files and excludes the workspace marke
   } finally {
     await finalizeWorkspace({ ...workspace, cleanup: true }, { runId });
     try { rmSync(source, { recursive: true, force: true }); } catch {}
+  }
+});
+
+
+test("reconcileRun marks stale running metadata orphaned when no pid is alive", async () => {
+  const logDir = mkdtempSync(join(tmpdir(), "terra-log-"));
+  const logPath = join(logDir, "run.log");
+  writeFileSync(logPath, "old log");
+  const meta = { runId: "ter_test_orphan", status: "running", pid: 99999999, logPath };
+  await new Promise((resolve) => setTimeout(resolve, 5));
+  const reconciled = await reconcileRun(meta, { staleMs: 0 });
+  try {
+    assert.equal(isPidAlive(99999999), false);
+    assert.equal(reconciled.status, "orphaned");
+    assert.equal(reconciled.ok, false);
+    assert.match(reconciled.note, /No live Terrarium child process/);
+  } finally {
+    rmSync(logDir, { recursive: true, force: true });
   }
 });
