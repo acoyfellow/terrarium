@@ -58,7 +58,7 @@ async function log(path, line) {
   await appendFile(path, line);
 }
 
-async function spawnCapture(cmd, args, opts = {}) {
+export async function spawnCapture(cmd, args, opts = {}) {
   return await new Promise((resolve) => {
     const child = spawn(cmd, args, { stdio: ["ignore", "pipe", "pipe"], ...opts });
     let stdout = "";
@@ -131,23 +131,41 @@ export async function prepareWorkspace(run) {
     await rm(workspacePath, { recursive: true, force: true });
     const r = await spawnCapture("git", ["worktree", "add", "-b", branch, workspacePath], { cwd: root });
     if (r.code !== 0) throw new Error(`git worktree add failed: ${r.stderr || r.stdout}`.trim());
+    await writeFile(join(workspacePath, ".terrarium-workspace"), JSON.stringify({ runId: run.runId, source: root, isolation: "worktree", branch }, null, 2) + "\n");
     run.cwd = workspacePath;
     return { type: "worktree", path: workspacePath, source: root, branch, cleanup: !run.keepWorkspace };
   }
   throw new Error(`unknown isolation mode: ${run.isolation}`);
 }
 
-async function finalizeWorkspace(workspace, resultPatch) {
+export async function capturePatch(workspacePath) {
+  await spawnCapture("git", ["add", "-A", "--", ":!.terrarium-workspace"], { cwd: workspacePath });
+  return await spawnCapture("git", ["diff", "--cached", "--binary"], { cwd: workspacePath });
+}
+
+export async function removeWorktree(workspace) {
+  const remove = await spawnCapture("git", ["worktree", "remove", "--force", workspace.path], { cwd: workspace.source });
+  if (remove.code !== 0) {
+    await rm(workspace.path, { recursive: true, force: true });
+    await spawnCapture("git", ["worktree", "prune"], { cwd: workspace.source });
+  }
+  if (workspace.branch) await spawnCapture("git", ["branch", "-D", workspace.branch], { cwd: workspace.source });
+}
+
+export async function finalizeWorkspace(workspace, resultPatch) {
   if (!workspace) return {};
   const out = { workspace };
-  const diff = await spawnCapture("git", ["diff", "--"], { cwd: workspace.path });
+  const diff = await capturePatch(workspace.path);
   if (diff.code === 0 && diff.stdout) {
     const patchPath = join(LOG_DIR, `${resultPatch.runId}.patch`);
     await writeFile(patchPath, diff.stdout);
     out.patchPath = patchPath;
     out.patchBytes = Buffer.byteLength(diff.stdout);
   }
-  if (workspace.cleanup) await rm(workspace.path, { recursive: true, force: true });
+  if (workspace.cleanup) {
+    if (workspace.type === "worktree") await removeWorktree(workspace);
+    else await rm(workspace.path, { recursive: true, force: true });
+  }
   return out;
 }
 
