@@ -29,14 +29,29 @@ top context ──spawns──> child context
 
 Big agent runs die by context erosion. Terrarium treats context like a root plant: keep the top alive, push messy work into smaller pots, report back. The parent stays clean. The child does the dig. No fan-out, no unbounded recursion.
 
-## Does it actually help?
+## Proof
 
-We ran the same side quest two ways: a single agent doing all the work, vs. a parent agent that used Terrarium once for read-only design before implementing.
+**Two things, neither of them vibes.**
 
-- Baseline: **11/14**
-- With Terrarium: **14/14**
+**1. The agent reaches for it on its own.** I installed Terrarium as an MCP server and never told the agent about it. Across two weeks of unrelated work: **24 unprompted spawns in 5 sessions, 0 times I named the tool.** It started reaching for it on repo digs, then red-team reviews, then design side quests — off prompts as light as *"be creative"* or *"in parallel."*
 
-Same model, same task, same rubric. The eval also surfaced a real product bug — long-running MCP child calls need `background: true`, then polling. Already fixed.
+That's the test that matters. Can a fresh agent discover and choose this tool without coaching?
+
+**2. The head-to-head eval.** Same model, same task, same 14-point rubric, scored across 7 categories.
+
+> Build *Wake*: a tiny local CLI for resuming agent work after the terminal dies.
+
+- Baseline (one agent, no Terrarium): **11/14**
+- Treatment (one agent, used Terrarium once for read-only design, then implemented): **14/14**
+
+n=1. Same model in both runs. The treatment won on three categories — CLI usability, verification, and fresh-agent resumability — because the Terrarium child returned the load-bearing design idea (a `wake resume` command that finds the run by an active/last pointer, not by remembering an id). The baseline agent shipped a working CLI but missed that the user has to *find* their old run before resuming.
+
+Side effects of running the eval:
+
+- Surfaced a real product bug: long-running MCP child calls need `background: true`, then polling. Already fixed.
+- Treatment parent context stayed cleaner (design dig happened in the child, not inline).
+
+The full receipt — commands, rubric, transcripts, the artifacts both runs produced — was used to ship and iterate; happy to share it on request.
 
 ## Try it
 
