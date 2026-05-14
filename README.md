@@ -1,23 +1,6 @@
 # Terrarium
 
-```text
-        ______________________________
-       /                              \
-      /  ~  ~  ~  ~  ~  ~  ~  ~  ~    \
-     |                                  |
-     |        ><(((º>                   |
-     |                         <º)))><  |
-     |                                  |
-     |                  o               |
-     |              o                   |
-     |          o                       |
-     |                                  |
-     |       ___              ___       |
-     |      /___\            /___\      |
-     |       | |              | |       |
-     |    ___|_|______________|_|___    |
-     |___/__________________________\___|
-```
+![A cozy glass terrarium on a wooden desk. Inside, a single small robot tends a tiny garden of even smaller robots, each working in their own pot.](./assets/terrarium.jpg)
 
 **One task. One child. One level deep.**
 
