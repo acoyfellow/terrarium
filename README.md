@@ -36,8 +36,8 @@ npm install -g .
 terra "summarize this repo"
 ```
 
-Terrarium isolates execution. It does not provide cross-session continuity; for
-that, see Wake. The boundary is documented in `BOUNDARY.md`.
+Terrarium isolates execution. It does not own memory, continuity, or handoffs —
+keep it small on purpose.
 
 ## When to use it
 
@@ -52,7 +52,7 @@ that, see Wake. The boundary is documented in `BOUNDARY.md`.
 - Tasks under ~5 minutes — child spin-up isn't worth it
 - Anything conversational with the user — runs are batch, not chat
 - Anything where verifying the child summary costs as much as just doing the work
-- Memory, continuity, or handoffs — that's Wake's job (see `BOUNDARY.md`)
+- Memory, continuity, or handoffs — out of scope, pair it with whatever you use for that
 
 
 ## Workspace isolation
@@ -83,19 +83,14 @@ Terrarium still does not claim security sandboxing. Workspace isolation prevents
 parallel agents from stomping on the same checkout; it does not make arbitrary
 commands safe.
 
-## Proof: Wake continuity eval
+## Proof
 
-We tested Terrarium on a representative side quest: designing **Wake**, a separate tiny CLI for sessionless work continuity.
+We ran the same side quest two ways: a single agent doing all the work, vs. a parent agent that used Terrarium once for read-only design before implementing.
 
-- Baseline: one agent built Wake directly.
-- Treatment: one agent used Terrarium once for read-only design, then implemented from the child summary.
-- Result: baseline scored **11/14**; treatment scored **14/14**.
+- Baseline: **11/14**
+- With Terrarium: **14/14**
 
-The point of the eval is delegation: Terrarium kept the design dig out of the parent and returned a better implementation plan.
-
-The eval also found and fixed a real Terrarium product bug: long-running MCP child calls need `background: true`, then polling via `terrarium_status` / `terrarium_read`.
-
-See `evals/wake-continuity/RESULT.md` for the full receipt.
+The eval also surfaced a real product bug: long-running MCP child calls need `background: true`, then polling via `terrarium_status` / `terrarium_read`. Already fixed.
 
 ## Tutorial: run your first delegation
 
@@ -193,17 +188,7 @@ For long-running MCP child tasks, call `terrarium_spawn` with `background: true`
 
 Terrarium is intentionally one level deep per local process. The top agent delegates messy work to one child process, preserving parent context. If the child needs another shell, it can start its own Terrarium process; each process still owns only one child.
 
-Child processes inherit the parent environment and, for OpenCode, the same `~/.config/opencode/opencode.jsonc` MCP configuration. Terrarium sets `TERRARIUM_RUN_ID`, `TERRARIUM_DEPTH`, and `TERRARIUM_MAX_DEPTH` so composed children can inherit tools without recursing forever. If `WAKE_HOME` or `WAKE_RUN_ID` are present, Terrarium passes them through but does not manage them.
-
-### Using Wake inside child runs
-
-If a child agent uses Wake, scope Wake state to that child run so parent and sibling agents do not share continuity state:
-
-```sh
-WAKE_HOME="/path/to/child-run/.wake"
-```
-
-A common pattern is to key the path by `$TERRARIUM_RUN_ID`. Terrarium passes `WAKE_HOME` and `WAKE_RUN_ID` through, but Wake state ownership remains explicit.
+Child processes inherit the parent environment and, for OpenCode, the same `~/.config/opencode/opencode.jsonc` MCP configuration. Terrarium sets `TERRARIUM_RUN_ID`, `TERRARIUM_DEPTH`, and `TERRARIUM_MAX_DEPTH` so composed children can inherit tools without recursing forever.
 
 ## Contract
 

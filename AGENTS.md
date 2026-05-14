@@ -21,7 +21,7 @@ Call `terrarium_spawn` when the subtask would pollute your context. Good signals
 - The task is under ~5 minutes of work
 - You need to iterate with the user conversationally
 - You can verify the summary as cheaply as just doing it
-- You need memory, continuity, or a handoff — that is Wake, not Terrarium
+- You need memory, continuity, or a handoff — that is out of scope for Terrarium
 
 ## How to call it well
 
@@ -31,9 +31,6 @@ Call `terrarium_spawn` when the subtask would pollute your context. Good signals
 
 ## Doctrine
 
-Terrarium isolates execution. It does not own memory, continuity, or handoffs.
-
-- `BOUNDARY.md` — what Terrarium is *not*
-- `AGENT-OPERATING-LOOP.md` — how Terrarium fits with Wake (continuity), Deja (durable memory), and The Machine (background orchestration)
+Terrarium isolates execution. It does not own memory, continuity, or handoffs — pair it with whatever continuity/memory system you already use.
 
 Do not make Terrarium a memory system. Do not fan out. One child per process.

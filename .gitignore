@@ -3,3 +3,5 @@ node_modules/
 .env
 *.log
 .wrangler/
+.wake/
+.wake-dogfood/
