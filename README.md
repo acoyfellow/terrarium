@@ -1,6 +1,6 @@
 # Terrarium
 
-![A cozy glass terrarium on a wooden desk. Inside, a single small robot tends a tiny garden of even smaller robots, each working in their own pot.](./assets/terrarium.jpg)
+![A cozy glass terrarium on a wooden desk. Inside, a single small robot tends a tiny garden of even smaller robots, each working in their own pot.](./assets/social-card.jpg)
 
 **One task. One child. One level deep.**
 
