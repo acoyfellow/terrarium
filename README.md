@@ -19,20 +19,40 @@
      |___/__________________________\___|
 ```
 
-A tiny local agent harness for one job: **orchestrate one task by spawning one subagent**.
+**One task. One child. One level deep.**
 
-That is the whole architecture. No fan-out. No unbounded recursion. The top-level
-agent keeps its context clean by delegating work to a child. If a workflow needs
-another shell, the child may start its own Terrarium run. Each process is only
-one level deep, but the system composes into long-running work.
+```text
+top context ──spawns──> child context
+   stays                 does messy work
+   clean                 returns concise result
+```
+
+Big agent runs die by context erosion. Terrarium treats context like a root plant:
+keep the top alive, push messy work into smaller pots, report back. The parent
+stays clean. The child does the dig. No fan-out, no unbounded recursion.
+
+```sh
+npm install -g .
+terra "summarize this repo"
+```
 
 Terrarium isolates execution. It does not provide cross-session continuity; for
 that, see Wake. The boundary is documented in `BOUNDARY.md`.
 
-## Why
+## When to use it
 
-Big agent runs die by context erosion. Terrarium treats context like a root plant:
-keep the top alive, push messy work into smaller pots, report back.
+- Repo archaeology ("find every place we handle X")
+- Failing test diagnosis (read-only, propose, don't edit)
+- Design side quests (read 8 files, return a plan)
+- Log digging where 90% of bytes are noise
+- Risky experiments in `--isolation copy`
+
+## When not to use it
+
+- Tasks under ~5 minutes — child spin-up isn't worth it
+- Anything conversational with the user — runs are batch, not chat
+- Anything where verifying the child summary costs as much as just doing the work
+- Memory, continuity, or handoffs — that's Wake's job (see `BOUNDARY.md`)
 
 
 ## Workspace isolation
@@ -175,6 +195,16 @@ Terrarium is intentionally one level deep per local process. The top agent deleg
 
 Child processes inherit the parent environment and, for OpenCode, the same `~/.config/opencode/opencode.jsonc` MCP configuration. Terrarium sets `TERRARIUM_RUN_ID`, `TERRARIUM_DEPTH`, and `TERRARIUM_MAX_DEPTH` so composed children can inherit tools without recursing forever. If `WAKE_HOME` or `WAKE_RUN_ID` are present, Terrarium passes them through but does not manage them.
 
+### Using Wake inside child runs
+
+If a child agent uses Wake, scope Wake state to that child run so parent and sibling agents do not share continuity state:
+
+```sh
+WAKE_HOME="/path/to/child-run/.wake"
+```
+
+A common pattern is to key the path by `$TERRARIUM_RUN_ID`. Terrarium passes `WAKE_HOME` and `WAKE_RUN_ID` through, but Wake state ownership remains explicit.
+
 ## Contract
 
 1. The orchestrator accepts one task.
@@ -183,15 +213,9 @@ Child processes inherit the parent environment and, for OpenCode, the same `~/.c
 4. Logs are written to `~/.terrarium/runs/` unless `--log` is passed.
 5. Version stays `0.0.1`.
 
-## Mental model
+## Composing depth
 
-```text
-top context ──spawns──> child context
-   stays                 does messy work
-   clean                 returns concise result
-```
-
-Need more depth? Compose it:
+Need more than one level? The child can start its own Terrarium:
 
 ```text
 terra task A

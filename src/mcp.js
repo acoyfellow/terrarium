@@ -5,18 +5,44 @@ import { getRunStatus, listRuns, readRun, runTerrarium, spawnTerrariumBackground
 const tools = [
   {
     name: "terrarium_spawn",
-    description: "Spawn exactly one child agent for one delegated task. Returns structured result and log path. Use background=true for long-running agent tasks to avoid MCP timeouts.",
-    inputSchema: { type: "object", properties: { task: { type: "string" }, agent: { type: "string" }, cwd: { type: "string" }, timeoutMs: { type: "number" }, maxDepth: { type: "number" }, dryRun: { type: "boolean" }, background: { type: "boolean" }, logPath: { type: "string" } }, required: ["task"] }
+    description: "Spawn exactly one child agent for one delegated task. Use this when a subtask would pollute parent context: repo archaeology, log digs, design research, failing-test diagnosis. Returns structured result and log path. Use background=true for long-running tasks to avoid MCP timeouts (then poll with terrarium_status / terrarium_read).",
+    inputSchema: {
+      type: "object",
+      properties: {
+        task: { type: "string", description: "The single bounded objective for the child agent. Be specific. Include 'do not edit files' for read-only digs." },
+        agent: { type: "string", description: "Child command. Default: 'opencode run'. Examples: 'opencode run', 'pi run'." },
+        cwd: { type: "string", description: "Working directory for the child. Default: current directory." },
+        timeoutMs: { type: "number", description: "Kill the child after this many milliseconds. Default: none." },
+        maxDepth: { type: "number", description: "Maximum Terrarium recursion depth. Default: 3." },
+        dryRun: { type: "boolean", description: "Print the child invocation without running it." },
+        background: { type: "boolean", description: "Detach and return immediately with runId/pid/logPath. Required for long agent tasks; poll via terrarium_status." },
+        logPath: { type: "string", description: "Override log file path. Default: ~/.terrarium/runs/<runId>.log" }
+      },
+      required: ["task"]
+    }
   },
   {
     name: "terrarium_status",
-    description: "List recent Terrarium runs with metadata.",
-    inputSchema: { type: "object", properties: { limit: { type: "number" }, runId: { type: "string" } } }
+    description: "List recent Terrarium runs with metadata, or get status for a single run. Use this to poll a background spawn until it finishes.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        limit: { type: "number", description: "Max number of recent runs to return. Default: 20." },
+        runId: { type: "string", description: "If set, return status for this single run instead of listing." }
+      }
+    }
   },
   {
     name: "terrarium_read",
-    description: "Read the tail of a Terrarium run log by runId or logPath.",
-    inputSchema: { type: "object", properties: { runId: { type: "string" }, logPath: { type: "string" }, tailBytes: { type: "number" } } }
+    description: "Read the tail of a Terrarium run log by runId or logPath. Use this to inspect a child's output, especially after a background spawn completes.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        runId: { type: "string", description: "Run ID returned by terrarium_spawn." },
+        logPath: { type: "string", description: "Explicit log path. Use this or runId." },
+        tailBytes: { type: "number", description: "Bytes from the end of the log to return. Default: 20000." }
+      }
+    }
   }
 ];
 
