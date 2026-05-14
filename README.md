@@ -27,17 +27,25 @@ top context ──spawns──> child context
    clean                 returns concise result
 ```
 
-Big agent runs die by context erosion. Terrarium treats context like a root plant:
-keep the top alive, push messy work into smaller pots, report back. The parent
-stays clean. The child does the dig. No fan-out, no unbounded recursion.
+Big agent runs die by context erosion. Terrarium treats context like a root plant: keep the top alive, push messy work into smaller pots, report back. The parent stays clean. The child does the dig. No fan-out, no unbounded recursion.
+
+## Does it actually help?
+
+We ran the same side quest two ways: a single agent doing all the work, vs. a parent agent that used Terrarium once for read-only design before implementing.
+
+- Baseline: **11/14**
+- With Terrarium: **14/14**
+
+Same model, same task, same rubric. The eval also surfaced a real product bug — long-running MCP child calls need `background: true`, then polling. Already fixed.
+
+## Try it
 
 ```sh
 npm install -g .
-terra "summarize this repo"
+terra --dry-run "summarize this repo"
 ```
 
-Terrarium isolates execution. It does not own memory, continuity, or handoffs —
-keep it small on purpose.
+You'll see the exact child command and prompt. Drop `--dry-run` to execute.
 
 ## When to use it
 
@@ -51,78 +59,35 @@ keep it small on purpose.
 
 - Tasks under ~5 minutes — child spin-up isn't worth it
 - Anything conversational with the user — runs are batch, not chat
-- Anything where verifying the child summary costs as much as just doing the work
+- Anything where verifying the child summary costs as much as just doing it
 - Memory, continuity, or handoffs — out of scope, pair it with whatever you use for that
 
+## Common recipes
 
-## Workspace isolation
-
-By default Terrarium runs the child in the requested `cwd`. That isolates the
-agent context and logs, but not filesystem writes. For parallel write-capable
-sidequests, give each child its own workspace.
+**Use a different child agent.** Default is `opencode run`.
 
 ```sh
-terra --isolation copy "make a patch in a disposable repo copy"
-terra --isolation worktree "make a patch on an isolated git branch"
+terra --agent "pi run" "fix the failing build"
+TERRARIUM_AGENT="opencode run" terra "add tests for the parser"
+```
+
+**Isolate the workspace.** By default the child writes in `--cwd`. For parallel write-capable side quests, give each child its own:
+
+```sh
+terra --isolation copy "patch a disposable repo copy"
+terra --isolation worktree "patch an isolated git branch"
 terra --isolation copy --keep-workspace "leave the workspace for inspection"
 ```
 
 Modes:
 
-- `none`: current behavior; child writes in `--cwd`.
-- `copy`: copy `--cwd` into `~/.terrarium/workspaces/<runId>-<name>` and run there. This is the universal fallback and is useful for dirty or non-Git directories.
-- `worktree`: create a Git worktree branch `terrarium/<runId>` under `~/.terrarium/workspaces/` and run there. This has the cleanest merge story for Git repos.
+- `none` — child writes in `--cwd`.
+- `copy` — copies `--cwd` into `~/.terrarium/workspaces/<runId>-<name>`. Universal fallback; works on dirty or non-Git directories.
+- `worktree` — creates a Git worktree on branch `terrarium/<runId>`. Cleanest merge story for Git repos.
 
-If a workspace is a Git checkout and the child leaves a diff, Terrarium writes a patch receipt next to the run metadata:
+If the workspace is a Git checkout and the child leaves a diff, Terrarium writes a patch receipt at `~/.terrarium/runs/<runId>.patch`.
 
-```text
-~/.terrarium/runs/<runId>.patch
-```
-
-Terrarium still does not claim security sandboxing. Workspace isolation prevents
-parallel agents from stomping on the same checkout; it does not make arbitrary
-commands safe.
-
-## Proof
-
-We ran the same side quest two ways: a single agent doing all the work, vs. a parent agent that used Terrarium once for read-only design before implementing.
-
-- Baseline: **11/14**
-- With Terrarium: **14/14**
-
-The eval also surfaced a real product bug: long-running MCP child calls need `background: true`, then polling via `terrarium_status` / `terrarium_read`. Already fixed.
-
-## Tutorial: run your first delegation
-
-Install locally:
-
-```sh
-npm install -g .
-```
-
-Run one task through one child agent:
-
-```sh
-terra --dry-run "summarize this repo"
-```
-
-You will see the exact child command and prompt. Remove `--dry-run` to execute it.
-
-## How-to guides
-
-### Use a different child agent
-
-Default child command is `opencode run`. Override it per run:
-
-```sh
-terra --agent "pi run" "fix the failing build"
-```
-
-Or set it for your shell:
-
-```sh
-TERRARIUM_AGENT="opencode run" terra "add tests for the parser"
-```
+Workspace isolation is not security sandboxing. It stops parallel agents from stomping on the same checkout; it does not make arbitrary commands safe.
 
 ## Reference
 
@@ -132,6 +97,7 @@ terra --agent "opencode run" "task"
 terra --cwd /path/to/repo "task"
 terra --timeout-ms 600000 "task"
 terra --max-depth 3 "task"
+terra --isolation copy "task"
 terra --dry-run "task"
 terra --json "task"
 terra --log ./run.log "task"
@@ -143,16 +109,17 @@ terrarium-mcp
 
 Options:
 
-- `--agent <cmd>`: child command. Default: `$TERRARIUM_AGENT` or `opencode run`.
-- `--cwd <path>`: child working directory. Default: current directory.
-- `--timeout-ms <n>`: kill child after `n` milliseconds. Default: config or no timeout.
-- `--max-depth <n>`: maximum Terrarium shell depth. Default: config or `3`.
-- `--dry-run`: print the child invocation without running it.
-- `--json`: print a structured result for agents.
-- `--log <path>`: write the transcript to a specific file.
-- `--help`: show CLI help.
+- `--agent <cmd>` — child command. Default: `$TERRARIUM_AGENT` or `opencode run`.
+- `--cwd <path>` — child working directory. Default: current directory.
+- `--timeout-ms <n>` — kill child after `n` milliseconds. Default: config or none.
+- `--max-depth <n>` — maximum Terrarium depth. Default: config or `3`.
+- `--isolation <mode>` — `none`, `copy`, or `worktree`. Default: `none`.
+- `--keep-workspace` — do not delete an isolated workspace after the run.
+- `--dry-run` — print the child invocation without running it.
+- `--json` — print a structured result for agents.
+- `--log <path>` — write the transcript to a specific file.
 
-Config lives at `~/.terrarium/config.json`:
+Config at `~/.terrarium/config.json`:
 
 ```json
 {
@@ -170,37 +137,24 @@ MCP tools:
   "arguments": {
     "task": "inspect this repo and summarize the test command",
     "agent": "opencode run",
-    "cwd": "/Users/jcoeyman/cloudflare/terrarium",
+    "cwd": "/path/to/repo",
     "timeoutMs": 600000,
-    "maxDepth": 3
+    "background": true
   }
 }
 ```
 
-Also available:
+- `terrarium_spawn` — run one child agent. Pass `background: true` for anything that may take more than ~60s, then poll. Holding an MCP call open will time out.
+- `terrarium_status` — list recent runs, or status of a single `runId`.
+- `terrarium_read` — tail of a run log by `runId` or `logPath`.
 
-- `terrarium_status`: list recent runs and metadata.
-- `terrarium_read`: read the tail of a run log by `runId` or `logPath`.
+## How it works
 
-For long-running MCP child tasks, call `terrarium_spawn` with `background: true`. It returns immediately with `runId`, `pid`, and `logPath`; poll with `terrarium_status` or `terrarium_read` instead of holding the MCP call open.
+Terrarium is intentionally one level deep per local process. The top agent delegates messy work to one child process, preserving parent context.
 
-## Explanation
+Children inherit the parent environment and, for OpenCode, the same `~/.config/opencode/opencode.jsonc` MCP configuration. Terrarium sets `TERRARIUM_RUN_ID`, `TERRARIUM_DEPTH`, and `TERRARIUM_MAX_DEPTH` so composed children can inherit tools without recursing forever.
 
-Terrarium is intentionally one level deep per local process. The top agent delegates messy work to one child process, preserving parent context. If the child needs another shell, it can start its own Terrarium process; each process still owns only one child.
-
-Child processes inherit the parent environment and, for OpenCode, the same `~/.config/opencode/opencode.jsonc` MCP configuration. Terrarium sets `TERRARIUM_RUN_ID`, `TERRARIUM_DEPTH`, and `TERRARIUM_MAX_DEPTH` so composed children can inherit tools without recursing forever.
-
-## Contract
-
-1. The orchestrator accepts one task.
-2. It starts at most one child agent for that task.
-3. The child receives the same constraint.
-4. Logs are written to `~/.terrarium/runs/` unless `--log` is passed.
-5. Version stays `0.0.1`.
-
-## Composing depth
-
-Need more than one level? The child can start its own Terrarium:
+Need more depth? The child can start its own Terrarium:
 
 ```text
 terra task A
@@ -208,13 +162,10 @@ terra task A
     grandchild does B
 ```
 
-No single Terrarium process manages more than one child.
-
-## Name
-
-A terrarium is a tiny sealed world. This one grows subagents without letting them
-overrun the room.
+Each process still owns only one child. The system composes; no single process fans out.
 
 ## Why not just shell?
 
-you can. terrarium is for when the parent agent needs its context window to stay pristine across long-running sub-tasks. one fresh process, clean handoff, no pollution. depth guard stops infinite recursion. that’s it.
+You can. Terrarium is for when the parent agent needs its context window to stay pristine across long-running sub-tasks. One fresh process, clean handoff, no pollution. Depth guard stops infinite recursion. That's it.
+
+A terrarium is a tiny sealed world. This one grows subagents without letting them overrun the room.
