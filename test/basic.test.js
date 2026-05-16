@@ -4,7 +4,7 @@ import { execSync } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { capturePatch, childPrompt, finalizeWorkspace, isPidAlive, prepareWorkspace, reconcileRun, splitCommand } from "../src/core.js";
+import { capturePatch, childPrompt, defaultMreLogPath, finalizeWorkspace, isPidAlive, prepareWorkspace, readRun, reconcileRun, splitCommand } from "../src/core.js";
 
 test("builds a constrained child prompt", () => {
   assert.match(childPrompt("ship it", { depth: 1, maxDepth: 3 }), /Do not fan out/);
@@ -95,6 +95,19 @@ test("capturePatch includes untracked new files and excludes the workspace marke
   }
 });
 
+
+test("reads an explicit MRE side log", async () => {
+  const logPath = await defaultMreLogPath(`ter_test_mre_${Date.now()}`);
+  try {
+    writeFileSync(logPath, "mre side log");
+    const result = await readRun({ logPath, kind: "mre" });
+    assert.equal(result.kind, "mre");
+    assert.equal(result.logPath, logPath);
+    assert.equal(result.text, "mre side log");
+  } finally {
+    rmSync(logPath, { force: true });
+  }
+});
 
 test("reconcileRun marks stale running metadata orphaned when no pid is alive", async () => {
   const logDir = mkdtempSync(join(tmpdir(), "terra-log-"));

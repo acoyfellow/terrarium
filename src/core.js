@@ -49,6 +49,11 @@ export async function defaultLogPath(runId) {
   return join(LOG_DIR, `${runId}.log`);
 }
 
+export async function defaultMreLogPath(runId) {
+  await mkdir(LOG_DIR, { recursive: true });
+  return join(LOG_DIR, `${runId}.mre.log`);
+}
+
 export function metadataPath(runId) {
   return join(LOG_DIR, `${runId}.json`);
 }
@@ -99,7 +104,7 @@ function buildRun(opts, config) {
   const { task, dryRun = false, cwd = process.cwd(), stream = true } = opts;
   const isolation = opts.isolation || config.isolation || "none";
   const keepWorkspace = Boolean(opts.keepWorkspace ?? config.keepWorkspace ?? false);
-  return { runId, parentRunId, depth, maxDepth, agent, timeoutMs, task, dryRun, cwd, originalCwd: cwd, stream, logPath: opts.logPath, isolation, keepWorkspace };
+  return { runId, parentRunId, depth, maxDepth, agent, timeoutMs, task, dryRun, cwd, originalCwd: cwd, stream, logPath: opts.logPath, mreLogPath: opts.mreLogPath, isolation, keepWorkspace };
 }
 
 async function workspaceExcludes() {
@@ -179,10 +184,11 @@ async function prepareRun(opts = {}) {
   const workspace = await prepareWorkspace(run);
   const prompt = childPrompt(run.task, run);
   run.logPath ??= await defaultLogPath(run.runId);
+  run.mreLogPath ??= await defaultMreLogPath(run.runId);
   const startedAt = new Date().toISOString();
-  const base = { runId: run.runId, parentRunId: run.parentRunId, depth: run.depth, maxDepth: run.maxDepth, version: VERSION, agent: run.agent, task: run.task, cwd: run.cwd, originalCwd: run.originalCwd, isolation: run.isolation, workspace, logPath: run.logPath, startedAt, status: "running", git: await gitInfo(run.cwd) };
+  const base = { runId: run.runId, parentRunId: run.parentRunId, depth: run.depth, maxDepth: run.maxDepth, version: VERSION, agent: run.agent, task: run.task, cwd: run.cwd, originalCwd: run.originalCwd, isolation: run.isolation, workspace, logPath: run.logPath, mreLogPath: run.mreLogPath, startedAt, status: "running", git: await gitInfo(run.cwd) };
   await writeMetadata(base);
-  const header = `terrarium ${VERSION}\nrun: ${run.runId}\nparent: ${run.parentRunId ?? "none"}\ndepth: ${run.depth}/${run.maxDepth}\nagent: ${run.agent}\ntask: ${run.task}\ncwd: ${run.cwd}\noriginal cwd: ${run.originalCwd}\nisolation: ${run.isolation}${workspace ? ` (${workspace.path})` : ""}\nlog: ${run.logPath}\n\n`;
+  const header = `terrarium ${VERSION}\nrun: ${run.runId}\nparent: ${run.parentRunId ?? "none"}\ndepth: ${run.depth}/${run.maxDepth}\nagent: ${run.agent}\ntask: ${run.task}\ncwd: ${run.cwd}\noriginal cwd: ${run.originalCwd}\nisolation: ${run.isolation}${workspace ? ` (${workspace.path})` : ""}\nlog: ${run.logPath}\nmre log: ${run.mreLogPath}\n\n`;
   if (run.stream) process.stdout.write(header);
   await writeFile(run.logPath, header);
   return { run, parts, prompt, base, workspace };
@@ -248,7 +254,7 @@ export async function spawnTerrariumBackground(opts = {}) {
     return finishRun(base, { ok: true, dryRun: true, status: "done", invocation, exitCode: 0, stdoutTail: invocation, stderrTail: "", ...ws });
   }
 
-  const env = { ...process.env, TERRARIUM_RUN_ID: run.runId, TERRARIUM_PARENT_RUN_ID: run.parentRunId ?? "", TERRARIUM_DEPTH: String(run.depth), TERRARIUM_MAX_DEPTH: String(run.maxDepth) };
+  const env = { ...process.env, TERRARIUM_RUN_ID: run.runId, TERRARIUM_PARENT_RUN_ID: run.parentRunId ?? "", TERRARIUM_DEPTH: String(run.depth), TERRARIUM_MAX_DEPTH: String(run.maxDepth), TERRARIUM_MRE_LOG_PATH: run.mreLogPath };
   const child = spawn(parts[0], [...parts.slice(1), prompt], { stdio: ["ignore", "pipe", "pipe"], env, cwd: run.cwd, detached: true });
   const started = { ok: true, ...base, status: "running", background: true, pid: child.pid, childPid: child.pid, runnerPid: process.pid, lastSeenAt: new Date().toISOString() };
   await writeMetadata(started);
@@ -289,7 +295,7 @@ export async function runTerrarium(opts = {}) {
     let stdout = "";
     let stderr = "";
     let settled = false;
-    const env = { ...process.env, TERRARIUM_RUN_ID: run.runId, TERRARIUM_PARENT_RUN_ID: run.parentRunId ?? "", TERRARIUM_DEPTH: String(run.depth), TERRARIUM_MAX_DEPTH: String(run.maxDepth) };
+    const env = { ...process.env, TERRARIUM_RUN_ID: run.runId, TERRARIUM_PARENT_RUN_ID: run.parentRunId ?? "", TERRARIUM_DEPTH: String(run.depth), TERRARIUM_MAX_DEPTH: String(run.maxDepth), TERRARIUM_MRE_LOG_PATH: run.mreLogPath };
     const child = spawn(parts[0], [...parts.slice(1), prompt], { stdio: ["inherit", "pipe", "pipe"], env, cwd: run.cwd });
     const timer = run.timeoutMs > 0 ? setTimeout(() => child.kill("SIGTERM"), run.timeoutMs) : null;
 
@@ -323,11 +329,13 @@ export async function listRuns({ limit = 20 } = {}) {
   return { version: VERSION, logDir: LOG_DIR, runs };
 }
 
-export async function readRun({ runId, logPath, tailBytes = 20000 } = {}) {
+export async function readRun({ runId, logPath, kind = "terrarium", tailBytes = 20000 } = {}) {
   if (!logPath) {
     if (!runId) throw new Error("runId or logPath required");
-    logPath = join(LOG_DIR, `${runId}.log`);
+    if (kind === "terrarium") logPath = join(LOG_DIR, `${runId}.log`);
+    else if (kind === "mre") logPath = (await readMetadata(runId)).mreLogPath ?? join(LOG_DIR, `${runId}.mre.log`);
+    else throw new Error(`unknown log kind: ${kind}`);
   }
   const text = await readFile(logPath, "utf8");
-  return { logPath, text: tail(text, tailBytes) };
+  return { kind, logPath, text: tail(text, tailBytes) };
 }

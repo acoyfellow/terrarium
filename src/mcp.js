@@ -16,7 +16,8 @@ const tools = [
         maxDepth: { type: "number", description: "Maximum Terrarium recursion depth. Default: 3." },
         dryRun: { type: "boolean", description: "Print the child invocation without running it." },
         background: { type: "boolean", description: "Detach and return immediately with runId/pid/logPath. Required for long agent tasks; poll via terrarium_status." },
-        logPath: { type: "string", description: "Override log file path. Default: ~/.terrarium/runs/<runId>.log" }
+        logPath: { type: "string", description: "Override log file path. Default: ~/.terrarium/runs/<runId>.log" },
+        mreLogPath: { type: "string", description: "Override MRE log file path passed to the child as TERRARIUM_MRE_LOG_PATH. Default: ~/.terrarium/runs/<runId>.mre.log" }
       },
       required: ["task"]
     }
@@ -40,6 +41,7 @@ const tools = [
       properties: {
         runId: { type: "string", description: "Run ID returned by terrarium_spawn." },
         logPath: { type: "string", description: "Explicit log path. Use this or runId." },
+        kind: { type: "string", enum: ["terrarium", "mre"], description: "Log kind to read by runId. Default: terrarium." },
         tailBytes: { type: "number", description: "Bytes from the end of the log to return. Default: 20000." }
       }
     }

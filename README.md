@@ -101,6 +101,7 @@ terra --json "task"
 terra --log ./run.log "task"
 terra status
 terra read <runId>
+terra read <runId> mre
 terra --help
 terrarium-mcp
 ```
@@ -144,13 +145,13 @@ MCP tools:
 
 - `terrarium_spawn` — run one child agent. Pass `background: true` for anything that may take more than ~60s, then poll. Holding an MCP call open will time out.
 - `terrarium_status` — list recent runs, or status of a single `runId`.
-- `terrarium_read` — tail of a run log by `runId` or `logPath`.
+- `terrarium_read` — tail of a run log by `runId` or `logPath`; pass `kind: "mre"` to read the MRE side log.
 
 ## How it works
 
 Terrarium is intentionally one level deep per local process. The top agent delegates messy work to one child process, preserving parent context.
 
-Children inherit the parent environment and, for OpenCode, the same `~/.config/opencode/opencode.jsonc` MCP configuration. Terrarium sets `TERRARIUM_RUN_ID`, `TERRARIUM_DEPTH`, and `TERRARIUM_MAX_DEPTH` so composed children can inherit tools without recursing forever.
+Children inherit the parent environment and, for OpenCode, the same `~/.config/opencode/opencode.jsonc` MCP configuration. Terrarium sets `TERRARIUM_RUN_ID`, `TERRARIUM_DEPTH`, and `TERRARIUM_MAX_DEPTH` so composed children can inherit tools without recursing forever. It also allocates `~/.terrarium/runs/<runId>.mre.log`, returns it as `mreLogPath`, and passes that path to the child as `TERRARIUM_MRE_LOG_PATH` so MRE-aware runtimes can write a side log the parent can inspect.
 
 Need more depth? The child can start its own Terrarium:
 
