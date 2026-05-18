@@ -40,7 +40,7 @@ const tools = [
       type: "object",
       properties: {
         runId: { type: "string", description: "Run ID returned by terrarium_spawn." },
-        logPath: { type: "string", description: "Explicit log path. Use this or runId." },
+        logPath: { type: "string", description: "Recorded Terrarium log path. Use this or runId." },
         kind: { type: "string", enum: ["terrarium", "mre"], description: "Log kind to read by runId. Default: terrarium." },
         tailBytes: { type: "number", description: "Bytes from the end of the log to return. Default: 20000." }
       }

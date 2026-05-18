@@ -1,10 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { execSync } from "node:child_process";
+import { execFileSync, execSync } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { capturePatch, childPrompt, defaultMreLogPath, finalizeWorkspace, isPidAlive, prepareWorkspace, readRun, reconcileRun, splitCommand } from "../src/core.js";
+import { capturePatch, childPrompt, defaultMreLogPath, finalizeWorkspace, getRunStatus, isPidAlive, prepareWorkspace, readRun, reconcileRun, spawnTerrariumBackground, splitCommand } from "../src/core.js";
 
 test("builds a constrained child prompt", () => {
   assert.match(childPrompt("ship it", { depth: 1, maxDepth: 3 }), /Do not fan out/);
@@ -96,17 +96,52 @@ test("capturePatch includes untracked new files and excludes the workspace marke
 });
 
 
-test("reads an explicit MRE side log", async () => {
-  const logPath = await defaultMreLogPath(`ter_test_mre_${Date.now()}`);
+test("rejects an unrecorded log path", async () => {
+  const logPath = await defaultMreLogPath(`ter_test_unrecorded_${Date.now()}`);
   try {
-    writeFileSync(logPath, "mre side log");
-    const result = await readRun({ logPath, kind: "mre" });
-    assert.equal(result.kind, "mre");
-    assert.equal(result.logPath, logPath);
-    assert.equal(result.text, "mre side log");
+    writeFileSync(logPath, "not a terrarium log");
+    await assert.rejects(() => readRun({ logPath, kind: "mre" }), /not a recorded Terrarium log/);
   } finally {
     rmSync(logPath, { force: true });
   }
+});
+
+test("reads a recorded MRE side log", async () => {
+  const result = await spawnTerrariumBackground({ task: "noop", dryRun: true, agent: "node -e \"process.exit(0)\"" });
+  writeFileSync(result.mreLogPath, "mre side log");
+  const read = await readRun({ logPath: result.mreLogPath, kind: "mre" });
+  assert.equal(read.kind, "mre");
+  assert.equal(read.logPath, result.mreLogPath);
+  assert.equal(read.text, "mre side log");
+});
+
+test("rejects pre-existing custom MRE side logs", async () => {
+  const logPath = await defaultMreLogPath(`ter_test_existing_${Date.now()}`);
+  try {
+    writeFileSync(logPath, "private data");
+    await assert.rejects(() => spawnTerrariumBackground({ task: "noop", dryRun: true, mreLogPath: logPath }), /EEXIST/);
+  } finally {
+    rmSync(logPath, { force: true });
+  }
+});
+
+test("background runs finish after the launcher exits", async () => {
+  const coreUrl = new URL("../src/core.js", import.meta.url).href;
+  const agent = `${process.execPath} -e "setTimeout(() => console.log('supervised child complete'), 80)"`;
+  const launcher = `import { spawnTerrariumBackground } from ${JSON.stringify(coreUrl)};\nconst result = await spawnTerrariumBackground(${JSON.stringify({ task: "finish independently", agent })});\nconsole.log(JSON.stringify({ runId: result.runId }));`;
+  const output = execFileSync(process.execPath, ["--input-type=module", "--eval", launcher], { encoding: "utf8" });
+  const { runId } = JSON.parse(output.trim());
+  let status;
+  for (let i = 0; i < 100; i++) {
+    status = await getRunStatus({ runId, staleMs: 5000 });
+    if (status.status !== "running") break;
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  assert.equal(status.status, "done");
+  assert.equal(status.exitCode, 0);
+  assert.match(status.stdoutTail, /supervised child complete/);
+  const log = await readRun({ runId });
+  assert.match(log.text, /supervised child complete/);
 });
 
 test("reconcileRun marks stale running metadata orphaned when no pid is alive", async () => {

@@ -2,7 +2,8 @@ import { spawn } from "node:child_process";
 import { appendFile, cp, mkdir, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
-import { basename, dirname, join } from "node:path";
+import { basename, dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 
 export const VERSION = "0.0.1";
 export const HOME = join(homedir(), ".terrarium");
@@ -191,6 +192,7 @@ async function prepareRun(opts = {}) {
   const header = `terrarium ${VERSION}\nrun: ${run.runId}\nparent: ${run.parentRunId ?? "none"}\ndepth: ${run.depth}/${run.maxDepth}\nagent: ${run.agent}\ntask: ${run.task}\ncwd: ${run.cwd}\noriginal cwd: ${run.originalCwd}\nisolation: ${run.isolation}${workspace ? ` (${workspace.path})` : ""}\nlog: ${run.logPath}\nmre log: ${run.mreLogPath}\n\n`;
   if (run.stream) process.stdout.write(header);
   await writeFile(run.logPath, header);
+  await writeFile(run.mreLogPath, "", { flag: "wx" });
   return { run, parts, prompt, base, workspace };
 }
 
@@ -245,6 +247,40 @@ export async function getRunStatus({ runId, staleMs = 30000 } = {}) {
   return await reconcileRun(await readMetadata(runId), { staleMs });
 }
 
+export async function superviseTerrariumBackground({ run, parts, prompt, base, workspace, specPath } = {}) {
+  const env = { ...process.env, TERRARIUM_RUN_ID: run.runId, TERRARIUM_PARENT_RUN_ID: run.parentRunId ?? "", TERRARIUM_DEPTH: String(run.depth), TERRARIUM_MAX_DEPTH: String(run.maxDepth), TERRARIUM_MRE_LOG_PATH: run.mreLogPath };
+  const child = spawn(parts[0], [...parts.slice(1), prompt], { stdio: ["ignore", "pipe", "pipe"], env, cwd: run.cwd });
+  const started = { ok: true, ...base, status: "running", background: true, pid: child.pid, childPid: child.pid, supervisorPid: process.pid, lastSeenAt: new Date().toISOString() };
+  await writeMetadata(started);
+
+  return await new Promise((resolveRun) => {
+    const timer = run.timeoutMs > 0 ? setTimeout(() => child.kill("SIGTERM"), run.timeoutMs) : null;
+    let stdout = "";
+    let stderr = "";
+    let settled = false;
+    const finish = async (patch) => {
+      if (settled) return;
+      settled = true;
+      if (timer) clearTimeout(timer);
+      const ws = await finalizeWorkspace(workspace, base);
+      const result = await finishRun(base, { background: true, pid: child.pid, childPid: child.pid, supervisorPid: process.pid, stdoutTail: tail(stdout), stderrTail: tail(stderr), ...patch, ...ws });
+      if (specPath) await rm(specPath, { force: true });
+      resolveRun(result);
+    };
+    child.stdout.on("data", async (d) => { const s = String(d); stdout += s; await log(run.logPath, s); });
+    child.stderr.on("data", async (d) => { const s = String(d); stderr += s; await log(run.logPath, s); });
+    child.on("error", async (e) => {
+      await log(run.logPath, `\nerror: ${e.message}\n`);
+      await finish({ ok: false, status: "error", exitCode: 127, error: e.message });
+    });
+    child.on("close", async (code, signal) => {
+      const exitCode = code ?? (signal ? 128 : 0);
+      await log(run.logPath, `\nexit: ${exitCode}${signal ? ` signal: ${signal}` : ""}\n`);
+      await finish({ ok: exitCode === 0, status: exitCode === 0 ? "done" : "failed", exitCode, signal });
+    });
+  });
+}
+
 export async function spawnTerrariumBackground(opts = {}) {
   const { run, parts, prompt, base, workspace } = await prepareRun({ ...opts, stream: false });
   const invocation = `${parts.join(" ")} ${JSON.stringify(prompt)}\n`;
@@ -254,30 +290,12 @@ export async function spawnTerrariumBackground(opts = {}) {
     return finishRun(base, { ok: true, dryRun: true, status: "done", invocation, exitCode: 0, stdoutTail: invocation, stderrTail: "", ...ws });
   }
 
-  const env = { ...process.env, TERRARIUM_RUN_ID: run.runId, TERRARIUM_PARENT_RUN_ID: run.parentRunId ?? "", TERRARIUM_DEPTH: String(run.depth), TERRARIUM_MAX_DEPTH: String(run.maxDepth), TERRARIUM_MRE_LOG_PATH: run.mreLogPath };
-  const child = spawn(parts[0], [...parts.slice(1), prompt], { stdio: ["ignore", "pipe", "pipe"], env, cwd: run.cwd, detached: true });
-  const started = { ok: true, ...base, status: "running", background: true, pid: child.pid, childPid: child.pid, runnerPid: process.pid, lastSeenAt: new Date().toISOString() };
+  const specPath = join(LOG_DIR, `${run.runId}.background.json`);
+  await writeFile(specPath, JSON.stringify({ run, parts, prompt, base, workspace, specPath }, null, 2) + "\n", { flag: "wx" });
+  const supervisor = spawn(process.execPath, [fileURLToPath(new URL("./supervisor.js", import.meta.url)), specPath], { stdio: "ignore", detached: true });
+  supervisor.unref();
+  const started = { ok: true, ...base, status: "running", background: true, supervisorPid: supervisor.pid, lastSeenAt: new Date().toISOString() };
   await writeMetadata(started);
-
-  const timer = run.timeoutMs > 0 ? setTimeout(() => child.kill("SIGTERM"), run.timeoutMs) : null;
-  let stdout = "";
-  let stderr = "";
-  child.stdout.on("data", async (d) => { const s = String(d); stdout += s; await log(run.logPath, s); });
-  child.stderr.on("data", async (d) => { const s = String(d); stderr += s; await log(run.logPath, s); });
-  child.on("error", async (e) => {
-    if (timer) clearTimeout(timer);
-    await log(run.logPath, `\nerror: ${e.message}\n`);
-    const ws = await finalizeWorkspace(workspace, base);
-    await finishRun(base, { ok: false, status: "error", background: true, pid: child.pid, childPid: child.pid, runnerPid: process.pid, exitCode: 127, error: e.message, stdoutTail: tail(stdout), stderrTail: tail(stderr), ...ws });
-  });
-  child.on("close", async (code, signal) => {
-    if (timer) clearTimeout(timer);
-    const exitCode = code ?? (signal ? 128 : 0);
-    await log(run.logPath, `\nexit: ${exitCode}${signal ? ` signal: ${signal}` : ""}\n`);
-    const ws = await finalizeWorkspace(workspace, base);
-    await finishRun(base, { ok: exitCode === 0, status: exitCode === 0 ? "done" : "failed", background: true, pid: child.pid, childPid: child.pid, runnerPid: process.pid, exitCode, signal, stdoutTail: tail(stdout), stderrTail: tail(stderr), ...ws });
-  });
-  child.unref();
   return started;
 }
 
@@ -329,13 +347,28 @@ export async function listRuns({ limit = 20 } = {}) {
   return { version: VERSION, logDir: LOG_DIR, runs };
 }
 
-export async function readRun({ runId, logPath, kind = "terrarium", tailBytes = 20000 } = {}) {
-  if (!logPath) {
-    if (!runId) throw new Error("runId or logPath required");
-    if (kind === "terrarium") logPath = join(LOG_DIR, `${runId}.log`);
-    else if (kind === "mre") logPath = (await readMetadata(runId)).mreLogPath ?? join(LOG_DIR, `${runId}.mre.log`);
-    else throw new Error(`unknown log kind: ${kind}`);
+async function recordedLogPath({ runId, logPath, kind }) {
+  if (kind !== "terrarium" && kind !== "mre") throw new Error(`unknown log kind: ${kind}`);
+  if (runId) {
+    const meta = await readMetadata(runId);
+    const expected = kind === "terrarium" ? meta.logPath ?? join(LOG_DIR, `${runId}.log`) : meta.mreLogPath ?? join(LOG_DIR, `${runId}.mre.log`);
+    if (logPath && resolve(logPath) !== resolve(expected)) throw new Error("logPath does not match the recorded log for this run");
+    return expected;
   }
-  const text = await readFile(logPath, "utf8");
-  return { kind, logPath, text: tail(text, tailBytes) };
+  if (!logPath) throw new Error("runId or recorded logPath required");
+  await mkdir(LOG_DIR, { recursive: true });
+  const requested = resolve(logPath);
+  const files = (await readdir(LOG_DIR)).filter((file) => file.endsWith(".json"));
+  for (const file of files) {
+    const meta = JSON.parse(await readFile(join(LOG_DIR, file), "utf8"));
+    const expected = kind === "terrarium" ? meta.logPath : meta.mreLogPath;
+    if (expected && resolve(expected) === requested) return expected;
+  }
+  throw new Error("logPath is not a recorded Terrarium log");
+}
+
+export async function readRun({ runId, logPath, kind = "terrarium", tailBytes = 20000 } = {}) {
+  const readablePath = await recordedLogPath({ runId, logPath, kind });
+  const text = await readFile(readablePath, "utf8");
+  return { kind, logPath: readablePath, text: tail(text, tailBytes) };
 }
