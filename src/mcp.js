@@ -164,13 +164,11 @@ async function handle(msg) {
   if (msg.id) return error(msg.id, -32601, `unknown method: ${msg.method}`);
 }
 
-const isMainEntry = (() => {
-  try {
-    return import.meta.url === `file://${process.argv[1]}` || process.argv[1]?.endsWith("/mcp.js");
-  } catch {
-    return false;
-  }
-})();
+// Always attach stdio when invoked as this executable. The previous
+// import.meta.url/process.argv comparison was brittle when launchers resolve a
+// symlink to terrarium-mcp differently from Node, which made Pi see an MCP
+// process that exited before initialize.
+const isMainEntry = /(?:^|\/)(?:mcp\.js|terrarium-mcp)$/.test(process.argv[1] ?? "");
 
 if (isMainEntry) {
   const rl = createInterface({ input: process.stdin });
