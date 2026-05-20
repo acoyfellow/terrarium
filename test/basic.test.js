@@ -4,11 +4,77 @@ import { execFileSync, execSync } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { capturePatch, childPrompt, defaultMreLogPath, finalizeWorkspace, getRunStatus, isPidAlive, prepareWorkspace, readRun, reconcileRun, spawnTerrariumBackground, splitCommand } from "../src/core.js";
+import { capturePatch, childPrompt, defaultMreLogPath, finalizeWorkspace, getRunStatus, isPidAlive, prepareWorkspace, readRun, reconcileRun, resolveAgent, resolvePromptProfile, runTerrarium, spawnTerrariumBackground, splitCommand, READ_ONLY_AGENT } from "../src/core.js";
 
 test("builds a constrained child prompt", () => {
   assert.match(childPrompt("ship it", { depth: 1, maxDepth: 3 }), /Do not fan out/);
   assert.deepEqual(splitCommand('node -e "console.log(1)"'), ["node", "-e", "console.log(1)"]);
+});
+
+test("childPrompt default profile keeps the full structured contract", () => {
+  const out = childPrompt("ship it", { depth: 1, maxDepth: 3, runId: "r1", parentRunId: null });
+  assert.match(out, /You are a Terrarium child agent\./);
+  assert.match(out, /Do not fan out\./);
+  assert.match(out, /Summary:\nChanged files:\nVerification:\nFollow-ups:/);
+  assert.match(out, /Task:\nship it/);
+});
+
+test("childPrompt minimal profile drops the role banner and the depth/run-id ceremony", () => {
+  const out = childPrompt("ship it", { profile: "minimal" });
+  assert.match(out, /Terrarium child\. Single bounded task\. Do not spawn subagents\./);
+  assert.match(out, /Reply with: Summary, Changed files, Verification\./);
+  assert.match(out, /Task:\nship it/);
+  assert.doesNotMatch(out, /You are a Terrarium child agent/);
+  assert.doesNotMatch(out, /Run ID:/);
+  assert.doesNotMatch(out, /Current Terrarium depth/);
+  const def = childPrompt("ship it", { profile: "default", depth: 1, maxDepth: 3 });
+  assert.ok(out.length < def.length, `minimal (${out.length}) should be shorter than default (${def.length})`);
+});
+
+test("childPrompt rejects unknown profile names", () => {
+  assert.throws(() => childPrompt("x", { profile: "tiny" }), /unknown prompt profile: tiny/);
+  assert.throws(() => resolvePromptProfile("nope"), /unknown prompt profile/);
+});
+
+test("resolveAgent precedence: explicit > readOnly > env > config > default", () => {
+  assert.equal(resolveAgent({}, { env: {}, config: {} }), "opencode run");
+  assert.equal(resolveAgent({}, { env: {}, config: { defaultAgent: "pi run" } }), "pi run");
+  assert.equal(resolveAgent({}, { env: { TERRARIUM_AGENT: "claude run" }, config: { defaultAgent: "pi run" } }), "claude run");
+  assert.equal(resolveAgent({ readOnly: true }, { env: { TERRARIUM_AGENT: "claude run" }, config: { defaultAgent: "pi run" } }), READ_ONLY_AGENT);
+  assert.equal(resolveAgent({ agent: "custom run", readOnly: true }, { env: { TERRARIUM_AGENT: "claude run" }, config: { defaultAgent: "pi run" } }), "custom run");
+});
+
+test("READ_ONLY_AGENT resolves to opencode explore mode", () => {
+  assert.equal(READ_ONLY_AGENT, "opencode run --agent explore");
+});
+
+test("runTerrarium dry-run wires readOnly preset into the child invocation when no agent is given", async () => {
+  const result = await runTerrarium({ task: "dig", readOnly: true, dryRun: true, stream: false });
+  assert.equal(result.ok, true);
+  assert.equal(result.agent, "opencode run --agent explore");
+  assert.equal(result.readOnly, true);
+  assert.match(result.invocation, /opencode run --agent explore /);
+});
+
+test("runTerrarium dry-run: explicit --agent overrides readOnly preset", async () => {
+  const result = await runTerrarium({ task: "dig", agent: "pi run", readOnly: true, dryRun: true, stream: false });
+  assert.equal(result.agent, "pi run");
+  assert.equal(result.readOnly, false);
+  assert.match(result.invocation, /^pi run /);
+});
+
+test("runTerrarium dry-run minimal profile produces a leaner child invocation", async () => {
+  const def = await runTerrarium({ task: "dig", profile: "default", dryRun: true, stream: false });
+  const min = await runTerrarium({ task: "dig", profile: "minimal", dryRun: true, stream: false });
+  assert.equal(def.profile, "default");
+  assert.equal(min.profile, "minimal");
+  assert.ok(min.invocation.length < def.invocation.length, `minimal invocation (${min.invocation.length}) should be shorter than default (${def.invocation.length})`);
+  assert.match(min.invocation, /Single bounded task\. Do not spawn subagents\./);
+  assert.doesNotMatch(min.invocation, /You are a Terrarium child agent/);
+});
+
+test("runTerrarium rejects an unknown profile name", async () => {
+  await assert.rejects(() => runTerrarium({ task: "x", profile: "tiny", dryRun: true, stream: false }), /unknown prompt profile/);
 });
 
 
@@ -113,6 +179,26 @@ test("reads a recorded MRE side log", async () => {
   assert.equal(read.kind, "mre");
   assert.equal(read.logPath, result.mreLogPath);
   assert.equal(read.text, "mre side log");
+});
+
+test("records git metadata when cwd is a repo and null when it is not", async () => {
+  const repo = mkdtempSync(join(tmpdir(), "terra-git-meta-"));
+  const nonRepo = mkdtempSync(join(tmpdir(), "terra-no-git-"));
+  try {
+    initRepo(repo);
+    const inRepo = await spawnTerrariumBackground({ task: "noop", dryRun: true, cwd: repo, agent: "node -e \"process.exit(0)\"" });
+    assert.ok(inRepo.git, "expected git metadata when cwd is a repo");
+    assert.equal(typeof inRepo.git.root, "string");
+    assert.ok(inRepo.git.root.length > 0);
+    assert.match(inRepo.git.head ?? "", /^[0-9a-f]{7,}/);
+    assert.equal(typeof inRepo.git.status, "string");
+
+    const outside = await spawnTerrariumBackground({ task: "noop", dryRun: true, cwd: nonRepo, agent: "node -e \"process.exit(0)\"" });
+    assert.equal(outside.git, null);
+  } finally {
+    try { rmSync(repo, { recursive: true, force: true }); } catch {}
+    try { rmSync(nonRepo, { recursive: true, force: true }); } catch {}
+  }
 });
 
 test("rejects pre-existing custom MRE side logs", async () => {

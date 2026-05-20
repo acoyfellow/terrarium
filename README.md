@@ -69,6 +69,23 @@ terra --agent "pi run" "fix the failing build"
 TERRARIUM_AGENT="opencode run" terra "add tests for the parser"
 ```
 
+**Pick a read-only child for read-only digs.** Wires the child to `opencode run --agent explore` — read + grep + glob, no write/edit. Explicit `--agent` always wins.
+
+```sh
+terra --read-only "find every place we handle X"
+terra --read-only --profile minimal "design dig: read 8 files, return a plan"
+```
+
+**Pick a leaner prompt profile.** Orthogonal to the agent.
+
+```sh
+terra --profile minimal "count uses of foo() and where"
+```
+
+`default` — full structured contract (`Summary / Changed files / Verification / Follow-ups`) and anti-fanout rule. Best for write tasks.
+
+`minimal` — lean shell; cuts ~50% of prompt-shell tokens per spawn. Best for read-only digs where the structured return is overkill.
+
 **Isolate the workspace.** By default the child writes in `--cwd`. For parallel write-capable side quests, give each child its own:
 
 ```sh
@@ -92,6 +109,8 @@ Workspace isolation is not security sandboxing. It stops parallel agents from st
 ```sh
 terra "task"
 terra --agent "opencode run" "task"
+terra --read-only "task"
+terra --profile minimal "task"
 terra --cwd /path/to/repo "task"
 terra --timeout-ms 600000 "task"
 terra --max-depth 3 "task"
@@ -108,7 +127,9 @@ terrarium-mcp
 
 Options:
 
-- `--agent <cmd>` — child command. Default: `$TERRARIUM_AGENT` or `opencode run`.
+- `--agent <cmd>` — child command. Default: `$TERRARIUM_AGENT` or `opencode run`. Explicit `--agent` overrides `--read-only`.
+- `--read-only` — use the read-only child preset (`opencode run --agent explore`) when no explicit `--agent` is given.
+- `--profile <name>` — child prompt profile: `default` or `minimal`. Default: `default`. Orthogonal to `--agent` / `--read-only`.
 - `--cwd <path>` — child working directory. Default: current directory.
 - `--timeout-ms <n>` — kill child after `n` milliseconds. Default: config or none.
 - `--max-depth <n>` — maximum Terrarium depth. Default: config or `3`.
@@ -117,6 +138,8 @@ Options:
 - `--dry-run` — print the child invocation without running it.
 - `--json` — print a structured result for agents.
 - `--log <path>` — write the transcript to a specific file.
+
+Agent resolution precedence (highest first): explicit `--agent` / `agent` → `--read-only` / `readOnly` preset → `$TERRARIUM_AGENT` → `config.defaultAgent` → built-in `opencode run`.
 
 Config at `~/.terrarium/config.json`:
 
@@ -136,6 +159,8 @@ MCP tools:
   "arguments": {
     "task": "inspect this repo and summarize the test command",
     "agent": "opencode run",
+    "readOnly": false,
+    "profile": "default",
     "cwd": "/path/to/repo",
     "timeoutMs": 600000,
     "background": true
@@ -143,9 +168,17 @@ MCP tools:
 }
 ```
 
-- `terrarium_spawn` — run one child agent. Pass `background: true` for anything that may take more than ~60s, then poll. Holding an MCP call open will time out.
+- `terrarium_spawn` — run one child agent. Pass `background: true` for anything that may take more than ~60s, then poll. Holding an MCP call open will time out. Pass `readOnly: true` for read-only digs (resolves to `opencode run --agent explore`) and `profile: "minimal"` for a leaner prompt shell. Explicit `agent` overrides `readOnly`.
 - `terrarium_status` — list recent runs, or status of a single `runId`.
 - `terrarium_read` — tail of a run log by `runId` or `logPath`; pass `kind: "mre"` to read the MRE side log.
+
+By default, `terrarium_spawn` and `terrarium_status` return a concise projection so the parent's tool-result transcript stays small. The full envelope (cwd, agent, git, workspace, paths, full tails) is always recorded on disk under `~/.terrarium/runs/<runId>.json`; fetch the structured envelope inline with `terrarium_status({ runId, verbose: true })`. Pass `verbose: true` on any status/spawn call to receive the unprojected shape inline.
+
+What concise responses preserve for failure triage:
+
+- `terrarium_spawn` — `ok`, `runId`, `status`, `background`, `exitCode`, `signal`, `error`, `note`, `startedAt`, `finishedAt`, plus a capped `tail` (2 KB) and `errTail` (500 B). When the tail is clipped, `tailTruncated: true` is set so the parent knows to call `terrarium_read` for the rest.
+- `terrarium_status({ runId })` — `runId`, `status`, `ok`, `background`, `alive`, `exitCode`, `signal`, `error`, `note`, `logAgeMs`, `startedAt`, `finishedAt`, `orphanedAt`.
+- `terrarium_status({})` — `{ count, runs: [...] }` with each run carrying the same triage fields plus a truncated `task` echo (max 80 chars).
 
 ## How it works
 

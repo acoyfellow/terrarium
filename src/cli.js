@@ -10,6 +10,8 @@ The child agent may be Terrarium too, with depth guards.
 Usage:
   terra "task to run"
   terra --agent "opencode run" "task"
+  terra --read-only "task"
+  terra --profile minimal "task"
   terra --dry-run "task"
   terra --json "task"
   terra --isolation copy "task"
@@ -19,7 +21,12 @@ Usage:
   terra read <runId> mre [tailBytes]
 
 Options:
-  --agent <cmd>      Child command. Default: config, $TERRARIUM_AGENT, or "opencode run"
+  --agent <cmd>      Child command. Default: config, $TERRARIUM_AGENT, or "opencode run".
+                     Explicit --agent overrides --read-only.
+  --read-only        Use the read-only child preset (opencode run --agent explore)
+                     when no explicit --agent is given. Good for read-only digs.
+  --profile <name>   Child prompt profile: default or minimal. Default: default.
+                     Orthogonal to --agent / --read-only.
   --cwd <path>       Child working directory. Default: current directory
   --timeout-ms <n>   Kill child after n milliseconds. Default: config or no timeout
   --max-depth <n>    Maximum Terrarium depth. Default: config or 3
@@ -42,6 +49,8 @@ function parse(argv) {
     else if (a === "--dry-run") out.dryRun = true;
     else if (a === "--json") out.json = true;
     else if (a === "--keep-workspace") out.keepWorkspace = true;
+    else if (a === "--read-only" || a === "--readonly") out.readOnly = true;
+    else if (a === "--profile") out.profile = argv[++i];
     else if (a === "--agent") out.agent = argv[++i];
     else if (a === "--cwd") out.cwd = argv[++i];
     else if (a === "--timeout-ms") out.timeoutMs = Number(argv[++i]);

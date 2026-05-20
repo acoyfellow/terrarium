@@ -19,7 +19,36 @@ export function makeRunId() {
   return `ter_${new Date().toISOString().replace(/[-:.TZ]/g, "")}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
-export function childPrompt(task, { depth, maxDepth, runId, parentRunId } = {}) {
+export const PROMPT_PROFILES = ["default", "minimal"];
+export const DEFAULT_PROMPT_PROFILE = "default";
+
+export const READ_ONLY_AGENT = "opencode run --agent explore";
+
+export function resolvePromptProfile(profile) {
+  if (profile == null || profile === "") return DEFAULT_PROMPT_PROFILE;
+  if (!PROMPT_PROFILES.includes(profile)) throw new Error(`unknown prompt profile: ${profile} (expected one of: ${PROMPT_PROFILES.join(", ")})`);
+  return profile;
+}
+
+export function resolveAgent({ agent, readOnly } = {}, { env = process.env, config = {} } = {}) {
+  if (agent) return agent;
+  if (readOnly) return READ_ONLY_AGENT;
+  if (env.TERRARIUM_AGENT) return env.TERRARIUM_AGENT;
+  if (config.defaultAgent) return config.defaultAgent;
+  return "opencode run";
+}
+
+export function childPrompt(task, opts = {}) {
+  const { depth, maxDepth, runId, parentRunId, profile } = opts;
+  const resolved = resolvePromptProfile(profile);
+  if (resolved === "minimal") {
+    return `Terrarium child. Single bounded task. Do not spawn subagents.
+
+Reply with: Summary, Changed files, Verification.
+
+Task:
+${task}`;
+  }
   return `You are a Terrarium child agent.
 
 Rules:
@@ -80,14 +109,23 @@ function tail(text, max = 12000) {
   return text.length > max ? text.slice(-max) : text;
 }
 
+async function gitOutput(cwd, args) {
+  const r = await spawnCapture("git", args, { cwd });
+  return r.code === 0 ? r.stdout.trim() : null;
+}
+
+async function gitRoot(cwd) {
+  return gitOutput(cwd, ["rev-parse", "--show-toplevel"]);
+}
+
 async function gitInfo(cwd) {
-  async function git(args) {
-    const r = await spawnCapture("git", args, { cwd });
-    return r.code === 0 ? r.stdout.trim() : null;
-  }
-  const root = await git(["rev-parse", "--show-toplevel"]);
+  const [root, head, status] = await Promise.all([
+    gitOutput(cwd, ["rev-parse", "--show-toplevel"]),
+    gitOutput(cwd, ["rev-parse", "HEAD"]),
+    gitOutput(cwd, ["status", "--short"]),
+  ]);
   if (!root) return null;
-  return { root, head: await git(["rev-parse", "HEAD"]), status: await git(["status", "--short"]) };
+  return { root, head, status };
 }
 
 async function writeMetadata(meta) {
@@ -100,12 +138,15 @@ function buildRun(opts, config) {
   const parentRunId = opts.parentRunId || process.env.TERRARIUM_RUN_ID || null;
   const depth = Number(opts.depth ?? process.env.TERRARIUM_DEPTH ?? 0) + 1;
   const maxDepth = Number(opts.maxDepth ?? process.env.TERRARIUM_MAX_DEPTH ?? config.maxDepth ?? 3);
-  const agent = opts.agent || process.env.TERRARIUM_AGENT || config.defaultAgent || "opencode run";
+  const requestedReadOnly = Boolean(opts.readOnly ?? config.readOnly ?? false);
+  const agent = resolveAgent({ agent: opts.agent, readOnly: requestedReadOnly }, { env: process.env, config });
+  const readOnly = requestedReadOnly && !opts.agent;
+  const profile = resolvePromptProfile(opts.profile ?? config.profile);
   const timeoutMs = Number(opts.timeoutMs ?? config.timeoutMs ?? 0);
   const { task, dryRun = false, cwd = process.cwd(), stream = true } = opts;
   const isolation = opts.isolation || config.isolation || "none";
   const keepWorkspace = Boolean(opts.keepWorkspace ?? config.keepWorkspace ?? false);
-  return { runId, parentRunId, depth, maxDepth, agent, timeoutMs, task, dryRun, cwd, originalCwd: cwd, stream, logPath: opts.logPath, mreLogPath: opts.mreLogPath, isolation, keepWorkspace };
+  return { runId, parentRunId, depth, maxDepth, agent, profile, readOnly, timeoutMs, task, dryRun, cwd, originalCwd: cwd, stream, logPath: opts.logPath, mreLogPath: opts.mreLogPath, isolation, keepWorkspace };
 }
 
 async function workspaceExcludes() {
@@ -130,7 +171,7 @@ export async function prepareWorkspace(run) {
     return { type: "copy", path: workspacePath, source: run.originalCwd, cleanup: !run.keepWorkspace };
   }
   if (run.isolation === "worktree") {
-    const root = (await gitInfo(run.originalCwd))?.root;
+    const root = await gitRoot(run.originalCwd);
     if (!root) throw new Error("--isolation worktree requires a git repository");
     const workspacePath = join(WORKSPACE_DIR, `${run.runId}-${basename(root)}`);
     const branch = `terrarium/${run.runId}`;
@@ -187,9 +228,9 @@ async function prepareRun(opts = {}) {
   run.logPath ??= await defaultLogPath(run.runId);
   run.mreLogPath ??= await defaultMreLogPath(run.runId);
   const startedAt = new Date().toISOString();
-  const base = { runId: run.runId, parentRunId: run.parentRunId, depth: run.depth, maxDepth: run.maxDepth, version: VERSION, agent: run.agent, task: run.task, cwd: run.cwd, originalCwd: run.originalCwd, isolation: run.isolation, workspace, logPath: run.logPath, mreLogPath: run.mreLogPath, startedAt, status: "running", git: await gitInfo(run.cwd) };
+  const base = { runId: run.runId, parentRunId: run.parentRunId, depth: run.depth, maxDepth: run.maxDepth, version: VERSION, agent: run.agent, profile: run.profile, readOnly: run.readOnly, task: run.task, cwd: run.cwd, originalCwd: run.originalCwd, isolation: run.isolation, workspace, logPath: run.logPath, mreLogPath: run.mreLogPath, startedAt, status: "running", git: await gitInfo(run.cwd) };
   await writeMetadata(base);
-  const header = `terrarium ${VERSION}\nrun: ${run.runId}\nparent: ${run.parentRunId ?? "none"}\ndepth: ${run.depth}/${run.maxDepth}\nagent: ${run.agent}\ntask: ${run.task}\ncwd: ${run.cwd}\noriginal cwd: ${run.originalCwd}\nisolation: ${run.isolation}${workspace ? ` (${workspace.path})` : ""}\nlog: ${run.logPath}\nmre log: ${run.mreLogPath}\n\n`;
+  const header = `terrarium ${VERSION}\nrun: ${run.runId}\nparent: ${run.parentRunId ?? "none"}\ndepth: ${run.depth}/${run.maxDepth}\nagent: ${run.agent}${run.readOnly ? " (read-only preset)" : ""}\nprofile: ${run.profile}\ntask: ${run.task}\ncwd: ${run.cwd}\noriginal cwd: ${run.originalCwd}\nisolation: ${run.isolation}${workspace ? ` (${workspace.path})` : ""}\nlog: ${run.logPath}\nmre log: ${run.mreLogPath}\n\n`;
   if (run.stream) process.stdout.write(header);
   await writeFile(run.logPath, header);
   await writeFile(run.mreLogPath, "", { flag: "wx" });
