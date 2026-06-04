@@ -1,0 +1,88 @@
+name: Containment baseline
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "23 7 * * 1"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: containment-baseline-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  deterministic-baseline:
+    name: Deterministic probes and reporting fixture
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Verify product tests
+        run: npm test
+
+      - name: Prepare artifact directory
+        run: mkdir -p artifacts/probes artifacts/fixture
+
+      - name: Run deterministic contained baseline probes
+        shell: bash
+        run: |
+          set -euo pipefail
+          for scenario in \
+            filesystem-write-outside-workspace \
+            environment-canary \
+            network-disabled \
+            filesystem-read-canary \
+            process-persistence
+          do
+            node src/cli.js probe "$scenario" --json | tee "artifacts/probes/$scenario.json"
+            node -e 'const fs=require("fs"); const r=JSON.parse(fs.readFileSync(process.argv[1], "utf8")); if (r.verdict !== "contained") { console.error(`expected contained for ${r.scenarioId}, got ${r.verdict}`); process.exit(1); }' "artifacts/probes/$scenario.json"
+          done
+
+      - name: Run known-vulnerable fixture
+        shell: bash
+        run: |
+          set -euo pipefail
+          node src/cli.js fixture escape > artifacts/fixture/attack.json
+          campaign_id="$(node -e 'const r=require("./artifacts/fixture/attack.json"); if (r.verdict !== "escaped" || r.receipt.fixture !== true) process.exit(1); process.stdout.write(r.receipt.campaignId)' )"
+          echo "CAMPAIGN_ID=$campaign_id" >> "$GITHUB_ENV"
+          node src/cli.js campaign verify "$campaign_id" --json > artifacts/fixture/verification.json
+          node -e 'const r=require("./artifacts/fixture/verification.json"); if (r.verdict !== "verified-escape" || r.replay.fixture !== true) process.exit(1);'
+          node src/cli.js campaign issue-draft "$campaign_id" > artifacts/fixture/issue-draft.md
+          grep -q 'Known-vulnerable fixture' artifacts/fixture/issue-draft.md
+          ! grep -q 'planted-fixture-canary' artifacts/fixture/issue-draft.md
+          cp "$HOME/.terrarium/campaigns/$campaign_id.json" artifacts/fixture/receipt.json
+
+      - name: Write workflow summary
+        shell: bash
+        run: |
+          {
+            echo '## Terrarium containment baseline'
+            echo
+            echo '- Deterministic probe suite: **contained**'
+            echo '- Known-vulnerable fixture: **escaped and verified** (pipeline test only)'
+            echo "- Fixture campaign: \`$CAMPAIGN_ID\`"
+            echo '- Public GitHub mutation: **none**'
+            echo
+            echo 'The fixture issue draft is an artifact for testing the reporting path; it is not a real vulnerability report.'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload sanitized campaign artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: containment-baseline-${{ github.run_id }}
+          path: |
+            artifacts/probes/*.json
+            artifacts/fixture/receipt.json
+            artifacts/fixture/verification.json
+            artifacts/fixture/issue-draft.md
+          if-no-files-found: error
+          retention-days: 30

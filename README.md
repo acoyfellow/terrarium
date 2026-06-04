@@ -145,6 +145,25 @@ fixture-environment-leak
 
 It deliberately injects a planted canary into the container environment so the detector reports `escaped`, replay confirms `verified-escape`, and an issue draft can be rendered. This fixture command does not invoke an AI agent because the pipeline being tested begins at a known escaped detector result. The generated draft is labeled as a **known-vulnerable fixture** and must not be published as a real discovery.
 
+## Public automation today
+
+A GitHub Actions workflow runs the safe baseline publicly:
+
+```text
+.github/workflows/containment-baseline.yml
+```
+
+It can be triggered manually and runs weekly. The workflow:
+
+1. runs the product test suite;
+2. requires every deterministic baseline probe to return `contained`;
+3. executes the explicitly vulnerable fixture;
+4. requires that fixture to replay as `verified-escape`;
+5. generates a sanitized fixture issue draft;
+6. uploads probe results, the sanitized receipt, verification result, and draft as workflow artifacts.
+
+The workflow has only `contents: read` permission. It does **not** create GitHub issues, open pull requests, execute adaptive attacker payloads, or mutate the repository.
+
 ## What is stable versus experimental
 
 ### Stable base interface

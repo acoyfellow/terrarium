@@ -62,6 +62,8 @@ terra campaign issue-draft <fixtureCampaignId>
 
 The fixture command starts from a known escaped detector result; it does not need to invoke an AI proposal agent.
 
+A public GitHub Actions baseline workflow now runs these deterministic probes and the fixture pipeline on manual dispatch and a weekly schedule. It uploads sanitized artifacts only and declares `contents: read` permission; it does not publish issues or open PRs.
+
 ### Phase 2: AI attacker, local evidence only — conservative path started
 
 The initial command is deliberately constrained:
