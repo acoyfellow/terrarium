@@ -21,25 +21,22 @@ test("attack proposal contract is narrow and machine parseable", () => {
   assert.throws(() => parseAttackProposal(`${ATTACK_RESULT_MARKER}{"run":false,"reason":"no"}`), /declined/);
 });
 
-test("docker scenario policy uses explicit hostile-run restrictions", () => {
-  const workspace = mkdtempSync(join(tmpdir(), "terra-sandbox-args-"));
-  try {
-    const args = dockerScenarioArgs({ scenarioId: "environment-canary", workspacePath: workspace, image: DEFAULT_SANDBOX_IMAGE, containerName: "probe-test" });
-    assert.deepEqual(args.slice(0, 4), ["run", "--rm", "--name", "probe-test"]);
-    assert.ok(args.includes("--network"));
-    assert.ok(args.includes("none"));
-    assert.ok(args.includes("--read-only"));
-    assert.ok(args.includes("--cap-drop"));
-    assert.ok(args.includes("ALL"));
-    assert.ok(args.includes("no-new-privileges"));
-    assert.ok(args.includes("65534:65534"));
-    assert.ok(args.includes(DEFAULT_SANDBOX_IMAGE));
-    assert.doesNotMatch(args.join(" "), /TERRARIUM_HOST_CANARY/);
-    const persistenceArgs = dockerScenarioArgs({ scenarioId: "process-persistence", workspacePath: workspace, image: DEFAULT_SANDBOX_IMAGE, containerName: "persist-test", autoRemove: false });
-    assert.equal(persistenceArgs.includes("--rm"), false);
-  } finally {
-    rmSync(workspace, { recursive: true, force: true });
-  }
+test("docker scenario policy uses explicit hostile-run restrictions without host bind mounts", () => {
+  const args = dockerScenarioArgs({ scenarioId: "environment-canary", image: DEFAULT_SANDBOX_IMAGE, containerName: "probe-test" });
+  assert.deepEqual(args.slice(0, 4), ["run", "--rm", "--name", "probe-test"]);
+  assert.ok(args.includes("--network"));
+  assert.ok(args.includes("none"));
+  assert.ok(args.includes("--read-only"));
+  assert.ok(args.includes("--cap-drop"));
+  assert.ok(args.includes("ALL"));
+  assert.ok(args.includes("no-new-privileges"));
+  assert.ok(args.includes("65534:65534"));
+  assert.ok(args.includes(DEFAULT_SANDBOX_IMAGE));
+  assert.ok(args.includes("-e"));
+  assert.equal(args.includes("--mount"), false);
+  assert.equal(args.includes("--env"), false);
+  const persistenceArgs = dockerScenarioArgs({ scenarioId: "process-persistence", image: DEFAULT_SANDBOX_IMAGE, containerName: "persist-test", autoRemove: false });
+  assert.equal(persistenceArgs.includes("--rm"), false);
 });
 
 test("docker sandbox contains deterministic baseline probes", { timeout: 120000 }, async (t) => {

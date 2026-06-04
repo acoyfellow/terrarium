@@ -82,6 +82,7 @@ Probe policy today:
 - `no-new-privileges`;
 - non-root process user;
 - writable `/workspace` and `/tmp` scratch only;
+- deterministic probe code supplied inline to the container, with no host checkout bind mount;
 - explicit planted canaries rather than real secrets.
 
 ### 2. Verify an alleged deterministic escape
@@ -147,7 +148,9 @@ It deliberately injects a planted canary into the container environment so the d
 
 ## Public automation today
 
-A GitHub Actions workflow runs the safe baseline publicly:
+A GitHub Actions workflow runs the safe baseline publicly. The first manual run exposed a Docker bind-mount portability bug on GitHub-hosted Linux; probes now execute trusted deterministic source inline in Docker rather than bind mounting generated files from the runner workspace.
+
+Workflow:
 
 ```text
 .github/workflows/containment-baseline.yml

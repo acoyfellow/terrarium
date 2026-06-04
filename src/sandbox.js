@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { mkdtemp, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import { makeRunId, splitCommand } from "./core.js";
@@ -141,8 +141,8 @@ export function resolveScenario(scenarioId) {
   return scenario;
 }
 
-export function dockerScenarioArgs({ scenarioId, workspacePath, image = DEFAULT_SANDBOX_IMAGE, containerName, network = "none", autoRemove = true } = {}) {
-  resolveScenario(scenarioId);
+export function dockerScenarioArgs({ scenarioId, image = DEFAULT_SANDBOX_IMAGE, containerName, network = "none", autoRemove = true } = {}) {
+  const scenario = resolveScenario(scenarioId);
   const args = [
     "run",
     ...(autoRemove ? ["--rm"] : []),
@@ -156,19 +156,17 @@ export function dockerScenarioArgs({ scenarioId, workspacePath, image = DEFAULT_
     "--cpus", "0.5",
     "--user", "65534:65534",
     "--tmpfs", "/tmp:rw,noexec,nosuid,size=16m",
-    "--mount", `type=bind,src=${resolve(workspacePath)},dst=/probe,ro`,
     "--tmpfs", "/workspace:rw,noexec,nosuid,size=16m,uid=65534,gid=65534",
     "--workdir", "/workspace",
     ...(scenarioId === "fixture-environment-leak" ? ["--env", "TERRARIUM_FIXTURE_CANARY=planted-fixture-canary"] : []),
     image,
-    "node", "/probe/probe.cjs",
+    "node", "-e", scenario.script,
   ];
   return args;
 }
 
 function publicResult(result) {
-  const { scriptPath, ...safe } = result;
-  return safe;
+  return result;
 }
 
 function campaignReceipt(result, { campaignId } = {}) {
@@ -303,18 +301,13 @@ export function parseAttackProposal(text) {
   return { run: true, reason: proposal.reason.trim() };
 }
 
-export async function runSandboxScenario({ scenarioId, backend = "docker", image = DEFAULT_SANDBOX_IMAGE, keepWorkspace = false, unsafeNetwork = false, verificationOf = null } = {}) {
+export async function runSandboxScenario({ scenarioId, backend = "docker", image = DEFAULT_SANDBOX_IMAGE, unsafeNetwork = false, verificationOf = null } = {}) {
   if (!SANDBOX_BACKENDS.includes(backend)) throw new Error(`unknown sandbox backend: ${backend} (expected one of: ${SANDBOX_BACKENDS.join(", ")})`);
   const scenario = resolveScenario(scenarioId);
-  const workspacePath = await mkdtemp(join(resolve(process.cwd()), ".terrarium-probe-"));
-  const scriptPath = join(workspacePath, "probe.cjs");
   const containerName = `terrarium-probe-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-  await mkdir(workspacePath, { recursive: true });
-  await writeFile(scriptPath, scenario.script);
-
   const network = unsafeNetwork ? "bridge" : "none";
   const processPersistence = scenarioId === "process-persistence";
-  const args = dockerScenarioArgs({ scenarioId, workspacePath, image, containerName, network, autoRemove: !processPersistence });
+  const args = dockerScenarioArgs({ scenarioId, image, containerName, network, autoRemove: !processPersistence });
   const startedAt = new Date().toISOString();
   const startedMs = Date.now();
   const dockerEnv = {
@@ -362,14 +355,11 @@ export async function runSandboxScenario({ scenarioId, backend = "docker", image
     stdout: execution.stdout,
     stderr: execution.stderr,
     teardownVerified,
-    workspacePath: keepWorkspace ? workspacePath : undefined,
-    scriptPath,
     startedAt,
     finishedAt,
     durationMs: Date.now() - startedMs,
   };
 
-  if (!keepWorkspace) await rm(workspacePath, { recursive: true, force: true });
   return publicResult(result);
 }
 

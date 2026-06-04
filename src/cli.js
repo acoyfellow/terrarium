@@ -49,7 +49,7 @@ Options:
   --dry-run          Print the child invocation without running it
   --json             Print structured JSON result
   --isolation <mode> Workspace isolation: none, copy, or worktree. Default: none
-  --keep-workspace   Do not delete an isolated workspace; for probe, preserve its local probe workspace
+  --keep-workspace   Do not delete an isolated workspace created by ordinary delegation
   --log <path>       Write a transcript to this path
   --image <name>     Container image for terra probe. Default: ${DEFAULT_SANDBOX_IMAGE}
   --unsafe-network   Probe/verify negative control: attach Docker bridge network instead of denying network
@@ -89,25 +89,25 @@ else if (opts.version) console.log(VERSION);
 else if (cmd === "status" && rest[0]) getRunStatus({ runId: rest[0] }).then((r) => console.log(JSON.stringify(r, null, 2)));
 else if (cmd === "status") listRuns({ limit: Number(rest[0] || 20) }).then((r) => console.log(JSON.stringify(r, null, 2)));
 else if (cmd === "read") readRun({ runId: rest[0], tailBytes: Number(rest[1] === "mre" ? rest[2] || 20000 : rest[1] || 20000), kind: rest[1] === "mre" ? "mre" : "terrarium" }).then((r) => console.log(r.text));
-else if (cmd === "probe") runSandboxScenario({ scenarioId: rest[0], image: opts.image, keepWorkspace: opts.keepWorkspace, unsafeNetwork: opts.unsafeNetwork }).then((result) => {
+else if (cmd === "probe") runSandboxScenario({ scenarioId: rest[0], image: opts.image, unsafeNetwork: opts.unsafeNetwork }).then((result) => {
   console.log(JSON.stringify(result, null, 2));
   process.exit(result.verdict === "inconclusive" ? 1 : 0);
 }).catch((e) => { console.error(`terrarium: ${e.message}`); process.exit(1); });
-else if (cmd === "verify") verifySandboxScenario({ scenarioId: rest[0], image: opts.image, keepWorkspace: opts.keepWorkspace, unsafeNetwork: opts.unsafeNetwork }).then((result) => {
+else if (cmd === "verify") verifySandboxScenario({ scenarioId: rest[0], image: opts.image, unsafeNetwork: opts.unsafeNetwork }).then((result) => {
   console.log(JSON.stringify(result, null, 2));
   process.exit(result.verdict === "inconclusive" ? 1 : 0);
 }).catch((e) => { console.error(`terrarium: ${e.message}`); process.exit(1); });
-else if (cmd === "attack") runAttackExperiment({ scenarioId: rest[0], agent: opts.agent, image: opts.image, keepWorkspace: opts.keepWorkspace, unsafeNetwork: opts.unsafeNetwork, timeoutMs: opts.timeoutMs }).then((result) => {
+else if (cmd === "attack") runAttackExperiment({ scenarioId: rest[0], agent: opts.agent, image: opts.image, unsafeNetwork: opts.unsafeNetwork, timeoutMs: opts.timeoutMs }).then((result) => {
   console.log(JSON.stringify(result, null, 2));
   process.exit(result.verdict === "inconclusive" ? 1 : 0);
 }).catch((e) => { console.error(`terrarium: ${e.message}`); process.exit(1); });
 else if (cmd === "campaigns") listCampaignReceipts({ limit: Number(rest[0] || 20) }).then((result) => console.log(JSON.stringify(result, null, 2))).catch((e) => { console.error(`terrarium: ${e.message}`); process.exit(1); });
 else if (cmd === "campaign" && rest[0] === "read") readCampaignReceipt({ campaignId: rest[1] }).then((result) => console.log(JSON.stringify(result, null, 2))).catch((e) => { console.error(`terrarium: ${e.message}`); process.exit(1); });
-else if (cmd === "campaign" && rest[0] === "verify") verifyCampaignReceipt({ campaignId: rest[1], image: opts.image, keepWorkspace: opts.keepWorkspace, unsafeNetwork: opts.unsafeNetwork }).then((result) => {
+else if (cmd === "campaign" && rest[0] === "verify") verifyCampaignReceipt({ campaignId: rest[1], image: opts.image, unsafeNetwork: opts.unsafeNetwork }).then((result) => {
   console.log(JSON.stringify(result, null, 2));
   process.exit(result.verdict === "inconclusive" ? 1 : 0);
 }).catch((e) => { console.error(`terrarium: ${e.message}`); process.exit(1); });
-else if (cmd === "campaign" && rest[0] === "issue-draft") campaignIssueDraft({ campaignId: rest[1], image: opts.image, keepWorkspace: opts.keepWorkspace, unsafeNetwork: opts.unsafeNetwork }).then((result) => {
+else if (cmd === "campaign" && rest[0] === "issue-draft") campaignIssueDraft({ campaignId: rest[1], image: opts.image, unsafeNetwork: opts.unsafeNetwork }).then((result) => {
   if (opts.json) console.log(JSON.stringify(result, null, 2));
   else console.log(result.markdown);
 }).catch((e) => { console.error(`terrarium: ${e.message}`); process.exit(1); });
