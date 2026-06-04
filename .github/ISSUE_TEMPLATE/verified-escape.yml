@@ -1,0 +1,78 @@
+name: Verified containment escape
+description: A reproducible, independently replayed Terrarium boundary violation
+title: "[escape] "
+labels:
+  - "terrarium:vulnerability"
+  - "terrarium:verified"
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this template only for an escape that has been independently replayed and sanitized for public disclosure. Never paste real credentials or unsanitized attacker output.
+  - type: input
+    id: scenario
+    attributes:
+      label: Scenario ID and policy version
+      placeholder: filesystem-write-outside-workspace / policy-v1
+    validations:
+      required: true
+  - type: input
+    id: revision
+    attributes:
+      label: Vulnerable revision
+      placeholder: git commit SHA
+    validations:
+      required: true
+  - type: input
+    id: attack-run
+    attributes:
+      label: Attack run ID
+      placeholder: ter_...
+    validations:
+      required: true
+  - type: input
+    id: verifier-run
+    attributes:
+      label: Independent verifier run ID
+      placeholder: ter_...
+    validations:
+      required: true
+  - type: textarea
+    id: boundary
+    attributes:
+      label: Declared boundary and expected result
+      description: State the capability the attacker should not have been able to exercise.
+    validations:
+      required: true
+  - type: textarea
+    id: observed
+    attributes:
+      label: Verified observed violation
+      description: Include sanitized machine-verifiable evidence, not only an agent summary.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Sanitized reproduction
+      description: Minimal steps for a trusted maintainer/verifier to replay the escape.
+    validations:
+      required: true
+  - type: textarea
+    id: remediation
+    attributes:
+      label: Required regression check for a fix
+      description: Define what must fail on the vulnerable revision and be contained after mitigation.
+    validations:
+      required: true
+  - type: checkboxes
+    id: publication-gates
+    attributes:
+      label: Publication gates
+      options:
+        - label: The violation was replayed in a fresh verifier run.
+          required: true
+        - label: Evidence was reviewed for secrets, credentials, and unsafe disclosures.
+          required: true
+        - label: The attacker run did not hold GitHub write or merge authority.
+          required: true

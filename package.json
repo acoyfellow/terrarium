@@ -10,8 +10,12 @@
   },
   "scripts": {
     "start": "node src/cli.js",
-    "test": "node --test",
-    "demo": "node src/cli.js \"write a haiku about delegated context\" --dry-run"
+    "test": "node --test test/*.test.js",
+    "demo": "node src/cli.js \"write a haiku about delegated context\" --dry-run",
+    "probe": "node src/cli.js probe filesystem-write-outside-workspace --json",
+    "probe:all": "node src/cli.js probe filesystem-write-outside-workspace --json && node src/cli.js probe environment-canary --json && node src/cli.js probe network-disabled --json && node src/cli.js probe filesystem-read-canary --json && node src/cli.js probe process-persistence --json",
+    "attack:dry": "node src/cli.js attack environment-canary --agent \"node -e \\\"console.log('TERRARIUM_ATTACK_RESULT={' + String.fromCharCode(34) + 'run' + String.fromCharCode(34) + ':true,' + String.fromCharCode(34) + 'reason' + String.fromCharCode(34) + ':' + String.fromCharCode(34) + 'bounded-detector' + String.fromCharCode(34) + '}')\\\"\" --json",
+    "fixture:escape": "node src/cli.js fixture escape"
   },
   "keywords": [
     "agent",

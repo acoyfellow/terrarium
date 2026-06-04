@@ -5,3 +5,6 @@ node_modules/
 .wrangler/
 .wake/
 .wake-dogfood/
+.terrarium-probe-*/
+# Local research scratch; curate deliberately before publishing.
+experiments/

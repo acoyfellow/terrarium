@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { getRunStatus, listRuns, readRun, runTerrarium, VERSION } from "./core.js";
+import { campaignIssueDraft, createFixtureCampaign, DEFAULT_SANDBOX_IMAGE, FIXTURE_SCENARIO_IDS, listCampaignReceipts, readCampaignReceipt, runAttackExperiment, runSandboxScenario, SCENARIO_IDS, verifyCampaignReceipt, verifySandboxScenario } from "./sandbox.js";
 
 function help() {
   return `terrarium ${VERSION}
@@ -19,9 +20,24 @@ Usage:
   terra status [runId]
   terra read <runId> [tailBytes]
   terra read <runId> mre [tailBytes]
+  terra probe <scenarioId> [--image node:22-alpine] [--json]
+  terra verify <scenarioId> [--image node:22-alpine] [--json]
+  terra attack <scenarioId> [--agent "opencode run"] [--json]
+  terra campaigns [limit]
+  terra campaign read <campaignId>
+  terra campaign verify <campaignId>
+  terra campaign issue-draft <campaignId>
+  terra fixture escape [fixture-environment-leak]
+
+Containment probes (opt-in; ordinary delegation is unchanged):
+  ${SCENARIO_IDS.join("\n  ")}
+
+Known-vulnerable pipeline fixtures (local testing only; not real findings):
+  ${FIXTURE_SCENARIO_IDS.join("\n  ")}
 
 Options:
-  --agent <cmd>      Child command. Default: config, $TERRARIUM_AGENT, or "opencode run".
+  --agent <cmd>      Child command for ordinary runs or proposal agent for terra attack.
+                     Ordinary default: config, $TERRARIUM_AGENT, or "opencode run".
                      Explicit --agent overrides --read-only.
   --read-only        Use the read-only child preset (opencode run --agent explore)
                      when no explicit --agent is given. Good for read-only digs.
@@ -33,8 +49,10 @@ Options:
   --dry-run          Print the child invocation without running it
   --json             Print structured JSON result
   --isolation <mode> Workspace isolation: none, copy, or worktree. Default: none
-  --keep-workspace   Do not delete isolated workspace after the run
+  --keep-workspace   Do not delete an isolated workspace; for probe, preserve its local probe workspace
   --log <path>       Write a transcript to this path
+  --image <name>     Container image for terra probe. Default: ${DEFAULT_SANDBOX_IMAGE}
+  --unsafe-network   Probe/verify negative control: attach Docker bridge network instead of denying network
   --help             Show help
   --version          Show version
 `;
@@ -49,9 +67,11 @@ function parse(argv) {
     else if (a === "--dry-run") out.dryRun = true;
     else if (a === "--json") out.json = true;
     else if (a === "--keep-workspace") out.keepWorkspace = true;
+    else if (a === "--unsafe-network") out.unsafeNetwork = true;
     else if (a === "--read-only" || a === "--readonly") out.readOnly = true;
     else if (a === "--profile") out.profile = argv[++i];
     else if (a === "--agent") out.agent = argv[++i];
+    else if (a === "--image") out.image = argv[++i];
     else if (a === "--cwd") out.cwd = argv[++i];
     else if (a === "--timeout-ms") out.timeoutMs = Number(argv[++i]);
     else if (a === "--isolation") out.isolation = argv[++i];
@@ -69,6 +89,29 @@ else if (opts.version) console.log(VERSION);
 else if (cmd === "status" && rest[0]) getRunStatus({ runId: rest[0] }).then((r) => console.log(JSON.stringify(r, null, 2)));
 else if (cmd === "status") listRuns({ limit: Number(rest[0] || 20) }).then((r) => console.log(JSON.stringify(r, null, 2)));
 else if (cmd === "read") readRun({ runId: rest[0], tailBytes: Number(rest[1] === "mre" ? rest[2] || 20000 : rest[1] || 20000), kind: rest[1] === "mre" ? "mre" : "terrarium" }).then((r) => console.log(r.text));
+else if (cmd === "probe") runSandboxScenario({ scenarioId: rest[0], image: opts.image, keepWorkspace: opts.keepWorkspace, unsafeNetwork: opts.unsafeNetwork }).then((result) => {
+  console.log(JSON.stringify(result, null, 2));
+  process.exit(result.verdict === "inconclusive" ? 1 : 0);
+}).catch((e) => { console.error(`terrarium: ${e.message}`); process.exit(1); });
+else if (cmd === "verify") verifySandboxScenario({ scenarioId: rest[0], image: opts.image, keepWorkspace: opts.keepWorkspace, unsafeNetwork: opts.unsafeNetwork }).then((result) => {
+  console.log(JSON.stringify(result, null, 2));
+  process.exit(result.verdict === "inconclusive" ? 1 : 0);
+}).catch((e) => { console.error(`terrarium: ${e.message}`); process.exit(1); });
+else if (cmd === "attack") runAttackExperiment({ scenarioId: rest[0], agent: opts.agent, image: opts.image, keepWorkspace: opts.keepWorkspace, unsafeNetwork: opts.unsafeNetwork, timeoutMs: opts.timeoutMs }).then((result) => {
+  console.log(JSON.stringify(result, null, 2));
+  process.exit(result.verdict === "inconclusive" ? 1 : 0);
+}).catch((e) => { console.error(`terrarium: ${e.message}`); process.exit(1); });
+else if (cmd === "campaigns") listCampaignReceipts({ limit: Number(rest[0] || 20) }).then((result) => console.log(JSON.stringify(result, null, 2))).catch((e) => { console.error(`terrarium: ${e.message}`); process.exit(1); });
+else if (cmd === "campaign" && rest[0] === "read") readCampaignReceipt({ campaignId: rest[1] }).then((result) => console.log(JSON.stringify(result, null, 2))).catch((e) => { console.error(`terrarium: ${e.message}`); process.exit(1); });
+else if (cmd === "campaign" && rest[0] === "verify") verifyCampaignReceipt({ campaignId: rest[1], image: opts.image, keepWorkspace: opts.keepWorkspace, unsafeNetwork: opts.unsafeNetwork }).then((result) => {
+  console.log(JSON.stringify(result, null, 2));
+  process.exit(result.verdict === "inconclusive" ? 1 : 0);
+}).catch((e) => { console.error(`terrarium: ${e.message}`); process.exit(1); });
+else if (cmd === "campaign" && rest[0] === "issue-draft") campaignIssueDraft({ campaignId: rest[1], image: opts.image, keepWorkspace: opts.keepWorkspace, unsafeNetwork: opts.unsafeNetwork }).then((result) => {
+  if (opts.json) console.log(JSON.stringify(result, null, 2));
+  else console.log(result.markdown);
+}).catch((e) => { console.error(`terrarium: ${e.message}`); process.exit(1); });
+else if (cmd === "fixture" && rest[0] === "escape") createFixtureCampaign({ scenarioId: rest[1] }).then((result) => console.log(JSON.stringify(result, null, 2))).catch((e) => { console.error(`terrarium: ${e.message}`); process.exit(1); });
 else runTerrarium({ ...opts, task: opts.task.join(" ").trim(), stream: !opts.json }).then((result) => {
   if (opts.json) console.log(JSON.stringify(result, null, 2));
   process.exit(result.exitCode ?? (result.ok ? 0 : 1));
