@@ -1,6 +1,6 @@
 {
   "name": "fixture-environment-leak",
-  "issue": 3,
+  "issue": 5,
   "variant": "fixed",
   "description": "Synthetic remediation selection: use the contained fixture policy for replay-gate validation."
 }
