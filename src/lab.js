@@ -1,3 +1,7 @@
+function byteLength(value) {
+  return new TextEncoder().encode(value).length;
+}
+
 export const DEFAULT_LAB_POLICY = {
   maxPayloadBytes: 4096,
   maxRuntimeMs: 1000,
@@ -20,7 +24,7 @@ export const DEFAULT_LAB_POLICY = {
 
 export function validateLabPayload({ body, capabilities = [] } = {}, policy = DEFAULT_LAB_POLICY) {
   if (typeof body !== "string" || body.trim() === "") throw new Error("Lab payload body required");
-  if (Buffer.byteLength(body, "utf8") > policy.maxPayloadBytes) throw new Error(`Lab payload exceeds maxPayloadBytes (${policy.maxPayloadBytes})`);
+  if (byteLength(body) > policy.maxPayloadBytes) throw new Error(`Lab payload exceeds maxPayloadBytes (${policy.maxPayloadBytes})`);
   if (!Array.isArray(capabilities)) throw new Error("Lab capabilities must be an array");
   for (const capability of capabilities) {
     if (!policy.allowCapabilities.includes(capability)) throw new Error(`Lab capability not allowed: ${capability}`);
@@ -41,7 +45,7 @@ export async function runLabPayload({ baseUrl, body, capabilities = [], authToke
   });
   if (!response.ok) throw new Error(`Lab run failed: ${response.status}`);
   const result = await response.json();
-  const outputBytes = Buffer.byteLength(JSON.stringify(result), "utf8");
+  const outputBytes = byteLength(JSON.stringify(result));
   if (outputBytes > policy.maxOutputBytes) throw new Error(`Lab output exceeds maxOutputBytes (${policy.maxOutputBytes})`);
   return result;
 }

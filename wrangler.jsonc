@@ -7,6 +7,18 @@
   "vars": {
     "TERRARIUM_MODE": "fixture"
   },
+  "kv_namespaces": [
+    {
+      "binding": "TERRARIUM_LEDGER",
+      "id": "5f5b9b1f6f8c4db69be2a0ad60f0a122"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "TERRARIUM_ARTIFACTS",
+      "bucket_name": "terrarium-control-artifacts"
+    }
+  ],
   "workflows": [
     {
       "name": "terrarium-campaign",

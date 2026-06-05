@@ -51,9 +51,22 @@ async function writeArtifact(env, id, kind, value) {
   return key;
 }
 
+async function payloadHash(body) {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(body));
+  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("").slice(0, 24);
+}
+
 async function writeReceipt(env, receipt) {
+  const payloadKey = await writeArtifact(env, receipt.campaignId, "payload", {
+    scenarioId: receipt.scenarioId,
+    body: receipt.body,
+    capabilities: receipt.capabilities,
+    payloadHash: receipt.payloadHash,
+  });
+  const executionKey = await writeArtifact(env, receipt.campaignId, "execution", receipt.execution);
+  const replayKey = receipt.replay ? await writeArtifact(env, receipt.campaignId, "replay", receipt.replay) : null;
   const key = await writeArtifact(env, receipt.campaignId, "receipt", receipt);
-  return { ...receipt, artifactKey: key };
+  return { ...receipt, artifactKey: key, payloadKey, executionKey, replayKey };
 }
 
 export class TerrariumCampaignWorkflow extends WorkflowEntrypoint {
@@ -86,6 +99,7 @@ export class TerrariumCampaignWorkflow extends WorkflowEntrypoint {
     }));
 
     const campaignId = `campaign_${new Date().toISOString().replace(/[-:.TZ]/g, "")}_${crypto.randomUUID().slice(0, 8)}`;
+    const hash = await step.do("payload-hash", async () => payloadHash(hostile.body));
     const receipt = await step.do("write-receipt", async () => writeReceipt(this.env, {
       receiptVersion: 1,
       campaignId,
@@ -93,9 +107,19 @@ export class TerrariumCampaignWorkflow extends WorkflowEntrypoint {
       scenarioId: hostile.scenarioId,
       fixture: mode === "fixture",
       ...hostile,
+      payloadHash: hash,
       startedAt: event.timestamp || new Date().toISOString(),
       finishedAt: new Date().toISOString(),
     }));
+
+    await step.do("record-result", async () => {
+      const ledger = await loadLedger(this.env);
+      const { day, current } = todayCounts(ledger);
+      if (hostile.verifiedVerdict === "verified-escape") current.verifiedEscapes += 1;
+      ledger[day] = current;
+      ledger.lastReceipt = { campaignId, verdict: hostile.verifiedVerdict || hostile.verdict, artifactKey: receipt.artifactKey };
+      await saveLedger(this.env, ledger);
+    });
 
     return {
       status: hostile.verifiedVerdict || hostile.verdict,
