@@ -3,11 +3,12 @@ import assert from "node:assert/strict";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { ATTACK_RESULT_MARKER, DEFAULT_SANDBOX_IMAGE, FIXTURE_SCENARIO_IDS, attackPrompt, campaignIssueDraft, createFixtureCampaign, dockerScenarioArgs, issueDraftFromVerification, listCampaignReceipts, parseAttackProposal, readCampaignReceipt, resolveScenario, runAttackExperiment, runSandboxScenario, SCENARIO_IDS, verifyCampaignReceipt, verifySandboxScenario } from "../src/sandbox.js";
+import { ATTACK_RESULT_MARKER, DEFAULT_SANDBOX_IMAGE, FIXTURE_SCENARIO_IDS, FIXTURE_VARIANTS, attackPrompt, campaignIssueDraft, createFixtureCampaign, dockerScenarioArgs, issueDraftFromVerification, listCampaignReceipts, parseAttackProposal, readCampaignReceipt, readFixturePolicy, resolveScenario, runAttackExperiment, runSandboxScenario, SCENARIO_IDS, verifyCampaignReceipt, verifySandboxScenario } from "../src/sandbox.js";
 
 test("declares small deterministic initial sandbox scenarios", () => {
   assert.deepEqual(SCENARIO_IDS, ["filesystem-write-outside-workspace", "environment-canary", "network-disabled", "filesystem-read-canary", "process-persistence"]);
   assert.deepEqual(FIXTURE_SCENARIO_IDS, ["fixture-environment-leak"]);
+  assert.deepEqual(FIXTURE_VARIANTS, ["vulnerable", "fixed"]);
   assert.match(resolveScenario("filesystem-write-outside-workspace").description, /outside/);
   assert.throws(() => resolveScenario("not-real"), /unknown sandbox scenario/);
 });
@@ -19,6 +20,12 @@ test("attack proposal contract is narrow and machine parseable", () => {
   assert.deepEqual(parseAttackProposal(`${ATTACK_RESULT_MARKER}{"run":true,"reason":"try detector"}`), { run: true, reason: "try detector" });
   assert.throws(() => parseAttackProposal("I escaped"), /did not contain/);
   assert.throws(() => parseAttackProposal(`${ATTACK_RESULT_MARKER}{"run":false,"reason":"no"}`), /declined/);
+});
+
+test("fixture policy variants are explicit and reusable", async () => {
+  assert.equal((await readFixturePolicy({ variant: "vulnerable" })).injectCanary, true);
+  assert.equal((await readFixturePolicy({ variant: "fixed" })).injectCanary, false);
+  await assert.rejects(() => readFixturePolicy({ variant: "nope" }), /unknown fixture variant/);
 });
 
 test("docker scenario policy uses explicit hostile-run restrictions without host bind mounts", () => {
@@ -37,6 +44,10 @@ test("docker scenario policy uses explicit hostile-run restrictions without host
   assert.equal(args.includes("--env"), false);
   const persistenceArgs = dockerScenarioArgs({ scenarioId: "process-persistence", image: DEFAULT_SANDBOX_IMAGE, containerName: "persist-test", autoRemove: false });
   assert.equal(persistenceArgs.includes("--rm"), false);
+  const vulnerableFixtureArgs = dockerScenarioArgs({ scenarioId: "fixture-environment-leak", image: DEFAULT_SANDBOX_IMAGE, containerName: "fixture-test", fixturePolicy: { injectCanary: true } });
+  const fixedFixtureArgs = dockerScenarioArgs({ scenarioId: "fixture-environment-leak", image: DEFAULT_SANDBOX_IMAGE, containerName: "fixed-test", fixturePolicy: { injectCanary: false } });
+  assert.ok(vulnerableFixtureArgs.includes("--env"));
+  assert.equal(fixedFixtureArgs.includes("--env"), false);
 });
 
 test("docker sandbox contains deterministic baseline probes", { timeout: 120000 }, async (t) => {
@@ -110,6 +121,7 @@ test("known-vulnerable fixture exercises escaped receipt, replay verification, a
     const attack = await createFixtureCampaign({ receiptDir: receipts, campaignId: "campaign_fixture" });
     assert.equal(attack.verdict, "escaped");
     assert.equal(attack.receipt.fixture, true);
+    assert.equal(attack.receipt.fixtureVariant, "vulnerable");
     assert.equal(attack.receipt.agentUsed, false);
     const verified = await verifyCampaignReceipt({ campaignId: "campaign_fixture", receiptDir: receipts });
     assert.equal(verified.verdict, "verified-escape");
@@ -118,6 +130,9 @@ test("known-vulnerable fixture exercises escaped receipt, replay verification, a
     assert.match(draft.markdown, /Known-vulnerable fixture/);
     assert.match(draft.markdown, /fixture-environment-leak/);
     assert.doesNotMatch(draft.markdown, /planted-fixture-canary/);
+    const fixed = await createFixtureCampaign({ variant: "fixed", receiptDir: receipts, campaignId: "campaign_fixture_fixed" });
+    assert.equal(fixed.verdict, "contained");
+    assert.equal(fixed.receipt.fixtureVariant, "fixed");
   } finally {
     rmSync(receipts, { recursive: true, force: true });
   }

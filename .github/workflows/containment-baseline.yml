@@ -51,7 +51,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          node src/cli.js fixture escape > artifacts/fixture/attack.json
+          node src/cli.js fixture escape vulnerable > artifacts/fixture/attack.json
           campaign_id="$(node -e 'const r=require("./artifacts/fixture/attack.json"); if (r.verdict !== "escaped" || r.receipt.fixture !== true) process.exit(1); process.stdout.write(r.receipt.campaignId)' )"
           echo "CAMPAIGN_ID=$campaign_id" >> "$GITHUB_ENV"
           node src/cli.js campaign verify "$campaign_id" --json > artifacts/fixture/verification.json
@@ -60,6 +60,8 @@ jobs:
           grep -q 'Known-vulnerable fixture' artifacts/fixture/issue-draft.md
           ! grep -q 'planted-fixture-canary' artifacts/fixture/issue-draft.md
           cp "$HOME/.terrarium/campaigns/$campaign_id.json" artifacts/fixture/receipt.json
+          node src/cli.js fixture escape fixed > artifacts/fixture/fixed.json
+          node -e 'const r=require("./artifacts/fixture/fixed.json"); if (r.verdict !== "contained" || r.receipt.fixtureVariant !== "fixed") process.exit(1);'
 
       - name: Write workflow summary
         shell: bash
@@ -68,7 +70,8 @@ jobs:
             echo '## Terrarium containment baseline'
             echo
             echo '- Deterministic probe suite: **contained**'
-            echo '- Known-vulnerable fixture: **escaped and verified** (pipeline test only)'
+            echo '- Known-vulnerable fixture (`vulnerable`): **escaped and verified** (pipeline test only)'
+            echo '- Remediated fixture (`fixed`): **contained**'
             echo "- Fixture campaign: \`$CAMPAIGN_ID\`"
             echo '- Public GitHub mutation: **none**'
             echo
@@ -83,6 +86,7 @@ jobs:
             artifacts/probes/*.json
             artifacts/fixture/receipt.json
             artifacts/fixture/verification.json
+            artifacts/fixture/fixed.json
             artifacts/fixture/issue-draft.md
           if-no-files-found: error
           retention-days: 30

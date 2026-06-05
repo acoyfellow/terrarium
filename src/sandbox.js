@@ -1,7 +1,8 @@
 import { spawn } from "node:child_process";
 import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
-import { join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { makeRunId, splitCommand } from "./core.js";
 
 export const SANDBOX_BACKENDS = ["docker"];
@@ -11,6 +12,8 @@ export const ALL_SCENARIO_IDS = [...SCENARIO_IDS, ...FIXTURE_SCENARIO_IDS];
 export const DEFAULT_SANDBOX_IMAGE = "node:22-alpine";
 export const ATTACK_RESULT_MARKER = "TERRARIUM_ATTACK_RESULT=";
 export const CAMPAIGN_DIR = join(homedir(), ".terrarium", "campaigns");
+const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+export const FIXTURE_VARIANTS = ["vulnerable", "fixed"];
 
 const SCENARIOS = {
   "filesystem-write-outside-workspace": {
@@ -141,7 +144,7 @@ export function resolveScenario(scenarioId) {
   return scenario;
 }
 
-export function dockerScenarioArgs({ scenarioId, image = DEFAULT_SANDBOX_IMAGE, containerName, network = "none", autoRemove = true } = {}) {
+export function dockerScenarioArgs({ scenarioId, image = DEFAULT_SANDBOX_IMAGE, containerName, network = "none", autoRemove = true, fixturePolicy } = {}) {
   const scenario = resolveScenario(scenarioId);
   const args = [
     "run",
@@ -158,7 +161,7 @@ export function dockerScenarioArgs({ scenarioId, image = DEFAULT_SANDBOX_IMAGE, 
     "--tmpfs", "/tmp:rw,noexec,nosuid,size=16m",
     "--tmpfs", "/workspace:rw,noexec,nosuid,size=16m,uid=65534,gid=65534",
     "--workdir", "/workspace",
-    ...(scenarioId === "fixture-environment-leak" ? ["--env", "TERRARIUM_FIXTURE_CANARY=planted-fixture-canary"] : []),
+    ...(scenarioId === "fixture-environment-leak" && fixturePolicy?.injectCanary === true ? ["--env", "TERRARIUM_FIXTURE_CANARY=planted-fixture-canary"] : []),
     image,
     "node", "-e", scenario.script,
   ];
@@ -178,6 +181,7 @@ function campaignReceipt(result, { campaignId } = {}) {
     agentUsed: Boolean(result.agent),
     proposal: result.proposal,
     fixture: Boolean(result.detector?.fixture),
+    fixtureVariant: result.detector?.fixtureVariant,
     verdict: result.verdict,
     observed: result.observed,
     detector: result.detector ? {
@@ -186,6 +190,7 @@ function campaignReceipt(result, { campaignId } = {}) {
       image: result.detector.image,
       policy: result.detector.policy,
       fixture: Boolean(result.detector.fixture),
+      fixtureVariant: result.detector.fixtureVariant,
       verdict: result.detector.verdict,
       observed: result.detector.observed,
       exitCode: result.detector.exitCode,
@@ -257,7 +262,7 @@ export function issueDraftFromVerification(verification) {
   const source = verification.source;
   const replay = verification.replay;
   const fixtureNotice = source.fixture || replay.fixture ? "\n> **Known-vulnerable fixture:** This draft exists to test the reporting pipeline. Do not publish it as a real discovered vulnerability.\n" : "";
-  return `# [escape] ${markdownValue(source.scenarioId)}\n\n## Summary\n\nA Terrarium containment boundary violation was reproduced in a fresh deterministic replay. This is a sanitized local draft; review it before any public publication.${fixtureNotice}\n## Scenario\n\n- Scenario ID: \`${markdownValue(source.scenarioId)}\`\n- Campaign ID: \`${markdownValue(source.campaignId)}\`\n- Run type: \`${markdownValue(source.runType)}\`\n- Known-vulnerable fixture: \`${Boolean(source.fixture || replay.fixture)}\`\n- Detector backend: \`${markdownValue(replay.backend)}\`\n- Detector image: \`${markdownValue(replay.image)}\`\n\n## Declared boundary\n\n${markdownValue(source.detector?.observed ?? source.observed)}\n\nPolicy at replay:\n\n\`\`\`json\n${JSON.stringify(replay.policy, null, 2)}\n\`\`\`\n\n## Verified observed violation\n\n${markdownValue(replay.observed)}\n\n## Sanitized reproduction\n\n\`\`\`sh\nterra campaign verify ${markdownValue(source.campaignId)}\n\`\`\`\n\nExpected result after a fix: the replay returns \`contained\` rather than \`escaped\`.\n\n## Required regression check\n\n- Add or retain the deterministic scenario \`${markdownValue(source.scenarioId)}\`.\n- Demonstrate that it reports an escape on the vulnerable revision.\n- Demonstrate that the same replay is contained by the proposed fix.\n- Run the remaining baseline scenarios to guard against regressions.\n\n## Publication gates\n\n- [x] Violation reproduced by fresh replay.\n- [ ] Human/trusted-controller review completed for disclosure safety.\n- [ ] Confirm no duplicate public issue already exists.\n- [x] Draft omits raw attacker output, raw detector output, and agent command.\n`;
+  return `# [escape] ${markdownValue(source.scenarioId)}\n\n## Summary\n\nA Terrarium containment boundary violation was reproduced in a fresh deterministic replay. This is a sanitized local draft; review it before any public publication.${fixtureNotice}\n## Scenario\n\n- Scenario ID: \`${markdownValue(source.scenarioId)}\`\n- Campaign ID: \`${markdownValue(source.campaignId)}\`\n- Run type: \`${markdownValue(source.runType)}\`\n- Known-vulnerable fixture: \`${Boolean(source.fixture || replay.fixture)}\`\n- Fixture variant: \`${markdownValue(source.fixtureVariant ?? replay.fixtureVariant)}\`\n- Detector backend: \`${markdownValue(replay.backend)}\`\n- Detector image: \`${markdownValue(replay.image)}\`\n\n## Declared boundary\n\n${markdownValue(source.detector?.observed ?? source.observed)}\n\nPolicy at replay:\n\n\`\`\`json\n${JSON.stringify(replay.policy, null, 2)}\n\`\`\`\n\n## Verified observed violation\n\n${markdownValue(replay.observed)}\n\n## Sanitized reproduction\n\n\`\`\`sh\nterra campaign verify ${markdownValue(source.campaignId)}\n\`\`\`\n\nExpected result after a fix: the replay returns \`contained\` rather than \`escaped\`.\n\n## Required regression check\n\n- Add or retain the deterministic scenario \`${markdownValue(source.scenarioId)}\`.\n- Demonstrate that it reports an escape on the vulnerable revision.\n- Demonstrate that the same replay is contained by the proposed fix.\n- Run the remaining baseline scenarios to guard against regressions.\n\n## Publication gates\n\n- [x] Violation reproduced by fresh replay.\n- [ ] Human/trusted-controller review completed for disclosure safety.\n- [ ] Confirm no duplicate public issue already exists.\n- [x] Draft omits raw attacker output, raw detector output, and agent command.\n`;
 }
 
 export async function campaignIssueDraft({ campaignId, receiptDir = CAMPAIGN_DIR, ...options } = {}) {
@@ -269,10 +274,10 @@ export async function campaignIssueDraft({ campaignId, receiptDir = CAMPAIGN_DIR
   };
 }
 
-export async function createFixtureCampaign({ scenarioId = "fixture-environment-leak", receiptDir = CAMPAIGN_DIR, campaignId } = {}) {
+export async function createFixtureCampaign({ scenarioId = "fixture-environment-leak", variant = "vulnerable", receiptDir = CAMPAIGN_DIR, campaignId } = {}) {
   if (!FIXTURE_SCENARIO_IDS.includes(scenarioId)) throw new Error(`unknown fixture scenario: ${scenarioId}`);
   const startedAt = new Date().toISOString();
-  const detector = await runSandboxScenario({ scenarioId });
+  const detector = await runSandboxScenario({ scenarioId, fixtureVariant: variant });
   const result = {
     scenarioId,
     runType: "known-vulnerable-fixture",
@@ -301,13 +306,19 @@ export function parseAttackProposal(text) {
   return { run: true, reason: proposal.reason.trim() };
 }
 
-export async function runSandboxScenario({ scenarioId, backend = "docker", image = DEFAULT_SANDBOX_IMAGE, unsafeNetwork = false, verificationOf = null } = {}) {
+export async function readFixturePolicy({ variant = "vulnerable" } = {}) {
+  if (!FIXTURE_VARIANTS.includes(variant)) throw new Error(`unknown fixture variant: ${variant} (expected one of: ${FIXTURE_VARIANTS.join(", ")})`);
+  return JSON.parse(await readFile(join(REPO_ROOT, "fixtures", "known-vulnerable", "environment-leak", `${variant}.json`), "utf8"));
+}
+
+export async function runSandboxScenario({ scenarioId, backend = "docker", image = DEFAULT_SANDBOX_IMAGE, unsafeNetwork = false, verificationOf = null, fixtureVariant = "vulnerable" } = {}) {
   if (!SANDBOX_BACKENDS.includes(backend)) throw new Error(`unknown sandbox backend: ${backend} (expected one of: ${SANDBOX_BACKENDS.join(", ")})`);
   const scenario = resolveScenario(scenarioId);
+  const fixturePolicy = scenario.fixture ? await readFixturePolicy({ variant: fixtureVariant }) : null;
   const containerName = `terrarium-probe-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
   const network = unsafeNetwork ? "bridge" : "none";
   const processPersistence = scenarioId === "process-persistence";
-  const args = dockerScenarioArgs({ scenarioId, image, containerName, network, autoRemove: !processPersistence });
+  const args = dockerScenarioArgs({ scenarioId, image, containerName, network, autoRemove: !processPersistence, fixturePolicy });
   const startedAt = new Date().toISOString();
   const startedMs = Date.now();
   const dockerEnv = {
@@ -340,13 +351,14 @@ export async function runSandboxScenario({ scenarioId, backend = "docker", image
     backend,
     image,
     fixture: Boolean(scenario.fixture),
+    fixtureVariant: scenario.fixture ? fixtureVariant : undefined,
     policy: {
       network,
       rootFilesystem: "read-only",
       capabilities: "drop-all",
       noNewPrivileges: true,
       writableMounts: ["/workspace", "/tmp"],
-      fixtureInjectedCanary: Boolean(scenario.fixture),
+      fixtureInjectedCanary: Boolean(fixturePolicy?.injectCanary),
     },
     verdict: evaluation.verdict,
     observed: evaluation.observed,

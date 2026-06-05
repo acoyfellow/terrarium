@@ -1,0 +1,5 @@
+{
+  "name": "fixture-environment-leak",
+  "description": "Remediated environment policy used to prove the replay gate can recognize containment.",
+  "injectCanary": false
+}

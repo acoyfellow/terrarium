@@ -52,15 +52,16 @@ Implemented scenarios:
 
 The initial verifier path is intentionally minimal: `terra verify <scenario>` performs a fresh replay only if the first deterministic attempt reports `escaped`; a `contained` attempt returns without inventing vulnerability evidence.
 
-A local-only known-vulnerable fixture, `fixture-environment-leak`, deliberately passes a planted canary into the container so maintainers can exercise the entire escaped receipt → verified replay → sanitized issue-draft pipeline without claiming a newly discovered vulnerability:
+A local-only known-vulnerable fixture, `fixture-environment-leak`, uses tracked `vulnerable.json` and `fixed.json` policy variants so maintainers can exercise the entire escaped receipt → verified replay → sanitized issue-draft → remediation-gate pipeline without claiming a newly discovered vulnerability:
 
 ```sh
-terra fixture escape
+terra fixture escape vulnerable
 terra campaign verify <fixtureCampaignId>
 terra campaign issue-draft <fixtureCampaignId>
+terra fixture escape fixed
 ```
 
-The fixture command starts from a known escaped detector result; it does not need to invoke an AI proposal agent.
+The fixture commands start from controlled detector results; they do not need to invoke an AI proposal agent. The fixed variant supplies a reusable contained target rather than requiring a vulnerability to be reintroduced on `main` for every pipeline exercise.
 
 A public GitHub Actions baseline workflow now runs these deterministic probes and the fixture pipeline on manual dispatch and a weekly schedule. It uploads sanitized artifacts only and declares `contents: read` permission; it does not publish issues or open PRs. After the first CI run revealed that runner-workspace bind mounts were not portable, deterministic probes were simplified to pass trusted probe source inline to Docker with `node -e`, avoiding host checkout mounts entirely.
 

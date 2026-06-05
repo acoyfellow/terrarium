@@ -132,19 +132,24 @@ Receipts contain scenario, policy, proposal reason, detector verdict, and timest
 A real secure baseline should not naturally generate an escape. To prove the receipt → replay → draft pipeline works, Terrarium ships one explicitly vulnerable fixture:
 
 ```sh
-terra fixture escape
+terra fixture escape vulnerable
 # Copy campaignId from the JSON output, then:
 terra campaign verify <fixtureCampaignId>
 terra campaign issue-draft <fixtureCampaignId>
+
+# The explicit remediated comparison returns contained:
+terra fixture escape fixed
 ```
 
-Fixture scenario:
+Fixture scenario and tracked policy variants:
 
 ```text
 fixture-environment-leak
+fixtures/known-vulnerable/environment-leak/vulnerable.json
+fixtures/known-vulnerable/environment-leak/fixed.json
 ```
 
-It deliberately injects a planted canary into the container environment so the detector reports `escaped`, replay confirms `verified-escape`, and an issue draft can be rendered. This fixture command does not invoke an AI agent because the pipeline being tested begins at a known escaped detector result. The generated draft is labeled as a **known-vulnerable fixture** and must not be published as a real discovery.
+The `vulnerable` variant deliberately injects a planted canary into the container environment so the detector reports `escaped`, replay confirms `verified-escape`, and an issue draft can be rendered. The `fixed` variant omits that injection and reports `contained`; it is the expected remediation target for the synthetic issue/PR loop. These fixture commands do not invoke an AI agent because the pipeline being tested begins at a controlled detector result. Generated drafts are labeled as a **known-vulnerable fixture** and must not be published as real discoveries.
 
 ## Public automation today
 
@@ -199,7 +204,8 @@ terra campaigns [limit]
 terra campaign read <campaignId>
 terra campaign verify <campaignId>
 terra campaign issue-draft <verifiedCampaignId>
-terra fixture escape
+terra fixture escape vulnerable
+terra fixture escape fixed
 ```
 
 ### Not shipped yet

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { getRunStatus, listRuns, readRun, runTerrarium, VERSION } from "./core.js";
-import { campaignIssueDraft, createFixtureCampaign, DEFAULT_SANDBOX_IMAGE, FIXTURE_SCENARIO_IDS, listCampaignReceipts, readCampaignReceipt, runAttackExperiment, runSandboxScenario, SCENARIO_IDS, verifyCampaignReceipt, verifySandboxScenario } from "./sandbox.js";
+import { campaignIssueDraft, createFixtureCampaign, DEFAULT_SANDBOX_IMAGE, FIXTURE_SCENARIO_IDS, FIXTURE_VARIANTS, listCampaignReceipts, readCampaignReceipt, runAttackExperiment, runSandboxScenario, SCENARIO_IDS, verifyCampaignReceipt, verifySandboxScenario } from "./sandbox.js";
 
 function help() {
   return `terrarium ${VERSION}
@@ -27,13 +27,14 @@ Usage:
   terra campaign read <campaignId>
   terra campaign verify <campaignId>
   terra campaign issue-draft <campaignId>
-  terra fixture escape [fixture-environment-leak]
+  terra fixture escape [vulnerable|fixed]
 
 Containment probes (opt-in; ordinary delegation is unchanged):
   ${SCENARIO_IDS.join("\n  ")}
 
 Known-vulnerable pipeline fixtures (local testing only; not real findings):
   ${FIXTURE_SCENARIO_IDS.join("\n  ")}
+  variants: ${FIXTURE_VARIANTS.join(", ")}
 
 Options:
   --agent <cmd>      Child command for ordinary runs or proposal agent for terra attack.
@@ -111,7 +112,7 @@ else if (cmd === "campaign" && rest[0] === "issue-draft") campaignIssueDraft({ c
   if (opts.json) console.log(JSON.stringify(result, null, 2));
   else console.log(result.markdown);
 }).catch((e) => { console.error(`terrarium: ${e.message}`); process.exit(1); });
-else if (cmd === "fixture" && rest[0] === "escape") createFixtureCampaign({ scenarioId: rest[1] }).then((result) => console.log(JSON.stringify(result, null, 2))).catch((e) => { console.error(`terrarium: ${e.message}`); process.exit(1); });
+else if (cmd === "fixture" && rest[0] === "escape") createFixtureCampaign({ variant: rest[1] || "vulnerable" }).then((result) => console.log(JSON.stringify(result, null, 2))).catch((e) => { console.error(`terrarium: ${e.message}`); process.exit(1); });
 else runTerrarium({ ...opts, task: opts.task.join(" ").trim(), stream: !opts.json }).then((result) => {
   if (opts.json) console.log(JSON.stringify(result, null, 2));
   process.exit(result.exitCode ?? (result.ok ? 0 : 1));

@@ -1,0 +1,120 @@
+name: Publish fixture issue
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+concurrency:
+  group: publish-fixture-issue
+  cancel-in-progress: false
+
+jobs:
+  publish-fixture-issue:
+    name: Publish verified synthetic fixture issue
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Produce verified fixture draft
+        id: fixture
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/fixture
+          node src/cli.js fixture escape vulnerable > artifacts/fixture/attack.json
+          campaign_id="$(node -e 'const r=require("./artifacts/fixture/attack.json"); if (r.verdict !== "escaped" || r.receipt.fixture !== true || r.receipt.fixtureVariant !== "vulnerable") process.exit(1); process.stdout.write(r.receipt.campaignId)' )"
+          node src/cli.js campaign verify "$campaign_id" --json > artifacts/fixture/verification.json
+          node -e 'const r=require("./artifacts/fixture/verification.json"); if (r.verdict !== "verified-escape" || r.replay.fixture !== true || r.replay.fixtureVariant !== "vulnerable") process.exit(1);'
+          node src/cli.js campaign issue-draft "$campaign_id" > artifacts/fixture/draft.md
+          grep -q 'Known-vulnerable fixture' artifacts/fixture/draft.md
+          ! grep -q 'planted-fixture-canary' artifacts/fixture/draft.md
+          {
+            echo 'body<<EOF'
+            echo '> **PIPELINE TEST ONLY — NOT A DISCOVERED SECURITY VULNERABILITY**'
+            echo '>'
+            echo '> This issue is automatically created from Terrarium’s intentionally vulnerable fixture to exercise the public issue → remediation → replay workflow.'
+            echo
+            cat artifacts/fixture/draft.md
+            echo 'EOF'
+          } >> "$GITHUB_OUTPUT"
+          echo "campaign_id=$campaign_id" >> "$GITHUB_OUTPUT"
+
+      - name: Find existing open fixture pipeline issue
+        id: existing
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const marker = 'fixture-environment-leak — public remediation pipeline exercise';
+            const issues = await github.paginate(github.rest.issues.listForRepo, {
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'terrarium:fixture,terrarium:pipeline-test',
+              per_page: 100,
+            });
+            const found = issues.find(issue => issue.title.includes(marker));
+            core.setOutput('number', found ? String(found.number) : '');
+            core.setOutput('url', found ? found.html_url : '');
+
+      - name: Ensure fixture labels exist
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const labels = [
+              { name: 'terrarium:fixture', color: '6f42c1', description: 'Intentional fixture, not a discovered vulnerability' },
+              { name: 'terrarium:verified', color: 'd73a4a', description: 'Reproduced by a fresh Terrarium replay' },
+              { name: 'terrarium:pipeline-test', color: '0366d6', description: 'Exercises public automation plumbing' },
+            ];
+            for (const label of labels) {
+              try {
+                await github.rest.issues.getLabel({ owner: context.repo.owner, repo: context.repo.repo, name: label.name });
+              } catch (error) {
+                if (error.status !== 404) throw error;
+                await github.rest.issues.createLabel({ owner: context.repo.owner, repo: context.repo.repo, ...label });
+              }
+            }
+
+      - name: Create fixture issue if absent
+        id: created
+        if: steps.existing.outputs.number == ''
+        uses: actions/github-script@v7
+        env:
+          ISSUE_BODY: ${{ steps.fixture.outputs.body }}
+        with:
+          script: |
+            const response = await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: '[fixture escape] fixture-environment-leak — public remediation pipeline exercise',
+              body: process.env.ISSUE_BODY,
+              labels: ['terrarium:fixture', 'terrarium:verified', 'terrarium:pipeline-test'],
+            });
+            core.setOutput('number', String(response.data.number));
+            core.setOutput('url', response.data.html_url);
+
+      - name: Summarize publication result
+        shell: bash
+        env:
+          EXISTING_URL: ${{ steps.existing.outputs.url }}
+          CREATED_URL: ${{ steps.created.outputs.url }}
+          CAMPAIGN_ID: ${{ steps.fixture.outputs.campaign_id }}
+        run: |
+          issue_url="${CREATED_URL:-$EXISTING_URL}"
+          {
+            echo '## Synthetic fixture issue publication'
+            echo
+            echo '- Finding type: **known-vulnerable fixture; not a real discovery**'
+            echo "- Campaign: \`$CAMPAIGN_ID\`"
+            echo "- Issue: $issue_url"
+            echo '- Mutation authority used: **issues only**'
+          } >> "$GITHUB_STEP_SUMMARY"

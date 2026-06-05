@@ -1,0 +1,5 @@
+{
+  "name": "fixture-environment-leak",
+  "description": "Known-vulnerable environment policy used only to prove the reporting pipeline.",
+  "injectCanary": true
+}
