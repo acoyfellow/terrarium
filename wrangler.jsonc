@@ -1,0 +1,17 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "terrarium-control",
+  "main": "src/control-worker.js",
+  "compatibility_date": "2026-06-05",
+  "account_id": "bfcb6ac5b3ceaf42a09607f6f7925823",
+  "vars": {
+    "TERRARIUM_MODE": "fixture"
+  },
+  "workflows": [
+    {
+      "name": "terrarium-campaign",
+      "binding": "TERRARIUM_CAMPAIGN",
+      "class_name": "TerrariumCampaignWorkflow"
+    }
+  ]
+}
