@@ -11,6 +11,10 @@
     {
       "binding": "TERRARIUM_LEDGER",
       "id": "7e322bfe94234a52896706a5c8231407"
+    },
+    {
+      "binding": "TERRARIUM_POLICY",
+      "id": "7e322bfe94234a52896706a5c8231407"
     }
   ],
   "r2_buckets": [

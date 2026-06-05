@@ -78,6 +78,7 @@ export class TerrariumCampaignWorkflow extends WorkflowEntrypoint {
     await step.do("guardrails", async () => {
       if (policy.paused) throw new Error("campaigns paused");
       if (mode !== "fixture" && !policy.allowReal) throw new Error("real campaigns disabled");
+      if (mode !== "fixture" && policy.paused) throw new Error("real campaigns paused");
       if (mode === "fixture" && !policy.allowFixture) throw new Error("fixture campaigns disabled");
       if (mode !== "fixture" && !input.payload) throw new Error("real campaign payload required");
       const ledger = await loadLedger(this.env);
@@ -137,6 +138,17 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     if (url.pathname === "/health") return Response.json({ ok: true, mode: env.TERRARIUM_MODE || "fixture" });
+    if (url.pathname === "/policy" && request.method === "GET") {
+      return Response.json(await loadPolicy(env, env.TERRARIUM_MODE || "fixture"));
+    }
+    if (url.pathname === "/policy" && request.method === "POST") {
+      const body = await json(request);
+      if (!env.TERRARIUM_POLICY) return Response.json({ ok: false, error: "TERRARIUM_POLICY binding missing" }, { status: 501 });
+      const current = await loadPolicy(env, body.mode || env.TERRARIUM_MODE || "fixture");
+      const next = { ...current, ...body };
+      await env.TERRARIUM_POLICY.put(body.mode || next.mode || "fixture", JSON.stringify(next));
+      return Response.json({ ok: true, policy: next });
+    }
     if (url.pathname === "/campaigns" && request.method === "POST") {
       const body = await json(request);
       const requestedMode = body.mode || env.TERRARIUM_MODE || "fixture";
