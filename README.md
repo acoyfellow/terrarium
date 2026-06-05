@@ -174,7 +174,7 @@ The baseline workflow has only `contents: read` permission. It does **not** crea
 
 A second manual workflow, `.github/workflows/publish-fixture-issue.yml`, exercises verified issue publication for the intentionally vulnerable fixture only. It is scoped to `issues: write`, refuses unverified fixture output, labels the result as a pipeline test, and avoids duplicate open fixture issues.
 
-A third manual workflow, `.github/workflows/fix-fixture-issue.yml`, accepts a labeled open fixture issue and opens a synthetic remediation PR selecting the tracked `fixed` fixture policy. The PR is checked by `.github/workflows/replay-fixture-fix.yml`, which requires the vulnerable control to remain reproducible and the fixed variant to return `contained`. This is remediation plumbing, not yet an AI-generated fix or an automatic merge path.
+A third manual workflow, `.github/workflows/fix-fixture-issue.yml`, accepts a labeled open fixture issue and opens a synthetic remediation PR selecting the tracked `fixed` fixture policy. The PR is checked by `.github/workflows/replay-fixture-fix.yml`, which requires the vulnerable control to remain reproducible and the fixed variant to return `contained`. The replay workflow also supports manual dispatch for bootstrapping its first PR before that workflow file exists on the base branch. This is remediation plumbing, not yet an AI-generated fix or an automatic merge path.
 
 ## What is stable versus experimental
 

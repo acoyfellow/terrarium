@@ -8,6 +8,12 @@ on:
       - "src/cli.js"
       - "test/sandbox.test.js"
       - ".github/workflows/replay-fixture-fix.yml"
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: Branch to validate when bootstrapping this workflow
+        required: true
+        default: "terrarium/fix-fixture-1"
 
 permissions:
   contents: read
@@ -18,8 +24,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - name: Check out pull request
+      - name: Check out pull request or selected branch
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.ref || github.ref }}
 
       - name: Set up Node.js 22
         uses: actions/setup-node@v4
