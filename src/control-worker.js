@@ -1,4 +1,6 @@
 import { WorkflowEntrypoint } from "cloudflare:workers";
+import { DEFAULT_LAB_POLICY } from "./lab.js";
+import { runHostileLabScenario } from "./hostile.js";
 
 const DEFAULT_POLICY = {
   paused: false,
@@ -11,14 +13,6 @@ const DEFAULT_POLICY = {
   allowFixture: true,
   allowReal: false,
   allowAutoMerge: false,
-};
-
-const FIXTURE_PAYLOAD = {
-  scenarioId: "fixture-environment-leak",
-  fixture: true,
-  variant: "vulnerable",
-  body: "return true;",
-  capabilities: [],
 };
 
 async function json(request) {
@@ -48,28 +42,6 @@ function todayCounts(ledger) {
   const day = utcDay();
   const current = ledger[day] || { runs: 0, verifiedEscapes: 0, issues: 0, fixPrs: 0, lastRunAt: null };
   return { day, current };
-}
-
-async function runLab(env, payload) {
-  if (!env.LAB_ORIGIN) throw new Error("LAB_ORIGIN missing");
-  const res = await fetch(`${env.LAB_ORIGIN}/run`, {
-    method: "POST",
-    headers: { "content-type": "application/json", ...(env.LAB_AUTH_TOKEN ? { authorization: `Bearer ${env.LAB_AUTH_TOKEN}` } : {}) },
-    body: JSON.stringify({ body: payload.body, input: payload.input, capabilities: payload.capabilities }),
-  });
-  if (!res.ok) throw new Error(`Lab run failed: ${res.status}`);
-  return await res.json();
-}
-
-function detectFixture(run) {
-  const result = run.result;
-  const escaped = result === true;
-  return {
-    verdict: escaped ? "escaped" : "contained",
-    observed: escaped ? "The fixture payload observed a forbidden secret-like value." : "The fixture payload did not observe a forbidden secret-like value.",
-    result,
-    resultId: run.resultId,
-  };
 }
 
 async function writeArtifact(env, id, kind, value) {
@@ -104,35 +76,29 @@ export class TerrariumCampaignWorkflow extends WorkflowEntrypoint {
       await saveLedger(this.env, ledger);
     });
 
-    const scenario = await step.do("choose-scenario", async () => mode === "fixture" ? FIXTURE_PAYLOAD : input.scenario);
-    const execution = await step.do("lab-run", async () => runLab(this.env, scenario));
-    const verdict = await step.do("detector", async () => detectFixture(execution));
-    const replay = verdict.verdict === "escaped"
-      ? await step.do("fresh-replay", async () => runLab(this.env, scenario))
-      : null;
-    const verified = replay
-      ? await step.do("verify-replay", async () => detectFixture(replay))
-      : null;
+    const scenarioId = await step.do("choose-scenario", async () => mode === "fixture" ? "lab-env-canary" : input.scenarioId);
+    const hostile = await step.do("hostile-lab-run", async () => runHostileLabScenario({
+      scenarioId,
+      fixture: mode === "fixture",
+      baseUrl: this.env.LAB_ORIGIN,
+      authToken: this.env.LAB_AUTH_TOKEN,
+      policy: { ...DEFAULT_LAB_POLICY, ...policy },
+    }));
 
     const campaignId = `campaign_${new Date().toISOString().replace(/[-:.TZ]/g, "")}_${crypto.randomUUID().slice(0, 8)}`;
     const receipt = await step.do("write-receipt", async () => writeReceipt(this.env, {
       receiptVersion: 1,
       campaignId,
       mode,
-      scenarioId: scenario.scenarioId,
-      fixture: Boolean(scenario.fixture),
-      backend: "lab",
-      policy,
-      verdict: verdict.verdict,
-      observed: verdict.observed,
-      execution: { resultId: verdict.resultId, result: verdict.result },
-      replay: verified ? { verdict: verified.verdict, observed: verified.observed, resultId: verified.resultId } : null,
+      scenarioId: hostile.scenarioId,
+      fixture: mode === "fixture",
+      ...hostile,
       startedAt: event.timestamp || new Date().toISOString(),
       finishedAt: new Date().toISOString(),
     }));
 
     return {
-      status: verified?.verdict === "escaped" ? "verified-escape" : verdict.verdict,
+      status: hostile.verifiedVerdict || hostile.verdict,
       campaignId,
       receipt,
     };

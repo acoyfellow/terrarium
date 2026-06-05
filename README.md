@@ -230,7 +230,7 @@ terra fixture escape fixed
 
 ### Cloudflare Dynamic Workflow prototype
 
-Terrarium now also has a minimal Cloudflare-native control-worker prototype in `src/control-worker.js`, configured by `wrangler.jsonc`. It uses a Dynamic Workflow to load policy, enforce pause/cooldown/daily caps, run one Lab-backed fixture scenario, replay escaped results, and write a receipt. The current deployment is intentionally fixture-only on the personal Cloudflare account at `https://terrarium-control.coy.workers.dev`; it does not yet publish issues, open PRs, or merge fixes.
+Terrarium now also has a minimal Cloudflare-native control-worker prototype in `src/control-worker.js`, configured by `wrangler.jsonc`. It uses a Dynamic Workflow to load policy, enforce pause/cooldown/daily caps, run one Lab-backed fixture scenario, replay escaped results, and write a receipt. The current deployment is intentionally fixture-only on the personal Cloudflare account at `https://terrarium-control.coy.workers.dev`; it does not yet publish issues, open PRs, or merge fixes. The next local-first layer is `src/lab.js` plus `src/hostile.js`: a bounded Lab adapter, hostile payload policy, one `lab-env-canary` scenario, and exact fresh replay before any real publication path is enabled.
 
 ```text
 load policy
