@@ -5,10 +5,9 @@ on:
     types: [opened, synchronize, reopened]
     paths:
       - "fixtures/known-vulnerable/**"
-      - "src/sandbox.js"
-      - "src/cli.js"
-      - "test/sandbox.test.js"
-      - ".github/workflows/replay-fixture-fix.yml"
+      - "src/**"
+      - "test/**"
+      - ".github/workflows/**"
   workflow_dispatch:
     inputs:
       ref:
