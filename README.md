@@ -190,7 +190,7 @@ fixture issue #3
 - PR: https://github.com/acoyfellow/terrarium/pull/4
 - Replay run: https://github.com/acoyfellow/terrarium/actions/runs/27006150043
 
-This is still a pipeline fixture, not a discovered security vulnerability. A second synthetic PR was created after the replay workflow landed, but its native `pull_request` check did not attach automatically, so the workflow now explicitly declares `opened`, `synchronize`, and `reopened` event types and covers `src/**`, `test/**`, `fixtures/**`, and workflow files. It still needs one clean native-cycle proof. The remaining gap from this proof to hostile adaptive public automation is tracked in [docs/GAPS_TO_AUTONOMY.md](./docs/GAPS_TO_AUTONOMY.md).
+This is still a pipeline fixture, not a discovered security vulnerability. Two later synthetic PRs were created after the replay workflow landed, but their native `pull_request` checks still did not attach automatically, so the workflow now explicitly declares `opened`, `synchronize`, and `reopened` event types and temporarily uses `paths: ["**"]` to eliminate path-filter ambiguity. It still needs one clean native-cycle proof. The remaining gap from this proof to hostile adaptive public automation is tracked in [docs/GAPS_TO_AUTONOMY.md](./docs/GAPS_TO_AUTONOMY.md).
 
 ## What is stable versus experimental
 
