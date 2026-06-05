@@ -2,6 +2,7 @@ name: Replay fixture fix
 
 on:
   pull_request:
+    types: [opened, synchronize, reopened]
     paths:
       - "fixtures/known-vulnerable/**"
       - "src/sandbox.js"
