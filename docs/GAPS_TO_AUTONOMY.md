@@ -137,7 +137,7 @@ Constraints:
 
 ## Gap 6: replay gate is not yet native on a newly created real PR
 
-The first synthetic PR needed a manual bootstrap replay because the workflow was introduced after the PR branch existed. A second synthetic PR was created after the workflow landed, but the check did not attach automatically. The workflow now explicitly declares `types: [opened, synchronize, reopened]` and broadens its path coverage to `src/**`, `test/**`, `fixtures/**`, and workflow files; that still needs one clean native-cycle proof.
+The first synthetic PR needed a manual bootstrap replay because the workflow was introduced after the PR branch existed. Two later synthetic PRs were created after the workflow landed, but the check still did not attach automatically. The workflow now explicitly declares `types: [opened, synchronize, reopened]` and temporarily uses `paths: ["**"]` to eliminate path-filter ambiguity; that still needs one clean native-cycle proof.
 
 Needed next:
 
