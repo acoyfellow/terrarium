@@ -1,0 +1,64 @@
+name: Replay fixture fix
+
+on:
+  pull_request:
+    paths:
+      - "fixtures/known-vulnerable/**"
+      - "src/sandbox.js"
+      - "src/cli.js"
+      - "test/sandbox.test.js"
+      - ".github/workflows/replay-fixture-fix.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  fixture-replay-gate:
+    name: Fixture replay gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Check out pull request
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Run product tests
+        run: npm test
+
+      - name: Require explicit remediation selection
+        run: |
+          node - <<'NODE'
+          const fs = require('fs');
+          const path = 'fixtures/known-vulnerable/environment-leak/remediation.json';
+          if (!fs.existsSync(path)) throw new Error('missing synthetic remediation selection');
+          const remediation = JSON.parse(fs.readFileSync(path, 'utf8'));
+          if (remediation.variant !== 'fixed') throw new Error('remediation must select the fixed fixture variant');
+          NODE
+
+      - name: Replay vulnerable and fixed variants
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/replay
+          node src/cli.js fixture escape vulnerable > artifacts/replay/vulnerable.json
+          node src/cli.js fixture escape fixed > artifacts/replay/fixed.json
+          node - <<'NODE'
+          const vulnerable = require('./artifacts/replay/vulnerable.json');
+          const fixed = require('./artifacts/replay/fixed.json');
+          if (vulnerable.verdict !== 'escaped' || vulnerable.receipt.fixtureVariant !== 'vulnerable') throw new Error('known vulnerable control did not reproduce');
+          if (fixed.verdict !== 'contained' || fixed.receipt.fixtureVariant !== 'fixed') throw new Error('fixed variant was not contained');
+          NODE
+
+      - name: Summarize replay gate
+        run: |
+          {
+            echo '## Fixture remediation replay gate'
+            echo
+            echo '- Vulnerable control: **escaped** (expected synthetic control)'
+            echo '- Fixed policy: **contained**'
+            echo '- Verdict: **synthetic remediation gate passed**'
+          } >> "$GITHUB_STEP_SUMMARY"

@@ -1,0 +1,135 @@
+name: Fix fixture issue
+
+on:
+  workflow_dispatch:
+    inputs:
+      issue_number:
+        description: Open fixture issue number to remediate
+        required: true
+        default: "1"
+
+permissions:
+  contents: write
+  issues: write
+  pull-requests: write
+
+concurrency:
+  group: fix-fixture-issue-${{ inputs.issue_number }}
+  cancel-in-progress: false
+
+jobs:
+  open-fixture-fix-pr:
+    name: Open deterministic fixture remediation PR
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Validate source issue
+        uses: actions/github-script@v7
+        env:
+          ISSUE_NUMBER: ${{ inputs.issue_number }}
+        with:
+          script: |
+            const issue_number = Number(process.env.ISSUE_NUMBER);
+            const { data: issue } = await github.rest.issues.get({ owner: context.repo.owner, repo: context.repo.repo, issue_number });
+            const labels = issue.labels.map(label => typeof label === 'string' ? label : label.name);
+            const required = ['terrarium:fixture', 'terrarium:verified', 'terrarium:pipeline-test'];
+            for (const label of required) {
+              if (!labels.includes(label)) core.setFailed(`issue #${issue_number} is missing required label ${label}`);
+            }
+            if (issue.state !== 'open') core.setFailed(`issue #${issue_number} is not open`);
+
+      - name: Confirm fixed fixture target is contained
+        run: |
+          node src/cli.js fixture escape fixed > /tmp/fixed-fixture.json
+          node -e 'const r=require("/tmp/fixed-fixture.json"); if (r.verdict !== "contained" || r.receipt.fixtureVariant !== "fixed") process.exit(1);'
+
+      - name: Create remediation branch content
+        id: patch
+        shell: bash
+        env:
+          ISSUE_NUMBER: ${{ inputs.issue_number }}
+        run: |
+          set -euo pipefail
+          branch="terrarium/fix-fixture-${ISSUE_NUMBER}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -B "$branch"
+          node - <<'NODE'
+          const fs = require('fs');
+          const path = 'fixtures/known-vulnerable/environment-leak/remediation.json';
+          const data = {
+            name: 'fixture-environment-leak',
+            issue: Number(process.env.ISSUE_NUMBER),
+            variant: 'fixed',
+            description: 'Synthetic remediation selection: use the contained fixture policy for replay-gate validation.'
+          };
+          fs.writeFileSync(path, JSON.stringify(data, null, 2) + '\n');
+          NODE
+          git add fixtures/known-vulnerable/environment-leak/remediation.json
+          if git diff --cached --quiet; then
+            echo 'No new remediation commit required; existing PR/branch may already exist.'
+          else
+            git commit -m "Remediate fixture environment leak for issue #${ISSUE_NUMBER}"
+            git push --force-with-lease origin "$branch"
+          fi
+          echo "branch=$branch" >> "$GITHUB_OUTPUT"
+
+      - name: Find existing remediation PR
+        id: existing
+        uses: actions/github-script@v7
+        env:
+          HEAD_BRANCH: ${{ steps.patch.outputs.branch }}
+        with:
+          script: |
+            const prs = await github.rest.pulls.list({ owner: context.repo.owner, repo: context.repo.repo, state: 'open', head: `${context.repo.owner}:${process.env.HEAD_BRANCH}` });
+            const pr = prs.data[0];
+            core.setOutput('number', pr ? String(pr.number) : '');
+            core.setOutput('url', pr ? pr.html_url : '');
+
+      - name: Open remediation PR if absent
+        id: created
+        if: steps.existing.outputs.number == ''
+        uses: actions/github-script@v7
+        env:
+          ISSUE_NUMBER: ${{ inputs.issue_number }}
+          HEAD_BRANCH: ${{ steps.patch.outputs.branch }}
+        with:
+          script: |
+            const issue = Number(process.env.ISSUE_NUMBER);
+            const response = await github.rest.pulls.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              head: process.env.HEAD_BRANCH,
+              base: 'main',
+              title: `[fixture fix] Remediate environment-leak pipeline fixture (#${issue})`,
+              body: `> **PIPELINE TEST ONLY — NOT A REAL SECURITY FIX**\n\nThis PR selects the tracked \`fixed\` policy variant for the intentional environment-leak fixture.\n\nCloses #${issue}\n\nExpected gate: the fixture remediation replay must be contained while the known vulnerable variant remains reproducibly escaped for pipeline testing.`,
+            });
+            core.setOutput('number', String(response.data.number));
+            core.setOutput('url', response.data.html_url);
+
+      - name: Label PR and comment on issue
+        uses: actions/github-script@v7
+        env:
+          ISSUE_NUMBER: ${{ inputs.issue_number }}
+          EXISTING_PR: ${{ steps.existing.outputs.number }}
+          CREATED_PR: ${{ steps.created.outputs.number }}
+          EXISTING_URL: ${{ steps.existing.outputs.url }}
+          CREATED_URL: ${{ steps.created.outputs.url }}
+        with:
+          script: |
+            const pr = Number(process.env.CREATED_PR || process.env.EXISTING_PR);
+            const url = process.env.CREATED_URL || process.env.EXISTING_URL;
+            const issue = Number(process.env.ISSUE_NUMBER);
+            await github.rest.issues.addLabels({ owner: context.repo.owner, repo: context.repo.repo, issue_number: pr, labels: ['terrarium:fixture', 'terrarium:pipeline-test'] });
+            await github.rest.issues.createComment({ owner: context.repo.owner, repo: context.repo.repo, issue_number: issue, body: `Synthetic remediation PR opened: ${url}\n\nReplay-gate checks must pass before merge.` });
+            core.summary.addHeading('Synthetic fixture remediation').addLink(`PR #${pr}`, url).addRaw(` for issue #${issue}`).write();
