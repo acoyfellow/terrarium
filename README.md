@@ -176,6 +176,22 @@ A second manual workflow, `.github/workflows/publish-fixture-issue.yml`, exercis
 
 A third manual workflow, `.github/workflows/fix-fixture-issue.yml`, accepts a labeled open fixture issue and opens a synthetic remediation PR selecting the tracked `fixed` fixture policy. The PR is checked by `.github/workflows/replay-fixture-fix.yml`, which runs the fixture/sandbox tests, requires the vulnerable control to remain reproducible, and requires the fixed variant to return `contained`. The replay workflow also supports manual dispatch for bootstrapping its first PR before that workflow file exists on the base branch. This is remediation plumbing, not yet an AI-generated fix or an automatic merge path.
 
+The synthetic loop has now been exercised end to end in public:
+
+```text
+fixture issue #3
+  → remediation PR #4
+  → replay gate passed
+  → merged
+  → issue closed
+```
+
+- Issue: https://github.com/acoyfellow/terrarium/issues/3
+- PR: https://github.com/acoyfellow/terrarium/pull/4
+- Replay run: https://github.com/acoyfellow/terrarium/actions/runs/27006150043
+
+This is still a pipeline fixture, not a discovered security vulnerability. The remaining gap from this proof to hostile adaptive public automation is tracked in [docs/GAPS_TO_AUTONOMY.md](./docs/GAPS_TO_AUTONOMY.md).
+
 ## What is stable versus experimental
 
 ### Stable base interface
@@ -227,7 +243,7 @@ Not yet shipped:
 - defensive fix-agent pull requests;
 - replay-gated automated merge and scheduled looping.
 
-Design and trust boundaries: [THREAT_MODEL.md](./THREAT_MODEL.md), [docs/AUTONOMOUS_LOOP.md](./docs/AUTONOMOUS_LOOP.md).
+Design and trust boundaries: [THREAT_MODEL.md](./THREAT_MODEL.md), [docs/AUTONOMOUS_LOOP.md](./docs/AUTONOMOUS_LOOP.md), [docs/GAPS_TO_AUTONOMY.md](./docs/GAPS_TO_AUTONOMY.md).
 
 ## Original delegation reference
 
