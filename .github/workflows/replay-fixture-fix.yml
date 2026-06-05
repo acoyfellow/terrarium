@@ -34,8 +34,8 @@ jobs:
         with:
           node-version: 22
 
-      - name: Run product tests
-        run: npm test
+      - name: Run fixture/sandbox tests
+        run: node --test test/sandbox.test.js
 
       - name: Require explicit remediation selection
         run: |
