@@ -79,9 +79,11 @@ export class TerrariumCampaignWorkflow extends WorkflowEntrypoint {
       if (policy.paused) throw new Error("campaigns paused");
       if (mode !== "fixture" && !policy.allowReal) throw new Error("real campaigns disabled");
       if (mode === "fixture" && !policy.allowFixture) throw new Error("fixture campaigns disabled");
+      if (mode !== "fixture" && !input.payload) throw new Error("real campaign payload required");
       const ledger = await loadLedger(this.env);
       const { day, current } = todayCounts(ledger);
       if (current.runs >= policy.maxRunsPerDay) throw new Error("daily run cap reached");
+      if (current.verifiedEscapes >= policy.maxVerifiedEscapesPerDay) throw new Error("daily verified escape cap reached");
       if (current.lastRunAt && Date.now() - Date.parse(current.lastRunAt) < policy.cooldownMinutes * 60000) throw new Error("cooldown active");
       current.runs += 1;
       current.lastRunAt = new Date().toISOString();
@@ -89,9 +91,11 @@ export class TerrariumCampaignWorkflow extends WorkflowEntrypoint {
       await saveLedger(this.env, ledger);
     });
 
-    const scenarioId = await step.do("choose-scenario", async () => mode === "fixture" ? "lab-env-canary" : input.scenarioId);
+    const scenarioId = await step.do("choose-scenario", async () => mode === "fixture" ? "lab-env-canary" : input.payload.scenarioId);
     const hostile = await step.do("hostile-lab-run", async () => runHostileLabScenario({
       scenarioId,
+      body: mode === "fixture" ? undefined : input.payload.body,
+      capabilities: mode === "fixture" ? undefined : input.payload.capabilities,
       fixture: mode === "fixture",
       baseUrl: this.env.LAB_ORIGIN,
       authToken: this.env.LAB_AUTH_TOKEN,

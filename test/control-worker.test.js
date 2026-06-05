@@ -16,3 +16,9 @@ test("control worker remains fixture-only and starts with bounded policy", () =>
   assert.equal(DEFAULT_LAB_POLICY.requireFreshReplay, true);
   assert.deepEqual(DEFAULT_LAB_POLICY.allowCapabilities, []);
 });
+
+test("real-mode payload shape is bounded by the same hostile scenario contract", () => {
+  const scenario = HOSTILE_SCENARIOS["lab-env-canary"];
+  assert.equal(scenario.body, "return typeof secret !== 'undefined';");
+  assert.deepEqual(scenario.capabilities, []);
+});
