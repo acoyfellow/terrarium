@@ -67,6 +67,22 @@ A public GitHub Actions baseline workflow now runs these deterministic probes an
 
 Manual public fixture-loop workflows now exercise mutation in bounded stages: `publish-fixture-issue.yml` can open a clearly labeled synthetic issue with only `issues: write`; `fix-fixture-issue.yml` can create a deterministic remediation PR for that labeled fixture issue; and `replay-fixture-fix.yml` uses read-only PR checks to require that the vulnerable control still escapes while the selected fixed policy is contained. This is infrastructure validation, not automated handling of real findings.
 
+The first full synthetic loop completed publicly:
+
+```text
+issue #3
+  → PR #4
+  → replay gate passed
+  → merged
+  → issue closed
+```
+
+- Issue: https://github.com/acoyfellow/terrarium/issues/3
+- PR: https://github.com/acoyfellow/terrarium/pull/4
+- Replay run: https://github.com/acoyfellow/terrarium/actions/runs/27006150043
+
+The replay for that first PR was manually dispatched because the replay workflow had only just been added to `main`. The next synthetic PR should verify native `pull_request` attachment before any real finding path is trusted.
+
 ### Phase 2: AI attacker, local evidence only — conservative path started
 
 The initial command is deliberately constrained:
