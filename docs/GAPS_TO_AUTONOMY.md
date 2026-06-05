@@ -137,7 +137,7 @@ Constraints:
 
 ## Gap 6: replay gate is not yet native on a newly created real PR
 
-The first synthetic PR needed a manual bootstrap replay because the workflow was introduced after the PR branch existed. A second synthetic PR was created after the workflow landed, but GitHub did not attach the check automatically with the original default `pull_request` event shape. The workflow now explicitly declares `types: [opened, synchronize, reopened]`; that still needs one clean native-cycle proof.
+The first synthetic PR needed a manual bootstrap replay because the workflow was introduced after the PR branch existed. A second synthetic PR was created after the workflow landed, but the check did not attach automatically. The workflow now explicitly declares `types: [opened, synchronize, reopened]` and broadens its path coverage to `src/**`, `test/**`, `fixtures/**`, and workflow files; that still needs one clean native-cycle proof.
 
 Needed next:
 
