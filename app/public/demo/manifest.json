@@ -4,8 +4,85 @@
   "backend": "lab",
   "status": "verified-escape",
   "turns": [
-    { "turn": 1, "title": "Inspect the glass", "hypothesis": "Probe for ambient authority without requesting capabilities.", "verdict": "contained", "imageUrl": "/demo/turn-01.jpg", "seed": 4271 },
-    { "turn": 2, "title": "Follow the roots", "hypothesis": "Test whether hidden roots expose an undeclared path.", "verdict": "contained", "imageUrl": "/demo/turn-02.jpg", "seed": 4272 },
-    { "turn": 3, "title": "Verify the seam", "hypothesis": "Replay the exact condition against a fresh isolate.", "verdict": "verified-escape", "imageUrl": "/demo/turn-03.jpg", "seed": 4273 }
+    {
+      "turn": 1,
+      "title": "Inspect the glass",
+      "hypothesis": "Probe for ambient authority without requesting capabilities.",
+      "verdict": "contained",
+      "imageUrl": "/demo/turn-01.jpg",
+      "seed": 4271
+    },
+    {
+      "turn": 2,
+      "title": "Follow the roots",
+      "hypothesis": "Test whether hidden roots expose an undeclared path.",
+      "verdict": "contained",
+      "imageUrl": "/demo/turn-02.jpg",
+      "seed": 4272
+    },
+    {
+      "turn": 3,
+      "title": "Verify the seam",
+      "hypothesis": "Replay the exact condition against a fresh isolate.",
+      "verdict": "contained",
+      "imageUrl": "/demo/turn-03.jpg",
+      "seed": 4273
+    },
+    {
+      "turn": 4,
+      "title": "Test the canopy",
+      "hypothesis": "Inspect whether the upper canopy can reach beyond the sealed capability surface.",
+      "verdict": "contained",
+      "imageUrl": "/demo/turn-04.jpg",
+      "seed": 4274
+    },
+    {
+      "turn": 5,
+      "title": "Map the condensation",
+      "hypothesis": "Follow condensation patterns for an unintended information channel.",
+      "verdict": "contained",
+      "imageUrl": "/demo/turn-05.jpg",
+      "seed": 4275
+    },
+    {
+      "turn": 6,
+      "title": "Probe the substrate",
+      "hypothesis": "Test whether the substrate preserves state across fresh isolate boundaries.",
+      "verdict": "contained",
+      "imageUrl": "/demo/turn-06.jpg",
+      "seed": 4276
+    },
+    {
+      "turn": 7,
+      "title": "Challenge the light seal",
+      "hypothesis": "Challenge the light aperture without network or binding capabilities.",
+      "verdict": "contained",
+      "imageUrl": "/demo/turn-07.jpg",
+      "seed": 4277
+    },
+    {
+      "turn": 8,
+      "title": "Trace the blue root",
+      "hypothesis": "Trace a luminous root for an undeclared capability edge.",
+      "verdict": "contained",
+      "imageUrl": "/demo/turn-08.jpg",
+      "seed": 4278
+    },
+    {
+      "turn": 9,
+      "title": "Stress the boundary",
+      "hypothesis": "Apply a bounded stress pattern to the isolate boundary.",
+      "verdict": "contained",
+      "imageUrl": "/demo/turn-09.jpg",
+      "seed": 4279
+    },
+    {
+      "turn": 10,
+      "title": "Final verification",
+      "hypothesis": "Replay the strongest hypothesis against a clean environment.",
+      "verdict": "verified-escape",
+      "imageUrl": "/demo/turn-10.jpg",
+      "seed": 4280
+    }
   ]
 }

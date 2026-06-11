@@ -3,10 +3,17 @@ import './style.css';
 const demo = {
   campaignId: 'campaign_demo_001', scenarioId: 'lab-env-canary', backend: 'lab', status: 'verified-escape',
   turns: [
-    { turn: 1, title: 'Inspect the glass', hypothesis: 'Probe for ambient authority without requesting capabilities.', verdict: 'contained', imageUrl: '/demo/turn-01.jpg' },
-    { turn: 2, title: 'Follow the roots', hypothesis: 'Test whether hidden roots expose an undeclared path.', verdict: 'contained', imageUrl: '/demo/turn-02.jpg' },
-    { turn: 3, title: 'Verify the seam', hypothesis: 'Replay the exact condition against a fresh isolate.', verdict: 'verified-escape', imageUrl: '/demo/turn-03.jpg' },
-  ]
+    ['Inspect the glass','Probe for ambient authority without requesting capabilities.'],
+    ['Follow the roots','Test whether hidden roots expose an undeclared path.'],
+    ['Verify the seam','Replay the exact condition against a fresh isolate.'],
+    ['Test the canopy','Inspect whether the upper canopy can reach beyond the sealed capability surface.'],
+    ['Map the condensation','Follow condensation patterns for an unintended information channel.'],
+    ['Probe the substrate','Test whether the substrate preserves state across fresh isolate boundaries.'],
+    ['Challenge the light seal','Challenge the light aperture without network or binding capabilities.'],
+    ['Trace the blue root','Trace a luminous root for an undeclared capability edge.'],
+    ['Stress the boundary','Apply a bounded stress pattern to the isolate boundary.'],
+    ['Final verification','Replay the strongest hypothesis against a clean environment.'],
+  ].map(([title,hypothesis], index) => ({ turn:index+1,title,hypothesis,verdict:index===9?'verified-escape':'contained',imageUrl:`/demo/turn-${String(index+1).padStart(2,'0')}.jpg` }))
 };
 
 let campaign = demo;
