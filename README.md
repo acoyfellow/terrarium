@@ -244,6 +244,17 @@ load policy
 → receipt
 ```
 
+Manual adaptive campaigns are available behind controller authentication and disabled real-mode policy:
+
+```sh
+TERRARIUM_CONTROL_TOKEN=... \
+TERRARIUM_CONTROLLER_URL=https://terrarium-control.coy.workers.dev \
+terra hostile run lab-env-canary --turns 3 \
+  --agent "pi -p --no-session" --model kindle-alpha
+```
+
+Each turn accepts one machine-parsed payload, validates it against the zero-capability/4 KB policy, executes it in Lab, returns sanitized feedback, and stops early only on a fresh replayed escape. Issue publication, fix PRs, and auto-merge remain disabled for this manual path.
+
 ### Not shipped yet
 
 The intended public loop is:

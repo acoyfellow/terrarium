@@ -42,6 +42,7 @@ export async function runLabPayload({ baseUrl, body, capabilities = [], authToke
       ...(authToken ? { authorization: `Bearer ${authToken}` } : {}),
     },
     body: JSON.stringify(payload),
+    signal: AbortSignal.timeout(policy.maxRuntimeMs),
   });
   if (!response.ok) throw new Error(`Lab run failed: ${response.status}`);
   const result = await response.json();
