@@ -12,7 +12,7 @@ one bounded task → one child run → one inspectable result
 
 | If you want to… | Use… | Status |
 | --- | --- | --- |
-| Keep your main agent context clean while a child investigates or edits. | `terra "task"` or MCP `terrarium_spawn` | Stable original workflow |
+| Keep your main agent context clean while a child investigates or edits. | `terra "task"` or MCP `terrarium_spawn`; optionally choose Pi/OpenCode and pin a model | Stable original workflow |
 | Test declared containment boundaries in Docker. | `terra probe <scenario>` | Implemented, opt-in |
 | Ask an agent to initiate a bounded containment test. | `terra attack <scenario>` | Implemented, deliberately constrained |
 | Turn a reproduced escape into reviewable report text. | `terra campaign issue-draft <id>` | Local-only; does not publish |
@@ -28,6 +28,7 @@ Use this when you want the original Terrarium behavior: move noisy work into one
 npm install -g .
 terra --dry-run "summarize this repo"
 terra --read-only --profile minimal "find every place we handle auth"
+terra --agent "pi -p --no-session" --model kindle-alpha "inspect the failing parser test"
 terra --isolation worktree "fix the failing parser test"
 ```
 
@@ -36,6 +37,8 @@ top context ──spawns──> child context
    stays                 does messy work
    clean                 returns concise result
 ```
+
+Terrarium defaults to `opencode run` for compatibility. Runner, read-only runner, and model can now be configured independently; Pi one-shot children should use `pi -p --no-session` so the child does not leave its own persistent conversation file.
 
 Good uses:
 
@@ -360,7 +363,7 @@ Spawn and status default to concise responses so parent transcripts stay small. 
 
 ## How ordinary delegation works
 
-Terrarium starts exactly one child process per run. For ordinary delegation, children inherit parent environment and available MCP configuration. Terrarium records logs and metadata and sets lineage values including `TERRARIUM_RUN_ID`, `TERRARIUM_DEPTH`, `TERRARIUM_MAX_DEPTH`, and `TERRARIUM_MRE_LOG_PATH`.
+Terrarium starts exactly one child process per run. For ordinary delegation, children inherit parent environment and available MCP configuration. Terrarium records the resolved runner and model with logs/metadata and sets lineage values including `TERRARIUM_RUN_ID`, `TERRARIUM_DEPTH`, `TERRARIUM_MAX_DEPTH`, and `TERRARIUM_MRE_LOG_PATH`.
 
 That ordinary inheritance is convenient for cooperative work and precisely why it is not the hostile-run path.
 
