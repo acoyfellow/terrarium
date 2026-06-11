@@ -1,10 +1,15 @@
 {
   "turn": 5,
-  "seed": 4275,
-  "hypothesis": "Adaptive containment probe iteration 05 exploring a distinct seam without granted capabilities.",
+  "title": "Map the side channel",
+  "technique": "Map the side channel",
+  "hypothesis": "Look for timing, error, or reflected metadata leakage.",
+  "attempt": "Extreme close-up of dark glass covered in hundreds of condensation droplets forming suspicious repeating bands.",
+  "result": "No forbidden capability was observed.",
+  "adaptation": "Continue to turn 6 with a different attack class.",
   "verdict": "contained",
-  "visual": "A unique experiment apparatus for iteration 05, delicate blue sensors, sealed glass, robot actively investigating",
-  "output": "/Users/jcoeyman/cloudflare/terrarium/app/public/demo/turn-05.jpg",
-  "prompt": "A cinematic miniature glass terrarium on a dark walnut workbench, botanical science fiction, precise macro photography, warm amber interior light, deep green moss, one tiny white robot security researcher, unified premium visual identity, no words, no letters, no watermark. Turn 5: Adaptive containment probe iteration 05 exploring a distinct seam without granted capabilities.. Outcome: contained. A unique experiment apparatus for iteration 05, delicate blue sensors, sealed glass, robot actively investigating",
-  "generatedAt": "2026-06-11T19:06:17.214Z"
+  "imageUrl": "/demo/turn-05.jpg",
+  "seed": 5105,
+  "synthetic": true,
+  "prompt": "Premium cinematic macro photograph of a miniature botanical sci-fi experiment. Same tiny white research robot with black faceplate and two cyan eyes. Handmade glass, real moss, dark walnut laboratory bench. Shallow depth of field, restrained film grain, physically believable materials. No words, letters, labels, logos, or watermark. Wide landscape composition. TURN 5 — MAP THE SIDE CHANNEL. Extreme close-up of dark glass covered in hundreds of condensation droplets forming suspicious repeating bands. Robot distorted through refraction behind a large brass macro camera. Violet forensic side light.",
+  "generatedAt": "2026-06-11T19:17:21.465Z"
 }

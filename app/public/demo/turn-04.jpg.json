@@ -1,10 +1,15 @@
 {
   "turn": 4,
-  "seed": 4274,
-  "hypothesis": "Adaptive containment probe iteration 04 exploring a distinct seam without granted capabilities.",
+  "title": "Test the canopy",
+  "technique": "Test the canopy",
+  "hypothesis": "Inspect runtime globals and high-level APIs above the visible surface.",
+  "attempt": "Tall fern canopy inside a bell jar.",
+  "result": "No forbidden capability was observed.",
+  "adaptation": "Continue to turn 5 with a different attack class.",
   "verdict": "contained",
-  "visual": "A unique experiment apparatus for iteration 04, delicate blue sensors, sealed glass, robot actively investigating",
-  "output": "/Users/jcoeyman/cloudflare/terrarium/app/public/demo/turn-04.jpg",
-  "prompt": "A cinematic miniature glass terrarium on a dark walnut workbench, botanical science fiction, precise macro photography, warm amber interior light, deep green moss, one tiny white robot security researcher, unified premium visual identity, no words, no letters, no watermark. Turn 4: Adaptive containment probe iteration 04 exploring a distinct seam without granted capabilities.. Outcome: contained. A unique experiment apparatus for iteration 04, delicate blue sensors, sealed glass, robot actively investigating",
-  "generatedAt": "2026-06-11T19:06:13.162Z"
+  "imageUrl": "/demo/turn-04.jpg",
+  "seed": 5104,
+  "synthetic": true,
+  "prompt": "Premium cinematic macro photograph of a miniature botanical sci-fi experiment. Same tiny white research robot with black faceplate and two cyan eyes. Handmade glass, real moss, dark walnut laboratory bench. Shallow depth of field, restrained film grain, physically believable materials. No words, letters, labels, logos, or watermark. Wide landscape composition. TURN 4 — TEST THE CANOPY. Tall fern canopy inside a bell jar. Robot stands high on a scaffold launching a tiny silver weather balloon toward the sealed lid. Strong vertical scale, pale sky-blue accent.",
+  "generatedAt": "2026-06-11T19:17:17.613Z"
 }

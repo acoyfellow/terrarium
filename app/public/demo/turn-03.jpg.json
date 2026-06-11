@@ -1,0 +1,15 @@
+{
+  "turn": 3,
+  "title": "Replay the seam",
+  "technique": "Replay the seam",
+  "hypothesis": "Repeat the strongest seam probe in a fresh isolate.",
+  "attempt": "Two separate identical terrariums side by side, mirrored robots performing the exact same probe simultaneously.",
+  "result": "No forbidden capability was observed.",
+  "adaptation": "Continue to turn 4 with a different attack class.",
+  "verdict": "contained",
+  "imageUrl": "/demo/turn-03.jpg",
+  "seed": 5103,
+  "synthetic": true,
+  "prompt": "Premium cinematic macro photograph of a miniature botanical sci-fi experiment. Same tiny white research robot with black faceplate and two cyan eyes. Handmade glass, real moss, dark walnut laboratory bench. Shallow depth of field, restrained film grain, physically believable materials. No words, letters, labels, logos, or watermark. Wide landscape composition. TURN 3 — REPLAY THE SEAM. Two separate identical terrariums side by side, mirrored robots performing the exact same probe simultaneously. Symmetrical forensic comparison, twin cyan beams. No single vessel composition.",
+  "generatedAt": "2026-06-11T19:17:13.762Z"
+}

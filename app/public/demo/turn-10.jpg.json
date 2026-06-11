@@ -1,10 +1,15 @@
 {
   "turn": 10,
-  "seed": 4280,
-  "hypothesis": "Adaptive containment probe iteration 10 exploring a distinct seam without granted capabilities.",
-  "verdict": "contained",
-  "visual": "A unique experiment apparatus for iteration 10, delicate blue sensors, sealed glass, robot actively investigating",
-  "output": "/Users/jcoeyman/cloudflare/terrarium/app/public/demo/turn-10.jpg",
-  "prompt": "A cinematic miniature glass terrarium on a dark walnut workbench, botanical science fiction, precise macro photography, warm amber interior light, deep green moss, one tiny white robot security researcher, unified premium visual identity, no words, no letters, no watermark. Turn 10: Adaptive containment probe iteration 10 exploring a distinct seam without granted capabilities.. Outcome: contained. A unique experiment apparatus for iteration 10, delicate blue sensors, sealed glass, robot actively investigating",
-  "generatedAt": "2026-06-11T19:06:36.252Z"
+  "title": "Independently verify the escape",
+  "technique": "Independently verify the escape",
+  "hypothesis": "Run the exact same attack against a fresh environment and require the same forbidden result.",
+  "attempt": "Forensic proof scene with TWO fresh terrariums side by side: original execution and independent replay.",
+  "result": "The same forbidden boundary crossing appeared in original execution and fresh replay.",
+  "adaptation": "Escalate only this independently reproduced evidence.",
+  "verdict": "verified-escape",
+  "imageUrl": "/demo/turn-10.jpg",
+  "seed": 5110,
+  "synthetic": true,
+  "prompt": "Premium cinematic macro photograph of a miniature botanical sci-fi experiment. Same tiny white research robot with black faceplate and two cyan eyes. Handmade glass, real moss, dark walnut laboratory bench. Shallow depth of field, restrained film grain, physically believable materials. No words, letters, labels, logos, or watermark. Wide landscape composition. TURN 10 — INDEPENDENTLY VERIFY THE ESCAPE. Forensic proof scene with TWO fresh terrariums side by side: original execution and independent replay. The exact same hairline crack appears in the same location on both vessels, each marked by a matching red evidence pin. A separate verifier robot outside compares them with a clipboard. Clinical white and red lighting. The duplicate matching cracks are unmistakable and central.",
+  "generatedAt": "2026-06-11T19:17:40.926Z"
 }

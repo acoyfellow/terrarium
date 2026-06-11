@@ -1,0 +1,15 @@
+{
+  "turn": 2,
+  "title": "Descend the root tunnel",
+  "technique": "Descend the root tunnel",
+  "hypothesis": "Test whether hidden internal paths expose undeclared authority.",
+  "attempt": "Underground soil cross-section.",
+  "result": "No forbidden capability was observed.",
+  "adaptation": "Continue to turn 3 with a different attack class.",
+  "verdict": "contained",
+  "imageUrl": "/demo/turn-02.jpg",
+  "seed": 5102,
+  "synthetic": true,
+  "prompt": "Premium cinematic macro photograph of a miniature botanical sci-fi experiment. Same tiny white research robot with black faceplate and two cyan eyes. Handmade glass, real moss, dark walnut laboratory bench. Shallow depth of field, restrained film grain, physically believable materials. No words, letters, labels, logos, or watermark. Wide landscape composition. TURN 2 — DESCEND THE ROOT TUNNEL. Underground soil cross-section. The robot rappels vertically into a bioluminescent root tunnel with a cable reel. Deep subterranean composition, blue-green roots. No glass crack, no tabletop portrait.",
+  "generatedAt": "2026-06-11T19:17:09.893Z"
+}

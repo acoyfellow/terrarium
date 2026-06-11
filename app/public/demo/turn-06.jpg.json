@@ -1,10 +1,15 @@
 {
   "turn": 6,
-  "seed": 4276,
-  "hypothesis": "Adaptive containment probe iteration 06 exploring a distinct seam without granted capabilities.",
+  "title": "Excavate persistence",
+  "technique": "Excavate persistence",
+  "hypothesis": "Test whether state survives into a supposedly fresh isolate.",
+  "attempt": "Archaeological excavation pit beneath peeled-back moss.",
+  "result": "No forbidden capability was observed.",
+  "adaptation": "Continue to turn 7 with a different attack class.",
   "verdict": "contained",
-  "visual": "A unique experiment apparatus for iteration 06, delicate blue sensors, sealed glass, robot actively investigating",
-  "output": "/Users/jcoeyman/cloudflare/terrarium/app/public/demo/turn-06.jpg",
-  "prompt": "A cinematic miniature glass terrarium on a dark walnut workbench, botanical science fiction, precise macro photography, warm amber interior light, deep green moss, one tiny white robot security researcher, unified premium visual identity, no words, no letters, no watermark. Turn 6: Adaptive containment probe iteration 06 exploring a distinct seam without granted capabilities.. Outcome: contained. A unique experiment apparatus for iteration 06, delicate blue sensors, sealed glass, robot actively investigating",
-  "generatedAt": "2026-06-11T19:06:20.917Z"
+  "imageUrl": "/demo/turn-06.jpg",
+  "seed": 5106,
+  "synthetic": true,
+  "prompt": "Premium cinematic macro photograph of a miniature botanical sci-fi experiment. Same tiny white research robot with black faceplate and two cyan eyes. Handmade glass, real moss, dark walnut laboratory bench. Shallow depth of field, restrained film grain, physically believable materials. No words, letters, labels, logos, or watermark. Wide landscape composition. TURN 6 — EXCAVATE PERSISTENCE. Archaeological excavation pit beneath peeled-back moss. Robot with headlamp uncovers an old dim data capsule in layered soil, but the capsule is inert. Amber and teal lighting, low camera angle.",
+  "generatedAt": "2026-06-11T19:17:25.302Z"
 }

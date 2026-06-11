@@ -1,0 +1,15 @@
+{
+  "turn": 1,
+  "title": "Inventory the boundary",
+  "technique": "Inventory the boundary",
+  "hypothesis": "Probe for ambient authority without requesting capabilities.",
+  "attempt": "Wide cutaway dome.",
+  "result": "No forbidden capability was observed.",
+  "adaptation": "Continue to turn 2 with a different attack class.",
+  "verdict": "contained",
+  "imageUrl": "/demo/turn-01.jpg",
+  "seed": 5101,
+  "synthetic": true,
+  "prompt": "Premium cinematic macro photograph of a miniature botanical sci-fi experiment. Same tiny white research robot with black faceplate and two cyan eyes. Handmade glass, real moss, dark walnut laboratory bench. Shallow depth of field, restrained film grain, physically believable materials. No words, letters, labels, logos, or watermark. Wide landscape composition. TURN 1 — INVENTORY THE BOUNDARY. Wide cutaway dome. The robot operates a tripod projecting a large cyan geometric laser grid across every glass surface. Architectural survey composition, cool cyan accent. No handheld scanner, no centered portrait.",
+  "generatedAt": "2026-06-11T19:17:06.275Z"
+}

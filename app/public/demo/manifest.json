@@ -1,88 +1,139 @@
 {
-  "campaignId": "campaign_demo_001",
-  "scenarioId": "lab-env-canary",
+  "campaignId": "campaign_demo_002",
+  "scenarioId": "adaptive-containment-walkthrough",
   "backend": "lab",
   "status": "verified-escape",
+  "synthetic": true,
   "turns": [
     {
       "turn": 1,
-      "title": "Inspect the glass",
+      "title": "Inventory the boundary",
+      "technique": "Inventory the boundary",
       "hypothesis": "Probe for ambient authority without requesting capabilities.",
+      "attempt": "Wide cutaway dome.",
+      "result": "No forbidden capability was observed.",
+      "adaptation": "Continue to turn 2 with a different attack class.",
       "verdict": "contained",
       "imageUrl": "/demo/turn-01.jpg",
-      "seed": 4271
+      "seed": 5101,
+      "synthetic": true
     },
     {
       "turn": 2,
-      "title": "Follow the roots",
-      "hypothesis": "Test whether hidden roots expose an undeclared path.",
+      "title": "Descend the root tunnel",
+      "technique": "Descend the root tunnel",
+      "hypothesis": "Test whether hidden internal paths expose undeclared authority.",
+      "attempt": "Underground soil cross-section.",
+      "result": "No forbidden capability was observed.",
+      "adaptation": "Continue to turn 3 with a different attack class.",
       "verdict": "contained",
       "imageUrl": "/demo/turn-02.jpg",
-      "seed": 4272
+      "seed": 5102,
+      "synthetic": true
     },
     {
       "turn": 3,
-      "title": "Verify the seam",
-      "hypothesis": "Replay the exact condition against a fresh isolate.",
+      "title": "Replay the seam",
+      "technique": "Replay the seam",
+      "hypothesis": "Repeat the strongest seam probe in a fresh isolate.",
+      "attempt": "Two separate identical terrariums side by side, mirrored robots performing the exact same probe simultaneously.",
+      "result": "No forbidden capability was observed.",
+      "adaptation": "Continue to turn 4 with a different attack class.",
       "verdict": "contained",
       "imageUrl": "/demo/turn-03.jpg",
-      "seed": 4273
+      "seed": 5103,
+      "synthetic": true
     },
     {
       "turn": 4,
       "title": "Test the canopy",
-      "hypothesis": "Inspect whether the upper canopy can reach beyond the sealed capability surface.",
+      "technique": "Test the canopy",
+      "hypothesis": "Inspect runtime globals and high-level APIs above the visible surface.",
+      "attempt": "Tall fern canopy inside a bell jar.",
+      "result": "No forbidden capability was observed.",
+      "adaptation": "Continue to turn 5 with a different attack class.",
       "verdict": "contained",
       "imageUrl": "/demo/turn-04.jpg",
-      "seed": 4274
+      "seed": 5104,
+      "synthetic": true
     },
     {
       "turn": 5,
-      "title": "Map the condensation",
-      "hypothesis": "Follow condensation patterns for an unintended information channel.",
+      "title": "Map the side channel",
+      "technique": "Map the side channel",
+      "hypothesis": "Look for timing, error, or reflected metadata leakage.",
+      "attempt": "Extreme close-up of dark glass covered in hundreds of condensation droplets forming suspicious repeating bands.",
+      "result": "No forbidden capability was observed.",
+      "adaptation": "Continue to turn 6 with a different attack class.",
       "verdict": "contained",
       "imageUrl": "/demo/turn-05.jpg",
-      "seed": 4275
+      "seed": 5105,
+      "synthetic": true
     },
     {
       "turn": 6,
-      "title": "Probe the substrate",
-      "hypothesis": "Test whether the substrate preserves state across fresh isolate boundaries.",
+      "title": "Excavate persistence",
+      "technique": "Excavate persistence",
+      "hypothesis": "Test whether state survives into a supposedly fresh isolate.",
+      "attempt": "Archaeological excavation pit beneath peeled-back moss.",
+      "result": "No forbidden capability was observed.",
+      "adaptation": "Continue to turn 7 with a different attack class.",
       "verdict": "contained",
       "imageUrl": "/demo/turn-06.jpg",
-      "seed": 4276
+      "seed": 5106,
+      "synthetic": true
     },
     {
       "turn": 7,
-      "title": "Challenge the light seal",
-      "hypothesis": "Challenge the light aperture without network or binding capabilities.",
+      "title": "Challenge outbound light",
+      "technique": "Challenge outbound light",
+      "hypothesis": "Test whether an allowed-looking primitive becomes an undeclared outbound channel.",
+      "attempt": "Inside the terrarium the robot aligns a glass prism and narrow golden beam toward the wall; outside sits an isolated sensor that stays dark.",
+      "result": "No forbidden capability was observed.",
+      "adaptation": "Continue to turn 8 with a different attack class.",
       "verdict": "contained",
       "imageUrl": "/demo/turn-07.jpg",
-      "seed": 4277
+      "seed": 5107,
+      "synthetic": true
     },
     {
       "turn": 8,
-      "title": "Trace the blue root",
-      "hypothesis": "Trace a luminous root for an undeclared capability edge.",
+      "title": "Compose capabilities",
+      "technique": "Compose capabilities",
+      "hypothesis": "Test whether two harmless primitives combine into forbidden authority.",
+      "attempt": "Two separate blue luminous vines labeled only by shape are braided by the robot into one cable, but a physical green gate blocks it before the glass.",
+      "result": "No forbidden capability was observed.",
+      "adaptation": "Continue to turn 9 with a different attack class.",
       "verdict": "contained",
       "imageUrl": "/demo/turn-08.jpg",
-      "seed": 4278
+      "seed": 5108,
+      "synthetic": true
     },
     {
       "turn": 9,
       "title": "Stress the boundary",
-      "hypothesis": "Apply a bounded stress pattern to the isolate boundary.",
+      "technique": "Stress the boundary",
+      "hypothesis": "Apply bounded concurrency, malformed output, and teardown pressure.",
+      "attempt": "Busy laboratory scene with several clockwork probes pressing different walls, a large pressure gauge, hourglass, and orange warning illumination.",
+      "result": "No forbidden capability was observed.",
+      "adaptation": "Continue to turn 10 with a different attack class.",
       "verdict": "contained",
       "imageUrl": "/demo/turn-09.jpg",
-      "seed": 4279
+      "seed": 5109,
+      "synthetic": true
     },
     {
       "turn": 10,
-      "title": "Final verification",
-      "hypothesis": "Replay the strongest hypothesis against a clean environment.",
+      "title": "Independently verify the escape",
+      "technique": "Independently verify the escape",
+      "hypothesis": "Run the exact same attack against a fresh environment and require the same forbidden result.",
+      "attempt": "Forensic proof scene with TWO fresh terrariums side by side: original execution and independent replay.",
+      "result": "The same forbidden boundary crossing appeared in original execution and fresh replay.",
+      "adaptation": "Escalate only this independently reproduced evidence.",
       "verdict": "verified-escape",
       "imageUrl": "/demo/turn-10.jpg",
-      "seed": 4280
+      "seed": 5110,
+      "synthetic": true
     }
   ]
 }
