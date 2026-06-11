@@ -12,10 +12,11 @@ The following interfaces are foundational and remain supported as containment wo
 
 ## CLI contract
 
-Existing delegation continues to mean ordinary one-child execution:
+Existing delegation continues to mean ordinary one-child execution. Runner and model selection are additive configuration, not a change in the one-child contract:
 
 ```sh
 terra "task"
+terra --agent "pi -p --no-session" --model kindle-alpha "task"
 terra --read-only "research task"
 terra --profile minimal "bounded dig"
 terra --isolation worktree "patch in a separate workspace"
@@ -58,7 +59,9 @@ Containment campaigns should compose these primitives or be implemented in new h
 ## Durable behavior invariants
 
 - One Terrarium process owns one child process at a time.
-- Existing prompt profiles (`default`, `minimal`) and agent-resolution precedence remain compatible.
+- Existing prompt profiles (`default`, `minimal`) remain compatible.
+- Agent precedence remains explicit agent → configured read-only agent → environment default → config default → built-in OpenCode fallback.
+- Model precedence is explicit `model` → `TERRARIUM_MODEL` → `config.defaultModel` → runner default; model metadata remains inspectable in run/status receipts.
 - Existing environment lineage keys (`TERRARIUM_RUN_ID`, `TERRARIUM_PARENT_RUN_ID`, `TERRARIUM_DEPTH`, `TERRARIUM_MAX_DEPTH`, `TERRARIUM_MRE_LOG_PATH`) remain available for ordinary composed runs.
 - Existing metadata, log, patch, and workspace receipts remain inspectable through the stable status/read flow.
 - A campaign action must leave an ordinary Terrarium run ID and receipt behind.

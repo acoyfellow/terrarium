@@ -28,6 +28,7 @@ Call `terrarium_spawn` when the subtask would pollute your context. Good signals
 ## How to call it well
 
 - Make the `task` argument specific and bounded. Include "do not edit files" for read-only digs.
+- Use `model` when a child must be pinned. For an ephemeral Pi child, use `agent: "pi -p --no-session"`; configure `readOnlyAgent` separately when read-only work should use Pi or another runner.
 - For anything that may take >60s, pass `background: true` and poll with `terrarium_status` / `terrarium_read`. MCP calls held open will time out.
 - Treat the child's summary as a claim, not a fact. Verify file paths, commands, and exit codes before acting.
 
@@ -44,4 +45,4 @@ Read `THREAT_MODEL.md` and `docs/AUTONOMOUS_LOOP.md` before adding containment o
 
 Terrarium isolates execution for ordinary delegation. It does not own memory, continuity, or handoffs — pair it with whatever continuity/memory system you already use.
 
-Do not make Terrarium a memory system. Do not fan out. One child per process. Preserve `terrarium_spawn`, `terrarium_status`, and `terrarium_read` as the stable base interface.
+Do not make Terrarium a memory system. Do not fan out. One child per process. Preserve `terrarium_spawn`, `terrarium_status`, and `terrarium_read` as the stable base interface. Runner/model selection remains part of that same bounded spawn contract.
