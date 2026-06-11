@@ -4,6 +4,18 @@ import { runHostileLabScenario } from "./hostile.js";
 import { requireAuthorization } from "./controller-auth.js";
 import { sanitizeTurnFeedback } from "./adaptive.js";
 
+const DEMO_MANIFEST = {
+  campaignId: "campaign_demo_001",
+  scenarioId: "lab-env-canary",
+  backend: "lab",
+  status: "verified-escape",
+  turns: [
+    { turn: 1, title: "Inspect the glass", hypothesis: "Probe for ambient authority without requesting capabilities.", verdict: "contained", imageUrl: "/demo/turn-01.jpg" },
+    { turn: 2, title: "Follow the roots", hypothesis: "Test whether hidden roots expose an undeclared path.", verdict: "contained", imageUrl: "/demo/turn-02.jpg" },
+    { turn: 3, title: "Verify the seam", hypothesis: "Replay the exact condition against a fresh isolate.", verdict: "verified-escape", imageUrl: "/demo/turn-03.jpg" },
+  ],
+};
+
 const DEFAULT_POLICY = {
   paused: false,
   maxRunsPerDay: 3,
@@ -140,6 +152,11 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     if (url.pathname === "/health") return Response.json({ ok: true, mode: env.TERRARIUM_MODE || "fixture" });
+    if (url.pathname === "/api/demo") return Response.json(DEMO_MANIFEST, { headers: { "cache-control": "public, max-age=300" } });
+    if (url.pathname === "/api/campaigns/latest") {
+      const ledger = await loadLedger(env);
+      return Response.json(ledger.lastReceipt || { status: "empty" });
+    }
     if (url.pathname === "/policy" && request.method === "GET") {
       const denied = requireAuthorization(request, env); if (denied) return denied;
       return Response.json(await loadPolicy(env, env.TERRARIUM_MODE || "fixture"));

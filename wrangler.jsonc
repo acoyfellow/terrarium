@@ -3,6 +3,12 @@
   "name": "terrarium-control",
   "main": "src/control-worker.js",
   "compatibility_date": "2026-06-05",
+  "assets": {
+    "directory": "./app/dist",
+    "binding": "APP_ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/health", "/api/*", "/policy", "/campaigns", "/campaigns/*"]
+  },
   "account_id": "bfcb6ac5b3ceaf42a09607f6f7925823",
   "vars": {
     "TERRARIUM_MODE": "fixture"
@@ -23,6 +29,10 @@
       "bucket_name": "terrarium-control-artifacts"
     }
   ],
+  "routes": [
+    { "pattern": "terrarium.coey.dev", "custom_domain": true }
+  ],
+  "observability": { "enabled": true },
   "workflows": [
     {
       "name": "terrarium-campaign",

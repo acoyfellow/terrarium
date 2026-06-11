@@ -1,5 +1,7 @@
 # Terrarium
 
+[![Live campaign demo](https://img.shields.io/badge/demo-terrarium.coey.dev-8ff0ad?style=for-the-badge)](https://terrarium.coey.dev)
+
 ![A cozy glass terrarium on a wooden desk. Inside, a single small robot tends a tiny garden of even smaller robots, each working in their own pot.](./assets/social-card.jpg)
 
 **Contain agents. Invite escapes. Patch the glass. Repeat in public.**
@@ -19,6 +21,19 @@ one bounded task → one child run → one inspectable result
 | Run hostile adaptive agents and automatically file/fix public vulnerabilities. | Public red-team loop | Direction, not shipped yet |
 
 Terrarium does **not** currently claim it safely contains arbitrary hostile AI agents. Ordinary children inherit host authority and environment. Docker probes are a deterministic boundary baseline, not a universal sandbox guarantee.
+
+## Public campaign demo
+
+[`terrarium.coey.dev`](https://terrarium.coey.dev) presents a campaign as a turn-by-turn visual receipt. Each iteration has one image in a unified cinematic terrarium style, generated with a unique seed from that turn's hypothesis and verdict. The image sequence is paired with the machine-readable campaign timeline rather than replacing it.
+
+```sh
+npm run demo:dev      # local public site
+npm run demo:build    # static build
+npm run demo:smoke    # local smoke check
+npm run deploy        # personal Cloudflare account + custom domain
+```
+
+Generated campaign images and manifests are stored by campaign/turn. The checked-in three-turn demo is the deterministic public fallback; live campaigns can publish the same normalized manifest shape.
 
 ## Quick start: ordinary delegation
 
