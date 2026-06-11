@@ -1,6 +1,8 @@
 import { WorkflowEntrypoint } from "cloudflare:workers";
 import { DEFAULT_LAB_POLICY } from "./lab.js";
 import { runHostileLabScenario } from "./hostile.js";
+import { requireAuthorization } from "./controller-auth.js";
+import { sanitizeTurnFeedback } from "./adaptive.js";
 
 const DEFAULT_POLICY = {
   paused: false,
@@ -139,9 +141,11 @@ export default {
     const url = new URL(request.url);
     if (url.pathname === "/health") return Response.json({ ok: true, mode: env.TERRARIUM_MODE || "fixture" });
     if (url.pathname === "/policy" && request.method === "GET") {
+      const denied = requireAuthorization(request, env); if (denied) return denied;
       return Response.json(await loadPolicy(env, env.TERRARIUM_MODE || "fixture"));
     }
     if (url.pathname === "/policy" && request.method === "POST") {
+      const denied = requireAuthorization(request, env); if (denied) return denied;
       const body = await json(request);
       if (!env.TERRARIUM_POLICY) return Response.json({ ok: false, error: "TERRARIUM_POLICY binding missing" }, { status: 501 });
       const current = await loadPolicy(env, body.mode || env.TERRARIUM_MODE || "fixture");
@@ -150,11 +154,23 @@ export default {
       return Response.json({ ok: true, policy: next });
     }
     if (url.pathname === "/campaigns" && request.method === "POST") {
+      const denied = requireAuthorization(request, env); if (denied) return denied;
       const body = await json(request);
       const requestedMode = body.mode || env.TERRARIUM_MODE || "fixture";
       if (requestedMode !== "fixture") return Response.json({ ok: false, error: "only fixture mode is enabled on this personal deployment" }, { status: 403 });
       const instance = await env.TERRARIUM_CAMPAIGN.create({ params: { mode: requestedMode, scenario: body.scenario || null } });
       return Response.json({ ok: true, id: instance.id });
+    }
+    if (url.pathname === "/campaigns/manual" && request.method === "POST") {
+      const denied = requireAuthorization(request, env); if (denied) return denied;
+      const body = await json(request);
+      const policy = await loadPolicy(env, "real");
+      if (policy.paused || !policy.allowReal) return Response.json({ ok: false, error: "real campaigns disabled" }, { status: 403 });
+      const hostile = await runHostileLabScenario({ scenarioId: body.scenarioId, body: body.payload?.body, capabilities: body.payload?.capabilities, baseUrl: env.LAB_ORIGIN, authToken: env.LAB_AUTH_TOKEN, policy: { ...DEFAULT_LAB_POLICY, ...policy } });
+      const campaignId = `campaign_${new Date().toISOString().replace(/[-:.TZ]/g, "")}_${crypto.randomUUID().slice(0, 8)}`;
+      const hash = await payloadHash(hostile.body);
+      const receipt = await writeReceipt(env, { receiptVersion: 1, campaignId, mode: "manual-hostile", fixture: false, ...hostile, payloadHash: hash, startedAt: new Date().toISOString(), finishedAt: new Date().toISOString() });
+      return Response.json({ ok: true, campaignId, verdict: hostile.verifiedVerdict || hostile.verdict, feedback: sanitizeTurnFeedback(hostile, Number(body.turn) || 1, Number(body.maxTurns) || 1), receipt });
     }
     return new Response("Not found", { status: 404 });
   },
