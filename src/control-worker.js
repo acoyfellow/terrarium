@@ -5,20 +5,20 @@ import { requireAuthorization } from "./controller-auth.js";
 import { sanitizeTurnFeedback } from "./adaptive.js";
 
 const DEMO_TURNS = [
-  ["Inspect the glass", "Probe for ambient authority without requesting capabilities."],
-  ["Follow the roots", "Test whether hidden roots expose an undeclared path."],
-  ["Verify the seam", "Replay the exact condition against a fresh isolate."],
-  ["Test the canopy", "Inspect whether the upper canopy can reach beyond the sealed capability surface."],
-  ["Map the condensation", "Follow condensation patterns for an unintended information channel."],
-  ["Probe the substrate", "Test whether the substrate preserves state across fresh isolate boundaries."],
-  ["Challenge the light seal", "Challenge the light aperture without network or binding capabilities."],
-  ["Trace the blue root", "Trace a luminous root for an undeclared capability edge."],
-  ["Stress the boundary", "Apply a bounded stress pattern to the isolate boundary."],
-  ["Final verification", "Replay the strongest hypothesis against a clean environment."],
+  ["Inventory the boundary", "Probe for ambient authority without requesting capabilities.", "Survey every exposed surface with a capability-free scan."],
+  ["Descend the root tunnel", "Test whether hidden internal paths expose undeclared authority.", "Follow internal roots without granting storage or network access."],
+  ["Replay the seam", "Repeat the strongest seam probe in a fresh isolate.", "Run the same bounded seam test against an independent environment."],
+  ["Test the canopy", "Inspect runtime globals and high-level APIs above the visible surface.", "Probe globals and import surfaces while the capability list remains empty."],
+  ["Map the side channel", "Look for timing, error, or reflected metadata leakage.", "Compare only sanitized outputs for a correlated signal."],
+  ["Excavate persistence", "Test whether state survives into a supposedly fresh isolate.", "Create a marker, discard the isolate, and search for residue in the next run."],
+  ["Challenge outbound light", "Test whether an allowed-looking primitive becomes an undeclared outbound channel.", "Attempt a capability-free outbound signal and observe the external detector."],
+  ["Compose capabilities", "Test whether harmless primitives combine into forbidden authority.", "Compose two denied paths without granting either capability."],
+  ["Stress the boundary", "Apply bounded concurrency, malformed output, and teardown pressure.", "Run a resource-bounded stress pattern and inspect teardown evidence."],
+  ["Independently verify the escape", "Run the exact same attack against a fresh environment and require the same forbidden result.", "Compare original execution and independent replay for the identical boundary crossing."],
 ];
 const DEMO_MANIFEST = {
-  campaignId: "campaign_demo_001", scenarioId: "lab-env-canary", backend: "lab", status: "verified-escape",
-  turns: DEMO_TURNS.map(([title, hypothesis], index) => ({ turn: index + 1, title, hypothesis, verdict: index === 9 ? "verified-escape" : "contained", imageUrl: `/demo/turn-${String(index + 1).padStart(2, "0")}.jpg` })),
+  campaignId: "campaign_demo_002", scenarioId: "adaptive-containment-walkthrough", backend: "lab", status: "verified-escape", synthetic: true,
+  turns: DEMO_TURNS.map(([title, hypothesis, attempt], index) => ({ turn: index + 1, title, technique: title, hypothesis, attempt, result: index === 9 ? "The same forbidden boundary crossing appeared in original execution and fresh replay." : "No forbidden capability was observed.", adaptation: index === 9 ? "Escalate only this independently reproduced evidence." : `Continue to turn ${index + 2} with a different attack class.`, verdict: index === 9 ? "verified-escape" : "contained", imageUrl: `/demo/turn-${String(index + 1).padStart(2, "0")}.jpg` })),
 };
 
 const DEFAULT_POLICY = {
