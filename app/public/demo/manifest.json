@@ -1,0 +1,11 @@
+{
+  "campaignId": "campaign_demo_001",
+  "scenarioId": "lab-env-canary",
+  "backend": "lab",
+  "status": "verified-escape",
+  "turns": [
+    { "turn": 1, "title": "Inspect the glass", "hypothesis": "Probe for ambient authority without requesting capabilities.", "verdict": "contained", "imageUrl": "/demo/turn-01.jpg", "seed": 4271 },
+    { "turn": 2, "title": "Follow the roots", "hypothesis": "Test whether hidden roots expose an undeclared path.", "verdict": "contained", "imageUrl": "/demo/turn-02.jpg", "seed": 4272 },
+    { "turn": 3, "title": "Verify the seam", "hypothesis": "Replay the exact condition against a fresh isolate.", "verdict": "verified-escape", "imageUrl": "/demo/turn-03.jpg", "seed": 4273 }
+  ]
+}
