@@ -11,6 +11,7 @@ The child agent may be Terrarium too, with depth guards.
 Usage:
   terra "task to run"
   terra --agent "opencode run" "task"
+  terra --agent "pi -p --no-session" --model kindle-alpha "task"
   terra --read-only "task"
   terra --profile minimal "task"
   terra --dry-run "task"
@@ -39,9 +40,12 @@ Known-vulnerable pipeline fixtures (local testing only; not real findings):
 Options:
   --agent <cmd>      Child command for ordinary runs or proposal agent for terra attack.
                      Ordinary default: config, $TERRARIUM_AGENT, or "opencode run".
+                     Example: "pi -p --no-session" avoids persistent child sessions.
                      Explicit --agent overrides --read-only.
-  --read-only        Use the read-only child preset (opencode run --agent explore)
-                     when no explicit --agent is given. Good for read-only digs.
+  --model <id>       Pin the child model. Supported for opencode run and pi agents.
+                     Default: $TERRARIUM_MODEL, config.defaultModel, or runner default.
+  --read-only        Use config.readOnlyAgent, $TERRARIUM_READ_ONLY_AGENT, or
+                     the legacy opencode explore preset. Good for read-only digs.
   --profile <name>   Child prompt profile: default or minimal. Default: default.
                      Orthogonal to --agent / --read-only.
   --cwd <path>       Child working directory. Default: current directory
@@ -72,6 +76,7 @@ function parse(argv) {
     else if (a === "--read-only" || a === "--readonly") out.readOnly = true;
     else if (a === "--profile") out.profile = argv[++i];
     else if (a === "--agent") out.agent = argv[++i];
+    else if (a === "--model") out.model = argv[++i];
     else if (a === "--image") out.image = argv[++i];
     else if (a === "--cwd") out.cwd = argv[++i];
     else if (a === "--timeout-ms") out.timeoutMs = Number(argv[++i]);

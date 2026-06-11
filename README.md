@@ -263,9 +263,12 @@ Design and trust boundaries: [THREAT_MODEL.md](./THREAT_MODEL.md), [docs/AUTONOM
 ### Useful recipes
 
 ```sh
-# Choose a child agent (default: opencode run)
-terra --agent "pi run" "fix the failing build"
-TERRARIUM_AGENT="opencode run" terra "add tests for the parser"
+# Choose a child runner and pin its model
+terra --agent "pi -p --no-session" --model kindle-alpha "fix the failing build"
+terra --agent "opencode run" --model anthropic/claude-sonnet-4-6 "add tests"
+
+# Or configure defaults once
+TERRARIUM_AGENT="pi -p --no-session" TERRARIUM_MODEL="kindle-alpha" terra "add tests for the parser"
 
 # Prefer a smaller read-only child for research
 terra --read-only "find every place we handle X"
@@ -294,7 +297,8 @@ If an isolated Git workspace leaves a diff, Terrarium writes a patch receipt at 
 
 ```text
 --agent <cmd>          Child command. Default: config, $TERRARIUM_AGENT, or opencode run.
---read-only            Use the read-only child preset when no explicit agent is provided.
+--model <id>           Pin model for opencode run or pi. Default: env/config/runner.
+--read-only            Use the configured read-only child command when no explicit agent is provided.
 --profile <name>       default or minimal.
 --cwd <path>           Child working directory.
 --timeout-ms <n>       Kill child after n milliseconds.
@@ -306,13 +310,19 @@ If an isolated Git workspace leaves a diff, Terrarium writes a patch receipt at 
 --log <path>           Write the transcript to a chosen path.
 ```
 
-Agent resolution precedence: explicit `--agent` → `--read-only` preset → `$TERRARIUM_AGENT` → `config.defaultAgent` → built-in `opencode run`.
+Agent resolution precedence: explicit `--agent` → configured `--read-only` command → `$TERRARIUM_AGENT` → `config.defaultAgent` → built-in `opencode run`.
+
+Model precedence: explicit `--model` → `$TERRARIUM_MODEL` → `config.defaultModel` → the runner's own default. Terrarium appends the correct `--model` flag for `opencode run` and `pi`.
+
+For Pi, use `pi -p --no-session`: `-p` is one-shot non-interactive mode and `--no-session` prevents a persistent Pi conversation file. Terrarium still records its own bounded receipt. A useful read-only command is `pi -p --no-session --tools read,grep,find,ls`.
 
 Config at `~/.terrarium/config.json`:
 
 ```json
 {
-  "defaultAgent": "opencode run",
+  "defaultAgent": "pi -p --no-session",
+  "readOnlyAgent": "pi -p --no-session --tools read,grep,find,ls",
+  "defaultModel": "kindle-alpha",
   "maxDepth": 3,
   "timeoutMs": 900000
 }
@@ -325,6 +335,7 @@ Config at `~/.terrarium/config.json`:
   "name": "terrarium_spawn",
   "arguments": {
     "task": "inspect this repo and summarize the test command",
+    "model": "kindle-alpha",
     "readOnly": true,
     "profile": "minimal",
     "cwd": "/path/to/repo",

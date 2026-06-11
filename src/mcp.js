@@ -10,8 +10,9 @@ const tools = [
       type: "object",
       properties: {
         task: { type: "string", description: "The single bounded objective for the child agent. Be specific. Include 'do not edit files' for read-only digs." },
-        agent: { type: "string", description: "Child command. Explicit agent overrides readOnly preset. Default: 'opencode run'. Examples: 'opencode run', 'pi run'." },
-        readOnly: { type: "boolean", description: "Use the read-only child preset (opencode run --agent explore) when no explicit agent is given. Good for read-only digs (repo archaeology, log digs, design research)." },
+        agent: { type: "string", description: "Child command. Explicit agent overrides readOnly preset. Defaults through config/env to 'opencode run'. Recommended ephemeral Pi child: 'pi -p --no-session'." },
+        model: { type: "string", description: "Pin the child model for opencode run or pi. Precedence: explicit model, TERRARIUM_MODEL, config.defaultModel, runner default." },
+        readOnly: { type: "boolean", description: "Use the configured read-only child command when no explicit agent is given. Configure readOnlyAgent or TERRARIUM_READ_ONLY_AGENT; legacy fallback is opencode explore." },
         profile: { type: "string", enum: ["default", "minimal"], description: "Child prompt profile. 'default' (full structured contract) or 'minimal' (lean shell for bounded read-only digs). Orthogonal to agent/readOnly. Default: 'default'." },
         cwd: { type: "string", description: "Working directory for the child. Default: current directory." },
         timeoutMs: { type: "number", description: "Kill the child after this many milliseconds. Default: none." },
@@ -76,6 +77,7 @@ export function conciseSpawn(full) {
     ok: full.ok,
     runId: full.runId,
     status: full.status,
+    model: full.model,
     background: full.background ? true : undefined,
     exitCode: full.exitCode,
     signal: full.signal,
@@ -94,6 +96,7 @@ export function conciseStatus(full) {
   return defined({
     runId: full.runId,
     status: full.status,
+    model: full.model,
     ok: full.ok,
     background: full.background ? true : undefined,
     alive: typeof full.alive === "boolean" ? full.alive : undefined,
@@ -115,6 +118,7 @@ export function conciseListing(full) {
     runs: full.runs.map((r) => defined({
       runId: r.runId,
       status: r.status,
+      model: r.model,
       ok: r.ok,
       background: r.background ? true : undefined,
       alive: typeof r.alive === "boolean" ? r.alive : undefined,

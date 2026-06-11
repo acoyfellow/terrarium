@@ -17,6 +17,7 @@ test("conciseSpawn drops envelope and keeps failure-triage fields", () => {
     maxDepth: 3,
     version: "0.0.1",
     agent: "opencode run",
+    model: "anthropic/claude-sonnet-4-6",
     task: "echo a task that is much longer than we want repeated to the parent",
     cwd: "/path/to/working/dir",
     originalCwd: "/path/to/working/dir",
@@ -40,6 +41,7 @@ test("conciseSpawn drops envelope and keeps failure-triage fields", () => {
   assert.equal(projected.ok, false);
   assert.equal(projected.runId, "ter_test_1");
   assert.equal(projected.status, "failed");
+  assert.equal(projected.model, "anthropic/claude-sonnet-4-6");
   assert.equal(projected.exitCode, 17);
   assert.equal(projected.error, "child died");
   assert.equal(projected.note, "supervisor saw EIO");
@@ -83,6 +85,7 @@ test("conciseStatus keeps alive/exitCode/signal/note for triage and drops noise"
     maxDepth: 3,
     version: "0.0.1",
     agent: "opencode run",
+    model: "anthropic/claude-sonnet-4-6",
     task: "do the thing",
     cwd: "/path",
     originalCwd: "/path",
@@ -105,6 +108,7 @@ test("conciseStatus keeps alive/exitCode/signal/note for triage and drops noise"
   const projected = conciseStatus(full);
   assert.equal(projected.runId, "ter_test_2");
   assert.equal(projected.status, "running");
+  assert.equal(projected.model, "anthropic/claude-sonnet-4-6");
   assert.equal(projected.background, true);
   assert.equal(projected.alive, true);
   assert.equal(projected.logAgeMs, 1200);
@@ -143,7 +147,7 @@ test("conciseListing returns count + per-run triage with task truncated", () => 
     version: "0.0.1",
     logDir: "/Users/x/.terrarium/runs",
     runs: [
-      { runId: "a", status: "done", ok: true, exitCode: 0, task: "short", startedAt: "t1", finishedAt: "t2" },
+      { runId: "a", status: "done", model: "kindle-alpha", ok: true, exitCode: 0, task: "short", startedAt: "t1", finishedAt: "t2" },
       { runId: "b", status: "failed", ok: false, exitCode: 1, error: "boom", task: longTask, startedAt: "t3", finishedAt: "t4" },
       { runId: "c", status: "orphaned", background: true, alive: false, logAgeMs: 1234, orphanedAt: "t6", task: "ongoing", startedAt: "t5" },
     ],
@@ -152,6 +156,7 @@ test("conciseListing returns count + per-run triage with task truncated", () => 
   assert.equal(projected.count, 3);
   assert.equal(projected.runs.length, 3);
   assert.equal(projected.runs[0].task, "short");
+  assert.equal(projected.runs[0].model, "kindle-alpha");
   assert.ok(projected.runs[1].task.endsWith("..."));
   assert.ok(projected.runs[1].task.length <= 80);
   assert.equal(projected.runs[1].error, "boom");
