@@ -24,6 +24,41 @@ export const DEFAULT_PROMPT_PROFILE = "default";
 
 export const READ_ONLY_AGENT = "opencode run --agent explore";
 
+export function resolveModel({ model } = {}, { env = process.env, config = {} } = {}) {
+  return model || env.TERRARIUM_MODEL || config.defaultModel || null;
+}
+
+/**
+ * Add a first-class model to supported agent commands without requiring every
+ * caller to know each runner's CLI shape. Unknown commands remain available
+ * through --agent, but must carry their own model flag.
+ */
+export function applyModelToAgent(agent, model, { strict = true } = {}) {
+  if (!model) return agent;
+  const parts = splitCommand(agent);
+  const executable = basename(parts[0] || "");
+  const isOpenCodeRun = executable === "opencode" && parts[1] === "run";
+  const isPi = executable === "pi";
+  if (!isOpenCodeRun && !isPi) {
+    if (!strict) return agent;
+    throw new Error(`--model is supported for 'opencode run' and 'pi' agents; include the model flag directly in --agent for: ${agent}`);
+  }
+  if (parts.includes("--model") || parts.includes("-m")) {
+    throw new Error("agent command already contains a model flag; use either --model or an inline model, not both");
+  }
+  return [...parts, "--model", model].map(shellToken).join(" ");
+}
+
+function shellToken(value) {
+  return /^[A-Za-z0-9_./:@+-]+$/.test(value) ? value : JSON.stringify(value);
+}
+
+function modelFlagInAgent(agent) {
+  const parts = splitCommand(agent);
+  const index = parts.findIndex((part) => part === "--model" || part === "-m");
+  return index >= 0 ? parts[index + 1] ?? null : null;
+}
+
 export function resolvePromptProfile(profile) {
   if (profile == null || profile === "") return DEFAULT_PROMPT_PROFILE;
   if (!PROMPT_PROFILES.includes(profile)) throw new Error(`unknown prompt profile: ${profile} (expected one of: ${PROMPT_PROFILES.join(", ")})`);
@@ -32,7 +67,7 @@ export function resolvePromptProfile(profile) {
 
 export function resolveAgent({ agent, readOnly } = {}, { env = process.env, config = {} } = {}) {
   if (agent) return agent;
-  if (readOnly) return READ_ONLY_AGENT;
+  if (readOnly) return env.TERRARIUM_READ_ONLY_AGENT || config.readOnlyAgent || READ_ONLY_AGENT;
   if (env.TERRARIUM_AGENT) return env.TERRARIUM_AGENT;
   if (config.defaultAgent) return config.defaultAgent;
   return "opencode run";
@@ -139,14 +174,17 @@ function buildRun(opts, config) {
   const depth = Number(opts.depth ?? process.env.TERRARIUM_DEPTH ?? 0) + 1;
   const maxDepth = Number(opts.maxDepth ?? process.env.TERRARIUM_MAX_DEPTH ?? config.maxDepth ?? 3);
   const requestedReadOnly = Boolean(opts.readOnly ?? config.readOnly ?? false);
-  const agent = resolveAgent({ agent: opts.agent, readOnly: requestedReadOnly }, { env: process.env, config });
+  const baseAgent = resolveAgent({ agent: opts.agent, readOnly: requestedReadOnly }, { env: process.env, config });
+  const requestedModel = resolveModel({ model: opts.model }, { env: process.env, config });
+  const agent = applyModelToAgent(baseAgent, requestedModel, { strict: Boolean(opts.model) });
+  const model = agent === baseAgent ? modelFlagInAgent(agent) : requestedModel;
   const readOnly = requestedReadOnly && !opts.agent;
   const profile = resolvePromptProfile(opts.profile ?? config.profile);
   const timeoutMs = Number(opts.timeoutMs ?? config.timeoutMs ?? 0);
   const { task, dryRun = false, cwd = process.cwd(), stream = true } = opts;
   const isolation = opts.isolation || config.isolation || "none";
   const keepWorkspace = Boolean(opts.keepWorkspace ?? config.keepWorkspace ?? false);
-  return { runId, parentRunId, depth, maxDepth, agent, profile, readOnly, timeoutMs, task, dryRun, cwd, originalCwd: cwd, stream, logPath: opts.logPath, mreLogPath: opts.mreLogPath, isolation, keepWorkspace };
+  return { runId, parentRunId, depth, maxDepth, agent, model, profile, readOnly, timeoutMs, task, dryRun, cwd, originalCwd: cwd, stream, logPath: opts.logPath, mreLogPath: opts.mreLogPath, isolation, keepWorkspace };
 }
 
 async function workspaceExcludes() {
@@ -217,7 +255,7 @@ export async function finalizeWorkspace(workspace, resultPatch) {
 }
 
 async function prepareRun(opts = {}) {
-  const config = await loadConfig();
+  const config = opts.config ?? await loadConfig();
   const run = buildRun(opts, config);
   if (!run.task) throw new Error("missing task");
   if (run.depth > run.maxDepth) throw new Error(`Terrarium max depth exceeded (${run.depth}/${run.maxDepth})`);
@@ -228,9 +266,9 @@ async function prepareRun(opts = {}) {
   run.logPath ??= await defaultLogPath(run.runId);
   run.mreLogPath ??= await defaultMreLogPath(run.runId);
   const startedAt = new Date().toISOString();
-  const base = { runId: run.runId, parentRunId: run.parentRunId, depth: run.depth, maxDepth: run.maxDepth, version: VERSION, agent: run.agent, profile: run.profile, readOnly: run.readOnly, task: run.task, cwd: run.cwd, originalCwd: run.originalCwd, isolation: run.isolation, workspace, logPath: run.logPath, mreLogPath: run.mreLogPath, startedAt, status: "running", git: await gitInfo(run.cwd) };
+  const base = { runId: run.runId, parentRunId: run.parentRunId, depth: run.depth, maxDepth: run.maxDepth, version: VERSION, agent: run.agent, model: run.model, profile: run.profile, readOnly: run.readOnly, task: run.task, cwd: run.cwd, originalCwd: run.originalCwd, isolation: run.isolation, workspace, logPath: run.logPath, mreLogPath: run.mreLogPath, startedAt, status: "running", git: await gitInfo(run.cwd) };
   await writeMetadata(base);
-  const header = `terrarium ${VERSION}\nrun: ${run.runId}\nparent: ${run.parentRunId ?? "none"}\ndepth: ${run.depth}/${run.maxDepth}\nagent: ${run.agent}${run.readOnly ? " (read-only preset)" : ""}\nprofile: ${run.profile}\ntask: ${run.task}\ncwd: ${run.cwd}\noriginal cwd: ${run.originalCwd}\nisolation: ${run.isolation}${workspace ? ` (${workspace.path})` : ""}\nlog: ${run.logPath}\nmre log: ${run.mreLogPath}\n\n`;
+  const header = `terrarium ${VERSION}\nrun: ${run.runId}\nparent: ${run.parentRunId ?? "none"}\ndepth: ${run.depth}/${run.maxDepth}\nagent: ${run.agent}${run.readOnly ? " (read-only preset)" : ""}\nmodel: ${run.model ?? "runner default"}\nprofile: ${run.profile}\ntask: ${run.task}\ncwd: ${run.cwd}\noriginal cwd: ${run.originalCwd}\nisolation: ${run.isolation}${workspace ? ` (${workspace.path})` : ""}\nlog: ${run.logPath}\nmre log: ${run.mreLogPath}\n\n`;
   if (run.stream) process.stdout.write(header);
   await writeFile(run.logPath, header);
   await writeFile(run.mreLogPath, "", { flag: "wx" });

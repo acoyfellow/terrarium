@@ -4,7 +4,7 @@ import { execFileSync, execSync } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { capturePatch, childPrompt, defaultMreLogPath, finalizeWorkspace, getRunStatus, isPidAlive, prepareWorkspace, readRun, reconcileRun, resolveAgent, resolvePromptProfile, runTerrarium, spawnTerrariumBackground, splitCommand, READ_ONLY_AGENT } from "../src/core.js";
+import { applyModelToAgent, capturePatch, childPrompt, defaultMreLogPath, finalizeWorkspace, getRunStatus, isPidAlive, prepareWorkspace, readRun, reconcileRun, resolveAgent, resolveModel, resolvePromptProfile, runTerrarium, spawnTerrariumBackground, splitCommand, READ_ONLY_AGENT } from "../src/core.js";
 
 test("builds a constrained child prompt", () => {
   assert.match(childPrompt("ship it", { depth: 1, maxDepth: 3 }), /Do not fan out/);
@@ -44,12 +44,32 @@ test("resolveAgent precedence: explicit > readOnly > env > config > default", ()
   assert.equal(resolveAgent({ agent: "custom run", readOnly: true }, { env: { TERRARIUM_AGENT: "claude run" }, config: { defaultAgent: "pi run" } }), "custom run");
 });
 
-test("READ_ONLY_AGENT resolves to opencode explore mode", () => {
+test("READ_ONLY_AGENT remains the compatibility fallback", () => {
   assert.equal(READ_ONLY_AGENT, "opencode run --agent explore");
 });
 
+test("read-only agent can be configured independently of the ordinary runner", () => {
+  assert.equal(resolveAgent({ readOnly: true }, { env: { TERRARIUM_READ_ONLY_AGENT: "pi -p --no-session --tools read,grep,find,ls" }, config: {} }), "pi -p --no-session --tools read,grep,find,ls");
+  assert.equal(resolveAgent({ readOnly: true }, { env: {}, config: { readOnlyAgent: "pi -p --no-session --tools read,grep,find,ls" } }), "pi -p --no-session --tools read,grep,find,ls");
+});
+
+test("model resolution is explicit > env > config > runner default", () => {
+  assert.equal(resolveModel({ model: "explicit/model" }, { env: { TERRARIUM_MODEL: "env/model" }, config: { defaultModel: "config/model" } }), "explicit/model");
+  assert.equal(resolveModel({}, { env: { TERRARIUM_MODEL: "env/model" }, config: { defaultModel: "config/model" } }), "env/model");
+  assert.equal(resolveModel({}, { env: {}, config: { defaultModel: "config/model" } }), "config/model");
+  assert.equal(resolveModel({}, { env: {}, config: {} }), null);
+});
+
+test("model is applied to opencode and pi child commands", () => {
+  assert.equal(applyModelToAgent("opencode run --agent explore", "anthropic/claude-sonnet-4-6"), "opencode run --agent explore --model anthropic/claude-sonnet-4-6");
+  assert.equal(applyModelToAgent("pi -p --no-session", "kindle-alpha"), "pi -p --no-session --model kindle-alpha");
+  assert.throws(() => applyModelToAgent("custom-agent", "x"), /supported for/);
+  assert.equal(applyModelToAgent("custom-agent", "config-default", { strict: false }), "custom-agent");
+  assert.throws(() => applyModelToAgent("pi -p --model old", "new"), /already contains a model flag/);
+});
+
 test("runTerrarium dry-run wires readOnly preset into the child invocation when no agent is given", async () => {
-  const result = await runTerrarium({ task: "dig", readOnly: true, dryRun: true, stream: false });
+  const result = await runTerrarium({ task: "dig", readOnly: true, dryRun: true, stream: false, config: {} });
   assert.equal(result.ok, true);
   assert.equal(result.agent, "opencode run --agent explore");
   assert.equal(result.readOnly, true);
@@ -57,15 +77,22 @@ test("runTerrarium dry-run wires readOnly preset into the child invocation when 
 });
 
 test("runTerrarium dry-run: explicit --agent overrides readOnly preset", async () => {
-  const result = await runTerrarium({ task: "dig", agent: "pi run", readOnly: true, dryRun: true, stream: false });
+  const result = await runTerrarium({ task: "dig", agent: "pi run", readOnly: true, dryRun: true, stream: false, config: {} });
   assert.equal(result.agent, "pi run");
   assert.equal(result.readOnly, false);
   assert.match(result.invocation, /^pi run /);
 });
 
+test("runTerrarium dry-run records and pins a Pi model", async () => {
+  const result = await runTerrarium({ task: "dig", agent: "pi -p --no-session", model: "kindle-alpha", dryRun: true, stream: false, config: {} });
+  assert.equal(result.model, "kindle-alpha");
+  assert.equal(result.agent, "pi -p --no-session --model kindle-alpha");
+  assert.match(result.invocation, /^pi -p --no-session --model kindle-alpha /);
+});
+
 test("runTerrarium dry-run minimal profile produces a leaner child invocation", async () => {
-  const def = await runTerrarium({ task: "dig", profile: "default", dryRun: true, stream: false });
-  const min = await runTerrarium({ task: "dig", profile: "minimal", dryRun: true, stream: false });
+  const def = await runTerrarium({ task: "dig", profile: "default", dryRun: true, stream: false, config: {} });
+  const min = await runTerrarium({ task: "dig", profile: "minimal", dryRun: true, stream: false, config: {} });
   assert.equal(def.profile, "default");
   assert.equal(min.profile, "minimal");
   assert.ok(min.invocation.length < def.invocation.length, `minimal invocation (${min.invocation.length}) should be shorter than default (${def.invocation.length})`);
@@ -74,7 +101,7 @@ test("runTerrarium dry-run minimal profile produces a leaner child invocation", 
 });
 
 test("runTerrarium rejects an unknown profile name", async () => {
-  await assert.rejects(() => runTerrarium({ task: "x", profile: "tiny", dryRun: true, stream: false }), /unknown prompt profile/);
+  await assert.rejects(() => runTerrarium({ task: "x", profile: "tiny", dryRun: true, stream: false, config: {} }), /unknown prompt profile/);
 });
 
 
