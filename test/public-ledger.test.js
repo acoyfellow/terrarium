@@ -25,6 +25,7 @@ test('public ledger rejects fixture receipts and counts real turns', () => {
   const escaped = publicTurnFromReceipt({ ...receipt, campaignId: 'campaign_real_2', verdict: 'escaped', verifiedVerdict: 'verified-escape', replay: { resultId: 'run-b', result: true } });
   const campaign = appendPublicTurn(appendPublicTurn(EMPTY_PUBLIC_CAMPAIGN, contained), escaped);
   assert.deepEqual(campaign.counts, { total: 2, contained: 1, escapes: 1 });
+  assert.equal(campaign.updatedAt, escaped.finishedAt);
   assert.equal(campaign.turns[1].evidence.independentReplay, true);
   assert.equal(campaign.synthetic, false);
 });

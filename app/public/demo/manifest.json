@@ -4,6 +4,7 @@
   "backend": "lab",
   "status": "waiting",
   "synthetic": false,
+  "updatedAt": null,
   "counts": { "total": 0, "contained": 0, "escapes": 0 },
   "turns": []
 }

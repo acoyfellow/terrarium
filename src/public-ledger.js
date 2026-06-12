@@ -8,6 +8,7 @@ export const EMPTY_PUBLIC_CAMPAIGN = {
   backend: "lab",
   status: "waiting",
   synthetic: false,
+  updatedAt: null,
   counts: { total: 0, contained: 0, escapes: 0 },
   turns: [],
 };
@@ -50,6 +51,7 @@ export function appendPublicTurn(campaign, turn) {
   return {
     ...current,
     status: turn.healing?.status === "merged" ? "healed" : turn.verdict,
+    updatedAt: turn.finishedAt || new Date().toISOString(),
     counts: { total: turns.length, contained: turns.length - escapes, escapes },
     turns,
   };

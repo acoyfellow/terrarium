@@ -6,6 +6,10 @@ let milestones = [];
 let active = 0;
 const app = document.querySelector('#app');
 const verdictLabel = (v) => v === 'verified-escape' ? 'verified escape' : v;
+const runStamp = () => {
+  const value = campaign?.updatedAt || campaign?.turns?.at(-1)?.finishedAt;
+  return value ? `LAST RUN · ${new Date(value).toISOString().replace('.000Z', 'Z')}` : 'LAST RUN · NONE';
+};
 
 const normalizeTurn = (turn, index) => ({
   turn: turn.turn ?? index + 1,
@@ -83,13 +87,13 @@ function render() {
   if (!campaign) { app.innerHTML = '<div class="empty">Loading campaign…</div>'; return; }
   turns = campaign.turns.map(normalizeTurn);
   if (!turns.length) {
-    app.innerHTML = `<div class="shell"><header class="top"><a class="brand" href="/"><span class="mark"></span>TERRARIUM</a><div class="status">LIVE DOGFOODING LOOP</div></header><main class="waiting"><div class="eyebrow">TERRARIUM HARDENS TERRARIUM</div><h1>No theatre. <span>The next run starts here.</span></h1><p>Manual campaigns will attack the current Terrarium revision, independently replay verified boundary crossings, publish redacted evidence, patch on an isolated branch, add a regression, and merge only after the frozen attack is contained.</p><section class="loop"><span>ATTACK</span><i>→</i><span>VERIFY</span><i>→</i><span>PATCH</span><i>→</i><span>REPLAY</span><i>→</i><span>MERGE</span><i>↻</i></section><div class="waiting-meta"><b>0 real iterations</b><b>0 verified escapes</b><b>manual start only</b></div><p class="waiting-note">The previous synthetic story is retained only as a development fixture. This public ledger will display receipt-backed runs and source-linked healing changes only.</p></main></div>`;
+    app.innerHTML = `<div class="shell"><header class="top"><a class="brand" href="/"><span class="mark"></span>TERRARIUM</a><time class="status">${runStamp()}</time></header><main class="waiting"><div class="eyebrow">TERRARIUM HARDENS TERRARIUM</div><h1>No theatre. <span>The next run starts here.</span></h1><p>Manual campaigns will attack the current Terrarium revision, independently replay verified boundary crossings, publish redacted evidence, patch on an isolated branch, add a regression, and merge only after the frozen attack is contained.</p><section class="loop"><span>ATTACK</span><i>→</i><span>VERIFY</span><i>→</i><span>PATCH</span><i>→</i><span>REPLAY</span><i>→</i><span>MERGE</span><i>↻</i></section><div class="waiting-meta"><b>0 real iterations</b><b>0 verified escapes</b><b>manual start only</b></div><p class="waiting-note">The previous synthetic story is retained only as a development fixture. This public ledger will display receipt-backed runs and source-linked healing changes only.</p></main></div>`;
     return;
   }
   milestones = buildMilestones();
   const c = campaign.counts || { total: turns.length, escapes: turns.filter(t => t.verdict === 'verified-escape').length };
   c.contained ??= c.total - c.escapes;
-  app.innerHTML = `<div class="shell"><header class="top"><a class="brand" href="/"><span class="mark"></span>TERRARIUM</a><div class="status">SYNTHETIC WALKTHROUGH</div></header>
+  app.innerHTML = `<div class="shell"><header class="top"><a class="brand" href="/"><span class="mark"></span>TERRARIUM</a><time class="status">${runStamp()}</time></header>
     <section class="campaign-head"><div><div class="eyebrow">ADAPTIVE CONTAINMENT CAMPAIGN</div><h1>An attacker that <span>never stops adapting.</span></h1></div><p>Every contained result triggers a new tactic. Images mark chapters only; individual iterations are evidence records. A finding counts only after independent replay.</p></section>
     <section class="stats"><div><b>${c.total}</b><span>iterations</span></div><div><b>${c.contained}</b><span>contained</span></div><div class="hot"><b>${c.escapes}</b><span>verified escapes</span></div><div><b>${milestones.length}</b><span>story milestones</span></div></section>
     <nav class="minimap" aria-label="All campaign iterations">${minimap()}</nav><section class="viewer">${detailPanel()}</section>
