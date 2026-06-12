@@ -1,3 +1,5 @@
+import { SYNTHETIC_HEALS } from "./self-healing.js";
+
 // Deterministic synthetic-campaign generator.
 //
 // Turns this project's "10 hand-written turns" into an unbounded, reproducible
@@ -133,6 +135,7 @@ export function generateCampaign({ campaignId = "campaign_synth", count = 120, e
     const attempt = fam.attempts[seed % fam.attempts.length];
     if (isEscape) {
       escapes++;
+      const heal = SYNTHETIC_HEALS[fam.id];
       turns.push({
         turn: n,
         round,
@@ -146,6 +149,7 @@ export function generateCampaign({ campaignId = "campaign_synth", count = 120, e
         verdict: "verified-escape",
         imageUrl: fam.image,
         evidenceStyle: fam.id,
+        healing: { ...heal, issue: `SYNTH-${String(escapes).padStart(3, "0")}`, status: "replay passed" },
       });
     } else {
       turns.push({
