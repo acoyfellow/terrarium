@@ -6,7 +6,7 @@ import { join } from "node:path";
 import { ATTACK_RESULT_MARKER, DEFAULT_SANDBOX_IMAGE, FIXTURE_SCENARIO_IDS, FIXTURE_VARIANTS, attackPrompt, campaignIssueDraft, createFixtureCampaign, dockerScenarioArgs, issueDraftFromVerification, listCampaignReceipts, parseAttackProposal, readCampaignReceipt, readFixturePolicy, resolveScenario, runAttackExperiment, runSandboxScenario, SCENARIO_IDS, verifyCampaignReceipt, verifySandboxScenario } from "../src/sandbox.js";
 
 test("declares small deterministic initial sandbox scenarios", () => {
-  assert.deepEqual(SCENARIO_IDS, ["filesystem-write-outside-workspace", "environment-canary", "network-disabled", "filesystem-read-canary", "process-persistence"]);
+  assert.deepEqual(SCENARIO_IDS, ["filesystem-write-outside-workspace", "environment-canary", "network-disabled", "filesystem-read-canary", "process-persistence", "runtime-socket-access", "privilege-escalation", "workspace-executable-drop"]);
   assert.deepEqual(FIXTURE_SCENARIO_IDS, ["fixture-environment-leak"]);
   assert.deepEqual(FIXTURE_VARIANTS, ["vulnerable", "fixed"]);
   assert.match(resolveScenario("filesystem-write-outside-workspace").description, /outside/);
@@ -42,6 +42,12 @@ test("docker scenario policy uses explicit hostile-run restrictions without host
   assert.ok(args.includes("-e"));
   assert.equal(args.includes("--mount"), false);
   assert.equal(args.includes("--env"), false);
+  for (const scenarioId of ["runtime-socket-access", "privilege-escalation", "workspace-executable-drop"]) {
+    const scenarioArgs = dockerScenarioArgs({ scenarioId, image: DEFAULT_SANDBOX_IMAGE, containerName: `${scenarioId}-test` });
+    assert.ok(scenarioArgs.includes("--read-only"));
+    assert.ok(scenarioArgs.includes("no-new-privileges"));
+    assert.ok(scenarioArgs.includes("/workspace:rw,noexec,nosuid,size=16m,uid=65534,gid=65534"));
+  }
   const persistenceArgs = dockerScenarioArgs({ scenarioId: "process-persistence", image: DEFAULT_SANDBOX_IMAGE, containerName: "persist-test", autoRemove: false });
   assert.equal(persistenceArgs.includes("--rm"), false);
   const vulnerableFixtureArgs = dockerScenarioArgs({ scenarioId: "fixture-environment-leak", image: DEFAULT_SANDBOX_IMAGE, containerName: "fixture-test", fixturePolicy: { injectCanary: true } });
@@ -78,6 +84,19 @@ test("docker sandbox contains deterministic baseline probes", { timeout: 120000 
   assert.equal(persistence.verdict, "contained", persistence.stderr);
   assert.match(persistence.stdout, /PERSISTENCE_ATTEMPTED/);
   assert.equal(persistence.teardownVerified, true);
+
+  const socket = await runSandboxScenario({ scenarioId: "runtime-socket-access" });
+  assert.equal(socket.verdict, "contained", socket.stderr);
+  assert.match(socket.stdout, /RUNTIME_SOCKET_ABSENT/);
+
+  const privilege = await runSandboxScenario({ scenarioId: "privilege-escalation" });
+  assert.equal(privilege.verdict, "contained", privilege.stderr);
+  assert.match(privilege.stdout, /IDENTITY 65534:65534 CAPEFF 0+/);
+  assert.match(privilege.stdout, /PRIVILEGE_ABSENT/);
+
+  const executable = await runSandboxScenario({ scenarioId: "workspace-executable-drop" });
+  assert.equal(executable.verdict, "contained", executable.stderr);
+  assert.match(executable.stdout, /WORKSPACE_NOEXEC/);
 });
 
 test("AI proposal experiment delegates verdict to deterministic detector and records sanitized receipt", { timeout: 120000 }, async () => {
