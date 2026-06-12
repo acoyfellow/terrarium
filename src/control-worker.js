@@ -3,16 +3,7 @@ import { DEFAULT_LAB_POLICY } from "./lab.js";
 import { runHostileLabScenario } from "./hostile.js";
 import { requireAuthorization } from "./controller-auth.js";
 import { sanitizeTurnFeedback } from "./adaptive.js";
-
-const EMPTY_LIVE_CAMPAIGN = {
-  campaignId: "terrarium-live",
-  scenarioId: "terrarium-self-hardening",
-  backend: "lab",
-  status: "waiting",
-  synthetic: false,
-  counts: { total: 0, contained: 0, escapes: 0 },
-  turns: [],
-};
+import { appendPublicTurn, EMPTY_PUBLIC_CAMPAIGN, publicTurnFromReceipt } from "./public-ledger.js";
 
 const DEFAULT_POLICY = {
   paused: false,
@@ -152,7 +143,7 @@ export default {
     if (url.pathname === "/health") return Response.json({ ok: true, mode: env.TERRARIUM_MODE || "fixture" });
     if (url.pathname === "/api/demo") {
       const ledger = await loadLedger(env);
-      const live = ledger.publicCampaign || EMPTY_LIVE_CAMPAIGN;
+      const live = ledger.publicCampaign || EMPTY_PUBLIC_CAMPAIGN;
       return Response.json(live, { headers: { "cache-control": "public, max-age=30" } });
     }
     if (url.pathname === "/api/campaigns/latest") {
@@ -189,7 +180,12 @@ export default {
       const campaignId = `campaign_${new Date().toISOString().replace(/[-:.TZ]/g, "")}_${crypto.randomUUID().slice(0, 8)}`;
       const hash = await payloadHash(hostile.body);
       const receipt = await writeReceipt(env, { receiptVersion: 1, campaignId, mode: "manual-hostile", fixture: false, ...hostile, payloadHash: hash, startedAt: new Date().toISOString(), finishedAt: new Date().toISOString() });
-      return Response.json({ ok: true, campaignId, verdict: hostile.verifiedVerdict || hostile.verdict, feedback: sanitizeTurnFeedback(hostile, Number(body.turn) || 1, Number(body.maxTurns) || 1), receipt });
+      const ledger = await loadLedger(env);
+      const publicTurn = publicTurnFromReceipt(receipt, { hypothesis: body.payload?.hypothesis, sourceRevision: body.sourceRevision });
+      ledger.publicCampaign = appendPublicTurn(ledger.publicCampaign, publicTurn);
+      ledger.lastReceipt = { campaignId, verdict: hostile.verifiedVerdict || hostile.verdict, artifactKey: receipt.artifactKey };
+      await saveLedger(env, ledger);
+      return Response.json({ ok: true, campaignId, verdict: hostile.verifiedVerdict || hostile.verdict, feedback: sanitizeTurnFeedback(hostile, Number(body.turn) || 1, Number(body.maxTurns) || 1), publicTurn, receipt });
     }
     return new Response("Not found", { status: 404 });
   },
