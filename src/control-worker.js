@@ -144,7 +144,7 @@ export default {
     if (url.pathname === "/api/demo") {
       const ledger = await loadLedger(env);
       const live = ledger.publicCampaign || EMPTY_PUBLIC_CAMPAIGN;
-      return Response.json(live, { headers: { "cache-control": "public, max-age=30" } });
+      return Response.json(live, { headers: { "cache-control": "public, max-age=5, stale-while-revalidate=10" } });
     }
     if (url.pathname === "/api/campaigns/latest") {
       const ledger = await loadLedger(env);

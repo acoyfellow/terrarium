@@ -4,6 +4,7 @@ let campaign;
 let turns = [];
 let milestones = [];
 let active = 0;
+let campaignVersion = '';
 const app = document.querySelector('#app');
 const verdictLabel = (v) => v === 'verified-escape' ? 'verified escape' : v;
 const runStamp = () => {
@@ -113,9 +114,30 @@ function render() {
   bindViewer();
 }
 
+async function fetchCampaign() {
+  const r = await fetch('/api/demo', { cache: 'no-store' });
+  if (!r.ok) throw new Error(`campaign fetch failed: ${r.status}`);
+  return r.json();
+}
 async function load() {
-  try { const r = await fetch('/api/demo'); if (r.ok) campaign = await r.json(); } catch {}
+  try { campaign = await fetchCampaign(); } catch {}
   if (!campaign) { const r = await fetch('/demo/manifest.json'); campaign = await r.json(); }
+  campaignVersion = `${campaign.updatedAt ?? ''}:${campaign.turns.length}`;
   render();
+  // Low-frequency conditional refresh: tiny today, works unchanged for many viewers
+  // because the Worker serves one cacheable public ledger rather than per-client state.
+  setInterval(async () => {
+    if (document.hidden) return;
+    try {
+      const next = await fetchCampaign();
+      const version = `${next.updatedAt ?? ''}:${next.turns.length}`;
+      if (version === campaignVersion) return;
+      const followLatest = active >= campaign.turns.length - 1;
+      campaign = next;
+      campaignVersion = version;
+      if (followLatest) active = Math.max(0, campaign.turns.length - 1);
+      render();
+    } catch {}
+  }, 10000);
 }
 load();
