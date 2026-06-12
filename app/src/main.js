@@ -23,6 +23,9 @@ const normalizeTurn = (turn, index) => ({
   adaptation: turn.adaptation ?? 'Continue with a different bounded attack class.',
   verdict: turn.verdict ?? 'inconclusive',
   imageUrl: turn.imageUrl ?? null,
+  payloadHash: turn.payloadHash ?? null,
+  sourceRevision: turn.sourceRevision ?? null,
+  evidence: turn.evidence ?? null,
   healing: turn.healing ?? null,
 });
 
@@ -36,8 +39,12 @@ function buildMilestones() {
   return turns.map((t, i) => ({ t, i })).filter(({ t, i }) => i === 0 || t.verdict === 'verified-escape' || t.round !== turns[i - 1].round);
 }
 
+function runGraphic(t) {
+  return `<div class="run-evidence"><div class="run-orbit"><span></span><i></i></div><div class="run-facts"><span>LAB EXECUTION</span><b>${t.verdict === 'contained' ? 'BOUNDARY HELD' : verdictLabel(t.verdict).toUpperCase()}</b><dl><div><dt>payload</dt><dd>${t.payloadHash ?? 'redacted'}</dd></div><div><dt>execution</dt><dd>${t.evidence?.executionId ?? 'recorded'}</dd></div><div><dt>revision</dt><dd>${t.sourceRevision?.slice(0, 12) ?? 'recorded'}</dd></div><div><dt>replay</dt><dd>${t.evidence?.independentReplay ? 'complete' : 'not required'}</dd></div></dl></div></div>`;
+}
+
 function evidenceGraphic(t) {
-  if (t.verdict !== 'verified-escape') return `<img src="${t.imageUrl}" alt="Chapter illustration for ${t.technique}">`;
+  if (t.verdict !== 'verified-escape') return t.imageUrl ? `<img src="${t.imageUrl}" alt="Chapter illustration for ${t.technique}">` : runGraphic(t);
   const h = t.healing;
   const payload = `${t.family}-${String(t.turn).padStart(3, '0')}`;
   return `<div class="escape-evidence family-${t.family}">
@@ -60,8 +67,8 @@ function detailPanel() {
 
 function milestoneRail() {
   return milestones.map(({ t, i }) => `<button data-milestone="${i}" class="milestone${i === active ? ' active' : ''}${t.verdict === 'verified-escape' ? ' escape' : ''}">
-    <span class="milestone-visual">${t.verdict === 'verified-escape' ? `<span class="mini-evidence family-${t.family}"><i></i><i></i></span>` : `<img loading="lazy" src="${t.imageUrl}" alt="">`}</span>
-    <span class="milestone-copy"><small>${t.verdict === 'verified-escape' ? 'VERIFIED ESCAPE' : `ROUND ${t.round}`}</small><b>Turn ${t.turn}</b><em>${t.technique}</em></span>
+    <span class="milestone-visual">${t.verdict === 'verified-escape' ? `<span class="mini-evidence family-${t.family}"><i></i><i></i></span>` : t.imageUrl ? `<img loading="lazy" src="${t.imageUrl}" alt="">` : `<span class="mini-run"><i></i><b>${String(t.turn).padStart(3, '0')}</b></span>`}</span>
+    <span class="milestone-copy"><small>${t.verdict === 'verified-escape' ? 'VERIFIED ESCAPE' : t.round ? `ROUND ${t.round}` : 'REAL EXECUTION'}</small><b>Turn ${t.turn}</b><em>${t.technique}</em></span>
   </button>`).join('');
 }
 
