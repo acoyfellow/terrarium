@@ -4,7 +4,7 @@ import { execFileSync, execSync } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { applyModelToAgent, capturePatch, childPrompt, defaultMreLogPath, finalizeWorkspace, getRunStatus, isPidAlive, prepareWorkspace, readRun, reconcileRun, resolveAgent, resolveModel, resolvePromptProfile, runTerrarium, spawnTerrariumBackground, splitCommand, READ_ONLY_AGENT } from "../src/core.js";
+import { applyModelToAgent, assertRunId, capturePatch, childPrompt, defaultMreLogPath, finalizeWorkspace, getRunStatus, isPidAlive, prepareWorkspace, readRun, reconcileRun, resolveAgent, resolveModel, resolvePromptProfile, runTerrarium, spawnTerrariumBackground, splitCommand, READ_ONLY_AGENT } from "../src/core.js";
 
 test("builds a constrained child prompt", () => {
   assert.match(childPrompt("ship it", { depth: 1, maxDepth: 3 }), /Do not fan out/);
@@ -188,6 +188,23 @@ test("capturePatch includes untracked new files and excludes the workspace marke
   }
 });
 
+
+test("rejects run traversal, external logs, and child depth escalation", async () => {
+  assert.throws(() => assertRunId("../../outside"), /invalid Terrarium run id/);
+  await assert.rejects(() => runTerrarium({ task: "noop", dryRun: true, runId: "../../outside" }), /invalid Terrarium run id/);
+  await assert.rejects(() => runTerrarium({ task: "noop", dryRun: true, logPath: join(tmpdir(), "outside.log") }), /must stay inside/);
+  const previousDepth = process.env.TERRARIUM_DEPTH;
+  const previousMax = process.env.TERRARIUM_MAX_DEPTH;
+  try {
+    process.env.TERRARIUM_DEPTH = "1";
+    process.env.TERRARIUM_MAX_DEPTH = "1";
+    await assert.rejects(() => runTerrarium({ task: "noop", dryRun: true, maxDepth: 999 }), /cannot raise inherited/);
+    await assert.rejects(() => runTerrarium({ task: "noop", dryRun: true, depth: -100 }), /invalid Terrarium depth/);
+  } finally {
+    if (previousDepth === undefined) delete process.env.TERRARIUM_DEPTH; else process.env.TERRARIUM_DEPTH = previousDepth;
+    if (previousMax === undefined) delete process.env.TERRARIUM_MAX_DEPTH; else process.env.TERRARIUM_MAX_DEPTH = previousMax;
+  }
+});
 
 test("rejects an unrecorded log path", async () => {
   const logPath = await defaultMreLogPath(`ter_test_unrecorded_${Date.now()}`);

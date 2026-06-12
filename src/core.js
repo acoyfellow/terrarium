@@ -109,17 +109,32 @@ export async function loadConfig() {
   return JSON.parse(await readFile(CONFIG_PATH, "utf8"));
 }
 
+export function assertRunId(runId) {
+  if (typeof runId !== "string" || !/^ter_[A-Za-z0-9_]+$/.test(runId)) throw new Error("invalid Terrarium run id");
+  return runId;
+}
+
+function confinedLogPath(path, label = "log path") {
+  const root = resolve(LOG_DIR);
+  const candidate = resolve(path);
+  if (candidate !== root && !candidate.startsWith(`${root}/`)) throw new Error(`${label} must stay inside the Terrarium log directory`);
+  return candidate;
+}
+
 export async function defaultLogPath(runId) {
+  assertRunId(runId);
   await mkdir(LOG_DIR, { recursive: true });
   return join(LOG_DIR, `${runId}.log`);
 }
 
 export async function defaultMreLogPath(runId) {
+  assertRunId(runId);
   await mkdir(LOG_DIR, { recursive: true });
   return join(LOG_DIR, `${runId}.mre.log`);
 }
 
 export function metadataPath(runId) {
+  assertRunId(runId);
   return join(LOG_DIR, `${runId}.json`);
 }
 
@@ -169,10 +184,20 @@ async function writeMetadata(meta) {
 }
 
 function buildRun(opts, config) {
-  const runId = opts.runId || makeRunId();
-  const parentRunId = opts.parentRunId || process.env.TERRARIUM_RUN_ID || null;
-  const depth = Number(opts.depth ?? process.env.TERRARIUM_DEPTH ?? 0) + 1;
-  const maxDepth = Number(opts.maxDepth ?? process.env.TERRARIUM_MAX_DEPTH ?? config.maxDepth ?? 3);
+  const runId = assertRunId(opts.runId || makeRunId());
+  const inheritedParent = process.env.TERRARIUM_RUN_ID || null;
+  if (opts.parentRunId && inheritedParent && opts.parentRunId !== inheritedParent) throw new Error("parent run id does not match inherited parent");
+  const parentRunId = opts.parentRunId || inheritedParent;
+  if (parentRunId) assertRunId(parentRunId);
+  const inheritedDepth = Number(process.env.TERRARIUM_DEPTH ?? 0);
+  const requestedDepth = Number(opts.depth ?? inheritedDepth);
+  if (!Number.isInteger(requestedDepth) || requestedDepth < inheritedDepth || requestedDepth < 0) throw new Error("invalid Terrarium depth");
+  const depth = requestedDepth + 1;
+  const inheritedMax = process.env.TERRARIUM_MAX_DEPTH ? Number(process.env.TERRARIUM_MAX_DEPTH) : null;
+  const requestedMax = Number(opts.maxDepth ?? inheritedMax ?? config.maxDepth ?? 3);
+  if (!Number.isInteger(requestedMax) || requestedMax < 1) throw new Error("invalid Terrarium max depth");
+  if (inheritedMax !== null && requestedMax > inheritedMax) throw new Error("child cannot raise inherited Terrarium max depth");
+  const maxDepth = requestedMax;
   const requestedReadOnly = Boolean(opts.readOnly ?? config.readOnly ?? false);
   const baseAgent = resolveAgent({ agent: opts.agent, readOnly: requestedReadOnly }, { env: process.env, config });
   const requestedModel = resolveModel({ model: opts.model }, { env: process.env, config });
@@ -184,7 +209,9 @@ function buildRun(opts, config) {
   const { task, dryRun = false, cwd = process.cwd(), stream = true } = opts;
   const isolation = opts.isolation || config.isolation || "none";
   const keepWorkspace = Boolean(opts.keepWorkspace ?? config.keepWorkspace ?? false);
-  return { runId, parentRunId, depth, maxDepth, agent, model, profile, readOnly, timeoutMs, task, dryRun, cwd, originalCwd: cwd, stream, logPath: opts.logPath, mreLogPath: opts.mreLogPath, isolation, keepWorkspace };
+  const logPath = opts.logPath ? confinedLogPath(opts.logPath) : opts.logPath;
+  const mreLogPath = opts.mreLogPath ? confinedLogPath(opts.mreLogPath, "MRE log path") : opts.mreLogPath;
+  return { runId, parentRunId, depth, maxDepth, agent, model, profile, readOnly, timeoutMs, task, dryRun, cwd, originalCwd: cwd, stream, logPath, mreLogPath, isolation, keepWorkspace };
 }
 
 async function workspaceExcludes() {
@@ -431,6 +458,7 @@ async function recordedLogPath({ runId, logPath, kind }) {
   if (runId) {
     const meta = await readMetadata(runId);
     const expected = kind === "terrarium" ? meta.logPath ?? join(LOG_DIR, `${runId}.log`) : meta.mreLogPath ?? join(LOG_DIR, `${runId}.mre.log`);
+    if (!meta.logPathExternal && !meta.mreLogPathExternal) confinedLogPath(expected, "recorded log path");
     if (logPath && resolve(logPath) !== resolve(expected)) throw new Error("logPath does not match the recorded log for this run");
     return expected;
   }
@@ -441,7 +469,10 @@ async function recordedLogPath({ runId, logPath, kind }) {
   for (const file of files) {
     const meta = JSON.parse(await readFile(join(LOG_DIR, file), "utf8"));
     const expected = kind === "terrarium" ? meta.logPath : meta.mreLogPath;
-    if (expected && resolve(expected) === requested) return expected;
+    if (expected && resolve(expected) === requested) {
+      if (!meta.logPathExternal && !meta.mreLogPathExternal) confinedLogPath(expected, "recorded log path");
+      return expected;
+    }
   }
   throw new Error("logPath is not a recorded Terrarium log");
 }

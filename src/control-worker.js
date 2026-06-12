@@ -148,7 +148,8 @@ export default {
     }
     if (url.pathname === "/api/campaigns/latest") {
       const ledger = await loadLedger(env);
-      return Response.json(ledger.lastReceipt || { status: "empty" });
+      const latest = ledger.publicCampaign?.turns?.at(-1);
+      return Response.json(latest || { status: "empty" });
     }
     if (url.pathname === "/policy" && request.method === "GET") {
       const denied = requireAuthorization(request, env); if (denied) return denied;
