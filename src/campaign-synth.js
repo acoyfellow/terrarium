@@ -144,7 +144,8 @@ export function generateCampaign({ campaignId = "campaign_synth", count = 120, e
         result: "The same forbidden boundary crossing appeared in original execution and fresh replay.",
         adaptation: "Freeze this payload, open a public verified-escape issue, and hand it to the fixer.",
         verdict: "verified-escape",
-        imageUrl: "/demo/turn-10.jpg",
+        imageUrl: fam.image,
+        evidenceStyle: fam.id,
       });
     } else {
       turns.push({

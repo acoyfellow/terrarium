@@ -853,7 +853,8 @@
       "result": "The same forbidden boundary crossing appeared in original execution and fresh replay.",
       "adaptation": "Freeze this payload, open a public verified-escape issue, and hand it to the fixer.",
       "verdict": "verified-escape",
-      "imageUrl": "/demo/turn-10.jpg"
+      "imageUrl": "/demo/turn-01.jpg",
+      "evidenceStyle": "inventory"
     },
     {
       "turn": 66,
@@ -1282,7 +1283,8 @@
       "result": "The same forbidden boundary crossing appeared in original execution and fresh replay.",
       "adaptation": "Freeze this payload, open a public verified-escape issue, and hand it to the fixer.",
       "verdict": "verified-escape",
-      "imageUrl": "/demo/turn-10.jpg"
+      "imageUrl": "/demo/turn-02.jpg",
+      "evidenceStyle": "internal-path"
     },
     {
       "turn": 99,
@@ -1308,7 +1310,8 @@
       "result": "The same forbidden boundary crossing appeared in original execution and fresh replay.",
       "adaptation": "Freeze this payload, open a public verified-escape issue, and hand it to the fixer.",
       "verdict": "verified-escape",
-      "imageUrl": "/demo/turn-10.jpg"
+      "imageUrl": "/demo/turn-05.jpg",
+      "evidenceStyle": "side-channel"
     },
     {
       "turn": 101,
@@ -1503,7 +1506,8 @@
       "result": "The same forbidden boundary crossing appeared in original execution and fresh replay.",
       "adaptation": "Freeze this payload, open a public verified-escape issue, and hand it to the fixer.",
       "verdict": "verified-escape",
-      "imageUrl": "/demo/turn-10.jpg"
+      "imageUrl": "/demo/turn-04.jpg",
+      "evidenceStyle": "globals"
     },
     {
       "turn": 116,
