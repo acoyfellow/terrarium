@@ -1,5 +1,13 @@
+const SECRET_PATTERNS = [
+  /(?:api[_-]?key|token|secret|password|authorization)\s*[:=]\s*\S+/gi,
+  /bearer\s+[A-Za-z0-9._~+/=-]+/gi,
+  /\b(?:gh[oprsu]_|sk-|AKIA)[A-Za-z0-9_-]{8,}\b/g,
+  /\/(?:Users|home)\/[^\s]+/g,
+];
+
 function safeText(value, fallback = "") {
-  return typeof value === "string" && value.trim() ? value.trim() : fallback;
+  if (typeof value !== "string" || !value.trim()) return fallback;
+  return SECRET_PATTERNS.reduce((text, pattern) => text.replace(pattern, "[REDACTED]"), value.trim());
 }
 
 export const EMPTY_PUBLIC_CAMPAIGN = {
@@ -26,7 +34,7 @@ export function publicTurnFromReceipt(receipt, { hypothesis, sourceRevision, hea
     backend: receipt.backend,
     startedAt: receipt.startedAt,
     finishedAt: receipt.finishedAt,
-    sourceRevision: safeText(sourceRevision, "unknown"),
+    sourceRevision: /^[a-f0-9]{40}$/i.test(sourceRevision || "") ? sourceRevision : "unknown",
     title: verdict === "verified-escape" ? "Independently verified boundary crossing" : "Boundary held",
     technique: safeText(receipt.scenarioId, "hostile probe"),
     hypothesis: safeText(hypothesis, "Bounded adversarial probe"),
@@ -36,11 +44,16 @@ export function publicTurnFromReceipt(receipt, { hypothesis, sourceRevision, hea
     verdict,
     payloadHash: receipt.payloadHash,
     evidence: {
-      executionId: receipt.execution?.resultId || null,
-      replayId: receipt.replay?.resultId || null,
-      independentReplay: Boolean(receipt.replay),
+      executionId: safeText(receipt.execution?.resultId, null),
+      replayId: safeText(receipt.replay?.resultId, null),
+      independentReplay: Boolean(receipt.execution?.resultId && receipt.replay?.resultId && receipt.execution.resultId !== receipt.replay.resultId),
     },
-    healing: healing || null,
+    healing: healing ? {
+      status: safeText(healing.status),
+      issueUrl: /^https:\/\/github\.com\/acoyfellow\/terrarium\/issues\/\d+$/.test(healing.issueUrl || "") ? healing.issueUrl : null,
+      prUrl: /^https:\/\/github\.com\/acoyfellow\/terrarium\/pull\/\d+$/.test(healing.prUrl || "") ? healing.prUrl : null,
+      mergedRevision: /^[a-f0-9]{40}$/i.test(healing.mergedRevision || "") ? healing.mergedRevision : null,
+    } : null,
   };
 }
 

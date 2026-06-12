@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { ATTACK_RESULT_MARKER, DEFAULT_SANDBOX_IMAGE, FIXTURE_SCENARIO_IDS, FIXTURE_VARIANTS, attackPrompt, campaignIssueDraft, createFixtureCampaign, dockerScenarioArgs, issueDraftFromVerification, listCampaignReceipts, parseAttackProposal, readCampaignReceipt, readFixturePolicy, resolveScenario, runAttackExperiment, runSandboxScenario, SCENARIO_IDS, verifyCampaignReceipt, verifySandboxScenario } from "../src/sandbox.js";
+import { ATTACK_RESULT_MARKER, DEFAULT_SANDBOX_IMAGE, FIXTURE_SCENARIO_IDS, FIXTURE_VARIANTS, attackPrompt, campaignIssueDraft, createFixtureCampaign, dockerScenarioArgs, issueDraftFromVerification, listCampaignReceipts, parseAttackProposal, readCampaignReceipt, readFixturePolicy, resolveScenario, runAttackExperiment, runSandboxScenario, SCENARIO_IDS, verifyCampaignReceipt, verifySandboxScenario, writeCampaignReceipt } from "../src/sandbox.js";
 
 test("declares small deterministic initial sandbox scenarios", () => {
   assert.deepEqual(SCENARIO_IDS, ["filesystem-write-outside-workspace", "environment-canary", "network-disabled", "filesystem-read-canary", "process-persistence", "runtime-socket-access", "privilege-escalation", "workspace-executable-drop"]);
@@ -130,8 +130,9 @@ test("AI proposal experiment delegates verdict to deterministic detector and rec
   }
 });
 
-test("campaign reader rejects path-shaped campaign ids", async () => {
+test("campaign reader and writer reject path-shaped campaign ids", async () => {
   await assert.rejects(() => readCampaignReceipt({ campaignId: "../secrets" }), /invalid campaign id/);
+  await assert.rejects(() => writeCampaignReceipt({ scenarioId: "environment-canary", verdict: "contained" }, { campaignId: "../../outside", receiptDir: tmpdir() }), /invalid campaign id/);
 });
 
 test("known-vulnerable fixture exercises escaped receipt, replay verification, and draft", { timeout: 120000 }, async () => {

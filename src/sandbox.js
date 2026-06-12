@@ -240,6 +240,7 @@ function campaignReceipt(result, { campaignId } = {}) {
 }
 
 export async function writeCampaignReceipt(result, { campaignId = makeRunId().replace(/^ter_/, "campaign_"), receiptDir = CAMPAIGN_DIR } = {}) {
+  assertCampaignId(campaignId);
   await mkdir(receiptDir, { recursive: true });
   const path = join(receiptDir, `${campaignId}.json`);
   const receipt = campaignReceipt(result, { campaignId });
@@ -265,7 +266,7 @@ export async function listCampaignReceipts({ receiptDir = CAMPAIGN_DIR, limit = 
   return { count: campaigns.length, campaigns };
 }
 
-export async function verifyCampaignReceipt({ campaignId, receiptDir = CAMPAIGN_DIR, ...options } = {}) {
+export async function verifyCampaignReceipt({ campaignId, receiptDir = CAMPAIGN_DIR, scenarioId: requestedScenarioId, ...options } = {}) {
   const receipt = await readCampaignReceipt({ campaignId, receiptDir });
   if (receipt.verdict !== "escaped" && receipt.verdict !== "verified-escape") {
     return {
@@ -276,7 +277,8 @@ export async function verifyCampaignReceipt({ campaignId, receiptDir = CAMPAIGN_
       observed: receipt.verdict === "contained" ? "The recorded campaign was contained; no claimed escape exists to replay." : "Only an escaped campaign can be replayed for verification.",
     };
   }
-  const replay = await runSandboxScenario({ scenarioId: receipt.scenarioId, ...options, verificationOf: campaignId });
+  if (requestedScenarioId && requestedScenarioId !== receipt.scenarioId) throw new Error("replay scenario must match recorded campaign scenario");
+  const replay = await runSandboxScenario({ ...options, scenarioId: receipt.scenarioId, verificationOf: campaignId });
   return {
     campaignId,
     source: receipt,

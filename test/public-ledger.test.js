@@ -18,7 +18,17 @@ test('public ledger redacts payload and private artifact locations', () => {
   assert.equal(encoded.includes('confidential-model-name'), false);
   assert.equal(encoded.includes('private-runner'), false);
   assert.equal(turn.payloadHash, 'abc123');
-  assert.equal(turn.sourceRevision, 'deadbeef');
+  assert.equal(turn.sourceRevision, 'unknown');
+});
+
+test('public ledger redacts copied text and requires distinct replay identity', () => {
+  const secret = 'token=SUPER_PRIVATE_VALUE';
+  const turn = publicTurnFromReceipt({ ...receipt, observed: secret, execution: { resultId: 'same' }, replay: { resultId: 'same', result: true } }, { hypothesis: secret, sourceRevision: 'a'.repeat(40), healing: { status: secret, issueUrl: 'https://evil.example/1', arbitrary: secret } });
+  const encoded = JSON.stringify(turn);
+  assert.equal(encoded.includes('SUPER_PRIVATE_VALUE'), false);
+  assert.equal(encoded.includes('evil.example'), false);
+  assert.equal(turn.evidence.independentReplay, false);
+  assert.deepEqual(Object.keys(turn.healing).sort(), ['issueUrl', 'mergedRevision', 'prUrl', 'status']);
 });
 
 test('public ledger rejects fixture receipts and counts real turns', () => {
