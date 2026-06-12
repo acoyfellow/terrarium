@@ -1,7 +1,9 @@
 #!/usr/bin/env node
+import { readFile } from "node:fs/promises";
 import { getRunStatus, listRuns, readRun, runTerrarium, VERSION } from "./core.js";
 import { campaignIssueDraft, createFixtureCampaign, DEFAULT_SANDBOX_IMAGE, FIXTURE_SCENARIO_IDS, FIXTURE_VARIANTS, listCampaignReceipts, readCampaignReceipt, runAttackExperiment, runSandboxScenario, SCENARIO_IDS, verifyCampaignReceipt, verifySandboxScenario } from "./sandbox.js";
 import { runManualHostile } from "./hostile-cli.js";
+import { runHealingLoop } from "./healing-cli.js";
 
 function help() {
   return `terrarium ${VERSION}
@@ -31,6 +33,7 @@ Usage:
   terra campaign issue-draft <campaignId>
   terra fixture escape [vulnerable|fixed]
   terra hostile run [--turns 3] [--agent "pi -p --no-session"] [--model <id>]
+  terra heal <issue-number> <finding-json> [--agent "pi -p --no-session"] [--model <id>]
 
 Containment probes (opt-in; ordinary delegation is unchanged):
   ${SCENARIO_IDS.join("\n  ")}
@@ -123,6 +126,7 @@ else if (cmd === "campaign" && rest[0] === "issue-draft") campaignIssueDraft({ c
 }).catch((e) => { console.error(`terrarium: ${e.message}`); process.exit(1); });
 else if (cmd === "fixture" && rest[0] === "escape") createFixtureCampaign({ variant: rest[1] || "vulnerable" }).then((result) => console.log(JSON.stringify(result, null, 2))).catch((e) => { console.error(`terrarium: ${e.message}`); process.exit(1); });
 else if (cmd === "hostile" && rest[0] === "run") runManualHostile({ scenarioId: rest[1] || "lab-env-canary", turns: opts.turns || 1, agent: opts.agent, model: opts.model, controller: opts.controller || process.env.TERRARIUM_CONTROLLER_URL, token: process.env.TERRARIUM_CONTROL_TOKEN, timeoutMs: opts.timeoutMs }).then((result) => console.log(JSON.stringify(result, null, 2))).catch((e) => { console.error(`terrarium: ${e.message}`); process.exit(1); });
+else if (cmd === "heal") readFile(rest[1], "utf8").then(JSON.parse).then((finding) => runHealingLoop({ issueNumber: Number(rest[0]), finding, agent: opts.agent, model: opts.model, timeoutMs: opts.timeoutMs, dryRun: opts.dryRun })).then((result) => console.log(JSON.stringify(result, null, 2))).catch((e) => { console.error(`terrarium: ${e.message}`); process.exit(1); });
 else runTerrarium({ ...opts, task: opts.task.join(" ").trim(), stream: !opts.json }).then((result) => {
   if (opts.json) console.log(JSON.stringify(result, null, 2));
   process.exit(result.exitCode ?? (result.ok ? 0 : 1));
