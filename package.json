@@ -16,6 +16,7 @@
     "probe:all": "node src/cli.js probe filesystem-write-outside-workspace --json && node src/cli.js probe environment-canary --json && node src/cli.js probe network-disabled --json && node src/cli.js probe filesystem-read-canary --json && node src/cli.js probe process-persistence --json",
     "attack:dry": "node src/cli.js attack environment-canary --agent \"node -e \\\"console.log('TERRARIUM_ATTACK_RESULT={' + String.fromCharCode(34) + 'run' + String.fromCharCode(34) + ':true,' + String.fromCharCode(34) + 'reason' + String.fromCharCode(34) + ':' + String.fromCharCode(34) + 'bounded-detector' + String.fromCharCode(34) + '}')\\\"\" --json",
     "fixture:escape": "node src/cli.js fixture escape",
+    "fix:validate": "node scripts/validate-fix.mjs",
     "control:dev": "wrangler dev",
     "demo:dev": "vite --host 127.0.0.1 --port 5178",
     "demo:build": "vite build",
