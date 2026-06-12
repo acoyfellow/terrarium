@@ -19,6 +19,7 @@ const normalizeTurn = (turn, index) => ({
   adaptation: turn.adaptation ?? 'Continue with a different bounded attack class.',
   verdict: turn.verdict ?? 'inconclusive',
   imageUrl: turn.imageUrl ?? null,
+  healing: turn.healing ?? null,
 });
 
 function minimap() {
@@ -33,20 +34,24 @@ function buildMilestones() {
 
 function evidenceGraphic(t) {
   if (t.verdict !== 'verified-escape') return `<img src="${t.imageUrl}" alt="Chapter illustration for ${t.technique}">`;
+  const h = t.healing;
+  const payload = `${t.family}-${String(t.turn).padStart(3, '0')}`;
   return `<div class="escape-evidence family-${t.family}">
-    <div class="receipt"><span>ORIGINAL</span><b>${t.family}</b><i>boundary crossed</i></div>
-    <div class="match">≡</div>
-    <div class="receipt replay"><span>FRESH REPLAY</span><b>${t.family}</b><i>same crossing</i></div>
+    <div class="evidence-title"><span>INDEPENDENT VERIFICATION</span><b>${h?.issue ?? 'SYNTHETIC FINDING'}</b></div>
+    <div class="receipt"><span>ORIGINAL RUN</span><dl><div><dt>environment</dt><dd>lab-a-${t.turn}</dd></div><div><dt>payload</dt><dd>${payload}</dd></div><div><dt>boundary</dt><dd>${h?.boundary ?? t.family}</dd></div><div><dt>detector</dt><dd>external</dd></div><div><dt>result</dt><dd>crossed</dd></div></dl></div>
+    <div class="match"><b>EXACT MATCH</b><span>same payload</span><span>fresh environment</span><span>same violation</span></div>
+    <div class="receipt replay"><span>FRESH REPLAY</span><dl><div><dt>environment</dt><dd>lab-b-${t.turn}</dd></div><div><dt>payload</dt><dd>${payload}</dd></div><div><dt>boundary</dt><dd>${h?.boundary ?? t.family}</dd></div><div><dt>detector</dt><dd>external</dd></div><div><dt>result</dt><dd>crossed</dd></div></dl></div>
   </div>`;
 }
 
 function detailPanel() {
   const t = turns[active];
-  const proof = t.verdict === 'verified-escape' ? `<div class="proof"><b>Independent match</b><p>The exact payload crossed the same declared boundary in original execution and fresh replay. This evidence diagram is keyed to the ${t.technique.toLowerCase()} finding.</p></div>` : '';
+  const proof = t.verdict === 'verified-escape' ? `<div class="proof"><b>What Terrarium learned</b><p>${t.healing?.lesson ?? 'The exact attack must be independently reproduced before it can improve the product.'}</p></div>` : '';
+  const healing = t.verdict === 'verified-escape' && t.healing ? `<section class="healing"><div class="healing-head"><span>SELF-HEALING CHANGE</span><b>${t.healing.status}</b></div><h3>${t.healing.change}</h3><ol><li><span>1</span><div><b>Escape verified</b><p>${t.healing.boundary}</p></div></li><li><span>2</span><div><b>Regression generated</b><p>${t.healing.test}</p></div></li><li><span>3</span><div><b>Terrarium patched</b><p>${t.healing.change}</p></div></li><li><span>4</span><div><b>Independent replay</b><p>Patch contained the frozen payload.</p></div></li></ol><div class="code-links"><a href="${t.healing.sourceUrl}" target="_blank" rel="noreferrer">view product code ↗</a><a href="${t.healing.testUrl}" target="_blank" rel="noreferrer">view regression test ↗</a></div></section>` : '';
   return `<figure class="visual ${t.verdict === 'verified-escape' ? 'evidence-visual' : ''}">${evidenceGraphic(t)}<figcaption><span>TURN ${String(t.turn).padStart(3, '0')}${t.round ? ` · ROUND ${t.round}` : ''}</span><strong class="${t.verdict === 'verified-escape' ? 'danger' : ''}">${verdictLabel(t.verdict)}</strong></figcaption></figure>
     <article class="detail"><div class="eyebrow">${t.technique}</div><h2>${t.title}</h2><dl>
       <div><dt>Hypothesis</dt><dd>${t.hypothesis}</dd></div><div><dt>Attempt</dt><dd>${t.attempt}</dd></div><div><dt>Observed result</dt><dd>${t.result}</dd></div><div><dt>Next adaptation</dt><dd>${t.adaptation}</dd></div>
-    </dl>${proof}<div class="navbuttons"><button data-prev>← Previous</button><button data-jump-escape>Next escape ↦</button><button data-next>Next iteration →</button></div></article>`;
+    </dl>${proof}${healing}<div class="navbuttons"><button data-prev>← Previous</button><button data-jump-escape>Next escape ↦</button><button data-next>Next iteration →</button></div></article>`;
 }
 
 function milestoneRail() {
