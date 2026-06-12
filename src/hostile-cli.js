@@ -44,7 +44,7 @@ export async function runManualHostile({ scenarioId = "lab-env-canary", turns = 
     const command = model ? `${agent} --model ${model}` : agent;
     const proposalText = await runCommand(command, adaptivePrompt({ scenarioId, turn, maxTurns, feedback }), timeoutMs);
     const payload = parseAdaptivePayload(proposalText, DEFAULT_LAB_POLICY);
-    const result = await controllerCall(controller, token, "/campaigns/manual", { scenarioId, payload, turn, maxTurns, sourceRevision });
+    const result = await controllerCall(controller, token, "/campaigns/manual", { scenarioId, payload, turn, maxTurns, sourceRevision, privateRunMetadata: { model: model || null, agent } });
     feedback = result.feedback;
     results.push(result);
     if (result.verdict === "verified-escape") break;

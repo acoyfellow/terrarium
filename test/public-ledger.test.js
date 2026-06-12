@@ -7,7 +7,7 @@ const receipt = {
   body: 'SECRET BODY', capabilities: [], payloadHash: 'abc123', observed: 'Boundary held.',
   verdict: 'contained', verifiedVerdict: null, startedAt: '2026-01-01T00:00:00Z', finishedAt: '2026-01-01T00:00:01Z',
   execution: { resultId: 'run-a', result: false }, replay: null,
-  artifactKey: 'private/key', payloadKey: 'private/payload',
+  artifactKey: 'private/key', payloadKey: 'private/payload', privateRunMetadata: { model: 'confidential-model-name', agent: 'private-runner' },
 };
 
 test('public ledger redacts payload and private artifact locations', () => {
@@ -15,6 +15,8 @@ test('public ledger redacts payload and private artifact locations', () => {
   const encoded = JSON.stringify(turn);
   assert.equal(encoded.includes('SECRET BODY'), false);
   assert.equal(encoded.includes('private/'), false);
+  assert.equal(encoded.includes('confidential-model-name'), false);
+  assert.equal(encoded.includes('private-runner'), false);
   assert.equal(turn.payloadHash, 'abc123');
   assert.equal(turn.sourceRevision, 'deadbeef');
 });

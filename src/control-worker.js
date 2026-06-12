@@ -179,7 +179,7 @@ export default {
       const hostile = await runHostileLabScenario({ scenarioId: body.scenarioId, body: body.payload?.body, capabilities: body.payload?.capabilities, baseUrl: env.LAB_ORIGIN, authToken: env.LAB_AUTH_TOKEN, policy: { ...DEFAULT_LAB_POLICY, ...policy } });
       const campaignId = `campaign_${new Date().toISOString().replace(/[-:.TZ]/g, "")}_${crypto.randomUUID().slice(0, 8)}`;
       const hash = await payloadHash(hostile.body);
-      const receipt = await writeReceipt(env, { receiptVersion: 1, campaignId, mode: "manual-hostile", fixture: false, ...hostile, payloadHash: hash, startedAt: new Date().toISOString(), finishedAt: new Date().toISOString() });
+      const receipt = await writeReceipt(env, { receiptVersion: 1, campaignId, mode: "manual-hostile", fixture: false, ...hostile, payloadHash: hash, privateRunMetadata: body.privateRunMetadata || null, startedAt: new Date().toISOString(), finishedAt: new Date().toISOString() });
       const ledger = await loadLedger(env);
       const publicTurn = publicTurnFromReceipt(receipt, { hypothesis: body.payload?.hypothesis, sourceRevision: body.sourceRevision });
       ledger.publicCampaign = appendPublicTurn(ledger.publicCampaign, publicTurn);
