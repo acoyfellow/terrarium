@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 import { makeRunId, splitCommand } from "./core.js";
 
 export const SANDBOX_BACKENDS = ["docker"];
-export const SCENARIO_IDS = ["filesystem-write-outside-workspace", "environment-canary", "network-disabled", "filesystem-read-canary", "process-persistence"];
+export const SCENARIO_IDS = ["filesystem-write-outside-workspace", "environment-canary", "network-disabled", "filesystem-read-canary", "process-persistence", "runtime-socket-access", "privilege-escalation", "workspace-executable-drop"];
 export const FIXTURE_SCENARIO_IDS = ["fixture-environment-leak"];
 export const ALL_SCENARIO_IDS = [...SCENARIO_IDS, ...FIXTURE_SCENARIO_IDS];
 export const DEFAULT_SANDBOX_IMAGE = "node:22-alpine";
@@ -94,6 +94,41 @@ console.log("PERSISTENCE_ATTEMPTED");`,
         verdict: attempted ? "contained" : "inconclusive",
         observed: attempted ? "The persistence attempt was launched; controller teardown verification is required." : "The probe did not record a persistence attempt.",
       };
+    },
+  },
+  "runtime-socket-access": {
+    description: "Attempt to discover container-runtime control sockets that could escape the execution boundary.",
+    script: `const fs = require("node:fs");
+const sockets = ["/var/run/docker.sock", "/run/containerd/containerd.sock", "/run/podman/podman.sock"];
+const exposed = sockets.filter((path) => { try { fs.accessSync(path, fs.constants.R_OK | fs.constants.W_OK); return true; } catch { return false; } });
+console.log(exposed.length ? "RUNTIME_SOCKET_EXPOSED " + exposed.join(",") : "RUNTIME_SOCKET_ABSENT");`,
+    evaluate({ stdout }) {
+      const escaped = stdout.includes("RUNTIME_SOCKET_EXPOSED");
+      return { verdict: escaped ? "escaped" : "contained", observed: escaped ? "The sandbox exposed a writable container-runtime control socket." : "No container-runtime control socket was available to the sandbox." };
+    },
+  },
+  "privilege-escalation": {
+    description: "Attempt to gain root identity or Linux capabilities despite the hostile-run policy.",
+    script: `const fs = require("node:fs");
+const status = fs.readFileSync("/proc/self/status", "utf8");
+const effective = status.match(/^CapEff:\\s*(\\S+)/m)?.[1] || "unknown";
+console.log("IDENTITY " + process.getuid() + ":" + process.getgid() + " CAPEFF " + effective);
+if (process.getuid() === 0 || !/^0+$/.test(effective)) console.log("PRIVILEGE_PRESENT"); else console.log("PRIVILEGE_ABSENT");`,
+    evaluate({ stdout }) {
+      const escaped = stdout.includes("PRIVILEGE_PRESENT");
+      return { verdict: escaped ? "escaped" : "contained", observed: escaped ? "The sandbox retained root identity or an effective Linux capability." : "The sandbox ran non-root with no effective Linux capabilities." };
+    },
+  },
+  "workspace-executable-drop": {
+    description: "Attempt to create and execute a new program from the writable workspace.",
+    script: `const fs = require("node:fs"), { spawnSync } = require("node:child_process");
+const target = "/workspace/dropped.sh";
+fs.writeFileSync(target, "#!/bin/sh\\necho DROPPED_EXECUTED\\n", { mode: 0o755 });
+const run = spawnSync(target, [], { encoding: "utf8" });
+console.log(run.stdout?.includes("DROPPED_EXECUTED") ? "WORKSPACE_EXECUTED" : "WORKSPACE_NOEXEC " + (run.error?.code || run.status));`,
+    evaluate({ stdout }) {
+      const escaped = stdout.includes("WORKSPACE_EXECUTED");
+      return { verdict: escaped ? "escaped" : "contained", observed: escaped ? "A newly written workspace program executed despite the noexec boundary." : "The writable workspace rejected execution of a newly written program." };
     },
   },
   "fixture-environment-leak": {
