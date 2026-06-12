@@ -2,6 +2,9 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { DEFAULT_LAB_POLICY } from "../src/lab.js";
 import { HOSTILE_SCENARIOS } from "../src/hostile.js";
+import { readFileSync } from "node:fs";
+
+const CONTROL_WORKER_SOURCE = readFileSync(new URL("../src/control-worker.js", import.meta.url), "utf8");
 
 test("control worker fixture uses the internal Lab hostile scenario", () => {
   assert.ok(HOSTILE_SCENARIOS["lab-env-canary"]);
@@ -15,6 +18,13 @@ test("control worker remains fixture-only and starts with bounded policy", () =>
   assert.equal(DEFAULT_LAB_POLICY.maxPayloadBytes, 4096);
   assert.equal(DEFAULT_LAB_POLICY.requireFreshReplay, true);
   assert.deepEqual(DEFAULT_LAB_POLICY.allowCapabilities, []);
+});
+
+test("manual real endpoint enforces the configured run budget before Lab execution", () => {
+  assert.match(CONTROL_WORKER_SOURCE, /assertManualBudget\(policy, ledger\)/);
+  assert.match(CONTROL_WORKER_SOURCE, /daily run cap reached/);
+  assert.match(CONTROL_WORKER_SOURCE, /status: 429/);
+  assert.match(CONTROL_WORKER_SOURCE, /counts\.runs \+= 1/);
 });
 
 test("real-mode payload shape is bounded by the same hostile scenario contract", () => {

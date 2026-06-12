@@ -37,6 +37,14 @@ async function saveLedger(env, ledger) {
   if (env.TERRARIUM_LEDGER) await env.TERRARIUM_LEDGER.put("state", JSON.stringify(ledger));
 }
 
+function assertManualBudget(policy, ledger) {
+  const { current } = todayCounts(ledger);
+  if (current.runs >= policy.maxRunsPerDay) throw new Error("daily run cap reached");
+  if (current.verifiedEscapes >= policy.maxVerifiedEscapesPerDay) throw new Error("daily verified escape cap reached");
+  if (current.lastRunAt && Date.now() - Date.parse(current.lastRunAt) < policy.cooldownMinutes * 60000) throw new Error("cooldown active");
+  return current;
+}
+
 function utcDay() {
   return new Date().toISOString().slice(0, 10);
 }
@@ -177,15 +185,23 @@ export default {
       const body = await json(request);
       const policy = await loadPolicy(env, "real");
       if (policy.paused || !policy.allowReal) return Response.json({ ok: false, error: "real campaigns disabled" }, { status: 403 });
+      const ledger = await loadLedger(env);
+      let counts;
+      try { counts = assertManualBudget(policy, ledger); } catch (error) { return Response.json({ ok: false, error: error.message }, { status: 429 }); }
+      counts.runs += 1;
+      counts.lastRunAt = new Date().toISOString();
+      ledger[utcDay()] = counts;
+      await saveLedger(env, ledger);
       const hostile = await runHostileLabScenario({ scenarioId: body.scenarioId, body: body.payload?.body, capabilities: body.payload?.capabilities, baseUrl: env.LAB_ORIGIN, authToken: env.LAB_AUTH_TOKEN, policy: { ...DEFAULT_LAB_POLICY, ...policy } });
       const campaignId = `campaign_${new Date().toISOString().replace(/[-:.TZ]/g, "")}_${crypto.randomUUID().slice(0, 8)}`;
       const hash = await payloadHash(hostile.body);
       const receipt = await writeReceipt(env, { receiptVersion: 1, campaignId, mode: "manual-hostile", fixture: false, ...hostile, payloadHash: hash, privateRunMetadata: body.privateRunMetadata || null, startedAt: new Date().toISOString(), finishedAt: new Date().toISOString() });
-      const ledger = await loadLedger(env);
+      const latestLedger = await loadLedger(env);
       const publicTurn = publicTurnFromReceipt(receipt, { hypothesis: body.payload?.hypothesis, sourceRevision: body.sourceRevision });
-      ledger.publicCampaign = appendPublicTurn(ledger.publicCampaign, publicTurn);
-      ledger.lastReceipt = { campaignId, verdict: hostile.verifiedVerdict || hostile.verdict, artifactKey: receipt.artifactKey };
-      await saveLedger(env, ledger);
+      if (hostile.verifiedVerdict === "verified-escape") latestLedger[utcDay()].verifiedEscapes += 1;
+      latestLedger.publicCampaign = appendPublicTurn(latestLedger.publicCampaign, publicTurn);
+      latestLedger.lastReceipt = { campaignId, verdict: hostile.verifiedVerdict || hostile.verdict, artifactKey: receipt.artifactKey };
+      await saveLedger(env, latestLedger);
       return Response.json({ ok: true, campaignId, verdict: hostile.verifiedVerdict || hostile.verdict, feedback: sanitizeTurnFeedback(hostile, Number(body.turn) || 1, Number(body.maxTurns) || 1), publicTurn, receipt });
     }
     return new Response("Not found", { status: 404 });
