@@ -3,9 +3,16 @@ import { DEFAULT_LAB_POLICY } from "./lab.js";
 import { runHostileLabScenario } from "./hostile.js";
 import { requireAuthorization } from "./controller-auth.js";
 import { sanitizeTurnFeedback } from "./adaptive.js";
-import { generateCampaign } from "./campaign-synth.js";
 
-const DEMO_MANIFEST = generateCampaign({ campaignId: "campaign_demo_synth", count: 144 });
+const EMPTY_LIVE_CAMPAIGN = {
+  campaignId: "terrarium-live",
+  scenarioId: "terrarium-self-hardening",
+  backend: "lab",
+  status: "waiting",
+  synthetic: false,
+  counts: { total: 0, contained: 0, escapes: 0 },
+  turns: [],
+};
 
 const DEFAULT_POLICY = {
   paused: false,
@@ -143,7 +150,11 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     if (url.pathname === "/health") return Response.json({ ok: true, mode: env.TERRARIUM_MODE || "fixture" });
-    if (url.pathname === "/api/demo") return Response.json(DEMO_MANIFEST, { headers: { "cache-control": "public, max-age=300" } });
+    if (url.pathname === "/api/demo") {
+      const ledger = await loadLedger(env);
+      const live = ledger.publicCampaign || EMPTY_LIVE_CAMPAIGN;
+      return Response.json(live, { headers: { "cache-control": "public, max-age=30" } });
+    }
     if (url.pathname === "/api/campaigns/latest") {
       const ledger = await loadLedger(env);
       return Response.json(ledger.lastReceipt || { status: "empty" });
