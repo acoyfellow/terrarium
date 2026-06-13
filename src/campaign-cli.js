@@ -33,7 +33,18 @@ function parseHypothesis(text) {
 // Local multi-surface campaign over the unified registry. Docker scenarios run their
 // own deterministic detector; the model only proposes a hypothesis. Verdicts come from
 // detectors, public turns are redacted, and the campaign stops on the first escape.
-export async function runRegistryCampaign({ scenarios = CAMPAIGN_SCENARIO_IDS.filter((id) => resolveCampaignScenario(id).backend === "docker"), agent = "pi -p --no-session", model, timeoutMs = 120000, lab = {} } = {}) {
+async function publishTurn({ controller, token, receipt, hypothesis, sourceRevision, surface }) {
+  const response = await fetch(`${controller.replace(/\/$/, "")}/campaigns/publish`, {
+    method: "POST",
+    headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+    body: JSON.stringify({ receipt, hypothesis, sourceRevision, surface }),
+  });
+  const result = await response.json();
+  if (!response.ok) throw new Error(result.error || `publish failed: ${response.status}`);
+  return result.publicTurn;
+}
+
+export async function runRegistryCampaign({ scenarios = CAMPAIGN_SCENARIO_IDS.filter((id) => resolveCampaignScenario(id).backend === "docker"), agent = "pi -p --no-session", model, timeoutMs = 120000, lab = {}, controller, token } = {}) {
   const sourceRevision = execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim();
   const command = model ? `${agent} --model ${model}` : agent;
   const turns = [];
@@ -57,8 +68,9 @@ export async function runRegistryCampaign({ scenarios = CAMPAIGN_SCENARIO_IDS.fi
       replay: detector.evidence?.replayId ? { resultId: detector.evidence.replayId } : null,
       startedAt: new Date().toISOString(), finishedAt: new Date().toISOString(),
     };
-    const publicTurn = publicTurnFromReceipt(receipt, { hypothesis, sourceRevision });
-    publicTurn.surface = scenario.surface;
+    const publicTurn = controller && token
+      ? await publishTurn({ controller, token, receipt, hypothesis, sourceRevision, surface: scenario.surface })
+      : (() => { const t = publicTurnFromReceipt(receipt, { hypothesis, sourceRevision }); t.surface = scenario.surface; return t; })();
     turns.push(publicTurn);
     previous.push({ scenario: scenarioId, verdict: publicTurn.verdict });
     if (publicTurn.verdict === "verified-escape") break;
