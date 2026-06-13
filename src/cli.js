@@ -5,6 +5,7 @@ import { campaignIssueDraft, createFixtureCampaign, DEFAULT_SANDBOX_IMAGE, FIXTU
 import { runManualHostile } from "./hostile-cli.js";
 import { runHealingLoop } from "./healing-cli.js";
 import { replayAndMerge } from "./replay-gate.js";
+import { scenarioCatalog } from "./scenario-registry.js";
 
 function help() {
   return `terrarium ${VERSION}
@@ -29,6 +30,7 @@ Usage:
   terra verify <scenarioId> [--image node:22-alpine] [--json]
   terra attack <scenarioId> [--agent "opencode run"] [--json]
   terra campaigns [limit]
+  terra scenarios
   terra campaign read <campaignId>
   terra campaign verify <campaignId>
   terra campaign issue-draft <campaignId>
@@ -116,6 +118,7 @@ else if (cmd === "attack") runAttackExperiment({ scenarioId: rest[0], agent: opt
   console.log(JSON.stringify(result, null, 2));
   process.exit(result.verdict === "inconclusive" ? 1 : 0);
 }).catch((e) => { console.error(`terrarium: ${e.message}`); process.exit(1); });
+else if (cmd === "scenarios") console.log(JSON.stringify(scenarioCatalog(), null, 2));
 else if (cmd === "campaigns") listCampaignReceipts({ limit: Number(rest[0] || 20) }).then((result) => console.log(JSON.stringify(result, null, 2))).catch((e) => { console.error(`terrarium: ${e.message}`); process.exit(1); });
 else if (cmd === "campaign" && rest[0] === "read") readCampaignReceipt({ campaignId: rest[1] }).then((result) => console.log(JSON.stringify(result, null, 2))).catch((e) => { console.error(`terrarium: ${e.message}`); process.exit(1); });
 else if (cmd === "campaign" && rest[0] === "verify") verifyCampaignReceipt({ campaignId: rest[1], image: opts.image, unsafeNetwork: opts.unsafeNetwork }).then((result) => {
