@@ -6,6 +6,7 @@ import { runManualHostile } from "./hostile-cli.js";
 import { runHealingLoop } from "./healing-cli.js";
 import { replayAndMerge } from "./replay-gate.js";
 import { scenarioCatalog } from "./scenario-registry.js";
+import { runRegistryCampaign } from "./campaign-cli.js";
 
 function help() {
   return `terrarium ${VERSION}
@@ -31,6 +32,7 @@ Usage:
   terra attack <scenarioId> [--agent "opencode run"] [--json]
   terra campaigns [limit]
   terra scenarios
+  terra campaign local [--scenarios a,b,c] [--agent "pi -p --no-session"] [--model <id>]
   terra campaign read <campaignId>
   terra campaign verify <campaignId>
   terra campaign issue-draft <campaignId>
@@ -90,6 +92,7 @@ function parse(argv) {
     else if (a === "--cwd") out.cwd = argv[++i];
     else if (a === "--timeout-ms") out.timeoutMs = Number(argv[++i]);
     else if (a === "--turns") out.turns = Number(argv[++i]);
+    else if (a === "--scenarios") out.scenarios = argv[++i];
     else if (a === "--controller") out.controller = argv[++i];
     else if (a === "--isolation") out.isolation = argv[++i];
     else if (a === "--max-depth") out.maxDepth = Number(argv[++i]);
@@ -119,6 +122,7 @@ else if (cmd === "attack") runAttackExperiment({ scenarioId: rest[0], agent: opt
   process.exit(result.verdict === "inconclusive" ? 1 : 0);
 }).catch((e) => { console.error(`terrarium: ${e.message}`); process.exit(1); });
 else if (cmd === "scenarios") console.log(JSON.stringify(scenarioCatalog(), null, 2));
+else if (cmd === "campaign" && rest[0] === "local") runRegistryCampaign({ scenarios: opts.scenarios ? opts.scenarios.split(",") : undefined, agent: opts.agent, model: opts.model, timeoutMs: opts.timeoutMs }).then((result) => console.log(JSON.stringify(result, null, 2))).catch((e) => { console.error(`terrarium: ${e.message}`); process.exit(1); });
 else if (cmd === "campaigns") listCampaignReceipts({ limit: Number(rest[0] || 20) }).then((result) => console.log(JSON.stringify(result, null, 2))).catch((e) => { console.error(`terrarium: ${e.message}`); process.exit(1); });
 else if (cmd === "campaign" && rest[0] === "read") readCampaignReceipt({ campaignId: rest[1] }).then((result) => console.log(JSON.stringify(result, null, 2))).catch((e) => { console.error(`terrarium: ${e.message}`); process.exit(1); });
 else if (cmd === "campaign" && rest[0] === "verify") verifyCampaignReceipt({ campaignId: rest[1], image: opts.image, unsafeNetwork: opts.unsafeNetwork }).then((result) => {
