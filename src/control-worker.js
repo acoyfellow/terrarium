@@ -204,6 +204,23 @@ export default {
       await saveLedger(env, latestLedger);
       return Response.json({ ok: true, campaignId, verdict: hostile.verifiedVerdict || hostile.verdict, feedback: sanitizeTurnFeedback(hostile, Number(body.turn) || 1, Number(body.maxTurns) || 1), publicTurn, receipt });
     }
+    if (url.pathname === "/campaigns/publish" && request.method === "POST") {
+      const denied = requireAuthorization(request, env); if (denied) return denied;
+      const body = await json(request);
+      const policy = await loadPolicy(env, "real");
+      if (policy.paused || !policy.allowReal) return Response.json({ ok: false, error: "real campaigns disabled" }, { status: 403 });
+      const receipt = body.receipt || {};
+      if (receipt.fixture) return Response.json({ ok: false, error: "fixture receipts cannot be published" }, { status: 400 });
+      let publicTurn;
+      try { publicTurn = publicTurnFromReceipt(receipt, { hypothesis: body.hypothesis, sourceRevision: body.sourceRevision }); }
+      catch (error) { return Response.json({ ok: false, error: error.message }, { status: 400 }); }
+      if (typeof body.surface === "string" && /^[a-z-]+$/.test(body.surface)) publicTurn.surface = body.surface;
+      const ledger = await loadLedger(env);
+      if (publicTurn.verdict === "verified-escape") { const { day, current } = todayCounts(ledger); current.verifiedEscapes += 1; ledger[day] = current; }
+      ledger.publicCampaign = appendPublicTurn(ledger.publicCampaign, publicTurn);
+      await saveLedger(env, ledger);
+      return Response.json({ ok: true, publicTurn });
+    }
     return new Response("Not found", { status: 404 });
   },
 };

@@ -93,6 +93,7 @@ function parse(argv) {
     else if (a === "--timeout-ms") out.timeoutMs = Number(argv[++i]);
     else if (a === "--turns") out.turns = Number(argv[++i]);
     else if (a === "--scenarios") out.scenarios = argv[++i];
+    else if (a === "--publish") out.publish = true;
     else if (a === "--controller") out.controller = argv[++i];
     else if (a === "--isolation") out.isolation = argv[++i];
     else if (a === "--max-depth") out.maxDepth = Number(argv[++i]);
@@ -122,7 +123,7 @@ else if (cmd === "attack") runAttackExperiment({ scenarioId: rest[0], agent: opt
   process.exit(result.verdict === "inconclusive" ? 1 : 0);
 }).catch((e) => { console.error(`terrarium: ${e.message}`); process.exit(1); });
 else if (cmd === "scenarios") console.log(JSON.stringify(scenarioCatalog(), null, 2));
-else if (cmd === "campaign" && rest[0] === "local") runRegistryCampaign({ scenarios: opts.scenarios ? opts.scenarios.split(",") : undefined, agent: opts.agent, model: opts.model, timeoutMs: opts.timeoutMs }).then((result) => console.log(JSON.stringify(result, null, 2))).catch((e) => { console.error(`terrarium: ${e.message}`); process.exit(1); });
+else if (cmd === "campaign" && rest[0] === "local") runRegistryCampaign({ scenarios: opts.scenarios ? opts.scenarios.split(",") : undefined, agent: opts.agent, model: opts.model, timeoutMs: opts.timeoutMs, controller: opts.publish ? (opts.controller || process.env.TERRARIUM_CONTROLLER_URL) : undefined, token: opts.publish ? process.env.TERRARIUM_CONTROL_TOKEN : undefined }).then((result) => console.log(JSON.stringify(result, null, 2))).catch((e) => { console.error(`terrarium: ${e.message}`); process.exit(1); });
 else if (cmd === "campaigns") listCampaignReceipts({ limit: Number(rest[0] || 20) }).then((result) => console.log(JSON.stringify(result, null, 2))).catch((e) => { console.error(`terrarium: ${e.message}`); process.exit(1); });
 else if (cmd === "campaign" && rest[0] === "read") readCampaignReceipt({ campaignId: rest[1] }).then((result) => console.log(JSON.stringify(result, null, 2))).catch((e) => { console.error(`terrarium: ${e.message}`); process.exit(1); });
 else if (cmd === "campaign" && rest[0] === "verify") verifyCampaignReceipt({ campaignId: rest[1], image: opts.image, unsafeNetwork: opts.unsafeNetwork }).then((result) => {

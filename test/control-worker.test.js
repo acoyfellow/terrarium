@@ -27,6 +27,13 @@ test("manual real endpoint enforces the configured run budget before Lab executi
   assert.match(CONTROL_WORKER_SOURCE, /counts\.runs \+= 1/);
 });
 
+test("publish endpoint re-sanitizes receipts and refuses fixtures", () => {
+  assert.match(CONTROL_WORKER_SOURCE, /\/campaigns\/publish/);
+  assert.match(CONTROL_WORKER_SOURCE, /requireAuthorization\(request, env\); if \(denied\) return denied;[\s\S]*campaigns\/publish|campaigns\/publish[\s\S]*requireAuthorization/);
+  assert.match(CONTROL_WORKER_SOURCE, /fixture receipts cannot be published/);
+  assert.match(CONTROL_WORKER_SOURCE, /publicTurnFromReceipt\(receipt, \{ hypothesis: body\.hypothesis, sourceRevision: body\.sourceRevision \}\)/);
+});
+
 test("real-mode payload shape is bounded by the same hostile scenario contract", () => {
   const scenario = HOSTILE_SCENARIOS["lab-env-canary"];
   assert.equal(scenario.body, "return typeof secret !== 'undefined';");
