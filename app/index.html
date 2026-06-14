@@ -2,13 +2,70 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
   <meta name="theme-color" content="#07100c" />
-  <meta name="description" content="Terrarium: contained AI red-team campaigns, rendered turn by turn." />
-  <title>Terrarium — contain, attack, verify, heal</title>
+  <meta name="color-scheme" content="dark" />
+
+  <title>Terrarium — a self-hardening AI containment loop</title>
+  <meta name="description" content="Terrarium contains AI agents, invites them to escape, independently reproduces verified boundary crossings, and patches itself. Watch the live adaptive campaign turn by turn." />
+  <link rel="canonical" href="https://terrarium.coey.dev/" />
+  <meta name="keywords" content="AI containment, AI sandbox, agent security, red team, self-healing, autonomous patching, LLM safety, Cloudflare, orchestration" />
+  <meta name="author" content="Jordan Coeyman" />
+  <meta name="robots" content="index, follow, max-image-preview:large" />
+
+  <!-- Open Graph -->
+  <meta property="og:type" content="website" />
+  <meta property="og:site_name" content="Terrarium" />
+  <meta property="og:title" content="Terrarium — a self-hardening AI containment loop" />
+  <meta property="og:description" content="An attacker that never stops adapting. Real boundaries, independent replay, autonomous repair — watch the live campaign." />
+  <meta property="og:url" content="https://terrarium.coey.dev/" />
+  <meta property="og:image" content="https://terrarium.coey.dev/og.jpg" />
+  <meta property="og:image:width" content="1200" />
+  <meta property="og:image:height" content="630" />
+  <meta property="og:image:alt" content="A small white research robot facing a glowing glass terrarium." />
+
+  <!-- Twitter / X -->
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content="Terrarium — a self-hardening AI containment loop" />
+  <meta name="twitter:description" content="An attacker that never stops adapting. Real boundaries, independent replay, autonomous repair." />
+  <meta name="twitter:image" content="https://terrarium.coey.dev/og.jpg" />
+
+  <!-- Icons + PWA -->
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png" />
+  <link rel="icon" type="image/png" sizes="192x192" href="/icon-192.png" />
+  <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Terrarium" />
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "Terrarium",
+    "applicationCategory": "DeveloperApplication",
+    "operatingSystem": "Any",
+    "url": "https://terrarium.coey.dev/",
+    "description": "A self-hardening AI orchestration primitive that adversarially attacks its own boundaries, independently reproduces verified findings, and patches itself.",
+    "author": { "@type": "Person", "name": "Jordan Coeyman" },
+    "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+    "sameAs": ["https://github.com/acoyfellow/terrarium"]
+  }
+  </script>
+
   <script type="module" src="/src/main.js"></script>
 </head>
 <body>
   <main id="app"></main>
+  <noscript>Terrarium is a self-hardening AI containment loop: it contains agents, invites escape, independently reproduces verified boundary crossings, and patches itself. Source: https://github.com/acoyfellow/terrarium</noscript>
+  <script>
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => navigator.serviceWorker.register("/sw.js").catch(() => {}));
+    }
+  </script>
 </body>
 </html>
