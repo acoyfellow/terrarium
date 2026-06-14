@@ -1,0 +1,18 @@
+{
+  "name": "Terrarium — contain, attack, verify, heal",
+  "short_name": "Terrarium",
+  "description": "A self-hardening AI orchestration primitive that adversarially attacks its own boundaries, independently reproduces findings, and patches itself.",
+  "id": "/",
+  "start_url": "/?source=pwa",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#07100c",
+  "theme_color": "#07100c",
+  "categories": ["developer", "security", "utilities"],
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "/icon-512-maskable.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
