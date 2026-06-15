@@ -33,6 +33,14 @@
     { "pattern": "terrarium.coey.dev", "custom_domain": true }
   ],
   "observability": { "enabled": true },
+  "durable_objects": {
+    "bindings": [
+      { "name": "CAMPAIGN_LOCK", "class_name": "CampaignLock" }
+    ]
+  },
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["CampaignLock"] }
+  ],
   "workflows": [
     {
       "name": "terrarium-campaign",
