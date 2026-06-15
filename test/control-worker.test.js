@@ -27,6 +27,14 @@ test("manual real endpoint enforces the configured run budget before Lab executi
   assert.match(CONTROL_WORKER_SOURCE, /counts\.runs \+= 1/);
 });
 
+test("real campaigns serialize through a single durable-object lock", () => {
+  assert.match(CONTROL_WORKER_SOURCE, /export class CampaignLock/);
+  assert.match(CONTROL_WORKER_SOURCE, /campaign already running/);
+  assert.match(CONTROL_WORKER_SOURCE, /withCampaignLock\(env, async/g);
+  const lockUses = CONTROL_WORKER_SOURCE.match(/withCampaignLock\(env, async/g) || [];
+  assert.ok(lockUses.length >= 2, "both real endpoints must hold the lock");
+});
+
 test("publish endpoint re-sanitizes receipts and refuses fixtures", () => {
   assert.match(CONTROL_WORKER_SOURCE, /\/campaigns\/publish/);
   assert.match(CONTROL_WORKER_SOURCE, /requireAuthorization\(request, env\); if \(denied\) return denied;[\s\S]*campaigns\/publish|campaigns\/publish[\s\S]*requireAuthorization/);

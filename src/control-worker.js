@@ -80,6 +80,32 @@ async function writeReceipt(env, receipt) {
   return { ...receipt, artifactKey: key, payloadKey, executionKey, replayKey };
 }
 
+// Single-instance mutex so concurrent real campaigns cannot race the KV ledger.
+// One named Durable Object instance serializes every budget-bearing real run.
+export class CampaignLock {
+  constructor(state) { this.state = state; }
+  async fetch(request) {
+    const { op } = await request.json();
+    if (op === "acquire") {
+      const heldAt = await this.state.storage.get("heldAt");
+      if (heldAt && Date.now() - heldAt < 120000) return Response.json({ ok: false, error: "campaign already running" }, { status: 409 });
+      await this.state.storage.put("heldAt", Date.now());
+      return Response.json({ ok: true });
+    }
+    if (op === "release") { await this.state.storage.delete("heldAt"); return Response.json({ ok: true }); }
+    return Response.json({ ok: false, error: "unknown op" }, { status: 400 });
+  }
+}
+
+async function withCampaignLock(env, fn) {
+  if (!env.CAMPAIGN_LOCK) return fn();
+  const stub = env.CAMPAIGN_LOCK.get(env.CAMPAIGN_LOCK.idFromName("global"));
+  const acquired = await stub.fetch("https://lock/acquire", { method: "POST", body: JSON.stringify({ op: "acquire" }) });
+  if (!acquired.ok) throw Object.assign(new Error("campaign already running"), { status: 409 });
+  try { return await fn(); }
+  finally { await stub.fetch("https://lock/release", { method: "POST", body: JSON.stringify({ op: "release" }) }); }
+}
+
 export class TerrariumCampaignWorkflow extends WorkflowEntrypoint {
   async run(event, step) {
     const input = event.payload || {};
@@ -185,6 +211,8 @@ export default {
       const body = await json(request);
       const policy = await loadPolicy(env, "real");
       if (policy.paused || !policy.allowReal) return Response.json({ ok: false, error: "real campaigns disabled" }, { status: 403 });
+      try {
+        return await withCampaignLock(env, async () => {
       const ledger = await loadLedger(env);
       let counts;
       try { counts = assertManualBudget(policy, ledger); } catch (error) { return Response.json({ ok: false, error: error.message }, { status: 429 }); }
@@ -203,12 +231,16 @@ export default {
       latestLedger.lastReceipt = { campaignId, verdict: hostile.verifiedVerdict || hostile.verdict, artifactKey: receipt.artifactKey };
       await saveLedger(env, latestLedger);
       return Response.json({ ok: true, campaignId, verdict: hostile.verifiedVerdict || hostile.verdict, feedback: sanitizeTurnFeedback(hostile, Number(body.turn) || 1, Number(body.maxTurns) || 1), publicTurn, receipt });
+        });
+      } catch (error) { return Response.json({ ok: false, error: error.message }, { status: error.status || 500 }); }
     }
     if (url.pathname === "/campaigns/publish" && request.method === "POST") {
       const denied = requireAuthorization(request, env); if (denied) return denied;
       const body = await json(request);
       const policy = await loadPolicy(env, "real");
       if (policy.paused || !policy.allowReal) return Response.json({ ok: false, error: "real campaigns disabled" }, { status: 403 });
+      try {
+        return await withCampaignLock(env, async () => {
       const receipt = body.receipt || {};
       if (receipt.fixture) return Response.json({ ok: false, error: "fixture receipts cannot be published" }, { status: 400 });
       let publicTurn;
@@ -220,6 +252,8 @@ export default {
       ledger.publicCampaign = appendPublicTurn(ledger.publicCampaign, publicTurn);
       await saveLedger(env, ledger);
       return Response.json({ ok: true, publicTurn });
+        });
+      } catch (error) { return Response.json({ ok: false, error: error.message }, { status: error.status || 500 }); }
     }
     return new Response("Not found", { status: 404 });
   },
