@@ -13,6 +13,6 @@ test('every control-plane boundary currently holds against its own detector', as
 test('detectors report escape language only on a real crossing', () => {
   for (const id of CONTROL_SCENARIO_IDS) {
     assert.equal(typeof CONTROL_SCENARIOS[id].boundary, 'string');
-    assert.equal(CONTROL_SCENARIOS[id].surface, 'control-plane');
+    assert.match(CONTROL_SCENARIOS[id].surface, /^(control-plane|healing-loop)$/);
   }
 });

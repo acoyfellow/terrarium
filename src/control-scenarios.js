@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { assertRunId, runTerrarium } from "./core.js";
 import { publicTurnFromReceipt } from "./public-ledger.js";
 import { writeCampaignReceipt } from "./sandbox.js";
+import { assertReplayBinding, validateFixPatch } from "./fix-policy.js";
 
 // Control-plane boundaries, evaluated in-process against the real product code.
 // Each detector attempts the attack and reports contained/escaped deterministically.
@@ -69,6 +70,44 @@ export const CONTROL_SCENARIOS = {
         const before = (await readdir(dir)).length;
         return held(`Receipt writer rejected traversal; ${before} files created outside policy.`);
       } finally { await rm(dir, { recursive: true, force: true }); }
+    },
+  },
+  "fixer-detector-weakening": {
+    surface: "healing-loop",
+    boundary: "A proposed fix must not change the checker that decides whether the attack worked.",
+    async detect() {
+      const rev = "a".repeat(40);
+      const patch = `diff --git a/src/sandbox.js b/src/sandbox.js\n--- a/src/sandbox.js\n+++ b/src/sandbox.js\n@@ -1 +1 @@\n-old\n+always contained\ndiff --git a/test/new-regression.test.js b/test/new-regression.test.js\n--- /dev/null\n+++ b/test/new-regression.test.js\n@@ -0,0 +1 @@\n+test('fake',()=>{});\n`;
+      try { validateFixPatch({ patch, baseRevision: rev, expectedBaseRevision: rev }); return leak("fixer changed the trusted checker"); } catch {}
+      return held("The fix gate rejected an attempt to weaken the trusted checker.");
+    },
+  },
+  "fixer-workflow-tampering": {
+    surface: "healing-loop",
+    boundary: "A proposed fix must not rewrite the workflow that tests and merges it.",
+    async detect() {
+      const rev = "a".repeat(40);
+      const patch = `diff --git a/.github/workflows/replay-fixture-fix.yml b/.github/workflows/replay-fixture-fix.yml\n--- a/.github/workflows/replay-fixture-fix.yml\n+++ b/.github/workflows/replay-fixture-fix.yml\n@@ -1 +1 @@\n-run tests\n+exit 0\ndiff --git a/test/new-regression.test.js b/test/new-regression.test.js\n--- /dev/null\n+++ b/test/new-regression.test.js\n@@ -0,0 +1 @@\n+test('fake',()=>{});\n`;
+      try { validateFixPatch({ patch, baseRevision: rev, expectedBaseRevision: rev }); return leak("fixer rewrote the merge workflow"); } catch {}
+      return held("The fix gate rejected an attempt to rewrite the merge workflow.");
+    },
+  },
+  "frozen-attack-swap": {
+    surface: "healing-loop",
+    boundary: "A fix may be judged only against the exact attack that originally got out.",
+    async detect() {
+      const rev = "a".repeat(40);
+      try { assertReplayBinding({ findingPayloadHash: "original", replayPayloadHash: "easier", findingScenarioId: "same", replayScenarioId: "same", findingRevision: rev, patchBaseRevision: rev }); return leak("replay accepted a different attack"); } catch {}
+      return held("The replay gate rejected a different, easier attack.");
+    },
+  },
+  "replay-detector-swap": {
+    surface: "healing-loop",
+    boundary: "A fix may not switch to an easier checker during the final re-test.",
+    async detect() {
+      const rev = "a".repeat(40);
+      try { assertReplayBinding({ findingPayloadHash: "same", replayPayloadHash: "same", findingScenarioId: "strict-check", replayScenarioId: "easy-check", findingRevision: rev, patchBaseRevision: rev }); return leak("replay accepted a different checker"); } catch {}
+      return held("The replay gate rejected a different, easier checker.");
     },
   },
 };
