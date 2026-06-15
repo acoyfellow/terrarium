@@ -1,6 +1,7 @@
 import { SCENARIO_IDS, resolveScenario, runSandboxScenario } from "./sandbox.js";
 import { HOSTILE_SCENARIOS, runHostileLabScenario } from "./hostile.js";
 import { DEFAULT_LAB_POLICY } from "./lab.js";
+import { CONTROL_SCENARIOS } from "./control-scenarios.js";
 
 // One campaign contract over every Terrarium-owned boundary. The attacker model
 // proposes within a scenario; a deterministic host-side detector decides. Verdicts
@@ -17,6 +18,11 @@ export const SCENARIO_SURFACES = {
       const detector = await runSandboxScenario({ scenarioId: id });
       return { verdict: detector.verdict, observed: detector.observed, evidence: { exitCode: detector.exitCode, teardownVerified: detector.teardownVerified } };
     },
+  }])),
+  // Product control-plane boundaries, evaluated in-process against real product code.
+  ...Object.fromEntries(Object.entries(CONTROL_SCENARIOS).map(([id, s]) => [id, {
+    id, surface: s.surface, boundary: s.boundary, backend: "control-plane",
+    async run() { return s.detect(); },
   }])),
   // Product control-plane boundary, evaluated against the live Lab isolate.
   "lab-env-canary": {

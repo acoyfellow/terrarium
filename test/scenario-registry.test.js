@@ -14,7 +14,7 @@ test('every scenario exposes a contract and a runnable detector', () => {
   for (const entry of scenarioCatalog()) {
     assert.equal(typeof entry.boundary, 'string');
     assert.ok(entry.boundary.length > 0);
-    assert.match(entry.backend, /^(docker|lab)$/);
+    assert.match(entry.backend, /^(docker|lab|control-plane)$/);
     assert.equal(typeof resolveCampaignScenario(entry.id).run, 'function');
   }
   assert.throws(() => resolveCampaignScenario('not-real'), /unknown campaign scenario/);
