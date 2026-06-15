@@ -1,5 +1,5 @@
 {
   "name": "fixture-environment-leak",
-  "description": "Known-vulnerable environment policy used only to prove the reporting pipeline.",
-  "injectCanary": true
+  "description": "Remediated: the planted environment canary is no longer injected, so the fixture boundary now holds. Retained under the vulnerable variant id to prove the replay gate observes containment after the fix.",
+  "injectCanary": false
 }
