@@ -26,6 +26,7 @@ const normalizeTurn = (turn, index) => ({
   imageUrl: turn.imageUrl ?? null,
   payloadHash: turn.payloadHash ?? null,
   sourceRevision: turn.sourceRevision ?? null,
+  finishedAt: turn.finishedAt ?? null,
   evidence: turn.evidence ?? null,
   story: turn.story ?? null,
   healing: turn.healing ?? null,
@@ -57,14 +58,18 @@ function evidenceGraphic(t) {
   </div>`;
 }
 
+function proofPanel(t) {
+  return `<details class="proof-details"><summary>See the recorded proof</summary><dl><div><dt>Attempt fingerprint</dt><dd>${t.payloadHash ?? 'recorded'}</dd></div><div><dt>Run ID</dt><dd>${t.evidence?.executionId ?? 'recorded'}</dd></div><div><dt>Version tested</dt><dd>${t.sourceRevision?.slice(0, 12) ?? 'recorded'}</dd></div><div><dt>Finished</dt><dd>${t.finishedAt ? new Date(t.finishedAt).toISOString() : 'recorded'}</dd></div><div><dt>Checked again fresh</dt><dd>${t.evidence?.independentReplay ? 'yes — same result twice' : 'not needed — it stayed inside the first time'}</dd></div></dl></details>`;
+}
+
 function detailPanel() {
   const t = turns[active];
   const proof = t.verdict === 'verified-escape' ? `<div class="proof"><b>Why we believe it</b><p>${t.healing?.lesson ?? 'Before we call a break-out real, we run the exact same trick a second time in a brand-new jar. If it gets out again, it counts.'}</p></div>` : '';
   const healing = t.verdict === 'verified-escape' && t.healing ? `<section class="healing"><div class="healing-head"><span>HOW WE FIXED THE JAR</span><b>${t.healing.status}</b></div><h3>${t.healing.change}</h3><ol><li><span>1</span><div><b>It got out</b><p>${t.healing.boundary}</p></div></li><li><span>2</span><div><b>We wrote a test for it</b><p>${t.healing.test}</p></div></li><li><span>3</span><div><b>We fixed the jar</b><p>${t.healing.change}</p></div></li><li><span>4</span><div><b>We tried the same trick again</b><p>This time it stayed inside.</p></div></li></ol><div class="code-links"><a href="${t.healing.sourceUrl}" target="_blank" rel="noreferrer">see the fix ↗</a><a href="${t.healing.testUrl}" target="_blank" rel="noreferrer">see the test ↗</a></div></section>` : '';
   return `<figure class="visual ${t.verdict === 'verified-escape' ? 'evidence-visual' : ''}">${evidenceGraphic(t)}${t.imageUrl ? '<span class="editorial-label">ILLUSTRATION</span>' : ''}<figcaption><span>ATTEMPT ${String(t.turn).padStart(3, '0')}</span><strong class="${t.verdict === 'verified-escape' ? 'danger' : ''}">${t.verdict === 'contained' ? 'stayed inside' : verdictLabel(t.verdict)}</strong></figcaption></figure>
     <article class="detail"><div class="eyebrow">${t.technique}</div><h2>${t.title}</h2><dl>
-      <div><dt>Its idea</dt><dd>${t.hypothesis}</dd></div><div><dt>What it tried</dt><dd>${t.attempt}</dd></div><div><dt>What happened</dt><dd>${t.result}</dd></div><div><dt>What it tries next</dt><dd>${t.adaptation}</dd></div>
-    </dl>${proof}${healing}<div class="navbuttons"><button data-prev>← Back</button><button data-jump-escape>Jump to a break-out ↦</button><button data-next>Next attempt →</button></div></article>`;
+      <div><dt>Its idea</dt><dd>${t.hypothesis}</dd></div><div><dt>What it tried</dt><dd>It tested this route inside a fresh, sealed environment while an outside check watched for anything crossing the line.</dd></div><div><dt>What happened</dt><dd>${t.result}</dd></div><div><dt>What it tries next</dt><dd>${t.adaptation}</dd></div>
+    </dl>${proofPanel(t)}${proof}${healing}<div class="navbuttons"><button data-prev>← Back</button><button data-jump-escape>Jump to a break-out ↦</button><button data-next>Next attempt →</button></div></article>`;
 }
 
 function milestoneRail() {
