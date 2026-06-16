@@ -1,7 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { buildCampaignMemory, planSignature, rejectDuplicatePlans } from '../src/campaign-memory.js';
+import { readFileSync } from 'node:fs';
 import { parsePlans, strategistPrompt } from '../src/campaign-strategist.js';
+
+const source = readFileSync(new URL('../src/campaign-strategist.js', import.meta.url), 'utf8');
 
 const plan = { scenario: 'run-id-traversal', family: 'encoding', target: 'run id parser', mechanism: 'unicode slash', expectedSignal: 'file outside namespace', novelty: 'unicode was not tried', priority: 1 };
 
@@ -26,6 +29,14 @@ test('novelty gate rejects duplicate mechanisms deterministically', () => {
   const result = rejectDuplicatePlans([plan, { ...plan, mechanism: 'different' }], new Set([signature]));
   assert.equal(result.rejected.length, 1);
   assert.equal(result.accepted.length, 1);
+});
+
+test('Pi strategist runs in a private process group and is reaped before return', () => {
+  assert.match(source, /detached: true/);
+  assert.match(source, /process\.kill\(-child\.pid/);
+  assert.match(source, /strategist process did not exit cleanly/);
+  assert.match(source, /SIGTERM/);
+  assert.match(source, /SIGKILL/);
 });
 
 test('prompt requests one compact ranked batch and carries memory', () => {

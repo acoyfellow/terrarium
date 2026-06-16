@@ -5,16 +5,40 @@ import { resolveCampaignScenario } from "./scenario-registry.js";
 
 const MARKER = "TERRARIUM_PLANS=";
 
+function signalGroup(child, signal) {
+  if (!child?.pid) return;
+  try { process.kill(-child.pid, signal); }
+  catch { try { child.kill(signal); } catch {} }
+}
+
+function processAlive(pid) {
+  if (!pid) return false;
+  try { process.kill(pid, 0); return true; } catch { return false; }
+}
+
 function run(command, prompt, timeoutMs) {
   const parts = splitCommand(command);
   return new Promise((resolve, reject) => {
-    const child = spawn(parts[0], [...parts.slice(1), prompt], { stdio: ["ignore", "pipe", "pipe"] });
-    let out = "", err = "";
-    const timer = setTimeout(() => child.kill("SIGTERM"), timeoutMs);
+    // detached creates a private process group. We can reap any helper processes Pi
+    // leaves behind without touching cmux or unrelated agent sessions.
+    const child = spawn(parts[0], [...parts.slice(1), prompt], { stdio: ["ignore", "pipe", "pipe"], detached: true });
+    const pid = child.pid;
+    let out = "", err = "", timedOut = false;
+    const timer = setTimeout(() => { timedOut = true; signalGroup(child, "SIGTERM"); }, timeoutMs);
     child.stdout.on("data", (d) => out += d);
     child.stderr.on("data", (d) => err += d);
     child.on("error", reject);
-    child.on("close", (code) => { clearTimeout(timer); code === 0 ? resolve(out) : reject(new Error(err || `strategist exited ${code}`)); });
+    child.on("close", (code) => {
+      clearTimeout(timer);
+      // Pi has finished; terminate only descendants remaining in its private group.
+      signalGroup(child, "SIGTERM");
+      setTimeout(() => signalGroup(child, "SIGKILL"), 250).unref();
+      setTimeout(() => {
+        if (processAlive(pid)) return reject(new Error("strategist process did not exit cleanly"));
+        if (!timedOut && code === 0) resolve(out);
+        else reject(new Error(timedOut ? "strategist timed out" : err || `strategist exited ${code}`));
+      }, 30);
+    });
   });
 }
 
