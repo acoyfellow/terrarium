@@ -7,6 +7,8 @@ import { runHealingLoop } from "./healing-cli.js";
 import { replayAndMerge } from "./replay-gate.js";
 import { scenarioCatalog } from "./scenario-registry.js";
 import { runRegistryCampaign } from "./campaign-cli.js";
+import { buildCampaignMemory } from "./campaign-memory.js";
+import { generatePlans } from "./campaign-strategist.js";
 
 function help() {
   return `terrarium ${VERSION}
@@ -33,6 +35,7 @@ Usage:
   terra campaigns [limit]
   terra scenarios
   terra campaign local [--scenarios a,b,c] [--agent "pi -p --no-session"] [--model <id>]
+  terra campaign strategize [--turns 8] [--model <id>]
   terra campaign read <campaignId>
   terra campaign verify <campaignId>
   terra campaign issue-draft <campaignId>
@@ -123,6 +126,7 @@ else if (cmd === "attack") runAttackExperiment({ scenarioId: rest[0], agent: opt
   process.exit(result.verdict === "inconclusive" ? 1 : 0);
 }).catch((e) => { console.error(`terrarium: ${e.message}`); process.exit(1); });
 else if (cmd === "scenarios") console.log(JSON.stringify(scenarioCatalog(), null, 2));
+else if (cmd === "campaign" && rest[0] === "strategize") fetch(`${(opts.controller || process.env.TERRARIUM_CONTROLLER_URL || "https://terrarium.coey.dev").replace(/\/$/, "")}/api/demo`).then((r) => r.json()).then((campaign) => generatePlans({ memory: buildCampaignMemory(campaign.turns, { revision: campaign.turns.at(-1)?.sourceRevision }), catalog: scenarioCatalog(), count: opts.turns || 8, agent: opts.agent, model: opts.model, timeoutMs: opts.timeoutMs })).then((result) => console.log(JSON.stringify(result, null, 2))).catch((e) => { console.error(`terrarium: ${e.message}`); process.exit(1); });
 else if (cmd === "campaign" && rest[0] === "local") runRegistryCampaign({ scenarios: opts.scenarios ? opts.scenarios.split(",") : undefined, agent: opts.agent, model: opts.model, timeoutMs: opts.timeoutMs, controller: opts.publish ? (opts.controller || process.env.TERRARIUM_CONTROLLER_URL) : undefined, token: opts.publish ? process.env.TERRARIUM_CONTROL_TOKEN : undefined }).then((result) => console.log(JSON.stringify(result, null, 2))).catch((e) => { console.error(`terrarium: ${e.message}`); process.exit(1); });
 else if (cmd === "campaigns") listCampaignReceipts({ limit: Number(rest[0] || 20) }).then((result) => console.log(JSON.stringify(result, null, 2))).catch((e) => { console.error(`terrarium: ${e.message}`); process.exit(1); });
 else if (cmd === "campaign" && rest[0] === "read") readCampaignReceipt({ campaignId: rest[1] }).then((result) => console.log(JSON.stringify(result, null, 2))).catch((e) => { console.error(`terrarium: ${e.message}`); process.exit(1); });
