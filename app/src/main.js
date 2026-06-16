@@ -28,6 +28,7 @@ const normalizeTurn = (turn, index) => ({
   sourceRevision: turn.sourceRevision ?? null,
   finishedAt: turn.finishedAt ?? null,
   evidence: turn.evidence ?? null,
+  trace: turn.trace ?? null,
   story: turn.story ?? null,
   healing: turn.healing ?? null,
 });
@@ -59,7 +60,7 @@ function evidenceGraphic(t) {
 }
 
 function proofPanel(t) {
-  return `<details class="proof-details"><summary>See the recorded proof</summary><dl><div><dt>Attempt fingerprint</dt><dd>${t.payloadHash ?? 'recorded'}</dd></div><div><dt>Run ID</dt><dd>${t.evidence?.executionId ?? 'recorded'}</dd></div><div><dt>Version tested</dt><dd>${t.sourceRevision?.slice(0, 12) ?? 'recorded'}</dd></div><div><dt>Finished</dt><dd>${t.finishedAt ? new Date(t.finishedAt).toISOString() : 'recorded'}</dd></div><div><dt>Checked again fresh</dt><dd>${t.evidence?.independentReplay ? 'yes — same result twice' : 'not needed — it stayed inside the first time'}</dd></div></dl></details>`;
+  return `<details class="proof-details"><summary>See the recorded proof</summary><dl><div><dt>Attempt fingerprint</dt><dd>${t.payloadHash ?? 'recorded'}</dd></div><div><dt>Run ID</dt><dd>${t.evidence?.executionId ?? 'recorded'}</dd></div><div><dt>Version tested</dt><dd>${t.sourceRevision?.slice(0, 12) ?? 'recorded'}</dd></div><div><dt>Finished</dt><dd>${t.finishedAt ? new Date(t.finishedAt).toISOString() : 'recorded'}</dd></div><div><dt>Checked again fresh</dt><dd>${t.evidence?.independentReplay ? 'yes — same result twice' : 'not needed — it stayed inside the first time'}</dd></div></dl>${t.trace?.url ? `<a class="trace-link" href="${t.trace.url}" target="_blank" rel="noreferrer">Open the run trace ↗</a>` : ''}</details>`;
 }
 
 function detailPanel() {
