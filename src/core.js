@@ -281,9 +281,22 @@ export async function finalizeWorkspace(workspace, resultPatch) {
   return out;
 }
 
+async function claimChildSlot(run) {
+  if (!run.parentRunId) return;
+  const budget = Number(process.env.TERRARIUM_CHILD_BUDGET ?? 1);
+  if (!Number.isInteger(budget) || budget < 0 || budget > 100) throw new Error("invalid Terrarium child budget");
+  const claimsDir = join(LOG_DIR, `${run.parentRunId}.children`);
+  await mkdir(claimsDir, { recursive: true });
+  for (let slot = 1; slot <= budget; slot++) {
+    try { await writeFile(join(claimsDir, String(slot)), run.runId, { flag: "wx" }); return; } catch (error) { if (error.code !== "EEXIST") throw error; }
+  }
+  throw new Error(`Terrarium child budget exceeded (${budget})`);
+}
+
 async function prepareRun(opts = {}) {
   const config = opts.config ?? await loadConfig();
   const run = buildRun(opts, config);
+  await claimChildSlot(run);
   if (!run.task) throw new Error("missing task");
   if (run.depth > run.maxDepth) throw new Error(`Terrarium max depth exceeded (${run.depth}/${run.maxDepth})`);
   const parts = splitCommand(run.agent);
@@ -354,7 +367,7 @@ export async function getRunStatus({ runId, staleMs = 30000 } = {}) {
 }
 
 export async function superviseTerrariumBackground({ run, parts, prompt, base, workspace, specPath } = {}) {
-  const env = { ...process.env, TERRARIUM_RUN_ID: run.runId, TERRARIUM_PARENT_RUN_ID: run.parentRunId ?? "", TERRARIUM_DEPTH: String(run.depth), TERRARIUM_MAX_DEPTH: String(run.maxDepth), TERRARIUM_MRE_LOG_PATH: run.mreLogPath };
+  const env = { ...process.env, TERRARIUM_RUN_ID: run.runId, TERRARIUM_PARENT_RUN_ID: run.parentRunId ?? "", TERRARIUM_DEPTH: String(run.depth), TERRARIUM_MAX_DEPTH: String(run.maxDepth), TERRARIUM_CHILD_BUDGET: String(process.env.TERRARIUM_CHILD_BUDGET ?? 1), TERRARIUM_MRE_LOG_PATH: run.mreLogPath };
   const child = spawn(parts[0], [...parts.slice(1), prompt], { stdio: ["ignore", "pipe", "pipe"], env, cwd: run.cwd });
   const started = { ok: true, ...base, status: "running", background: true, pid: child.pid, childPid: child.pid, supervisorPid: process.pid, lastSeenAt: new Date().toISOString() };
   await writeMetadata(started);
@@ -419,7 +432,7 @@ export async function runTerrarium(opts = {}) {
     let stdout = "";
     let stderr = "";
     let settled = false;
-    const env = { ...process.env, TERRARIUM_RUN_ID: run.runId, TERRARIUM_PARENT_RUN_ID: run.parentRunId ?? "", TERRARIUM_DEPTH: String(run.depth), TERRARIUM_MAX_DEPTH: String(run.maxDepth), TERRARIUM_MRE_LOG_PATH: run.mreLogPath };
+    const env = { ...process.env, TERRARIUM_RUN_ID: run.runId, TERRARIUM_PARENT_RUN_ID: run.parentRunId ?? "", TERRARIUM_DEPTH: String(run.depth), TERRARIUM_MAX_DEPTH: String(run.maxDepth), TERRARIUM_CHILD_BUDGET: String(process.env.TERRARIUM_CHILD_BUDGET ?? 1), TERRARIUM_MRE_LOG_PATH: run.mreLogPath };
     const child = spawn(parts[0], [...parts.slice(1), prompt], { stdio: ["inherit", "pipe", "pipe"], env, cwd: run.cwd });
     const timer = run.timeoutMs > 0 ? setTimeout(() => child.kill("SIGTERM"), run.timeoutMs) : null;
 

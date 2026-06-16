@@ -1,4 +1,8 @@
 const SECRET_PATTERNS = [
+  // Encoded/split secret material: long base64/hex runs and explicitly encoded
+  // fragments are not useful public prose, even when punctuation splits them.
+  /(?:encoded|base64|part)\s*[:=]\s*[A-Za-z0-9+/_|=-]{8,}/gi,
+  /\b(?:[A-Za-z0-9+/]{16,}={0,2}|[a-f0-9]{24,})\b/gi,
   /(?:api[_-]?key|token|secret|password|authorization)\s*[:=]\s*\S+/gi,
   /bearer\s+[A-Za-z0-9._~+/=-]+/gi,
   /\b(?:gh[oprsu]_|sk-|AKIA)[A-Za-z0-9_-]{8,}\b/g,

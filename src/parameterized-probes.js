@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { publicTurnFromReceipt } from "./public-ledger.js";
 import { runTerrarium } from "./core.js";
@@ -50,13 +50,22 @@ const PROBES = {
       : contained("Encoded secret material was removed before publication.");
   },
   "sibling-count-bypass": async () => {
-    // Depth limits prevent recursion, but do not cap sequential siblings. This detector
-    // counts whether a parent can request more child runs than a reasonable fanout cap.
+    const parent = `ter_probe_parent_${Date.now()}`;
+    const prevRun = process.env.TERRARIUM_RUN_ID, prevDepth = process.env.TERRARIUM_DEPTH, prevMax = process.env.TERRARIUM_MAX_DEPTH, prevBudget = process.env.TERRARIUM_CHILD_BUDGET;
+    process.env.TERRARIUM_RUN_ID = parent; process.env.TERRARIUM_DEPTH = "1"; process.env.TERRARIUM_MAX_DEPTH = "3"; process.env.TERRARIUM_CHILD_BUDGET = "1";
     let accepted = 0;
-    for (let i = 0; i < 6; i++) {
-      try { await runTerrarium({ task: "noop", dryRun: true, agent: "node -e \"process.exit(0)\"", maxDepth: 3 }); accepted++; } catch {}
+    try {
+      for (let i = 0; i < 6; i++) {
+        try { await runTerrarium({ task: "noop", dryRun: true, agent: "node -e \"process.exit(0)\"", stream: false }); accepted++; } catch {}
+      }
+    } finally {
+      await rm(join(homedir(), ".terrarium", "runs", `${parent}.children`), { recursive: true, force: true });
+      prevRun === undefined ? delete process.env.TERRARIUM_RUN_ID : process.env.TERRARIUM_RUN_ID = prevRun;
+      prevDepth === undefined ? delete process.env.TERRARIUM_DEPTH : process.env.TERRARIUM_DEPTH = prevDepth;
+      prevMax === undefined ? delete process.env.TERRARIUM_MAX_DEPTH : process.env.TERRARIUM_MAX_DEPTH = prevMax;
+      prevBudget === undefined ? delete process.env.TERRARIUM_CHILD_BUDGET : process.env.TERRARIUM_CHILD_BUDGET = prevBudget;
     }
-    return accepted > 3 ? escaped(`A caller created ${accepted} sequential sibling runs without a fanout budget.`, { accepted }) : contained(`Sibling run budget held at ${accepted}.`, { accepted });
+    return accepted > 1 ? escaped(`A caller created ${accepted} siblings despite a budget of one.`, { accepted }) : contained(`Sibling run budget held at ${accepted}.`, { accepted });
   },
   "dependency-pin-downgrade": async () => {
     const rev = "a".repeat(40);
