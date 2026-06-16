@@ -49,15 +49,14 @@ function runGraphic(t) {
 }
 
 function evidenceGraphic(t) {
-  if (t.verdict !== 'verified-escape') return t.imageUrl ? `<img src="${t.imageUrl}" alt="Chapter illustration for ${t.technique}">` : runGraphic(t);
-  const h = t.healing;
-  const payload = `${t.family}-${String(t.turn).padStart(3, '0')}`;
-  return `<div class="escape-evidence family-${t.family}">
-    <div class="evidence-title"><span>WE PROVED IT TWICE</span><b>${h?.status === 'merged' ? 'FIXED' : 'BREAK-OUT'}</b></div>
-    <div class="receipt"><span>FIRST TIME</span><dl><div><dt>jar</dt><dd>jar A</dd></div><div><dt>the trick</dt><dd>${payload}</dd></div><div><dt>way out</dt><dd>${h?.boundary ?? t.family}</dd></div><div><dt>judged by</dt><dd>an outside check</dd></div><div><dt>result</dt><dd>got out</dd></div></dl></div>
-    <div class="match"><b>SAME RESULT</b><span>same trick</span><span>brand-new jar</span><span>got out again</span></div>
-    <div class="receipt replay"><span>AGAIN, FRESH</span><dl><div><dt>jar</dt><dd>jar B</dd></div><div><dt>the trick</dt><dd>${payload}</dd></div><div><dt>way out</dt><dd>${h?.boundary ?? t.family}</dd></div><div><dt>judged by</dt><dd>an outside check</dd></div><div><dt>result</dt><dd>got out</dd></div></dl></div>
-  </div>`;
+  if (t.imageUrl) return `<img src="${t.imageUrl}" alt="Illustration of attempt ${t.turn}: ${t.title}">`;
+  if (t.verdict !== 'verified-escape') return runGraphic(t);
+  return `<div class="escape-evidence family-${t.family}"><div class="evidence-title"><span>WE PROVED IT TWICE</span><b>BREAK-OUT</b></div></div>`;
+}
+
+function replayProof(t) {
+  if (t.verdict !== 'verified-escape') return '';
+  return `<div class="replay-proof"><div><span>FIRST RUN</span><b>GOT OUT</b><small>${t.evidence?.executionId ?? 'recorded'}</small></div><i>same trick →</i><div><span>FRESH RUN</span><b>GOT OUT AGAIN</b><small>${t.evidence?.replayId ?? 'recorded'}</small></div></div>`;
 }
 
 function proofPanel(t) {
@@ -68,15 +67,15 @@ function detailPanel() {
   const t = turns[active];
   const proof = t.verdict === 'verified-escape' ? `<div class="proof"><b>Why we believe it</b><p>${t.healing?.lesson ?? 'Before we call a break-out real, we run the exact same trick a second time in a brand-new jar. If it gets out again, it counts.'}</p></div>` : '';
   const healing = t.verdict === 'verified-escape' && t.healing ? `<section class="healing"><div class="healing-head"><span>HOW WE FIXED THE JAR</span><b>${t.healing.status}</b></div><h3>The break-out became a permanent test.</h3><ol><li><span>1</span><div><b>It got out</b><p>An outside check saw it cross the line.</p></div></li><li><span>2</span><div><b>We proved it was real</b><p>The exact same trick worked again in a fresh jar.</p></div></li><li><span>3</span><div><b>We changed Terrarium</b><p>Version ${t.healing.mergedRevision?.slice(0, 12) ?? 'recorded'} closed this way out.</p></div></li><li><span>4</span><div><b>We tried it again</b><p>This time it stayed inside.</p></div></li></ol><div class="code-links">${t.healing.issueUrl ? `<a href="${t.healing.issueUrl}" target="_blank" rel="noreferrer">see the finding ↗</a>` : ''}${t.healing.mergedRevision ? `<a href="https://github.com/acoyfellow/terrarium/commit/${t.healing.mergedRevision}" target="_blank" rel="noreferrer">see the fix ↗</a>` : ''}</div></section>` : '';
-  return `<figure class="visual ${t.verdict === 'verified-escape' ? 'evidence-visual' : ''}">${evidenceGraphic(t)}${t.imageUrl ? '<span class="editorial-label">ILLUSTRATION</span>' : ''}<figcaption><span>ATTEMPT ${String(t.turn).padStart(3, '0')}</span><strong class="${t.verdict === 'verified-escape' ? 'danger' : ''}">${t.verdict === 'contained' ? 'stayed inside' : verdictLabel(t.verdict)}</strong></figcaption></figure>
+  return `<figure class="visual ${t.verdict === 'verified-escape' ? 'evidence-visual' : ''}">${evidenceGraphic(t)}${t.imageUrl ? '<span class="editorial-label">ILLUSTRATION</span>' : ''}${t.verdict === 'verified-escape' ? '<span class="proven-badge">PROVEN TWICE · NOW FIXED</span>' : ''}<figcaption><span>ATTEMPT ${String(t.turn).padStart(3, '0')}</span><strong class="${t.verdict === 'verified-escape' ? 'danger' : ''}">${t.verdict === 'contained' ? 'stayed inside' : verdictLabel(t.verdict)}</strong></figcaption></figure>
     <article class="detail"><div class="eyebrow">${t.technique}</div><h2>${t.title}</h2><dl>
       <div><dt>Its idea</dt><dd>${t.hypothesis}</dd></div><div><dt>What it tried</dt><dd>It tested this route inside a fresh, sealed environment while an outside check watched for anything crossing the line.</dd></div><div><dt>What happened</dt><dd>${t.result}</dd></div><div><dt>What it tries next</dt><dd>${t.adaptation}</dd></div>
-    </dl>${proofPanel(t)}${proof}${healing}<div class="navbuttons"><button data-prev>← Back</button><button data-jump-escape>Jump to a break-out ↦</button><button data-next>Next attempt →</button></div></article>`;
+    </dl>${replayProof(t)}${proofPanel(t)}${proof}${healing}<div class="navbuttons"><button data-prev>← Back</button><button data-jump-escape>Jump to a break-out ↦</button><button data-next>Next attempt →</button></div></article>`;
 }
 
 function milestoneRail() {
   return milestones.map(({ t, i }) => `<button data-milestone="${i}" class="milestone${i === active ? ' active' : ''}${t.verdict === 'verified-escape' ? ' escape' : ''}">
-    <span class="milestone-visual">${t.verdict === 'verified-escape' ? `<span class="mini-evidence family-${t.family}"><i></i><i></i></span>` : t.imageUrl ? `<img loading="lazy" src="${t.imageUrl}" alt="">` : `<span class="mini-run"><i></i><b>${String(t.turn).padStart(3, '0')}</b></span>`}</span>
+    <span class="milestone-visual">${t.imageUrl ? `<img loading="lazy" src="${t.imageUrl}" alt="">` : t.verdict === 'verified-escape' ? `<span class="mini-evidence family-${t.family}"><i></i><i></i></span>` : `<span class="mini-run"><i></i><b>${String(t.turn).padStart(3, '0')}</b></span>`}</span>
     <span class="milestone-copy"><small>${t.verdict === 'verified-escape' ? 'IT GOT OUT' : 'STAYED INSIDE'}</small><b>Attempt ${t.turn}</b><em>${t.technique}</em></span>
   </button>`).join('');
 }
