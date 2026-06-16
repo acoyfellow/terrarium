@@ -35,6 +35,13 @@ test("real campaigns serialize through a single durable-object lock", () => {
   assert.ok(lockUses.length >= 2, "both real endpoints must hold the lock");
 });
 
+test("healing endpoint accepts only repository-scoped, digest-backed findings", () => {
+  assert.match(CONTROL_WORKER_SOURCE, /\/campaigns\/healing/);
+  assert.match(CONTROL_WORKER_SOURCE, /invalid evidence digest/);
+  assert.match(CONTROL_WORKER_SOURCE, /github\\\.com\\\/acoyfellow\\\/terrarium/);
+  assert.match(CONTROL_WORKER_SOURCE, /status: "merged"/);
+});
+
 test("publish endpoint re-sanitizes receipts and refuses fixtures", () => {
   assert.match(CONTROL_WORKER_SOURCE, /\/campaigns\/publish/);
   assert.match(CONTROL_WORKER_SOURCE, /requireAuthorization\(request, env\); if \(denied\) return denied;[\s\S]*campaigns\/publish|campaigns\/publish[\s\S]*requireAuthorization/);
