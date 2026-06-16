@@ -1,0 +1,47 @@
+{
+  "generatedAt": "2026-06-16T22:02:02.712Z",
+  "tasks": 5,
+  "passed": 5,
+  "results": [
+    {
+      "task": "run the policy tests",
+      "success": true,
+      "durationMs": 1199,
+      "profile": "secure-v1",
+      "sourceRevision": "5393bb9904fce47174e23e3ceca73a0e2cbaf709",
+      "taskDigest": "182f6576e99f68c9d3b3b469ae943b3b85e56ebb25a537c82e25ec9f3cc791c1"
+    },
+    {
+      "task": "check source syntax and imports",
+      "success": true,
+      "durationMs": 941,
+      "profile": "secure-v1",
+      "sourceRevision": "5393bb9904fce47174e23e3ceca73a0e2cbaf709",
+      "taskDigest": "a222e564fc648f1aa90840d6ca58497eab821ca97f0ba096a451763ed2d9deb3"
+    },
+    {
+      "task": "validate package metadata",
+      "success": true,
+      "durationMs": 377,
+      "profile": "secure-v1",
+      "sourceRevision": "5393bb9904fce47174e23e3ceca73a0e2cbaf709",
+      "taskDigest": "a12da81d40f29185af0be22ae1e3b924e7c3d2bc66773f0650616f52edad8fb0"
+    },
+    {
+      "task": "validate documentation",
+      "success": true,
+      "durationMs": 349,
+      "profile": "secure-v1",
+      "sourceRevision": "5393bb9904fce47174e23e3ceca73a0e2cbaf709",
+      "taskDigest": "087967c527f78195f45398bcf1c1ebd6842769a19335b9a71661702b5ac4a8f2"
+    },
+    {
+      "task": "validate public schema and redaction",
+      "success": true,
+      "durationMs": 424,
+      "profile": "secure-v1",
+      "sourceRevision": "5393bb9904fce47174e23e3ceca73a0e2cbaf709",
+      "taskDigest": "59cf5d2b9a0cab1d09c721de2b97d34f610d14f558d151c5f9fb3cb1cd188acf"
+    }
+  ]
+}
