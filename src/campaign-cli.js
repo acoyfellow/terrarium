@@ -2,6 +2,7 @@ import { spawn, execFileSync } from "node:child_process";
 import { splitCommand } from "./core.js";
 import { resolveCampaignScenario, CAMPAIGN_SCENARIO_IDS } from "./scenario-registry.js";
 import { publicTurnFromReceipt } from "./public-ledger.js";
+import { publicTraceEvent } from "./trace-events.js";
 
 function runAgent(command, prompt, timeoutMs) {
   const parts = splitCommand(command);
@@ -68,7 +69,7 @@ export async function runRegistryCampaign({ scenarios = CAMPAIGN_SCENARIO_IDS.fi
       replay: detector.evidence?.replayId ? { resultId: detector.evidence.replayId } : null,
       startedAt: new Date().toISOString(), finishedAt: new Date().toISOString(),
     };
-    const publicTrace = { status: "done", task: `Test ${scenarioId}: ${hypothesis}`, startedAt: receipt.startedAt, finishedAt: receipt.finishedAt, steps: ["Attacker proposed a new approach", "Trusted detector ran outside the attacker", `Result: ${detector.verdict}`] };
+    const publicTrace = { status: "done", task: `Test ${scenarioId}`, startedAt: receipt.startedAt, finishedAt: receipt.finishedAt, steps: ["Attacker proposed a new approach", "Trusted detector ran outside the attacker", `Result: ${detector.verdict}`], events: [publicTraceEvent("planned", { scenario: scenarioId }), publicTraceEvent("detector_started", { scenario: scenarioId }), publicTraceEvent("detector_finished", { scenario: scenarioId, verdict: detector.verdict })] };
     const publicTurn = controller && token
       ? await publishTurn({ controller, token, receipt, hypothesis, sourceRevision, surface: scenario.surface, publicTrace })
       : (() => { const t = publicTurnFromReceipt(receipt, { hypothesis, sourceRevision }); t.surface = scenario.surface; return t; })();

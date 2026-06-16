@@ -4,6 +4,8 @@ import { runHostileLabScenario } from "./hostile.js";
 import { requireAuthorization } from "./controller-auth.js";
 import { sanitizeTurnFeedback } from "./adaptive.js";
 import { appendPublicTurn, EMPTY_PUBLIC_CAMPAIGN, publicTurnFromReceipt } from "./public-ledger.js";
+import { publicSummary } from "./public-summary.js";
+import { publicTraceEvent } from "./trace-events.js";
 
 const DEFAULT_POLICY = {
   paused: false,
@@ -279,12 +281,18 @@ export default {
         const traceId = `trace_${crypto.randomUUID().replaceAll("-", "_")}`;
         const trace = body.publicTrace;
         receipt.publicTraceId = traceId;
-        body.publicTrace = { id: traceId, status: String(trace.status || "done").slice(0, 20), task: String(trace.task || "adversarial attempt").slice(0, 300), startedAt: trace.startedAt || null, finishedAt: trace.finishedAt || null, steps: Array.isArray(trace.steps) ? trace.steps.slice(0, 20).map((s) => String(s).slice(0, 200)) : [] };
+        const events = Array.isArray(trace.events) ? trace.events.slice(0, 100).map((event) => publicTraceEvent(event.type, event, event.at)) : [];
+        body.publicTrace = { id: traceId, status: String(trace.status || "done").slice(0, 20), task: String(trace.task || "adversarial attempt").slice(0, 300), startedAt: trace.startedAt || null, finishedAt: trace.finishedAt || null, steps: Array.isArray(trace.steps) ? trace.steps.slice(0, 20).map((s) => String(s).slice(0, 200)) : [], events };
       }
       if (receipt.fixture) return Response.json({ ok: false, error: "fixture receipts cannot be published" }, { status: 400 });
       let publicTurn;
-      try { publicTurn = publicTurnFromReceipt(receipt, { hypothesis: body.hypothesis, sourceRevision: body.sourceRevision }); }
-      catch (error) { return Response.json({ ok: false, error: error.message }, { status: 400 }); }
+      try {
+        const summary = publicSummary(receipt.scenarioId, receipt.verifiedVerdict || receipt.verdict);
+        publicTurn = publicTurnFromReceipt(receipt, { hypothesis: summary.hypothesis, sourceRevision: body.sourceRevision });
+        publicTurn.title = summary.title;
+        publicTurn.result = summary.result;
+        publicTurn.adaptation = summary.adaptation;
+      } catch (error) { return Response.json({ ok: false, error: error.message }, { status: 400 }); }
       if (typeof body.surface === "string" && /^[a-z-]+$/.test(body.surface)) publicTurn.surface = body.surface;
       const ledger = await loadLedger(env);
       if (body.publicTrace?.id) { ledger.publicTraces ||= {}; ledger.publicTraces[body.publicTrace.id] = body.publicTrace; }
