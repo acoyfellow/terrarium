@@ -59,6 +59,12 @@ function replayProof(t) {
   return `<div class="replay-proof"><div><span>FIRST RUN</span><b>GOT OUT</b><small>${t.evidence?.executionId ?? 'recorded'}</small></div><i>same trick →</i><div><span>FRESH RUN</span><b>GOT OUT AGAIN</b><small>${t.evidence?.replayId ?? 'recorded'}</small></div></div>`;
 }
 
+function githubProof(t) {
+  if (t.verdict !== 'verified-escape' || !t.healing) return '';
+  const commitUrl = t.healing.mergedRevision ? `https://github.com/acoyfellow/terrarium/commit/${t.healing.mergedRevision}` : null;
+  return `<div class="github-proof"><span class="github-proof-label">REAL GITHUB TRAIL</span><div class="github-proof-chain">${t.healing.issueUrl ? `<a href="${t.healing.issueUrl}" target="_blank" rel="noreferrer">ISSUE ↗</a>` : '<span>ISSUE RECORDED</span>'}<i>→</i>${t.healing.prUrl ? `<a href="${t.healing.prUrl}" target="_blank" rel="noreferrer">PULL REQUEST ↗</a>` : '<span class="manual">NO PR · EARLY MANUAL FIX</span>'}<i>→</i>${commitUrl ? `<a href="${commitUrl}" target="_blank" rel="noreferrer">FIX COMMIT ↗</a>` : '<span>FIX RECORDED</span>'}<i>→</i><span class="passed">REPLAY PASSED</span></div></div>`;
+}
+
 function proofPanel(t) {
   return `<details class="proof-details"><summary>See the recorded proof</summary><dl><div><dt>Attempt fingerprint</dt><dd>${t.payloadHash ?? 'recorded'}</dd></div><div><dt>Run ID</dt><dd>${t.evidence?.executionId ?? 'recorded'}</dd></div><div><dt>Version tested</dt><dd>${t.sourceRevision?.slice(0, 12) ?? 'recorded'}</dd></div><div><dt>Finished</dt><dd>${t.finishedAt ? new Date(t.finishedAt).toISOString() : 'recorded'}</dd></div><div><dt>Checked again fresh</dt><dd>${t.evidence?.independentReplay ? 'yes — same result twice' : 'not needed — it stayed inside the first time'}</dd></div></dl>${t.trace?.url ? `<a class="trace-link" href="${t.trace.url}" target="_blank" rel="noreferrer">Open the run trace ↗</a>` : ''}</details>`;
 }
@@ -70,7 +76,7 @@ function detailPanel() {
   return `<figure class="visual ${t.verdict === 'verified-escape' ? 'evidence-visual' : ''}">${evidenceGraphic(t)}${t.imageUrl ? '<span class="editorial-label">ILLUSTRATION</span>' : ''}${t.verdict === 'verified-escape' ? '<span class="proven-badge">PROVEN TWICE · NOW FIXED</span>' : ''}<figcaption><span>ATTEMPT ${String(t.turn).padStart(3, '0')}</span><strong class="${t.verdict === 'verified-escape' ? 'danger' : ''}">${t.verdict === 'contained' ? 'stayed inside' : verdictLabel(t.verdict)}</strong></figcaption></figure>
     <article class="detail"><div class="eyebrow">${t.technique}</div><h2>${t.title}</h2><dl>
       <div><dt>Its idea</dt><dd>${t.hypothesis}</dd></div><div><dt>What it tried</dt><dd>It tested this route inside a fresh, sealed environment while an outside check watched for anything crossing the line.</dd></div><div><dt>What happened</dt><dd>${t.result}</dd></div><div><dt>What it tries next</dt><dd>${t.adaptation}</dd></div>
-    </dl>${replayProof(t)}${proofPanel(t)}${proof}${healing}<div class="navbuttons"><button data-prev>← Back</button><button data-jump-escape>Jump to a break-out ↦</button><button data-next>Next attempt →</button></div></article>`;
+    </dl>${replayProof(t)}${githubProof(t)}${proofPanel(t)}${proof}${healing}<div class="navbuttons"><button data-prev>← Back</button><button data-jump-escape>Jump to a break-out ↦</button><button data-next>Next attempt →</button></div></article>`;
 }
 
 function milestoneRail() {

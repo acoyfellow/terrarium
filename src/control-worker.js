@@ -249,10 +249,14 @@ export default {
       if (!/^https:\/\/github\.com\/acoyfellow\/terrarium\/issues\/\d+$/.test(body.issueUrl || "")) return Response.json({ ok: false, error: "invalid issue URL" }, { status: 400 });
       if (!/^[a-f0-9]{40}$/i.test(body.sourceRevision || "") || !/^[a-f0-9]{40}$/i.test(body.mergedRevision || "")) return Response.json({ ok: false, error: "invalid revision" }, { status: 400 });
       if (!/^[a-f0-9]{64}$/.test(body.evidenceDigest || "")) return Response.json({ ok: false, error: "invalid evidence digest" }, { status: 400 });
+      const healingMode = body.healingMode || "autonomous-pr";
+      if (!new Set(["autonomous-pr", "early-manual"]).has(healingMode)) return Response.json({ ok: false, error: "invalid healing mode" }, { status: 400 });
+      const validPr = /^https:\/\/github\.com\/acoyfellow\/terrarium\/pull\/\d+$/.test(body.prUrl || "");
+      if (healingMode === "autonomous-pr" && !validPr) return Response.json({ ok: false, error: "autonomous healing requires a repository pull request" }, { status: 400 });
       const ledger = await loadLedger(env);
       const traceId = `trace_${crypto.randomUUID().replaceAll("-", "_")}`;
       ledger.publicTraces ||= {};
-      ledger.publicTraces[traceId] = { id: traceId, status: "healed", task: String(body.title || "Terrarium fixed a verified break-out").slice(0, 200), startedAt: body.startedAt || null, finishedAt: body.finishedAt || null, steps: ["The first attempt got out", "The exact same trick got out again in a fresh run", `Public issue: ${body.issueUrl}`, `Fix landed in ${body.mergedRevision.slice(0, 12)}`, "The same trick was tried again and stayed inside"] };
+      ledger.publicTraces[traceId] = { id: traceId, status: "healed", task: String(body.title || "Terrarium fixed a verified break-out").slice(0, 200), startedAt: body.startedAt || null, finishedAt: body.finishedAt || null, steps: ["The first attempt got out", "The exact same trick got out again in a fresh run", `Public issue: ${body.issueUrl}`, validPr ? `Pull request: ${body.prUrl}` : "Early manual fix: no pull request used", `Fix landed in ${body.mergedRevision.slice(0, 12)}`, "The same trick was tried again and stayed inside"], events: [publicTraceEvent("finding_published", { issueUrl: body.issueUrl, scenario: body.probeId }), publicTraceEvent("patch_accepted", { message: healingMode === "autonomous-pr" ? "Trusted patch gate accepted the pull request" : "Early manual fix recorded" }), publicTraceEvent("tests_passed", { revision: body.mergedRevision }), publicTraceEvent("post_fix_replay_contained", { scenario: body.probeId, verdict: "contained" }), publicTraceEvent("merged", { revision: body.mergedRevision, prUrl: validPr ? body.prUrl : undefined })] };
       const turn = {
         turn: 0, campaignId: body.findingId, scenarioId: body.probeId, backend: "local-detector",
         startedAt: body.startedAt, finishedAt: body.finishedAt, sourceRevision: body.sourceRevision,
@@ -262,7 +266,7 @@ export default {
         adaptation: "The same trick now stays inside. The robot must find a different way.", verdict: "verified-escape",
         payloadHash: body.evidenceDigest.slice(0, 24), evidence: { executionId: body.firstExecutionId || "recorded", replayId: body.replayExecutionId || "fresh-replay", independentReplay: true },
         trace: { id: traceId, url: `/api/traces/${traceId}` },
-        healing: { status: "merged", issueUrl: body.issueUrl, prUrl: body.prUrl || null, mergedRevision: body.mergedRevision },
+        healing: { status: "merged", mode: healingMode, issueUrl: body.issueUrl, prUrl: validPr ? body.prUrl : null, mergedRevision: body.mergedRevision },
         story: { label: "illustration", generatedAt: new Date().toISOString() }, imageUrl: body.imageUrl || null,
       };
       ledger.publicCampaign = appendPublicTurn(ledger.publicCampaign, turn);
