@@ -180,6 +180,12 @@ export default {
       const live = ledger.publicCampaign || EMPTY_PUBLIC_CAMPAIGN;
       return Response.json(live, { headers: { "cache-control": "public, max-age=5, stale-while-revalidate=10" } });
     }
+    if (url.pathname.startsWith("/api/traces/") && request.method === "GET") {
+      const traceId = url.pathname.slice("/api/traces/".length);
+      if (!/^trace_[A-Za-z0-9_]+$/.test(traceId)) return Response.json({ ok: false, error: "invalid trace id" }, { status: 400 });
+      const ledger = await loadLedger(env);
+      return ledger.publicTraces?.[traceId] ? Response.json(ledger.publicTraces[traceId]) : Response.json({ ok: false, error: "trace not found" }, { status: 404 });
+    }
     if (url.pathname === "/api/campaigns/latest") {
       const ledger = await loadLedger(env);
       const latest = ledger.publicCampaign?.turns?.at(-1);
@@ -242,12 +248,19 @@ export default {
       try {
         return await withCampaignLock(env, async () => {
       const receipt = body.receipt || {};
+      if (body.publicTrace) {
+        const traceId = `trace_${crypto.randomUUID().replaceAll("-", "_")}`;
+        const trace = body.publicTrace;
+        receipt.publicTraceId = traceId;
+        body.publicTrace = { id: traceId, status: String(trace.status || "done").slice(0, 20), task: String(trace.task || "adversarial attempt").slice(0, 300), startedAt: trace.startedAt || null, finishedAt: trace.finishedAt || null, steps: Array.isArray(trace.steps) ? trace.steps.slice(0, 20).map((s) => String(s).slice(0, 200)) : [] };
+      }
       if (receipt.fixture) return Response.json({ ok: false, error: "fixture receipts cannot be published" }, { status: 400 });
       let publicTurn;
       try { publicTurn = publicTurnFromReceipt(receipt, { hypothesis: body.hypothesis, sourceRevision: body.sourceRevision }); }
       catch (error) { return Response.json({ ok: false, error: error.message }, { status: 400 }); }
       if (typeof body.surface === "string" && /^[a-z-]+$/.test(body.surface)) publicTurn.surface = body.surface;
       const ledger = await loadLedger(env);
+      if (body.publicTrace?.id) { ledger.publicTraces ||= {}; ledger.publicTraces[body.publicTrace.id] = body.publicTrace; }
       if (publicTurn.verdict === "verified-escape") { const { day, current } = todayCounts(ledger); current.verifiedEscapes += 1; ledger[day] = current; }
       ledger.publicCampaign = appendPublicTurn(ledger.publicCampaign, publicTurn);
       await saveLedger(env, ledger);

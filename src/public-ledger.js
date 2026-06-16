@@ -48,6 +48,7 @@ export function publicTurnFromReceipt(receipt, { hypothesis, sourceRevision, hea
       replayId: safeText(receipt.replay?.resultId, null),
       independentReplay: Boolean(receipt.execution?.resultId && receipt.replay?.resultId && receipt.execution.resultId !== receipt.replay.resultId),
     },
+    trace: typeof receipt.publicTraceId === "string" && /^trace_[A-Za-z0-9_]+$/.test(receipt.publicTraceId) ? { id: receipt.publicTraceId, url: `/api/traces/${receipt.publicTraceId}` } : null,
     healing: healing ? {
       status: safeText(healing.status),
       issueUrl: /^https:\/\/github\.com\/acoyfellow\/terrarium\/issues\/\d+$/.test(healing.issueUrl || "") ? healing.issueUrl : null,

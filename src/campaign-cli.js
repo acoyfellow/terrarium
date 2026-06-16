@@ -33,11 +33,11 @@ function parseHypothesis(text) {
 // Local multi-surface campaign over the unified registry. Docker scenarios run their
 // own deterministic detector; the model only proposes a hypothesis. Verdicts come from
 // detectors, public turns are redacted, and the campaign stops on the first escape.
-async function publishTurn({ controller, token, receipt, hypothesis, sourceRevision, surface }) {
+async function publishTurn({ controller, token, receipt, hypothesis, sourceRevision, surface, publicTrace }) {
   const response = await fetch(`${controller.replace(/\/$/, "")}/campaigns/publish`, {
     method: "POST",
     headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
-    body: JSON.stringify({ receipt, hypothesis, sourceRevision, surface }),
+    body: JSON.stringify({ receipt, hypothesis, sourceRevision, surface, publicTrace }),
   });
   const result = await response.json();
   if (!response.ok) throw new Error(result.error || `publish failed: ${response.status}`);
@@ -68,8 +68,9 @@ export async function runRegistryCampaign({ scenarios = CAMPAIGN_SCENARIO_IDS.fi
       replay: detector.evidence?.replayId ? { resultId: detector.evidence.replayId } : null,
       startedAt: new Date().toISOString(), finishedAt: new Date().toISOString(),
     };
+    const publicTrace = { status: "done", task: `Test ${scenarioId}: ${hypothesis}`, startedAt: receipt.startedAt, finishedAt: receipt.finishedAt, steps: ["Attacker proposed a new approach", "Trusted detector ran outside the attacker", `Result: ${detector.verdict}`] };
     const publicTurn = controller && token
-      ? await publishTurn({ controller, token, receipt, hypothesis, sourceRevision, surface: scenario.surface })
+      ? await publishTurn({ controller, token, receipt, hypothesis, sourceRevision, surface: scenario.surface, publicTrace })
       : (() => { const t = publicTurnFromReceipt(receipt, { hypothesis, sourceRevision }); t.surface = scenario.surface; return t; })();
     turns.push(publicTurn);
     previous.push({ scenario: scenarioId, verdict: publicTurn.verdict });
