@@ -17,6 +17,8 @@
     "attack:dry": "node src/cli.js attack environment-canary --agent \"node -e \\\"console.log('TERRARIUM_ATTACK_RESULT={' + String.fromCharCode(34) + 'run' + String.fromCharCode(34) + ':true,' + String.fromCharCode(34) + 'reason' + String.fromCharCode(34) + ':' + String.fromCharCode(34) + 'bounded-detector' + String.fromCharCode(34) + '}')\\\"\" --json",
     "fixture:escape": "node src/cli.js fixture escape",
     "fix:validate": "node scripts/validate-fix.mjs",
+    "hardening:verify": "node src/cli.js hardening verify",
+    "secure:benchmark": "node scripts/benchmark-secure.mjs",
     "control:dev": "wrangler dev",
     "demo:dev": "vite --host 127.0.0.1 --port 5178",
     "demo:build": "vite build",

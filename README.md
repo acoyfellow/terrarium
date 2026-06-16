@@ -4,7 +4,9 @@
 
 ![A cozy glass terrarium on a wooden desk. Inside, a single small robot tends a tiny garden of even smaller robots, each working in their own pot.](./assets/social-card.jpg)
 
-**Contain agents. Invite escapes. Patch the glass. Repeat in public.**
+**A hardened place to run AI agents.**
+
+Terrarium's boundaries are continuously attacked. Every reproduced weakness becomes a permanent regression before the next release.
 
 Terrarium has two uses built around one stable idea:
 
@@ -18,13 +20,15 @@ one bounded task → one child run → one inspectable result
 | Test declared containment boundaries in Docker. | `terra probe <scenario>` | Implemented, opt-in |
 | Ask an agent to initiate a bounded containment test. | `terra attack <scenario>` | Implemented, deliberately constrained |
 | Turn a reproduced escape into reviewable report text. | `terra campaign issue-draft <id>` | Local-only; does not publish |
-| Run hostile adaptive agents and automatically file/fix public vulnerabilities. | Public red-team loop | Direction, not shipped yet |
+| Validate repository work inside the hardened profile. | `terra secure "run the repository tests"` | secure-v1, opt-in |
+| Replay the permanent attack corpus before release. | `terra hardening verify` | Implemented |
+| Inspect real attempts, findings, fixes, and safe traces. | [`terrarium.coey.dev`](https://terrarium.coey.dev) | Live |
 
-Terrarium does **not** currently claim it safely contains arbitrary hostile AI agents. Ordinary children inherit host authority and environment. Docker probes are a deterministic boundary baseline, not a universal sandbox guarantee.
+Ordinary children inherit host authority and environment; use them for cooperative work, not as a security boundary. `secure-v1` is the opt-in Docker profile with explicit [guarantees and non-guarantees](./docs/SECURE_V1.md).
 
 ## Public campaign demo
 
-[`terrarium.coey.dev`](https://terrarium.coey.dev) presents a campaign as a turn-by-turn visual receipt. Each iteration has one image in a unified cinematic terrarium style, generated with a unique seed from that turn's hypothesis and verdict. The image sequence is paired with the machine-readable campaign timeline rather than replacing it.
+[`terrarium.coey.dev`](https://terrarium.coey.dev) shows real attempts against the current product, verified findings, GitHub issues, fix commits, post-fix replay, and safe event traces. Illustrations tell the human story; receipts and GitHub artifacts are the proof.
 
 ```sh
 npm run demo:dev      # local public site
@@ -33,7 +37,7 @@ npm run demo:smoke    # local smoke check
 npm run deploy        # personal Cloudflare account + custom domain
 ```
 
-Generated campaign images and manifests are stored by campaign/turn. The checked-in three-turn demo is the deterministic public fallback; live campaigns can publish the same normalized manifest shape.
+Start here for the full system model: [Architecture](./docs/ARCHITECTURE.md).
 
 ## Quick start: ordinary delegation
 
@@ -43,7 +47,7 @@ Use this when you want the original Terrarium behavior: move noisy work into one
 npm install -g .
 terra --dry-run "summarize this repo"
 terra --read-only --profile minimal "find every place we handle auth"
-terra --agent "pi -p --no-session" --model kindle-alpha "inspect the failing parser test"
+terra --agent "pi -p --no-session" --model <model-id> "inspect the failing parser test"
 terra --isolation worktree "fix the failing parser test"
 ```
 
