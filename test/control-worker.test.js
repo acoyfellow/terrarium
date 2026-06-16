@@ -40,6 +40,8 @@ test("healing endpoint accepts only repository-scoped, digest-backed findings", 
   assert.match(CONTROL_WORKER_SOURCE, /invalid evidence digest/);
   assert.match(CONTROL_WORKER_SOURCE, /github\\\.com\\\/acoyfellow\\\/terrarium/);
   assert.match(CONTROL_WORKER_SOURCE, /status: "merged"/);
+  assert.match(CONTROL_WORKER_SOURCE, /autonomous healing requires a repository pull request/);
+  assert.match(CONTROL_WORKER_SOURCE, /early-manual/);
 });
 
 test("publish endpoint re-sanitizes receipts and refuses fixtures", () => {
