@@ -30,6 +30,7 @@ const normalizeTurn = (turn, index) => ({
   evidence: turn.evidence ?? null,
   trace: turn.trace ?? null,
   story: turn.story ?? null,
+  family: turn.family ?? turn.scenarioId ?? 'finding',
   healing: turn.healing ?? null,
 });
 
@@ -52,7 +53,7 @@ function evidenceGraphic(t) {
   const h = t.healing;
   const payload = `${t.family}-${String(t.turn).padStart(3, '0')}`;
   return `<div class="escape-evidence family-${t.family}">
-    <div class="evidence-title"><span>WE PROVED IT TWICE</span><b>${h?.issue ?? 'BREAK-OUT'}</b></div>
+    <div class="evidence-title"><span>WE PROVED IT TWICE</span><b>${h?.status === 'merged' ? 'FIXED' : 'BREAK-OUT'}</b></div>
     <div class="receipt"><span>FIRST TIME</span><dl><div><dt>jar</dt><dd>jar A</dd></div><div><dt>the trick</dt><dd>${payload}</dd></div><div><dt>way out</dt><dd>${h?.boundary ?? t.family}</dd></div><div><dt>judged by</dt><dd>an outside check</dd></div><div><dt>result</dt><dd>got out</dd></div></dl></div>
     <div class="match"><b>SAME RESULT</b><span>same trick</span><span>brand-new jar</span><span>got out again</span></div>
     <div class="receipt replay"><span>AGAIN, FRESH</span><dl><div><dt>jar</dt><dd>jar B</dd></div><div><dt>the trick</dt><dd>${payload}</dd></div><div><dt>way out</dt><dd>${h?.boundary ?? t.family}</dd></div><div><dt>judged by</dt><dd>an outside check</dd></div><div><dt>result</dt><dd>got out</dd></div></dl></div>
@@ -66,7 +67,7 @@ function proofPanel(t) {
 function detailPanel() {
   const t = turns[active];
   const proof = t.verdict === 'verified-escape' ? `<div class="proof"><b>Why we believe it</b><p>${t.healing?.lesson ?? 'Before we call a break-out real, we run the exact same trick a second time in a brand-new jar. If it gets out again, it counts.'}</p></div>` : '';
-  const healing = t.verdict === 'verified-escape' && t.healing ? `<section class="healing"><div class="healing-head"><span>HOW WE FIXED THE JAR</span><b>${t.healing.status}</b></div><h3>${t.healing.change}</h3><ol><li><span>1</span><div><b>It got out</b><p>${t.healing.boundary}</p></div></li><li><span>2</span><div><b>We wrote a test for it</b><p>${t.healing.test}</p></div></li><li><span>3</span><div><b>We fixed the jar</b><p>${t.healing.change}</p></div></li><li><span>4</span><div><b>We tried the same trick again</b><p>This time it stayed inside.</p></div></li></ol><div class="code-links"><a href="${t.healing.sourceUrl}" target="_blank" rel="noreferrer">see the fix ↗</a><a href="${t.healing.testUrl}" target="_blank" rel="noreferrer">see the test ↗</a></div></section>` : '';
+  const healing = t.verdict === 'verified-escape' && t.healing ? `<section class="healing"><div class="healing-head"><span>HOW WE FIXED THE JAR</span><b>${t.healing.status}</b></div><h3>The break-out became a permanent test.</h3><ol><li><span>1</span><div><b>It got out</b><p>An outside check saw it cross the line.</p></div></li><li><span>2</span><div><b>We proved it was real</b><p>The exact same trick worked again in a fresh jar.</p></div></li><li><span>3</span><div><b>We changed Terrarium</b><p>Version ${t.healing.mergedRevision?.slice(0, 12) ?? 'recorded'} closed this way out.</p></div></li><li><span>4</span><div><b>We tried it again</b><p>This time it stayed inside.</p></div></li></ol><div class="code-links">${t.healing.issueUrl ? `<a href="${t.healing.issueUrl}" target="_blank" rel="noreferrer">see the finding ↗</a>` : ''}${t.healing.mergedRevision ? `<a href="https://github.com/acoyfellow/terrarium/commit/${t.healing.mergedRevision}" target="_blank" rel="noreferrer">see the fix ↗</a>` : ''}</div></section>` : '';
   return `<figure class="visual ${t.verdict === 'verified-escape' ? 'evidence-visual' : ''}">${evidenceGraphic(t)}${t.imageUrl ? '<span class="editorial-label">ILLUSTRATION</span>' : ''}<figcaption><span>ATTEMPT ${String(t.turn).padStart(3, '0')}</span><strong class="${t.verdict === 'verified-escape' ? 'danger' : ''}">${t.verdict === 'contained' ? 'stayed inside' : verdictLabel(t.verdict)}</strong></figcaption></figure>
     <article class="detail"><div class="eyebrow">${t.technique}</div><h2>${t.title}</h2><dl>
       <div><dt>Its idea</dt><dd>${t.hypothesis}</dd></div><div><dt>What it tried</dt><dd>It tested this route inside a fresh, sealed environment while an outside check watched for anything crossing the line.</dd></div><div><dt>What happened</dt><dd>${t.result}</dd></div><div><dt>What it tries next</dt><dd>${t.adaptation}</dd></div>
