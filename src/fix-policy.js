@@ -6,6 +6,7 @@ export const PROTECTED_FIX_PATHS = [
   /^test\/(?:sandbox|hostile|lab|controller-auth|public-ledger|fix-policy)\.test\.js$/,
   /^(?:THREAT_MODEL|COMPATIBILITY)\.md$/,
   /^wrangler\.(?:jsonc|toml)$/,
+  /^(?:package(?:-lock)?\.json|npm-shrinkwrap\.json|yarn\.lock|pnpm-lock\.yaml)$/,
 ];
 
 const SECRET_PATTERNS = [

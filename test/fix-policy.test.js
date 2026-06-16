@@ -26,7 +26,7 @@ test('accepts a branch-bound fix with a regression test', () => {
 });
 
 test('rejects detector, workflow, evidence-policy, and test weakening', () => {
-  for (const path of ['src/sandbox.js', 'src/public-ledger.js', 'src/fix-policy.js', 'test/sandbox.test.js', '.github/workflows/replay-fixture-fix.yml', 'THREAT_MODEL.md', 'wrangler.jsonc']) {
+  for (const path of ['src/sandbox.js', 'src/public-ledger.js', 'src/fix-policy.js', 'test/sandbox.test.js', '.github/workflows/replay-fixture-fix.yml', 'THREAT_MODEL.md', 'wrangler.jsonc', 'package.json', 'package-lock.json']) {
     const hostile = `${patch}\ndiff --git a/${path} b/${path}\n--- a/${path}\n+++ b/${path}\n@@ -1 +1 @@\n-old\n+weakened\n`;
     assert.throws(() => validateFixPatch({ patch: hostile, baseRevision: revision, expectedBaseRevision: revision }), /protected path/);
   }

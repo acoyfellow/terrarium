@@ -31,6 +31,12 @@ test('public ledger redacts copied text and requires distinct replay identity', 
   assert.deepEqual(Object.keys(turn.healing).sort(), ['issueUrl', 'mergedRevision', 'prUrl', 'status']);
 });
 
+test('public ledger removes encoded secret material', () => {
+  const encoded = Buffer.from('SUPER_SECRET_CANARY').toString('base64');
+  const turn = publicTurnFromReceipt({ ...receipt, observed: encoded }, { hypothesis: `split:${encoded.slice(0, 8)}${encoded.slice(8)}`, sourceRevision: 'a'.repeat(40) });
+  assert.equal(JSON.stringify(turn).includes(encoded), false);
+});
+
 test('public ledger rejects fixture receipts and counts real turns', () => {
   assert.throws(() => publicTurnFromReceipt({ ...receipt, fixture: true }), /real receipts only/);
   const contained = publicTurnFromReceipt(receipt);

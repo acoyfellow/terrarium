@@ -14,7 +14,7 @@ test('classifies interpreter proxy as clarification, not product escape', () => 
 test('fresh replay produces immutable evidence and dedupe', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'terra-findings-'));
   try {
-    const finding = await verifyProbeFinding('encoding-evasion-leak', { findingDir: dir, traceRunId: 'ter_trace' });
+    const finding = await verifyProbeFinding('interpreter-proxy-exec', { findingDir: dir, traceRunId: 'ter_trace' });
     assert.equal(finding.verdict, 'verified-escape');
     assert.equal(finding.fixture, false);
     assert.match(finding.evidenceDigest, /^[a-f0-9]{64}$/);
