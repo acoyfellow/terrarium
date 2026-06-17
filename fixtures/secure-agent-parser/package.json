@@ -1,0 +1,1 @@
+{"name":"secure-agent-parser-fixture","private":true,"type":"module","scripts":{"test":"node --test"}}

@@ -1,0 +1,18 @@
+export const SECURE_PROFILE = Object.freeze({
+  id: "secure-v1",
+  image: "node:22-alpine",
+  network: "none",
+  rootFilesystem: "read-only",
+  user: "65534:65534",
+  capabilities: "drop-all",
+  noNewPrivileges: true,
+  workspace: "rw,noexec,nosuid,size=64m",
+  tmp: "rw,noexec,nosuid,size=16m",
+  pids: 32,
+  memory: "512m",
+  cpus: "1",
+  timeoutMs: 300000,
+  maxOutputBytes: 65536,
+  childBudget: 1,
+  maxDepth: 2,
+});

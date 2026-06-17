@@ -21,6 +21,7 @@ one bounded task → one child run → one inspectable result
 | Ask an agent to initiate a bounded containment test. | `terra attack <scenario>` | Implemented, deliberately constrained |
 | Turn a reproduced escape into reviewable report text. | `terra campaign issue-draft <id>` | Local-only; does not publish |
 | Validate repository work inside the hardened profile. | `terra secure "run the repository tests"` | secure-v1, opt-in |
+| Wrap Pi around a secure workspace without giving it host tools. | `terra secure-agent --model <id> "fix the bug"` | Node fixture vertical slice |
 | Replay the permanent attack corpus before release. | `terra hardening verify` | Implemented |
 | Inspect real attempts, findings, fixes, and safe traces. | [`terrarium.coey.dev`](https://terrarium.coey.dev) | Live |
 
@@ -37,7 +38,7 @@ npm run demo:smoke    # local smoke check
 npm run deploy        # personal Cloudflare account + custom domain
 ```
 
-Start here for the full system model: [Architecture](./docs/ARCHITECTURE.md).
+Start here for the full system model: [Architecture](./docs/ARCHITECTURE.md). See the [secure-agent proof](./docs/SECURE_AGENT_PROOF.md) and [landscape research](./docs/SECURE_AGENT_LANDSCAPE.md).
 
 ## Quick start: ordinary delegation
 

@@ -36,3 +36,15 @@ terra secure "run the repository tests"
 ```
 
 Read the JSON receipt. A successful task is not sufficient on its own: `teardownVerified` and the recorded profile are part of the result.
+
+## Secure agent wrapper
+
+```sh
+terra secure-agent --model <model-id> --cwd ./repo "fix the failing parser test"
+```
+
+Pi remains the agent and model transport on the host. Terrarium launches it with built-in tools disabled and a run-scoped code-mode MCP. Agent-authored orchestration runs in QuickJS and can call only `list_files`, `read_file`, `search_text`, `write_file`, `run_tests`, and `get_diff` inside the disposable secure-v1 container. `finish` stays a native explicit action.
+
+The receipt includes only the safe tool audit, final summary, test result, diff, source revision, and teardown proof. Provider/model identity and raw Pi events remain private.
+
+Current scope: one proven dependency-free Node fixture. Package installation, network use, arbitrary shell, binary edits, and broad repository compatibility remain unsupported.
