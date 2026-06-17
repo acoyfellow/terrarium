@@ -62,9 +62,22 @@ Every public event is allowlisted and bounded. Raw model transcripts, private pr
 
 Independent attacks may run in bounded parallel pools against one pinned revision. Strategy rounds are separated by a memory barrier. Fixes may be generated concurrently but merge serially; every stale fix must replay against the current head.
 
+## Secure agent composition
+
+```text
+Pi (model transport; no built-in host tools)
+  → run-scoped MCP: search + execute + finish
+  → QuickJS code-mode orchestration
+  → allowlisted Terrarium workspace capabilities
+  → disposable secure-v1 Docker workspace
+  → tests + diff + receipt + teardown
+```
+
+Terrarium remains the wrapper and capability broker; Pi remains the agent. Model credentials never enter Docker.
+
 ## Current limits
 
-- secure-v1 supports bounded repository validation tasks, not a full coding agent yet.
+- secure-agent is proven on one dependency-free Node bug-fix fixture, not broad coding workloads yet.
 - Docker/Lab provide the execution boundary; copy/worktree alone do not.
 - GitHub required-check integration still needs a dedicated publisher identity.
 - Public traces are safe event streams, never raw chain-of-thought.

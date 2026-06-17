@@ -25,6 +25,14 @@
     "demo:smoke": "node scripts/smoke-demo.mjs",
     "deploy": "vite build && wrangler deploy"
   },
+  "files": [
+    "src",
+    "docs/SECURE_V1.md",
+    "docs/ARCHITECTURE.md",
+    "docs/SECURE_AGENT_PROOF.md",
+    "docs/SECURE_AGENT_LANDSCAPE.md",
+    "fixtures/secure-agent-parser"
+  ],
   "keywords": [
     "agent",
     "orchestrator",
@@ -42,5 +50,9 @@
   },
   "exports": {
     ".": "./src/core.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.29.0",
+    "mcp-code-mode": "github:acoyfellow/mcp-code-mode#f27af39d5aa020200f712f222c02d682c7ab9c2a"
   }
 }

@@ -11,6 +11,7 @@ import { buildCampaignMemory } from "./campaign-memory.js";
 import { generatePlans } from "./campaign-strategist.js";
 import { runSecureTask } from "./secure.js";
 import { verifyHardening } from "./hardening.js";
+import { runSecureAgent } from "./secure-agent.js";
 
 function help() {
   return `terrarium ${VERSION}
@@ -39,6 +40,7 @@ Usage:
   terra campaign local [--scenarios a,b,c] [--agent "pi -p --no-session"] [--model <id>]
   terra campaign strategize [--turns 8] [--model <id>]
   terra secure "task"
+  terra secure-agent --model <id> "task"
   terra hardening verify
   terra campaign read <campaignId>
   terra campaign verify <campaignId>
@@ -129,6 +131,7 @@ else if (cmd === "attack") runAttackExperiment({ scenarioId: rest[0], agent: opt
   console.log(JSON.stringify(result, null, 2));
   process.exit(result.verdict === "inconclusive" ? 1 : 0);
 }).catch((e) => { console.error(`terrarium: ${e.message}`); process.exit(1); });
+else if (cmd === "secure-agent") runSecureAgent({ task: rest.join(" "), cwd: opts.cwd, model: opts.model, timeoutMs: opts.timeoutMs || undefined }).then((result) => console.log(JSON.stringify(result, null, 2))).catch((e) => { console.error(`terrarium: ${e.message}`); process.exit(1); });
 else if (cmd === "secure") runSecureTask({ task: rest.join(" "), cwd: opts.cwd, timeoutMs: opts.timeoutMs || undefined }).then((result) => console.log(JSON.stringify(result, null, 2))).catch((e) => { console.error(`terrarium: ${e.message}`); process.exit(1); });
 else if (cmd === "hardening" && rest[0] === "verify") verifyHardening({ cwd: opts.cwd }).then((result) => { console.log(JSON.stringify(result, null, 2)); process.exit(result.ok ? 0 : 1); }).catch((e) => { console.error(`terrarium: ${e.message}`); process.exit(1); });
 else if (cmd === "scenarios") console.log(JSON.stringify(scenarioCatalog(), null, 2));
