@@ -53,6 +53,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
+    "effect": "^3.21.3",
     "mcp-code-mode": "github:acoyfellow/mcp-code-mode#f27af39d5aa020200f712f222c02d682c7ab9c2a"
   }
 }
