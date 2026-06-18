@@ -518,10 +518,27 @@ export async function runTerrarium(opts = {}) {
 
 export async function listRuns({ limit = 20 } = {}) {
   await mkdir(LOG_DIR, { recursive: true });
-  const files = (await readdir(LOG_DIR)).filter((f) => f.endsWith(".json")).sort().reverse().slice(0, limit);
-  const runs = [];
-  for (const file of files) runs.push(await reconcileRun(JSON.parse(await readFile(join(LOG_DIR, file), "utf8"))));
-  return { version: VERSION, logDir: LOG_DIR, runs };
+  // Background supervisor specs also end in .json but are not run metadata.
+  // Read only canonical run files and ignore malformed/non-run records.
+  const files = (await readdir(LOG_DIR))
+    .filter((f) => f.endsWith(".json") && !f.endsWith(".background.json"))
+    .sort().reverse();
+  const allRuns = [];
+  for (const file of files) {
+    try {
+      const run = await reconcileRun(JSON.parse(await readFile(join(LOG_DIR, file), "utf8")));
+      if (run?.runId && run?.status) allRuns.push(run);
+    } catch {}
+  }
+  const active = allRuns.filter((run) => run.status === "running" && run.alive !== false);
+  return {
+    version: VERSION,
+    logDir: LOG_DIR,
+    activeCount: active.length,
+    activeRunIds: active.map((run) => run.runId),
+    count: Math.min(allRuns.length, Math.max(0, Number(limit) || 20)),
+    runs: allRuns.slice(0, Math.max(0, Number(limit) || 20)),
+  };
 }
 
 async function recordedLogPath({ runId, logPath, kind }) {

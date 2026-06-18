@@ -116,7 +116,7 @@ const opts = parse(process.argv.slice(2));
 const [cmd, ...rest] = opts.task;
 if (opts.help) console.log(help());
 else if (opts.version) console.log(VERSION);
-else if (cmd === "status" && rest[0]) getRunStatus({ runId: rest[0] }).then((r) => console.log(JSON.stringify(r, null, 2)));
+else if (cmd === "status" && rest[0]?.startsWith("ter_")) getRunStatus({ runId: rest[0] }).then((r) => console.log(JSON.stringify(r, null, 2)));
 else if (cmd === "status") listRuns({ limit: Number(rest[0] || 20) }).then((r) => console.log(JSON.stringify(r, null, 2)));
 else if (cmd === "read") readRun({ runId: rest[0], tailBytes: Number(rest[1] === "mre" ? rest[2] || 20000 : rest[1] || 20000), kind: rest[1] === "mre" ? "mre" : "terrarium" }).then((r) => console.log(r.text));
 else if (cmd === "probe") runSandboxScenario({ scenarioId: rest[0], image: opts.image, unsafeNetwork: opts.unsafeNetwork }).then((result) => {
