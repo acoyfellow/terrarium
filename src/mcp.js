@@ -115,6 +115,8 @@ export function conciseListing(full) {
   if (!full || !Array.isArray(full.runs)) return full;
   return {
     count: full.runs.length,
+    activeCount: Number(full.activeCount ?? 0),
+    activeRunIds: Array.isArray(full.activeRunIds) ? full.activeRunIds : [],
     runs: full.runs.map((r) => defined({
       runId: r.runId,
       status: r.status,

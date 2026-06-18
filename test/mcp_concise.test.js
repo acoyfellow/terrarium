@@ -146,6 +146,8 @@ test("conciseListing returns count + per-run triage with task truncated", () => 
   const full = {
     version: "0.0.1",
     logDir: "/Users/x/.terrarium/runs",
+    activeCount: 1,
+    activeRunIds: ["d"],
     runs: [
       { runId: "a", status: "done", model: "kindle-alpha", ok: true, exitCode: 0, task: "short", startedAt: "t1", finishedAt: "t2" },
       { runId: "b", status: "failed", ok: false, exitCode: 1, error: "boom", task: longTask, startedAt: "t3", finishedAt: "t4" },
@@ -154,6 +156,8 @@ test("conciseListing returns count + per-run triage with task truncated", () => 
   };
   const projected = conciseListing(full);
   assert.equal(projected.count, 3);
+  assert.equal(projected.activeCount, 1);
+  assert.deepEqual(projected.activeRunIds, ["d"]);
   assert.equal(projected.runs.length, 3);
   assert.equal(projected.runs[0].task, "short");
   assert.equal(projected.runs[0].model, "kindle-alpha");
