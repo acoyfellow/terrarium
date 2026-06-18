@@ -5,6 +5,7 @@ import { homedir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { publishEvent, eventForRun, TerrariumEventType } from "./event-runtime.js";
+import { routeEvent } from "./router.js";
 
 export const VERSION = "0.0.1";
 export const HOME = join(homedir(), ".terrarium");
@@ -321,7 +322,9 @@ async function emitProgressEvent(run, text) {
   try {
     const channel = run.channel ?? process.env.TERRARIUM_EVENT_CHANNEL;
     const event = { type: "terrarium.progress", runId: run.runId, cwd: run.originalCwd ?? run.cwd, task: run.task, text, at: new Date().toISOString(), channel: channel ?? null };
-    await publishEvent(eventForRun(TerrariumEventType.Progress, run, { text }));
+    const typed = eventForRun(TerrariumEventType.Progress, run, { text, channel: run.channel ?? basename(run.originalCwd ?? run.cwd) });
+    await publishEvent(typed);
+    await routeEvent(typed);
     if (!channel) return;
     const dir = join(EVENT_DIR, channel);
     await mkdir(dir, { recursive: true });
@@ -345,7 +348,9 @@ async function emitCompletionEvent(result) {
       logPath: result.logPath,
       channel: channel ?? null,
     };
-    await publishEvent(eventForRun(result.ok ? TerrariumEventType.Completed : TerrariumEventType.Failed, result));
+    const typed = eventForRun(result.ok ? TerrariumEventType.Completed : TerrariumEventType.Failed, result, { channel: result.channel ?? basename(result.originalCwd ?? result.cwd) });
+    await publishEvent(typed);
+    await routeEvent(typed);
     if (!channel) return;
     const dir = join(EVENT_DIR, channel);
     await mkdir(dir, { recursive: true });
