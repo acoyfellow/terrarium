@@ -36,6 +36,7 @@ export function eventForRun(type, run, extra = {}) {
     task: run.task,
     workflowId: run.workflowId ?? run.parentRunId ?? run.runId,
     sessionId: run.sessionId ?? null,
+    channel: run.channel ?? process.env.TERRARIUM_EVENT_CHANNEL ?? null,
     at: new Date().toISOString(),
     ...extra,
   };
