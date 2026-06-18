@@ -4,12 +4,14 @@ import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { publishEvent, eventForRun, TerrariumEventType } from "./event-runtime.js";
 
 export const VERSION = "0.0.1";
 export const HOME = join(homedir(), ".terrarium");
 export const LOG_DIR = join(HOME, "runs");
 export const CONFIG_PATH = join(HOME, "config.json");
 export const WORKSPACE_DIR = join(HOME, "workspaces");
+export const EVENT_DIR = join(HOME, "events");
 
 export function splitCommand(command) {
   return command.match(/(?:[^\s"']+|"[^"]*"|'[^']*')+/g)?.map((s) => s.replace(/^[']|[']$/g, "").replace(/^[\"]|[\"]$/g, "")) ?? [];
@@ -315,9 +317,39 @@ async function prepareRun(opts = {}) {
   return { run, parts, prompt, base, workspace };
 }
 
+async function emitProgressEvent(run, text) {
+  try {
+    await mkdir(EVENT_DIR, { recursive: true });
+    const event = { type: "terrarium.progress", runId: run.runId, cwd: run.originalCwd ?? run.cwd, task: run.task, text, at: new Date().toISOString() };
+    await publishEvent(eventForRun(TerrariumEventType.Progress, run, { text }));
+    await writeFile(join(EVENT_DIR, `${run.runId}.progress.json`), `${JSON.stringify(event)}\n`);
+  } catch {}
+}
+
+async function emitCompletionEvent(result) {
+  try {
+    await mkdir(EVENT_DIR, { recursive: true });
+    const event = {
+      type: "terrarium.completed",
+      runId: result.runId,
+      status: result.status,
+      ok: result.ok,
+      exitCode: result.exitCode,
+      signal: result.signal ?? null,
+      cwd: result.originalCwd ?? result.cwd,
+      task: result.task,
+      finishedAt: result.finishedAt,
+      logPath: result.logPath,
+    };
+    await publishEvent(eventForRun(result.ok ? TerrariumEventType.Completed : TerrariumEventType.Failed, result));
+    await writeFile(join(EVENT_DIR, `${result.runId}.json`), `${JSON.stringify(event)}\n`, { flag: "wx" });
+  } catch {}
+}
+
 async function finishRun(base, patch) {
   const result = { ...base, ...patch, finishedAt: patch.finishedAt ?? new Date().toISOString() };
   await writeMetadata(result);
+  await emitCompletionEvent(result);
   return result;
 }
 
@@ -377,6 +409,18 @@ export async function superviseTerrariumBackground({ run, parts, prompt, base, w
     let stdout = "";
     let stderr = "";
     let settled = false;
+    let lastProgressAt = 0;
+    let progressBuffer = "";
+    void emitProgressEvent(run, 'started');
+    const progress = async (s) => {
+      progressBuffer += s;
+      const now = Date.now();
+      if (now - lastProgressAt < 5000) return;
+      lastProgressAt = now;
+      const lines = progressBuffer.trim().split(/\r?\n/).filter(Boolean);
+      progressBuffer = "";
+      if (lines.length) await emitProgressEvent(run, lines.slice(-3).join("\n"));
+    };
     const finish = async (patch) => {
       if (settled) return;
       settled = true;
@@ -386,8 +430,8 @@ export async function superviseTerrariumBackground({ run, parts, prompt, base, w
       if (specPath) await rm(specPath, { force: true });
       resolveRun(result);
     };
-    child.stdout.on("data", async (d) => { const s = String(d); stdout += s; await log(run.logPath, s); });
-    child.stderr.on("data", async (d) => { const s = String(d); stderr += s; await log(run.logPath, s); });
+    child.stdout.on("data", async (d) => { const s = String(d); stdout += s; await log(run.logPath, s); await progress(s); });
+    child.stderr.on("data", async (d) => { const s = String(d); stderr += s; await log(run.logPath, s); await progress(s); });
     child.on("error", async (e) => {
       await log(run.logPath, `\nerror: ${e.message}\n`);
       await finish({ ok: false, status: "error", exitCode: 127, error: e.message });
