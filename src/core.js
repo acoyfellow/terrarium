@@ -424,6 +424,7 @@ export async function superviseTerrariumBackground({ run, parts, prompt, base, w
     let lastProgressAt = 0;
     let progressBuffer = "";
     void emitProgressEvent(run, 'started');
+    const heartbeat = setInterval(() => { void emitProgressEvent(run, 'running'); }, 3000);
     const progress = async (s) => {
       progressBuffer += s;
       const now = Date.now();
@@ -437,6 +438,7 @@ export async function superviseTerrariumBackground({ run, parts, prompt, base, w
       if (settled) return;
       settled = true;
       if (timer) clearTimeout(timer);
+      clearInterval(heartbeat);
       const ws = await finalizeWorkspace(workspace, base);
       const result = await finishRun(base, { background: true, pid: child.pid, childPid: child.pid, supervisorPid: process.pid, stdoutTail: tail(stdout), stderrTail: tail(stderr), ...patch, ...ws });
       if (specPath) await rm(specPath, { force: true });
