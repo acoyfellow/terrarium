@@ -342,13 +342,21 @@ async function emitCompletionEvent(result) {
       ok: result.ok,
       exitCode: result.exitCode,
       signal: result.signal ?? null,
+      dryRun: result.dryRun === true,
       cwd: result.originalCwd ?? result.cwd,
       task: result.task,
       finishedAt: result.finishedAt,
       logPath: result.logPath,
       channel: channel ?? null,
     };
-    const typed = eventForRun(result.ok ? TerrariumEventType.Completed : TerrariumEventType.Failed, result, { channel: result.channel ?? basename(result.originalCwd ?? result.cwd) });
+    const typed = eventForRun(result.ok ? TerrariumEventType.Completed : TerrariumEventType.Failed, result, {
+      channel: result.channel ?? basename(result.originalCwd ?? result.cwd),
+      status: result.status,
+      ok: result.ok,
+      exitCode: result.exitCode,
+      signal: result.signal ?? null,
+      dryRun: result.dryRun === true,
+    });
     await publishEvent(typed);
     await routeEvent(typed);
     if (!channel) return;
