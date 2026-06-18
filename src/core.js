@@ -319,16 +319,19 @@ async function prepareRun(opts = {}) {
 
 async function emitProgressEvent(run, text) {
   try {
-    await mkdir(EVENT_DIR, { recursive: true });
-    const event = { type: "terrarium.progress", runId: run.runId, cwd: run.originalCwd ?? run.cwd, task: run.task, text, at: new Date().toISOString() };
+    const channel = run.channel ?? process.env.TERRARIUM_EVENT_CHANNEL;
+    const event = { type: "terrarium.progress", runId: run.runId, cwd: run.originalCwd ?? run.cwd, task: run.task, text, at: new Date().toISOString(), channel: channel ?? null };
     await publishEvent(eventForRun(TerrariumEventType.Progress, run, { text }));
-    await writeFile(join(EVENT_DIR, `${run.runId}.progress.json`), `${JSON.stringify(event)}\n`);
+    if (!channel) return;
+    const dir = join(EVENT_DIR, channel);
+    await mkdir(dir, { recursive: true });
+    await writeFile(join(dir, `${run.runId}.progress.json`), `${JSON.stringify(event)}\n`);
   } catch {}
 }
 
 async function emitCompletionEvent(result) {
   try {
-    await mkdir(EVENT_DIR, { recursive: true });
+    const channel = result.channel ?? process.env.TERRARIUM_EVENT_CHANNEL;
     const event = {
       type: "terrarium.completed",
       runId: result.runId,
@@ -340,9 +343,13 @@ async function emitCompletionEvent(result) {
       task: result.task,
       finishedAt: result.finishedAt,
       logPath: result.logPath,
+      channel: channel ?? null,
     };
     await publishEvent(eventForRun(result.ok ? TerrariumEventType.Completed : TerrariumEventType.Failed, result));
-    await writeFile(join(EVENT_DIR, `${result.runId}.json`), `${JSON.stringify(event)}\n`, { flag: "wx" });
+    if (!channel) return;
+    const dir = join(EVENT_DIR, channel);
+    await mkdir(dir, { recursive: true });
+    await writeFile(join(dir, `${result.runId}.json`), `${JSON.stringify(event)}\n`, { flag: "wx" });
   } catch {}
 }
 
