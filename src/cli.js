@@ -22,7 +22,7 @@ The child agent may be Terrarium too, with depth guards.
 Usage:
   terra "task to run"
   terra --agent "opencode run" "task"
-  terra --agent "pi -p --no-session" --model kindle-alpha "task"
+  terra --agent "pi -p --no-session" --model <model-id> "task"
   terra --read-only "task"
   terra --profile minimal "task"
   terra --dry-run "task"

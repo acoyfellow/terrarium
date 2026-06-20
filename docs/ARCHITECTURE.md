@@ -7,6 +7,10 @@ terra "task"          cooperative one-child delegation (stable compatibility sur
 terra secure "task"   hostile/untrusted secure-v1 validation profile
 ```
 
+## Ordinary-run isolation
+
+Parallel top-level runs keep separate metadata/logs and may execute concurrently. Each child receives a lineage-scoped capability policy: minimal/max-depth-one runs have no recursive spawn and self-only status/read; explicitly nested runs may see descendants but not siblings. MCP results require a run/task-correlated receipt, so process success is not automatically task success. See [CONCURRENCY_ISOLATION.md](./CONCURRENCY_ISOLATION.md).
+
 ## Seven-minute model
 
 ```text

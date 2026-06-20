@@ -38,7 +38,7 @@ npm run demo:smoke    # local smoke check
 npm run deploy        # personal Cloudflare account + custom domain
 ```
 
-Start here for the full system model: [Architecture](./docs/ARCHITECTURE.md). See the [secure-agent proof](./docs/SECURE_AGENT_PROOF.md) and [landscape research](./docs/SECURE_AGENT_LANDSCAPE.md).
+Start here for the full system model: [Architecture](./docs/ARCHITECTURE.md). See [concurrency and context isolation](./docs/CONCURRENCY_ISOLATION.md), the [secure-agent proof](./docs/SECURE_AGENT_PROOF.md), and [landscape research](./docs/SECURE_AGENT_LANDSCAPE.md).
 
 ## Quick start: ordinary delegation
 
@@ -270,7 +270,7 @@ Manual adaptive campaigns are available behind controller authentication and dis
 TERRARIUM_CONTROL_TOKEN=... \
 TERRARIUM_CONTROLLER_URL=https://terrarium-control.coy.workers.dev \
 terra hostile run lab-env-canary --turns 3 \
-  --agent "pi -p --no-session" --model kindle-alpha
+  --agent "pi -p --no-session" --model <model-id>
 ```
 
 Each turn accepts one machine-parsed payload, validates it against the zero-capability/4 KB policy, executes it in Lab, returns sanitized feedback, and stops early only on a fresh replayed escape. Issue publication, fix PRs, and auto-merge remain disabled for this manual path.
@@ -298,11 +298,11 @@ Design and trust boundaries: [THREAT_MODEL.md](./THREAT_MODEL.md), [docs/AUTONOM
 
 ```sh
 # Choose a child runner and pin its model
-terra --agent "pi -p --no-session" --model kindle-alpha "fix the failing build"
+terra --agent "pi -p --no-session" --model <model-id> "fix the failing build"
 terra --agent "opencode run" --model anthropic/claude-sonnet-4-6 "add tests"
 
 # Or configure defaults once
-TERRARIUM_AGENT="pi -p --no-session" TERRARIUM_MODEL="kindle-alpha" terra "add tests for the parser"
+TERRARIUM_AGENT="pi -p --no-session" TERRARIUM_MODEL="<model-id>" terra "add tests for the parser"
 
 # Prefer a smaller read-only child for research
 terra --read-only "find every place we handle X"
@@ -356,7 +356,7 @@ Config at `~/.terrarium/config.json`:
 {
   "defaultAgent": "pi -p --no-session",
   "readOnlyAgent": "pi -p --no-session --tools read,grep,find,ls",
-  "defaultModel": "kindle-alpha",
+  "defaultModel": "<model-id>",
   "maxDepth": 3,
   "timeoutMs": 900000
 }
@@ -369,7 +369,7 @@ Config at `~/.terrarium/config.json`:
   "name": "terrarium_spawn",
   "arguments": {
     "task": "inspect this repo and summarize the test command",
-    "model": "kindle-alpha",
+    "model": "<model-id>",
     "readOnly": true,
     "profile": "minimal",
     "cwd": "/path/to/repo",
@@ -394,7 +394,7 @@ Spawn and status default to concise responses so parent transcripts stay small. 
 
 ## How ordinary delegation works
 
-Terrarium starts exactly one child process per run. For ordinary delegation, children inherit parent environment and available MCP configuration. Terrarium records the resolved runner and model with logs/metadata and sets lineage values including `TERRARIUM_RUN_ID`, `TERRARIUM_DEPTH`, `TERRARIUM_MAX_DEPTH`, and `TERRARIUM_MRE_LOG_PATH`.
+Terrarium starts exactly one child process per run. For ordinary delegation, children inherit host execution authority, but Terrarium MCP/CLI capabilities are now scoped by run lineage. Minimal or max-depth-one children cannot spawn Terrarium recursively and can inspect only their own status/logs; explicitly nested runs may inspect their descendants, never siblings. MCP children must return a run/task-correlated receipt before exit zero is accepted as task success. Terrarium records the resolved runner and model with logs/metadata and sets lineage/capability values including `TERRARIUM_RUN_ID`, `TERRARIUM_DEPTH`, `TERRARIUM_MAX_DEPTH`, `TERRARIUM_ALLOW_SPAWN`, `TERRARIUM_STATUS_SCOPE`, `TERRARIUM_READ_SCOPE`, and `TERRARIUM_MRE_LOG_PATH`.
 
 That ordinary inheritance is convenient for cooperative work and precisely why it is not the hostile-run path.
 

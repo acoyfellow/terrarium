@@ -16,7 +16,7 @@ Existing delegation continues to mean ordinary one-child execution. Runner and m
 
 ```sh
 terra "task"
-terra --agent "pi -p --no-session" --model kindle-alpha "task"
+terra --agent "pi -p --no-session" --model <model-id> "task"
 terra --read-only "research task"
 terra --profile minimal "bounded dig"
 terra --isolation worktree "patch in a separate workspace"
@@ -62,8 +62,9 @@ Containment campaigns should compose these primitives or be implemented in new h
 - Existing prompt profiles (`default`, `minimal`) remain compatible.
 - Agent precedence remains explicit agent → configured read-only agent → environment default → config default → built-in OpenCode fallback.
 - Model precedence is explicit `model` → `TERRARIUM_MODEL` → `config.defaultModel` → runner default; model metadata remains inspectable in run/status receipts.
-- Existing environment lineage keys (`TERRARIUM_RUN_ID`, `TERRARIUM_PARENT_RUN_ID`, `TERRARIUM_DEPTH`, `TERRARIUM_MAX_DEPTH`, `TERRARIUM_MRE_LOG_PATH`) remain available for ordinary composed runs.
-- Existing metadata, log, patch, and workspace receipts remain inspectable through the stable status/read flow.
+- Existing environment lineage keys (`TERRARIUM_RUN_ID`, `TERRARIUM_PARENT_RUN_ID`, `TERRARIUM_DEPTH`, `TERRARIUM_MAX_DEPTH`, `TERRARIUM_MRE_LOG_PATH`) remain available for ordinary composed runs. Additive capability keys (`TERRARIUM_ALLOW_SPAWN`, `TERRARIUM_STATUS_SCOPE`, `TERRARIUM_READ_SCOPE`) prevent child runs from inspecting unrelated lineages.
+- Existing metadata, log, patch, and workspace receipts remain inspectable through the stable status/read flow by top-level callers. Child callers are restricted to self/descendant lineage unless the parent explicitly grants `all`.
+- MCP-spawned non-dry runs require a structured run/task receipt. Exit zero without correlation is returned as `inconclusive`/`ok:false`; concise and verbose response envelopes remain additive-compatible.
 - A campaign action must leave an ordinary Terrarium run ID and receipt behind.
 
 ## Security boundary distinction

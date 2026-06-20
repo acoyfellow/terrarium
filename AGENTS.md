@@ -31,6 +31,8 @@ Call `terrarium_spawn` when the subtask would pollute your context. Good signals
 - Use `model` when a child must be pinned. For an ephemeral Pi child, use `agent: "pi -p --no-session"`; configure `readOnlyAgent` separately when read-only work should use Pi or another runner.
 - For anything that may take >60s, pass `background: true` and poll with `terrarium_status` / `terrarium_read`. MCP calls held open will time out.
 - Treat the child's summary as a claim, not a fact. Verify file paths, commands, and exit codes before acting.
+- MCP children must return Terrarium's run/task receipt. A zero exit with a missing or mismatched receipt is `inconclusive`, not success.
+- Minimal and max-depth-one children do not receive recursive spawn authority and cannot inspect sibling runs. Do the delegated task directly instead of querying Terrarium orchestration state.
 
 ## Containment honesty
 
