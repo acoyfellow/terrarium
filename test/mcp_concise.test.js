@@ -34,6 +34,7 @@ test("conciseSpawn drops envelope and keeps failure-triage fields", () => {
     signal: null,
     error: "child died",
     note: "supervisor saw EIO",
+    taskContractStatus: "mismatch",
     stdoutTail: "out",
     stderrTail: "err",
   };
@@ -45,6 +46,7 @@ test("conciseSpawn drops envelope and keeps failure-triage fields", () => {
   assert.equal(projected.exitCode, 17);
   assert.equal(projected.error, "child died");
   assert.equal(projected.note, "supervisor saw EIO");
+  assert.equal(projected.taskContractStatus, "mismatch");
   assert.equal(projected.startedAt, "2026-05-19T19:00:00.000Z");
   assert.equal(projected.finishedAt, "2026-05-19T19:00:01.000Z");
   assert.equal(projected.tail, "out");
@@ -149,7 +151,7 @@ test("conciseListing returns count + per-run triage with task truncated", () => 
     activeCount: 1,
     activeRunIds: ["d"],
     runs: [
-      { runId: "a", status: "done", model: "kindle-alpha", ok: true, exitCode: 0, task: "short", startedAt: "t1", finishedAt: "t2" },
+      { runId: "a", status: "done", model: "test-model", ok: true, exitCode: 0, task: "short", startedAt: "t1", finishedAt: "t2" },
       { runId: "b", status: "failed", ok: false, exitCode: 1, error: "boom", task: longTask, startedAt: "t3", finishedAt: "t4" },
       { runId: "c", status: "orphaned", background: true, alive: false, logAgeMs: 1234, orphanedAt: "t6", task: "ongoing", startedAt: "t5" },
     ],
@@ -160,7 +162,7 @@ test("conciseListing returns count + per-run triage with task truncated", () => 
   assert.deepEqual(projected.activeRunIds, ["d"]);
   assert.equal(projected.runs.length, 3);
   assert.equal(projected.runs[0].task, "short");
-  assert.equal(projected.runs[0].model, "kindle-alpha");
+  assert.equal(projected.runs[0].model, "test-model");
   assert.ok(projected.runs[1].task.endsWith("..."));
   assert.ok(projected.runs[1].task.length <= 80);
   assert.equal(projected.runs[1].error, "boom");

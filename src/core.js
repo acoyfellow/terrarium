@@ -1,5 +1,6 @@
 import { spawn } from "node:child_process";
-import { appendFile, cp, mkdir, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
+import { createHash, randomUUID } from "node:crypto";
+import { appendFile, cp, mkdir, readFile, readdir, rm, rmdir, stat, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
@@ -26,6 +27,24 @@ export const PROMPT_PROFILES = ["default", "minimal"];
 export const DEFAULT_PROMPT_PROFILE = "default";
 
 export const READ_ONLY_AGENT = "opencode run --agent explore";
+export const ACCESS_SCOPES = ["self", "descendants", "all"];
+
+function envBoolean(value) {
+  if (value == null || value === "") return null;
+  if (value === true || value === "true" || value === "1") return true;
+  if (value === false || value === "false" || value === "0") return false;
+  throw new Error("invalid boolean capability value");
+}
+
+function accessScope(value, fallback) {
+  const scope = value || fallback;
+  if (!ACCESS_SCOPES.includes(scope)) throw new Error(`invalid Terrarium access scope: ${scope}`);
+  return scope;
+}
+
+export function taskFingerprint(task) {
+  return createHash("sha256").update(String(task)).digest("hex").slice(0, 24);
+}
 
 export function resolveModel({ model } = {}, { env = process.env, config = {} } = {}) {
   return model || env.TERRARIUM_MODEL || config.defaultModel || null;
@@ -77,12 +96,14 @@ export function resolveAgent({ agent, readOnly } = {}, { env = process.env, conf
 }
 
 export function childPrompt(task, opts = {}) {
-  const { depth, maxDepth, runId, parentRunId, profile } = opts;
+  const { depth, maxDepth, runId, parentRunId, profile, allowSpawn = true, taskContract } = opts;
   const resolved = resolvePromptProfile(profile);
+  const contract = taskContract ? `\nYour final output MUST include exactly one line:\nTERRARIUM_RESULT=${JSON.stringify({ runId: taskContract.runId, taskFingerprint: taskContract.taskFingerprint, nonce: taskContract.nonce, summary: "brief task-specific result" })}` : "";
   if (resolved === "minimal") {
-    return `Terrarium child. Single bounded task. Do not spawn subagents.
+    return `Terrarium child. Single bounded task. Do not spawn subagents.\n${allowSpawn ? "One explicit Terrarium child call is available only if the task requires it." : "Terrarium recursion is disabled; do not call Terrarium tools."}
 
-Reply with: Summary, Changed files, Verification.
+Do the assigned task directly. Do not inspect unrelated Terrarium runs, callbacks, logs, or other agents.
+Reply with: Summary, Changed files, Verification.${contract}
 
 Task:
 ${task}`;
@@ -90,8 +111,9 @@ ${task}`;
   return `You are a Terrarium child agent.
 
 Rules:
-- Complete exactly the delegated task.
-- You may call Terrarium at most once.
+- Complete exactly the delegated task directly.
+- ${allowSpawn ? "You may call Terrarium at most once." : "Terrarium recursion is disabled; do not call Terrarium tools."}
+- Do not inspect unrelated Terrarium runs, callbacks, logs, or other agents.
 - Do not fan out.
 - Current Terrarium depth: ${depth ?? 1}/${maxDepth ?? 3}.
 - Run ID: ${runId ?? "unknown"}.
@@ -101,7 +123,7 @@ Return in this shape:
 Summary:
 Changed files:
 Verification:
-Follow-ups:
+Follow-ups:${contract}
 
 Task:
 ${task}`;
@@ -214,7 +236,23 @@ function buildRun(opts, config) {
   const keepWorkspace = Boolean(opts.keepWorkspace ?? config.keepWorkspace ?? false);
   const logPath = opts.logPath ? confinedLogPath(opts.logPath) : opts.logPath;
   const mreLogPath = opts.mreLogPath ? confinedLogPath(opts.mreLogPath, "MRE log path") : opts.mreLogPath;
-  return { runId, parentRunId, depth, maxDepth, agent, model, profile, readOnly, timeoutMs, task, dryRun, cwd, originalCwd: cwd, stream, logPath, mreLogPath, isolation, keepWorkspace };
+  const inheritedAllowSpawn = envBoolean(process.env.TERRARIUM_ALLOW_SPAWN);
+  const requestedAllowSpawn = envBoolean(opts.allowSpawn ?? config.allowSpawn);
+  if (inheritedAllowSpawn === false && requestedAllowSpawn === true) throw new Error("child cannot enable inherited Terrarium spawn capability");
+  const callerSpawnAllowed = inheritedAllowSpawn !== false;
+  const allowSpawn = requestedAllowSpawn ?? (profile !== "minimal" && depth < maxDepth);
+  const inheritedStatusScope = process.env.TERRARIUM_STATUS_SCOPE;
+  const inheritedReadScope = process.env.TERRARIUM_READ_SCOPE;
+  const requestedStatusScope = accessScope(opts.statusScope ?? config.statusScope, inheritedStatusScope || (allowSpawn ? "descendants" : "self"));
+  const requestedReadScope = accessScope(opts.readScope ?? config.readScope, inheritedReadScope || (allowSpawn ? "descendants" : "self"));
+  const scopeRank = (scope) => ACCESS_SCOPES.indexOf(scope);
+  if (inheritedStatusScope && scopeRank(requestedStatusScope) > scopeRank(accessScope(inheritedStatusScope, "self"))) throw new Error("child cannot widen inherited status scope");
+  if (inheritedReadScope && scopeRank(requestedReadScope) > scopeRank(accessScope(inheritedReadScope, "self"))) throw new Error("child cannot widen inherited read scope");
+  const statusScope = inheritedStatusScope ? accessScope(inheritedStatusScope, "self") : requestedStatusScope;
+  const readScope = inheritedReadScope ? accessScope(inheritedReadScope, "self") : requestedReadScope;
+  const requireTaskContract = Boolean(opts.requireTaskContract ?? config.requireTaskContract ?? false);
+  const taskContract = requireTaskContract ? { runId, taskFingerprint: taskFingerprint(task), nonce: randomUUID() } : null;
+  return { runId, parentRunId, depth, maxDepth, agent, model, profile, readOnly, timeoutMs, task, dryRun, cwd, originalCwd: cwd, stream, logPath, mreLogPath, isolation, keepWorkspace, callerSpawnAllowed, allowSpawn, statusScope, readScope, requireTaskContract, taskContract };
 }
 
 async function workspaceExcludes() {
@@ -285,23 +323,31 @@ export async function finalizeWorkspace(workspace, resultPatch) {
 }
 
 async function claimChildSlot(run) {
-  if (!run.parentRunId) return;
+  if (!run.parentRunId) return null;
   const budget = Number(process.env.TERRARIUM_CHILD_BUDGET ?? 1);
   if (!Number.isInteger(budget) || budget < 0 || budget > 100) throw new Error("invalid Terrarium child budget");
   const claimsDir = join(LOG_DIR, `${run.parentRunId}.children`);
   await mkdir(claimsDir, { recursive: true });
   for (let slot = 1; slot <= budget; slot++) {
-    try { await writeFile(join(claimsDir, String(slot)), run.runId, { flag: "wx" }); return; } catch (error) { if (error.code !== "EEXIST") throw error; }
+    const claimPath = join(claimsDir, String(slot));
+    try { await writeFile(claimPath, run.runId, { flag: "wx" }); return claimPath; } catch (error) { if (error.code !== "EEXIST") throw error; }
   }
   throw new Error(`Terrarium child budget exceeded (${budget})`);
+}
+
+async function releaseChildSlot(claimPath) {
+  if (!claimPath) return;
+  await rm(claimPath, { force: true });
+  try { await rmdir(dirname(claimPath)); } catch {}
 }
 
 async function prepareRun(opts = {}) {
   const config = opts.config ?? await loadConfig();
   const run = buildRun(opts, config);
-  await claimChildSlot(run);
+  // All non-mutating validation must happen before a child slot is claimed.
   if (!run.task) throw new Error("missing task");
   if (run.depth > run.maxDepth) throw new Error(`Terrarium max depth exceeded (${run.depth}/${run.maxDepth})`);
+  if (run.parentRunId && !run.callerSpawnAllowed) throw new Error("Terrarium spawn capability denied for this child");
   const parts = splitCommand(run.agent);
   if (parts.length === 0) throw new Error("empty agent command");
   const workspace = await prepareWorkspace(run);
@@ -309,13 +355,25 @@ async function prepareRun(opts = {}) {
   run.logPath ??= await defaultLogPath(run.runId);
   run.mreLogPath ??= await defaultMreLogPath(run.runId);
   const startedAt = new Date().toISOString();
-  const base = { runId: run.runId, parentRunId: run.parentRunId, depth: run.depth, maxDepth: run.maxDepth, version: VERSION, agent: run.agent, model: run.model, profile: run.profile, readOnly: run.readOnly, task: run.task, cwd: run.cwd, originalCwd: run.originalCwd, isolation: run.isolation, workspace, logPath: run.logPath, mreLogPath: run.mreLogPath, startedAt, status: "running", git: await gitInfo(run.cwd) };
-  await writeMetadata(base);
-  const header = `terrarium ${VERSION}\nrun: ${run.runId}\nparent: ${run.parentRunId ?? "none"}\ndepth: ${run.depth}/${run.maxDepth}\nagent: ${run.agent}${run.readOnly ? " (read-only preset)" : ""}\nmodel: ${run.model ?? "runner default"}\nprofile: ${run.profile}\ntask: ${run.task}\ncwd: ${run.cwd}\noriginal cwd: ${run.originalCwd}\nisolation: ${run.isolation}${workspace ? ` (${workspace.path})` : ""}\nlog: ${run.logPath}\nmre log: ${run.mreLogPath}\n\n`;
-  if (run.stream) process.stdout.write(header);
-  await writeFile(run.logPath, header);
-  await writeFile(run.mreLogPath, "", { flag: "wx" });
-  return { run, parts, prompt, base, workspace };
+  const base = { runId: run.runId, parentRunId: run.parentRunId, depth: run.depth, maxDepth: run.maxDepth, version: VERSION, agent: run.agent, model: run.model, profile: run.profile, readOnly: run.readOnly, task: run.task, cwd: run.cwd, originalCwd: run.originalCwd, isolation: run.isolation, workspace, logPath: run.logPath, mreLogPath: run.mreLogPath, startedAt, status: "running", git: await gitInfo(run.cwd), allowSpawn: run.allowSpawn, statusScope: run.statusScope, readScope: run.readScope, taskFingerprint: run.taskContract?.taskFingerprint ?? taskFingerprint(run.task), taskContractStatus: run.requireTaskContract ? "pending" : "not-required", taskContract: run.taskContract };
+  let claimPath = null;
+  try {
+    claimPath = await claimChildSlot(run);
+    await writeMetadata(base);
+    const header = `terrarium ${VERSION}\nrun: ${run.runId}\nparent: ${run.parentRunId ?? "none"}\ndepth: ${run.depth}/${run.maxDepth}\nagent: ${run.agent}${run.readOnly ? " (read-only preset)" : ""}\nmodel: ${run.model ?? "runner default"}\nprofile: ${run.profile}\ntask: ${run.task}\ncwd: ${run.cwd}\noriginal cwd: ${run.originalCwd}\nisolation: ${run.isolation}${workspace ? ` (${workspace.path})` : ""}\nlog: ${run.logPath}\nmre log: ${run.mreLogPath}\n\n`;
+    if (run.stream) process.stdout.write(header);
+    await writeFile(run.logPath, header);
+    await writeFile(run.mreLogPath, "", { flag: "wx" });
+    return { run, parts, prompt, base, workspace, claimPath };
+  } catch (error) {
+    await releaseChildSlot(claimPath);
+    try { await rm(metadataPath(run.runId), { force: true }); } catch {}
+    try { await rm(run.logPath, { force: true }); } catch {}
+    if (workspace?.cleanup) {
+      try { workspace.type === "worktree" ? await removeWorktree(workspace) : await rm(workspace.path, { recursive: true, force: true }); } catch {}
+    }
+    throw error;
+  }
 }
 
 async function emitProgressEvent(run, text) {
@@ -366,8 +424,29 @@ async function emitCompletionEvent(result) {
   } catch {}
 }
 
+export function validateTaskContractOutput(output, expected) {
+  if (!expected) return { status: "not-required" };
+  const lines = String(output ?? "").split(/\r?\n/).filter((value) => value.trim().startsWith("TERRARIUM_RESULT="));
+  if (lines.length === 0) return { status: "missing" };
+  if (lines.length !== 1) return { status: "malformed" };
+  let receipt;
+  try { receipt = JSON.parse(lines[0].trim().slice("TERRARIUM_RESULT=".length)); }
+  catch { return { status: "malformed" }; }
+  if (receipt.runId !== expected.runId || receipt.taskFingerprint !== expected.taskFingerprint || receipt.nonce !== expected.nonce) return { status: "mismatch" };
+  if (typeof receipt.summary !== "string" || !receipt.summary.trim() || receipt.summary.length > 2000) return { status: "malformed" };
+  return { status: "verified", summary: receipt.summary.trim() };
+}
+
 async function finishRun(base, patch) {
-  const result = { ...base, ...patch, finishedAt: patch.finishedAt ?? new Date().toISOString() };
+  let result = { ...base, ...patch, finishedAt: patch.finishedAt ?? new Date().toISOString() };
+  if (patch.dryRun === true && base.taskContractStatus === "pending") result.taskContractStatus = "not-applicable";
+  else if (base.taskContractStatus === "pending") {
+    const contract = validateTaskContractOutput(result.stdoutTail, base.taskContract);
+    result.taskContractStatus = contract.status;
+    if (contract.summary) result.taskResultSummary = contract.summary;
+    if (contract.status !== "verified") result = { ...result, ok: false, status: result.exitCode === 0 ? "inconclusive" : result.status, note: `Task contract ${contract.status}; process exit is not accepted as task success.` };
+  }
+  delete result.taskContract;
   await writeMetadata(result);
   await emitCompletionEvent(result);
   return result;
@@ -413,13 +492,61 @@ export async function reconcileRun(meta, { staleMs = 30000 } = {}) {
   return { ...meta, alive, logAgeMs };
 }
 
-export async function getRunStatus({ runId, staleMs = 30000 } = {}) {
+export async function isRunAccessible({ requesterRunId, targetRunId, scope = "all" } = {}) {
+  accessScope(scope, "all");
+  if (!requesterRunId || scope === "all") return true;
+  assertRunId(requesterRunId); assertRunId(targetRunId);
+  if (requesterRunId === targetRunId) return true;
+  if (scope === "self") return false;
+  let current = targetRunId;
+  const seen = new Set();
+  while (current && !seen.has(current)) {
+    seen.add(current);
+    let meta; try { meta = await readMetadata(current); } catch { return false; }
+    if (meta.parentRunId === requesterRunId) return true;
+    current = meta.parentRunId;
+  }
+  return false;
+}
+
+async function assertRunAccessible(args) {
+  if (!(await isRunAccessible(args))) throw new Error(`run access denied by ${args.scope} scope`);
+}
+
+function effectiveAccess(requesterRunId, scope, envName) {
+  const inheritedRequester = process.env.TERRARIUM_RUN_ID || null;
+  if (inheritedRequester && requesterRunId && requesterRunId !== inheritedRequester) throw new Error("requester run id does not match inherited lineage");
+  const requester = inheritedRequester || requesterRunId;
+  const inheritedScope = process.env[envName];
+  const requested = accessScope(scope, inheritedScope || (requester ? "self" : "all"));
+  if (inheritedScope && ACCESS_SCOPES.indexOf(requested) > ACCESS_SCOPES.indexOf(accessScope(inheritedScope, "self"))) throw new Error(`cannot widen inherited ${envName === "TERRARIUM_READ_SCOPE" ? "read" : "status"} scope`);
+  return { requesterRunId: requester, scope: inheritedScope ? accessScope(inheritedScope, "self") : requested };
+}
+
+export async function getRunStatus({ runId, staleMs = 30000, requesterRunId, scope } = {}) {
   if (!runId) throw new Error("runId required");
+  const access = effectiveAccess(requesterRunId, scope, "TERRARIUM_STATUS_SCOPE");
+  await assertRunAccessible({ ...access, targetRunId: runId });
   return await reconcileRun(await readMetadata(runId), { staleMs });
 }
 
+function childEnvironment(run) {
+  return {
+    ...process.env,
+    TERRARIUM_RUN_ID: run.runId,
+    TERRARIUM_PARENT_RUN_ID: run.parentRunId ?? "",
+    TERRARIUM_DEPTH: String(run.depth),
+    TERRARIUM_MAX_DEPTH: String(run.maxDepth),
+    TERRARIUM_CHILD_BUDGET: String(process.env.TERRARIUM_CHILD_BUDGET ?? 1),
+    TERRARIUM_ALLOW_SPAWN: String(run.allowSpawn),
+    TERRARIUM_STATUS_SCOPE: run.statusScope,
+    TERRARIUM_READ_SCOPE: run.readScope,
+    TERRARIUM_MRE_LOG_PATH: run.mreLogPath,
+  };
+}
+
 export async function superviseTerrariumBackground({ run, parts, prompt, base, workspace, specPath } = {}) {
-  const env = { ...process.env, TERRARIUM_RUN_ID: run.runId, TERRARIUM_PARENT_RUN_ID: run.parentRunId ?? "", TERRARIUM_DEPTH: String(run.depth), TERRARIUM_MAX_DEPTH: String(run.maxDepth), TERRARIUM_CHILD_BUDGET: String(process.env.TERRARIUM_CHILD_BUDGET ?? 1), TERRARIUM_MRE_LOG_PATH: run.mreLogPath };
+  const env = childEnvironment(run);
   const child = spawn(parts[0], [...parts.slice(1), prompt], { stdio: ["ignore", "pipe", "pipe"], env, cwd: run.cwd });
   const started = { ok: true, ...base, status: "running", background: true, pid: child.pid, childPid: child.pid, supervisorPid: process.pid, lastSeenAt: new Date().toISOString() };
   await writeMetadata(started);
@@ -498,7 +625,7 @@ export async function runTerrarium(opts = {}) {
     let stdout = "";
     let stderr = "";
     let settled = false;
-    const env = { ...process.env, TERRARIUM_RUN_ID: run.runId, TERRARIUM_PARENT_RUN_ID: run.parentRunId ?? "", TERRARIUM_DEPTH: String(run.depth), TERRARIUM_MAX_DEPTH: String(run.maxDepth), TERRARIUM_CHILD_BUDGET: String(process.env.TERRARIUM_CHILD_BUDGET ?? 1), TERRARIUM_MRE_LOG_PATH: run.mreLogPath };
+    const env = childEnvironment(run);
     const child = spawn(parts[0], [...parts.slice(1), prompt], { stdio: ["inherit", "pipe", "pipe"], env, cwd: run.cwd });
     const timer = run.timeoutMs > 0 ? setTimeout(() => child.kill("SIGTERM"), run.timeoutMs) : null;
 
@@ -524,7 +651,8 @@ export async function runTerrarium(opts = {}) {
   });
 }
 
-export async function listRuns({ limit = 20 } = {}) {
+export async function listRuns({ limit = 20, requesterRunId, scope } = {}) {
+  const access = effectiveAccess(requesterRunId, scope, "TERRARIUM_STATUS_SCOPE");
   await mkdir(LOG_DIR, { recursive: true });
   // Background supervisor specs also end in .json but are not run metadata.
   // Read only canonical run files and ignore malformed/non-run records.
@@ -538,14 +666,16 @@ export async function listRuns({ limit = 20 } = {}) {
       if (run?.runId && run?.status) allRuns.push(run);
     } catch {}
   }
-  const active = allRuns.filter((run) => run.status === "running" && run.alive !== false);
+  const visibleRuns = [];
+  for (const run of allRuns) if (await isRunAccessible({ ...access, targetRunId: run.runId })) visibleRuns.push(run);
+  const active = visibleRuns.filter((run) => run.status === "running" && run.alive !== false);
   return {
     version: VERSION,
     logDir: LOG_DIR,
     activeCount: active.length,
     activeRunIds: active.map((run) => run.runId),
-    count: Math.min(allRuns.length, Math.max(0, Number(limit) || 20)),
-    runs: allRuns.slice(0, Math.max(0, Number(limit) || 20)),
+    count: Math.min(visibleRuns.length, Math.max(0, Number(limit) || 20)),
+    runs: visibleRuns.slice(0, Math.max(0, Number(limit) || 20)),
   };
 }
 
@@ -573,7 +703,10 @@ async function recordedLogPath({ runId, logPath, kind }) {
   throw new Error("logPath is not a recorded Terrarium log");
 }
 
-export async function readRun({ runId, logPath, kind = "terrarium", tailBytes = 20000 } = {}) {
+export async function readRun({ runId, logPath, kind = "terrarium", tailBytes = 20000, requesterRunId, scope } = {}) {
+  const access = effectiveAccess(requesterRunId, scope, "TERRARIUM_READ_SCOPE");
+  if (access.requesterRunId && access.scope !== "all" && !runId) throw new Error("scoped log reads require a runId");
+  if (runId) await assertRunAccessible({ ...access, targetRunId: runId });
   const readablePath = await recordedLogPath({ runId, logPath, kind });
   const text = await readFile(readablePath, "utf8");
   return { kind, logPath: readablePath, text: tail(text, tailBytes) };

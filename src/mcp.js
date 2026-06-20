@@ -5,7 +5,7 @@ import { getRunStatus, listRuns, readRun, runTerrarium, spawnTerrariumBackground
 const tools = [
   {
     name: "terrarium_spawn",
-    description: "Spawn exactly one child agent for one delegated task. Use this when a subtask would pollute parent context: repo archaeology, log digs, design research, failing-test diagnosis. Returns a concise structured result (runId, status, ok, exitCode, capped tail). Pass verbose=true to get the full envelope. Use background=true for long-running tasks to avoid MCP timeouts (then poll with terrarium_status / terrarium_read).",
+    description: "Spawn exactly one child agent for one delegated task. Child recursion and status/read visibility are capability-scoped by run lineage. Process exit zero is accepted only with a matching run/task receipt. Returns a concise structured result; use background=true for long runs and poll the returned runId.",
     inputSchema: {
       type: "object",
       properties: {
@@ -17,10 +17,14 @@ const tools = [
         cwd: { type: "string", description: "Working directory for the child. Default: current directory." },
         timeoutMs: { type: "number", description: "Kill the child after this many milliseconds. Default: none." },
         maxDepth: { type: "number", description: "Maximum Terrarium recursion depth. Default: 3." },
+        allowSpawn: { type: "boolean", description: "Grant the child one nested Terrarium spawn when depth permits. Minimal/maxDepth=1 runs default false." },
+        statusScope: { type: "string", enum: ["self", "descendants", "all"], description: "Run-status visibility granted to the child. Default: descendants when spawn is allowed, otherwise self." },
+        readScope: { type: "string", enum: ["self", "descendants", "all"], description: "Run-log visibility granted to the child. Default: descendants when spawn is allowed, otherwise self." },
         dryRun: { type: "boolean", description: "Print the child invocation without running it." },
         background: { type: "boolean", description: "Detach and return immediately with a concise run pointer by default. Pass verbose=true for pid/logPath fields. Required for long agent tasks; poll via terrarium_status." },
         logPath: { type: "string", description: "Override log file path. Default: ~/.terrarium/runs/<runId>.log" },
         mreLogPath: { type: "string", description: "Override MRE log file path passed to the child as TERRARIUM_MRE_LOG_PATH. Default: ~/.terrarium/runs/<runId>.mre.log" },
+        maxRetries: { type: "number", minimum: 0, maximum: 2, description: "Bounded retries for missing/mismatched task receipts. Default: 0; background runs cannot retry." },
         verbose: { type: "boolean", description: "Return the full unprojected result envelope. Default: false (concise projection)." }
       },
       required: ["task"]
@@ -28,7 +32,7 @@ const tools = [
   },
   {
     name: "terrarium_status",
-    description: "List recent Terrarium runs with metadata, or get status for a single run. By default returns a concise projection that preserves triage fields (status, ok, background, alive, exitCode, signal, error, note, timestamps). Pass verbose=true for the full envelope. Use this to poll a background spawn until it finishes.",
+    description: "List/poll Terrarium runs within the caller's granted lineage scope. Child callers default to self or descendants and cannot inspect siblings. Concise by default; verbose returns the full allowed envelope.",
     inputSchema: {
       type: "object",
       properties: {
@@ -40,7 +44,7 @@ const tools = [
   },
   {
     name: "terrarium_read",
-    description: "Read the tail of a Terrarium run log by runId or logPath. Use this to inspect a child's output, especially after a background spawn completes.",
+    description: "Read the tail of a recorded Terrarium log within the caller's granted lineage scope. Scoped child callers must use a runId and cannot read sibling logs.",
     inputSchema: {
       type: "object",
       properties: {
@@ -52,6 +56,39 @@ const tools = [
     }
   }
 ];
+
+function capabilityPolicy(env = process.env) {
+  const requesterRunId = env.TERRARIUM_RUN_ID || null;
+  return {
+    requesterRunId,
+    allowSpawn: requesterRunId ? env.TERRARIUM_ALLOW_SPAWN === "true" : true,
+    statusScope: requesterRunId ? (env.TERRARIUM_STATUS_SCOPE || "self") : "all",
+    readScope: requesterRunId ? (env.TERRARIUM_READ_SCOPE || "self") : "all",
+  };
+}
+
+function visibleTools(policy) {
+  return policy.allowSpawn ? tools : tools.filter((tool) => tool.name !== "terrarium_spawn");
+}
+
+const SPAWN_ARG_KEYS = new Set(["task", "agent", "model", "readOnly", "profile", "cwd", "timeoutMs", "maxDepth", "allowSpawn", "statusScope", "readScope", "dryRun", "background", "logPath", "mreLogPath", "verbose"]);
+function sanitizeSpawnArgs(args) {
+  const out = {};
+  for (const [key, value] of Object.entries(args)) if (SPAWN_ARG_KEYS.has(key)) out[key] = value;
+  out.requireTaskContract = true;
+  return out;
+}
+
+async function runWithBoundedRetries(args, maxRetries) {
+  if (!Number.isInteger(maxRetries) || maxRetries < 0 || maxRetries > 2) throw new Error("maxRetries must be an integer from 0 to 2");
+  const attempts = [];
+  for (let index = 0; index <= maxRetries; index++) {
+    const result = await runTerrarium({ ...args, runId: undefined, stream: false });
+    attempts.push(result.runId);
+    if (result.ok || result.exitCode !== 0 || !["missing", "mismatch", "malformed"].includes(result.taskContractStatus)) return { ...result, attemptRunIds: attempts, retryCount: index };
+  }
+  return { ...(await getRunStatus({ runId: attempts.at(-1) })), attemptRunIds: attempts, retryCount: maxRetries };
+}
 
 const SPAWN_TAIL_CAP = 2000;
 const SPAWN_ERR_TAIL_CAP = 500;
@@ -83,6 +120,9 @@ export function conciseSpawn(full) {
     signal: full.signal,
     error: full.error,
     note: full.note,
+    taskContractStatus: full.taskContractStatus,
+    retryCount: full.retryCount,
+    attemptRunIds: full.attemptRunIds,
     startedAt: full.startedAt,
     finishedAt: full.finishedAt,
     tail,
@@ -104,6 +144,7 @@ export function conciseStatus(full) {
     signal: full.signal,
     error: full.error,
     note: full.note,
+    taskContractStatus: full.taskContractStatus,
     logAgeMs: full.logAgeMs,
     startedAt: full.startedAt,
     finishedAt: full.finishedAt,
@@ -128,6 +169,7 @@ export function conciseListing(full) {
       signal: r.signal,
       error: r.error,
       note: r.note,
+      taskContractStatus: r.taskContractStatus,
       logAgeMs: r.logAgeMs,
       orphanedAt: r.orphanedAt,
       task: typeof r.task === "string" && r.task.length > 80 ? r.task.slice(0, 77) + "..." : r.task,
@@ -142,26 +184,32 @@ function error(id, code, message) { process.stdout.write(JSON.stringify({ jsonrp
 function content(obj, isError = false) { return { content: [{ type: "text", text: typeof obj === "string" ? obj : JSON.stringify(obj, null, 2) }], isError }; }
 
 async function handle(msg) {
+  const policy = capabilityPolicy();
   if (msg.method === "initialize") return send(msg.id, { protocolVersion: "2024-11-05", capabilities: { tools: {} }, serverInfo: { name: "terrarium", version: VERSION } });
-  if (msg.method === "tools/list") return send(msg.id, { tools });
+  if (msg.method === "tools/list") return send(msg.id, { tools: visibleTools(policy) });
   if (msg.method === "tools/call") {
     const { name, arguments: args = {} } = msg.params ?? {};
     const verbose = args.verbose === true;
     try {
       if (name === "terrarium_spawn") {
-        const result = args.background ? await spawnTerrariumBackground(args) : await runTerrarium({ ...args, stream: false });
+        if (!policy.allowSpawn) throw new Error("Terrarium spawn capability denied for this run");
+        const maxRetries = Number(args.maxRetries ?? 0);
+        if (args.background && maxRetries > 0) throw new Error("background Terrarium runs do not support retries");
+        if (policy.requesterRunId && maxRetries > 0) throw new Error("nested Terrarium runs do not support retries; the parent owns retry policy");
+        const safeArgs = sanitizeSpawnArgs(args);
+        const result = args.background ? await spawnTerrariumBackground(safeArgs) : await runWithBoundedRetries(safeArgs, maxRetries);
         const projected = verbose ? result : conciseSpawn(result);
         return send(msg.id, content(projected, !result.ok));
       }
       if (name === "terrarium_status") {
-        if (args.runId) {
-          const result = await getRunStatus(args);
+        if (args.runId || policy.statusScope !== "all") {
+          const result = await getRunStatus({ ...args, runId: args.runId || policy.requesterRunId, requesterRunId: policy.requesterRunId, scope: policy.statusScope });
           return send(msg.id, content(verbose ? result : conciseStatus(result)));
         }
-        const result = await listRuns(args);
+        const result = await listRuns({ ...args, requesterRunId: policy.requesterRunId, scope: policy.statusScope });
         return send(msg.id, content(verbose ? result : conciseListing(result)));
       }
-      if (name === "terrarium_read") return send(msg.id, content(await readRun(args)));
+      if (name === "terrarium_read") return send(msg.id, content(await readRun({ ...args, requesterRunId: policy.requesterRunId, scope: policy.readScope })));
       return error(msg.id, -32602, `unknown tool: ${name}`);
     } catch (e) {
       return send(msg.id, content(e.message, true));
