@@ -62,7 +62,7 @@ test("model resolution is explicit > env > config > runner default", () => {
 
 test("model is applied to opencode and pi child commands", () => {
   assert.equal(applyModelToAgent("opencode run --agent explore", "anthropic/claude-sonnet-4-6"), "opencode run --agent explore --model anthropic/claude-sonnet-4-6");
-  assert.equal(applyModelToAgent("pi -p --no-session", "kindle-alpha"), "pi -p --no-session --model kindle-alpha");
+  assert.equal(applyModelToAgent("pi -p --no-session", "test-model"), "pi -p --no-session --model test-model");
   assert.throws(() => applyModelToAgent("custom-agent", "x"), /supported for/);
   assert.equal(applyModelToAgent("custom-agent", "config-default", { strict: false }), "custom-agent");
   assert.throws(() => applyModelToAgent("pi -p --model old", "new"), /already contains a model flag/);
@@ -84,10 +84,10 @@ test("runTerrarium dry-run: explicit --agent overrides readOnly preset", async (
 });
 
 test("runTerrarium dry-run records and pins a Pi model", async () => {
-  const result = await runTerrarium({ task: "dig", agent: "pi -p --no-session", model: "kindle-alpha", dryRun: true, stream: false, config: {} });
-  assert.equal(result.model, "kindle-alpha");
-  assert.equal(result.agent, "pi -p --no-session --model kindle-alpha");
-  assert.match(result.invocation, /^pi -p --no-session --model kindle-alpha /);
+  const result = await runTerrarium({ task: "dig", agent: "pi -p --no-session", model: "test-model", dryRun: true, stream: false, config: {} });
+  assert.equal(result.model, "test-model");
+  assert.equal(result.agent, "pi -p --no-session --model test-model");
+  assert.match(result.invocation, /^pi -p --no-session --model test-model /);
 });
 
 test("runTerrarium dry-run minimal profile produces a leaner child invocation", async () => {
@@ -95,6 +95,12 @@ test("runTerrarium dry-run minimal profile produces a leaner child invocation", 
   const min = await runTerrarium({ task: "dig", profile: "minimal", dryRun: true, stream: false, config: {} });
   assert.equal(def.profile, "default");
   assert.equal(min.profile, "minimal");
+  assert.equal(def.allowSpawn, true);
+  assert.equal(def.statusScope, "descendants");
+  assert.equal(def.readScope, "descendants");
+  assert.equal(min.allowSpawn, false);
+  assert.equal(min.statusScope, "self");
+  assert.equal(min.readScope, "self");
   assert.ok(min.invocation.length < def.invocation.length, `minimal invocation (${min.invocation.length}) should be shorter than default (${def.invocation.length})`);
   assert.match(min.invocation, /Single bounded task\. Do not spawn subagents\./);
   assert.doesNotMatch(min.invocation, /You are a Terrarium child agent/);
