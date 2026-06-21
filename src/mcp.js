@@ -5,7 +5,7 @@ import { getRunStatus, listRuns, readRun, runTerrarium, spawnTerrariumBackground
 const tools = [
   {
     name: "terrarium_spawn",
-    description: "Spawn exactly one child agent for one delegated task. Child recursion and status/read visibility are capability-scoped by run lineage. Process exit zero is accepted only with a matching run/task receipt. Returns a concise structured result; use background=true for long runs and poll the returned runId.",
+    description: "Spawn exactly one child agent for one delegated task. Child recursion and status/read visibility are capability-scoped by run lineage. Process exit zero is accepted only with a matching run/task receipt. Normal runs detach by default and return a concise run pointer; poll with terrarium_status. Pass background=false only for short synchronous work.",
     inputSchema: {
       type: "object",
       properties: {
@@ -194,10 +194,11 @@ async function handle(msg) {
       if (name === "terrarium_spawn") {
         if (!policy.allowSpawn) throw new Error("Terrarium spawn capability denied for this run");
         const maxRetries = Number(args.maxRetries ?? 0);
-        if (args.background && maxRetries > 0) throw new Error("background Terrarium runs do not support retries");
+        const background = args.background ?? (!args.dryRun && maxRetries === 0);
+        if (background && maxRetries > 0) throw new Error("background Terrarium runs do not support retries");
         if (policy.requesterRunId && maxRetries > 0) throw new Error("nested Terrarium runs do not support retries; the parent owns retry policy");
-        const safeArgs = sanitizeSpawnArgs(args);
-        const result = args.background ? await spawnTerrariumBackground(safeArgs) : await runWithBoundedRetries(safeArgs, maxRetries);
+        const safeArgs = sanitizeSpawnArgs({ ...args, background });
+        const result = background ? await spawnTerrariumBackground(safeArgs) : await runWithBoundedRetries(safeArgs, maxRetries);
         const projected = verbose ? result : conciseSpawn(result);
         return send(msg.id, content(projected, !result.ok));
       }
