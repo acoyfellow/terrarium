@@ -39,6 +39,7 @@ These tools remain available with their present ordinary-run meaning:
 | `terrarium_read` | Read a recorded Terrarium or MRE log. |
 | `terrarium_cancel` | Additive control: cancel one active lineage-scoped run. |
 | `terrarium_group` | Additive view: group existing independent runs; never spawns children. |
+| `terrarium_callbacks` | Additive callback queue: scoped subscribe/claim/ack/status/unsubscribe. |
 
 Existing arguments preserve their semantics. Optional fields may be added later for sandbox selection, run role, scenario identity, or campaign identity; ordinary callers do not need them.
 
