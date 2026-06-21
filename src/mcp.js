@@ -15,9 +15,11 @@ const tools = [
         agent: { type: "string", description: "Child command. Explicit agent overrides readOnly preset. Defaults through config/env to 'opencode run'. Recommended ephemeral Pi child: 'pi -p --no-session'." },
         model: { type: "string", description: "Pin the child model for opencode run or pi. Precedence: explicit model, TERRARIUM_MODEL, config.defaultModel, runner default." },
         readOnly: { type: "boolean", description: "Use the configured read-only child command when no explicit agent is given. Configure readOnlyAgent or TERRARIUM_READ_ONLY_AGENT; legacy fallback is opencode explore." },
+        ephemeral: { type: "boolean", description: "For Pi agents, append --no-session unless an explicit session flag is already present. Default true." },
         profile: { type: "string", enum: ["default", "minimal"], description: "Child prompt profile. 'default' (full structured contract) or 'minimal' (lean shell for bounded read-only digs). Orthogonal to agent/readOnly. Default: 'default'." },
         cwd: { type: "string", description: "Working directory for the child. Default: current directory." },
         timeoutMs: { type: "number", description: "Kill the child after this many milliseconds. Default: none." },
+        needsAttentionAfterMs: { type: "number", minimum: 5000, maximum: 3600000, description: "Mark a running child needs-attention after this much time without observed output. Default: 60000." },
         maxDepth: { type: "number", description: "Maximum Terrarium recursion depth. Default: 3." },
         allowSpawn: { type: "boolean", description: "Grant the child one nested Terrarium spawn when depth permits. Minimal/maxDepth=1 runs default false." },
         statusScope: { type: "string", enum: ["self", "descendants", "all"], description: "Run-status visibility granted to the child. Default: descendants when spawn is allowed, otherwise self." },
@@ -113,7 +115,7 @@ function visibleTools(policy) {
   return policy.allowSpawn ? tools : tools.filter((tool) => tool.name !== "terrarium_spawn");
 }
 
-const SPAWN_ARG_KEYS = new Set(["task", "agent", "model", "readOnly", "profile", "cwd", "timeoutMs", "maxDepth", "allowSpawn", "statusScope", "readScope", "dryRun", "background", "logPath", "mreLogPath", "verbose"]);
+const SPAWN_ARG_KEYS = new Set(["task", "agent", "model", "readOnly", "ephemeral", "profile", "cwd", "timeoutMs", "needsAttentionAfterMs", "maxDepth", "allowSpawn", "statusScope", "readScope", "dryRun", "background", "logPath", "mreLogPath", "verbose"]);
 function sanitizeSpawnArgs(args) {
   const out = {};
   for (const [key, value] of Object.entries(args)) if (SPAWN_ARG_KEYS.has(key)) out[key] = value;
@@ -163,6 +165,9 @@ export function conciseSpawn(full) {
     error: full.error,
     note: full.note,
     taskContractStatus: full.taskContractStatus,
+    needsAttention: full.needsAttention,
+    idleMs: full.idleMs,
+    progressText: full.progressText,
     retryCount: full.retryCount,
     attemptRunIds: full.attemptRunIds,
     startedAt: full.startedAt,
@@ -187,6 +192,9 @@ export function conciseStatus(full) {
     error: full.error,
     note: full.note,
     taskContractStatus: full.taskContractStatus,
+    needsAttention: full.needsAttention,
+    idleMs: full.idleMs,
+    progressText: full.progressText,
     logAgeMs: full.logAgeMs,
     startedAt: full.startedAt,
     finishedAt: full.finishedAt,
@@ -212,6 +220,9 @@ export function conciseListing(full) {
       error: r.error,
       note: r.note,
       taskContractStatus: r.taskContractStatus,
+      needsAttention: r.needsAttention,
+      idleMs: r.idleMs,
+      progressText: r.progressText,
       logAgeMs: r.logAgeMs,
       orphanedAt: r.orphanedAt,
       task: typeof r.task === "string" && r.task.length > 80 ? r.task.slice(0, 77) + "..." : r.task,

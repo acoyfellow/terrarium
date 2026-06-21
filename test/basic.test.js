@@ -78,9 +78,18 @@ test("runTerrarium dry-run wires readOnly preset into the child invocation when 
 
 test("runTerrarium dry-run: explicit --agent overrides readOnly preset", async () => {
   const result = await runTerrarium({ task: "dig", agent: "pi run", readOnly: true, dryRun: true, stream: false, config: {} });
-  assert.equal(result.agent, "pi run");
+  assert.equal(result.agent, "pi run --no-session");
   assert.equal(result.readOnly, false);
-  assert.match(result.invocation, /^pi run /);
+  assert.match(result.invocation, /^pi run --no-session /);
+});
+
+test("Pi children default ephemeral but explicit session behavior is preserved", async () => {
+  const ephemeral = await runTerrarium({ task: "dig", agent: "pi -p", dryRun: true, stream: false, config: {} });
+  assert.match(ephemeral.agent, /--no-session/);
+  const persistent = await runTerrarium({ task: "dig", agent: "pi -p --session-id chosen", dryRun: true, stream: false, config: {} });
+  assert.doesNotMatch(persistent.agent, /--no-session/);
+  const optedOut = await runTerrarium({ task: "dig", agent: "pi -p", ephemeral: false, dryRun: true, stream: false, config: {} });
+  assert.doesNotMatch(optedOut.agent, /--no-session/);
 });
 
 test("runTerrarium dry-run records and pins a Pi model", async () => {
@@ -278,6 +287,19 @@ test("background runs finish after the launcher exits", async () => {
   assert.match(status.stdoutTail, /supervised child complete/);
   const log = await readRun({ runId });
   assert.match(log.text, /supervised child complete/);
+});
+
+test("reconcileRun reports factual needs-attention after output inactivity", async () => {
+  const logDir = mkdtempSync(join(tmpdir(), "terra-attention-"));
+  const logPath = join(logDir, "run.log");
+  writeFileSync(logPath, "quiet");
+  try {
+    const meta = { runId: "ter_test_attention", status: "running", pid: process.pid, logPath, startedAt: new Date(Date.now() - 10000).toISOString(), lastActivityAt: new Date(Date.now() - 10000).toISOString(), needsAttentionAfterMs: 5000 };
+    const result = await reconcileRun(meta);
+    assert.equal(result.alive, true);
+    assert.equal(result.needsAttention, true);
+    assert.ok(result.idleMs >= 5000);
+  } finally { rmSync(logDir, { recursive: true, force: true }); }
 });
 
 test("reconcileRun marks stale running metadata orphaned when no pid is alive", async () => {

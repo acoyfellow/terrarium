@@ -35,7 +35,7 @@ export async function getRunGroupStatus({ groupId, verbose = false } = {}) {
   }));
   const counts = Object.fromEntries(["running", "done", "failed", "inconclusive", "cancelled", "error", "orphaned", "missing"].map((status) => [status, runs.filter((run) => run.status === status).length]));
   const complete = runs.every((run) => !["running"].includes(run.status));
-  return { ...group, complete, counts, runs: verbose ? runs : runs.map(({ runId, status, ok, exitCode, taskContractStatus, startedAt, finishedAt, error, note }) => ({ runId, status, ok, exitCode, taskContractStatus, startedAt, finishedAt, error, note })) };
+  return { ...group, complete, counts, runs: verbose ? runs : runs.map(({ runId, status, ok, exitCode, taskContractStatus, progressText, needsAttention, idleMs, startedAt, finishedAt, error, note }) => ({ runId, status, ok, exitCode, taskContractStatus, progressText, needsAttention, idleMs, startedAt, finishedAt, error, note })) };
 }
 
 export async function readRunGroupLogs({ groupId, kind = "terrarium", tailBytes = 2000 } = {}) {
