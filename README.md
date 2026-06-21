@@ -380,11 +380,13 @@ Config at `~/.terrarium/config.json`:
 Tools:
 
 - `terrarium_spawn` — run one bounded child agent task. Existing callers remain synchronous when `background` is omitted. Set `background: true` (or `TERRARIUM_BACKGROUND_BY_DEFAULT=true`) to detach by default and poll the returned run ID. Retries remain synchronous.
-- `terrarium_status` — inspect one run or list recent runs.
+- `terrarium_status` — inspect one run or list recent runs, including last activity, concise progress, idle time, and a factual needs-attention flag.
 - `terrarium_read` — read a recorded run log; pass `kind: "mre"` for the MRE side log.
 - `terrarium_cancel` — cancel one active run and its descendant process group within the caller's lineage scope.
 - `terrarium_group` — create/status/read/cancel a parent-owned collection of already-started independent runs; it never spawns or hides fan-out.
 - `terrarium_callbacks` — subscribe to scoped run events, atomically claim each callback once, and acknowledge delivery.
+
+Pi children default to ephemeral `--no-session` runs unless the caller supplies an explicit `--session`/`--session-id` or sets `ephemeral: false`. `needsAttentionAfterMs` controls when an active run with no observed output is marked for attention; this is an inactivity signal, not a claim that the child is stuck.
 
 CLI equivalents:
 
