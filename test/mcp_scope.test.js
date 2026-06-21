@@ -30,6 +30,8 @@ test('top-level MCP keeps the stable three-tool surface', async () => {
   assert.deepEqual(names.slice(0, 3), ['terrarium_spawn', 'terrarium_status', 'terrarium_read']);
   assert.ok(names.includes('terrarium_cancel'));
   assert.ok(names.includes('terrarium_group'));
+  assert.ok(names.includes('terrarium_callbacks'));
+  assert.ok(names.includes('terrarium_doctor'));
 });
 
 test('child MCP removes spawn and denies sibling status/read', async () => {
