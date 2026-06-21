@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { createInterface } from "node:readline";
-import { getRunStatus, listRuns, readRun, runTerrarium, spawnTerrariumBackground, VERSION } from "./core.js";
+import { cancelRun, getRunStatus, listRuns, readRun, runTerrarium, spawnTerrariumBackground, VERSION } from "./core.js";
+import { createRunGroup, getRunGroupStatus, readRunGroupLogs } from "./groups.js";
 
 const tools = [
   {
@@ -53,6 +54,28 @@ const tools = [
         kind: { type: "string", enum: ["terrarium", "mre"], description: "Log kind to read by runId. Default: terrarium." },
         tailBytes: { type: "number", description: "Bytes from the end of the log to return. Default: 20000." }
       }
+    }
+  },
+  {
+    name: "terrarium_cancel",
+    description: "Cancel one active run within the caller's lineage scope. Terminates the child process group and records cancelled status.",
+    inputSchema: { type: "object", properties: { runId: { type: "string" } }, required: ["runId"] }
+  },
+  {
+    name: "terrarium_group",
+    description: "Create or inspect a parent-owned collection of already-started independent Terrarium runs. This tool does not spawn or fan out.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        action: { type: "string", enum: ["create", "status", "read", "cancel"] },
+        groupId: { type: "string" },
+        label: { type: "string" },
+        runIds: { type: "array", items: { type: "string" }, minItems: 1, maxItems: 32 },
+        verbose: { type: "boolean" },
+        kind: { type: "string", enum: ["terrarium", "mre"] },
+        tailBytes: { type: "number" }
+      },
+      required: ["action"]
     }
   }
 ];
@@ -212,6 +235,19 @@ async function handle(msg) {
         return send(msg.id, content(verbose ? result : conciseListing(result)));
       }
       if (name === "terrarium_read") return send(msg.id, content(await readRun({ ...args, requesterRunId: policy.requesterRunId, scope: policy.readScope })));
+      if (name === "terrarium_cancel") return send(msg.id, content(await cancelRun({ ...args, requesterRunId: policy.requesterRunId, scope: policy.statusScope })));
+      if (name === "terrarium_group") {
+        if (args.action === "create") return send(msg.id, content(await createRunGroup(args)));
+        if (args.action === "status") return send(msg.id, content(await getRunGroupStatus(args)));
+        if (args.action === "read") return send(msg.id, content(await readRunGroupLogs(args)));
+        if (args.action === "cancel") {
+          const group = await getRunGroupStatus({ groupId: args.groupId });
+          const results = [];
+          for (const run of group.runs) if (run.status === "running") results.push(await cancelRun({ runId: run.runId, requesterRunId: policy.requesterRunId, scope: policy.statusScope }));
+          return send(msg.id, content({ groupId: args.groupId, cancelled: results }));
+        }
+        throw new Error("unknown Terrarium group action");
+      }
       return error(msg.id, -32602, `unknown tool: ${name}`);
     } catch (e) {
       return send(msg.id, content(e.message, true));

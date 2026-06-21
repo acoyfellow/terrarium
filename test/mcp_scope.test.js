@@ -25,7 +25,10 @@ function toolText(response) { return response.result?.content?.[0]?.text || ''; 
 
 test('top-level MCP keeps the stable three-tool surface', async () => {
   const { responses } = await rpc([{ jsonrpc: '2.0', id: 1, method: 'tools/list' }]);
-  assert.deepEqual(responses[0].result.tools.map((tool) => tool.name), ['terrarium_spawn', 'terrarium_status', 'terrarium_read']);
+  const names = responses[0].result.tools.map((tool) => tool.name);
+  assert.deepEqual(names.slice(0, 3), ['terrarium_spawn', 'terrarium_status', 'terrarium_read']);
+  assert.ok(names.includes('terrarium_cancel'));
+  assert.ok(names.includes('terrarium_group'));
 });
 
 test('child MCP removes spawn and denies sibling status/read', async () => {
@@ -39,7 +42,7 @@ test('child MCP removes spawn and denies sibling status/read', async () => {
     { jsonrpc: '2.0', id: 4, method: 'tools/call', params: { name: 'terrarium_read', arguments: { runId: b.runId } } },
     { jsonrpc: '2.0', id: 5, method: 'tools/call', params: { name: 'terrarium_spawn', arguments: { task: 'nope', dryRun: true } } },
   ], env);
-  assert.deepEqual(responses.find((r) => r.id === 1).result.tools.map((t) => t.name), ['terrarium_status', 'terrarium_read']);
+  assert.deepEqual(responses.find((r) => r.id === 1).result.tools.map((t) => t.name), ['terrarium_status', 'terrarium_read', 'terrarium_cancel', 'terrarium_group']);
   assert.equal(JSON.parse(toolText(responses.find((r) => r.id === 2))).runId, a.runId);
   assert.match(toolText(responses.find((r) => r.id === 3)), /access denied/);
   assert.match(toolText(responses.find((r) => r.id === 4)), /access denied/);
