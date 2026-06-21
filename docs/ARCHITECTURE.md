@@ -64,7 +64,7 @@ Every public event is allowlisted and bounded. Raw model transcripts, private pr
 
 ## Concurrency
 
-Independent attacks may run in bounded parallel pools against one pinned revision. Strategy rounds are separated by a memory barrier. Fixes may be generated concurrently but merge serially; every stale fix must replay against the current head.
+Independent runs may execute concurrently, but each Terrarium process still owns one child. Parents can register existing run IDs in a durable group to preserve ordering and display grouped status/log summaries without hidden fan-out. Cancellation targets the child's Unix process group so ordinary descendants are torn down together. Strategy rounds are separated by a memory barrier. Fixes may be generated concurrently but merge serially; every stale fix must replay against the current head.
 
 ## Secure agent composition
 
