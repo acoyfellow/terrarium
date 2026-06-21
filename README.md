@@ -382,6 +382,17 @@ Tools:
 - `terrarium_spawn` — run one bounded child agent task. Existing callers remain synchronous when `background` is omitted. Set `background: true` (or `TERRARIUM_BACKGROUND_BY_DEFAULT=true`) to detach by default and poll the returned run ID. Retries remain synchronous.
 - `terrarium_status` — inspect one run or list recent runs.
 - `terrarium_read` — read a recorded run log; pass `kind: "mre"` for the MRE side log.
+- `terrarium_cancel` — cancel one active run and its descendant process group within the caller's lineage scope.
+- `terrarium_group` — create/status/read/cancel a parent-owned collection of already-started independent runs; it never spawns or hides fan-out.
+
+CLI equivalents:
+
+```sh
+terra cancel <runId>
+terra group create "research batch" <runIdA> <runIdB>
+terra group status <groupId>
+terra group read <groupId>
+```
 
 Spawn and status default to concise responses so parent transcripts stay small. The full envelope remains on disk under `~/.terrarium/runs/<runId>.json`, or can be requested inline with `verbose: true`.
 
