@@ -38,7 +38,7 @@ npm run demo:smoke    # local smoke check
 npm run deploy        # personal Cloudflare account + custom domain
 ```
 
-Start here for the full system model: [Architecture](./docs/ARCHITECTURE.md). See [concurrency and context isolation](./docs/CONCURRENCY_ISOLATION.md), the [secure-agent proof](./docs/SECURE_AGENT_PROOF.md), and [landscape research](./docs/SECURE_AGENT_LANDSCAPE.md).
+Start here for the full system model: [Architecture](./docs/ARCHITECTURE.md). See [concurrency and context isolation](./docs/CONCURRENCY_ISOLATION.md), the [pi-subagents comparison](./docs/PI_SUBAGENTS_COMPARISON.md), the [secure-agent proof](./docs/SECURE_AGENT_PROOF.md), and [landscape research](./docs/SECURE_AGENT_LANDSCAPE.md).
 
 ## Quick start: ordinary delegation
 
@@ -386,6 +386,8 @@ Tools:
 - `terrarium_group` — create/status/read/cancel a parent-owned collection of already-started independent runs; it never spawns or hides fan-out.
 - `terrarium_callbacks` — subscribe to scoped run events, atomically claim each callback once, acknowledge delivery, requeue abandoned inflight events, and prune old acknowledged/journal records.
 - `terrarium_doctor` — top-level-only diagnostics for storage, runs, attention, callbacks, groups, and stale claims.
+
+When installed as a Pi package, Terrarium adds a thin native widget for active runs/groups, exactly-once completion messages, and `/terrarium-status`, `/terrarium-groups`, and `/terrarium-cancel`. Spawned children do not load this observer layer.
 
 Pi children default to ephemeral `--no-session` runs unless the caller supplies an explicit `--session`/`--session-id` or sets `ephemeral: false`. `needsAttentionAfterMs` controls when an active run with no observed output is marked for attention; this is an inactivity signal, not a claim that the child is stuck.
 
