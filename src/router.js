@@ -106,8 +106,11 @@ export async function claimMailboxEvents({ subscriberId, limit = 20 } = {}) {
   const events = [];
   for (const file of files) {
     try {
-      await rename(join(dirs.pending, file), join(dirs.inflight, file));
-      events.push(JSON.parse(await readFile(join(dirs.inflight, file), 'utf8')));
+      const target = join(dirs.inflight, file);
+      await rename(join(dirs.pending, file), target);
+      const event = { ...JSON.parse(await readFile(target, 'utf8')), claimedAt: new Date().toISOString() };
+      await atomicJson(target, event);
+      events.push(event);
     } catch (error) { if (error.code !== 'ENOENT') throw error; }
   }
   return { subscriberId, events };
@@ -130,4 +133,43 @@ export async function getMailboxStatus(subscriberId) {
   const dirs = mailboxDirs(subscriberId);
   const count = async (dir) => { try { return (await readdir(dir)).filter((file) => file.endsWith('.json')).length; } catch { return 0; } };
   return { subscriberId, pending: await count(dirs.pending), inflight: await count(dirs.inflight), acknowledged: await count(dirs.acked) };
+}
+
+export async function requeueInflightEvents({ subscriberId, olderThanMs = 300000 } = {}) {
+  const dirs = mailboxDirs(subscriberId);
+  await Promise.all([mkdir(dirs.pending, { recursive: true }), mkdir(dirs.inflight, { recursive: true })]);
+  const now = Date.now();
+  let requeued = 0;
+  for (const file of (await readdir(dirs.inflight)).filter((name) => name.endsWith('.json'))) {
+    let event; try { event = JSON.parse(await readFile(join(dirs.inflight, file), 'utf8')); } catch { continue; }
+    const age = now - Date.parse(event.claimedAt || event.at || new Date(now).toISOString());
+    if (age < Math.max(0, Number(olderThanMs) || 0)) continue;
+    try { await rename(join(dirs.inflight, file), join(dirs.pending, file)); requeued++; } catch (error) { if (error.code !== 'ENOENT') throw error; }
+  }
+  return { subscriberId, requeued };
+}
+
+export async function pruneRouter({ acknowledgedOlderThanMs = 7 * 86400000, journalOlderThanMs = 7 * 86400000, subscriberIds, eventIds } = {}) {
+  const now = Date.now();
+  let acknowledgedRemoved = 0, journalRemoved = 0;
+  try {
+    for (const subscriber of await readdir(MAILBOXES_DIR)) {
+      if (Array.isArray(subscriberIds) && !subscriberIds.includes(subscriber)) continue;
+      const dirs = mailboxDirs(subscriber);
+      let files = []; try { files = (await readdir(dirs.acked)).filter((file) => file.endsWith('.json')); } catch {}
+      for (const file of files) {
+        if (Array.isArray(eventIds) && !eventIds.includes(file.slice(0, -5))) continue;
+        let event; try { event = JSON.parse(await readFile(join(dirs.acked, file), 'utf8')); } catch { continue; }
+        if (now - Date.parse(event.at || new Date(now).toISOString()) >= acknowledgedOlderThanMs) { await rm(join(dirs.acked, file), { force: true }); acknowledgedRemoved++; }
+      }
+    }
+  } catch {}
+  try {
+    for (const file of (await readdir(JOURNAL_DIR)).filter((name) => name.endsWith('.json'))) {
+      if (Array.isArray(eventIds) && !eventIds.includes(file.slice(0, -5))) continue;
+      let event; try { event = JSON.parse(await readFile(join(JOURNAL_DIR, file), 'utf8')); } catch { continue; }
+      if (now - Date.parse(event.at || new Date(now).toISOString()) >= journalOlderThanMs) { await rm(join(JOURNAL_DIR, file), { force: true }); journalRemoved++; }
+    }
+  } catch {}
+  return { acknowledgedRemoved, journalRemoved };
 }
