@@ -372,15 +372,14 @@ Config at `~/.terrarium/config.json`:
     "model": "<model-id>",
     "readOnly": true,
     "profile": "minimal",
-    "cwd": "/path/to/repo",
-    "background": true
+    "cwd": "/path/to/repo"
   }
 }
 ```
 
 Tools:
 
-- `terrarium_spawn` — run one bounded child agent task. Use `background: true` for longer work and poll rather than holding an MCP call open.
+- `terrarium_spawn` — run one bounded child agent task. Non-dry MCP runs detach by default; poll the returned run ID instead of holding an MCP call open. Pass `background: false` only for short synchronous work. `maxRetries > 0` also selects synchronous execution unless `background` is explicitly set.
 - `terrarium_status` — inspect one run or list recent runs.
 - `terrarium_read` — read a recorded run log; pass `kind: "mre"` for the MRE side log.
 
