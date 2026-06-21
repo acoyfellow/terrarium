@@ -236,8 +236,13 @@ function buildRun(opts, config) {
   const requestedReadOnly = Boolean(opts.readOnly ?? config.readOnly ?? false);
   const baseAgent = resolveAgent({ agent: opts.agent, readOnly: requestedReadOnly }, { env: process.env, config });
   const requestedModel = resolveModel({ model: opts.model }, { env: process.env, config });
-  const agent = applyModelToAgent(baseAgent, requestedModel, { strict: Boolean(opts.model) });
-  const model = agent === baseAgent ? modelFlagInAgent(agent) : requestedModel;
+  const appliedAgent = applyModelToAgent(baseAgent, requestedModel, { strict: Boolean(opts.model) });
+  const model = appliedAgent === baseAgent ? modelFlagInAgent(appliedAgent) : requestedModel;
+  let agent = appliedAgent;
+  const agentParts = splitCommand(agent);
+  if (basename(agentParts[0] || "") === "pi" && !agentParts.includes("--no-session") && !agentParts.includes("--session") && !agentParts.includes("--session-id") && opts.ephemeral !== false) {
+    agent = [...agentParts, "--no-session"].map(shellToken).join(" ");
+  }
   const readOnly = requestedReadOnly && !opts.agent;
   const profile = resolvePromptProfile(opts.profile ?? config.profile);
   const timeoutMs = Number(opts.timeoutMs ?? config.timeoutMs ?? 0);
@@ -262,7 +267,9 @@ function buildRun(opts, config) {
   const readScope = inheritedReadScope ? accessScope(inheritedReadScope, "self") : requestedReadScope;
   const requireTaskContract = Boolean(opts.requireTaskContract ?? config.requireTaskContract ?? false);
   const taskContract = requireTaskContract ? { runId, taskFingerprint: taskFingerprint(task), nonce: randomUUID() } : null;
-  return { runId, parentRunId, depth, maxDepth, agent, model, profile, readOnly, timeoutMs, task, dryRun, cwd, originalCwd: cwd, stream, logPath, mreLogPath, isolation, keepWorkspace, callerSpawnAllowed, allowSpawn, statusScope, readScope, requireTaskContract, taskContract };
+  const needsAttentionAfterMs = Number(opts.needsAttentionAfterMs ?? config.needsAttentionAfterMs ?? 60000);
+  if (!Number.isFinite(needsAttentionAfterMs) || needsAttentionAfterMs < 5000 || needsAttentionAfterMs > 3600000) throw new Error("needsAttentionAfterMs must be between 5000 and 3600000");
+  return { runId, parentRunId, depth, maxDepth, agent, model, profile, readOnly, timeoutMs, task, dryRun, cwd, originalCwd: cwd, stream, logPath, mreLogPath, isolation, keepWorkspace, callerSpawnAllowed, allowSpawn, statusScope, readScope, requireTaskContract, taskContract, needsAttentionAfterMs };
 }
 
 async function workspaceExcludes() {
@@ -365,7 +372,7 @@ async function prepareRun(opts = {}) {
   run.logPath ??= await defaultLogPath(run.runId);
   run.mreLogPath ??= await defaultMreLogPath(run.runId);
   const startedAt = new Date().toISOString();
-  const base = { runId: run.runId, parentRunId: run.parentRunId, depth: run.depth, maxDepth: run.maxDepth, version: VERSION, agent: run.agent, model: run.model, profile: run.profile, readOnly: run.readOnly, task: run.task, cwd: run.cwd, originalCwd: run.originalCwd, isolation: run.isolation, workspace, logPath: run.logPath, mreLogPath: run.mreLogPath, startedAt, status: "running", git: await gitInfo(run.cwd), allowSpawn: run.allowSpawn, statusScope: run.statusScope, readScope: run.readScope, taskFingerprint: run.taskContract?.taskFingerprint ?? taskFingerprint(run.task), taskContractStatus: run.requireTaskContract ? "pending" : "not-required", taskContract: run.taskContract };
+  const base = { runId: run.runId, parentRunId: run.parentRunId, depth: run.depth, maxDepth: run.maxDepth, version: VERSION, agent: run.agent, model: run.model, profile: run.profile, readOnly: run.readOnly, task: run.task, cwd: run.cwd, originalCwd: run.originalCwd, isolation: run.isolation, workspace, logPath: run.logPath, mreLogPath: run.mreLogPath, startedAt, lastActivityAt: startedAt, progressText: "started", needsAttentionAfterMs: run.needsAttentionAfterMs, status: "running", git: await gitInfo(run.cwd), allowSpawn: run.allowSpawn, statusScope: run.statusScope, readScope: run.readScope, taskFingerprint: run.taskContract?.taskFingerprint ?? taskFingerprint(run.task), taskContractStatus: run.requireTaskContract ? "pending" : "not-required", taskContract: run.taskContract };
   let claimPath = null;
   try {
     claimPath = await claimChildSlot(run);
@@ -386,8 +393,12 @@ async function prepareRun(opts = {}) {
   }
 }
 
-async function emitProgressEvent(run, text) {
+async function emitProgressEvent(run, text, { activity = true } = {}) {
   try {
+    if (activity) {
+      const current = await readMetadata(run.runId);
+      if (current.status === "running") await writeMetadata({ ...current, lastActivityAt: new Date().toISOString(), progressText: String(text).slice(-300) });
+    }
     const channel = run.channel ?? process.env.TERRARIUM_EVENT_CHANNEL;
     const event = { type: "terrarium.progress", runId: run.runId, cwd: run.originalCwd ?? run.cwd, task: run.task, text, at: new Date().toISOString(), channel: channel ?? null };
     const typed = eventForRun(TerrariumEventType.Progress, run, { text, channel: run.channel ?? basename(run.originalCwd ?? run.cwd) });
@@ -499,7 +510,9 @@ export async function reconcileRun(meta, { staleMs = 30000 } = {}) {
     await writeMetadata(next);
     return next;
   }
-  return { ...meta, alive, logAgeMs };
+  const idleMs = now - Date.parse(meta.lastActivityAt || meta.startedAt || new Date(now).toISOString());
+  const needsAttention = alive && idleMs >= Number(meta.needsAttentionAfterMs || 60000);
+  return { ...meta, alive, logAgeMs, idleMs, needsAttention };
 }
 
 export async function isRunAccessible({ requesterRunId, targetRunId, scope = "all" } = {}) {
@@ -584,7 +597,7 @@ export async function superviseTerrariumBackground({ run, parts, prompt, base, w
     let lastProgressAt = 0;
     let progressBuffer = "";
     void emitProgressEvent(run, 'started');
-    const heartbeat = setInterval(() => { void emitProgressEvent(run, 'running'); }, 3000);
+    const heartbeat = setInterval(() => { void emitProgressEvent(run, 'running', { activity: false }); }, 3000);
     const progress = async (s) => {
       progressBuffer += s;
       const now = Date.now();
