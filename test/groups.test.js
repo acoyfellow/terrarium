@@ -1,0 +1,49 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { cancelRun, getRunStatus, isPidAlive, readRun, runTerrarium, spawnTerrariumBackground } from '../src/core.js';
+import { createRunGroup, getRunGroupStatus, readRunGroupLogs } from '../src/groups.js';
+
+test('run groups preserve ordered independent runs and summarize status/logs', async () => {
+  const a = await runTerrarium({ task: 'group alpha', dryRun: true, stream: false });
+  const b = await runTerrarium({ task: 'group beta', dryRun: true, stream: false });
+  const group = await createRunGroup({ label: 'research batch', runIds: [a.runId, b.runId] });
+  assert.deepEqual(group.runIds, [a.runId, b.runId]);
+  const status = await getRunGroupStatus({ groupId: group.groupId });
+  assert.equal(status.complete, true);
+  assert.equal(status.counts.done, 2);
+  const logs = await readRunGroupLogs({ groupId: group.groupId, tailBytes: 200 });
+  assert.equal(logs.results.length, 2);
+  assert.ok(logs.results.every((result) => typeof result.text === 'string'));
+});
+
+test('cancel terminates the child process group and records cancelled status', { timeout: 15000 }, async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'terra-cancel-agent-'));
+  const script = join(dir, 'agent.mjs');
+  writeFileSync(script, `import{spawn}from'node:child_process';const c=spawn(process.execPath,['-e','setInterval(()=>{},1000)'],{stdio:'ignore'});console.log('GRANDCHILD='+c.pid);setInterval(()=>{},1000);`);
+  try {
+    const run = await spawnTerrariumBackground({ task: 'cancel process tree', agent: `${process.execPath} ${script}`, requireTaskContract: false });
+    let grandchild;
+    for (let i = 0; i < 60; i++) {
+      const log = await readRun({ runId: run.runId });
+      const match = log.text.match(/GRANDCHILD=(\d+)/);
+      if (match) { grandchild = Number(match[1]); break; }
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    assert.ok(grandchild, 'expected grandchild PID in run log');
+    assert.equal(isPidAlive(grandchild), true);
+    const request = await cancelRun({ runId: run.runId });
+    assert.equal(request.cancelled, true);
+    let status;
+    for (let i = 0; i < 80; i++) {
+      status = await getRunStatus({ runId: run.runId, staleMs: 1000 });
+      if (status.status !== 'running') break;
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    }
+    assert.equal(status.status, 'cancelled');
+    assert.equal(status.ok, false);
+    assert.equal(isPidAlive(grandchild), false);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});

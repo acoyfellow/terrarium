@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
-import { appendFile, cp, mkdir, readFile, readdir, rm, rmdir, stat, writeFile } from "node:fs/promises";
+import { appendFile, cp, mkdir, readFile, readdir, rename, rm, rmdir, stat, writeFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
@@ -14,6 +14,13 @@ export const LOG_DIR = join(HOME, "runs");
 export const CONFIG_PATH = join(HOME, "config.json");
 export const WORKSPACE_DIR = join(HOME, "workspaces");
 export const EVENT_DIR = join(HOME, "events");
+
+function cancelMarkerPath(runId) { return join(LOG_DIR, `${assertRunId(runId)}.cancel`); }
+function signalProcessGroup(pid, signal) {
+  if (!pid) return;
+  try { process.kill(-Number(pid), signal); }
+  catch { try { process.kill(Number(pid), signal); } catch {} }
+}
 
 export function splitCommand(command) {
   return command.match(/(?:[^\s"']+|"[^"]*"|'[^']*')+/g)?.map((s) => s.replace(/^[']|[']$/g, "").replace(/^[\"]|[\"]$/g, "")) ?? [];
@@ -205,7 +212,10 @@ async function gitInfo(cwd) {
 
 async function writeMetadata(meta) {
   await mkdir(LOG_DIR, { recursive: true });
-  await writeFile(metadataPath(meta.runId), JSON.stringify(meta, null, 2) + "\n");
+  const target = metadataPath(meta.runId);
+  const temp = `${target}.${process.pid}.${Math.random().toString(36).slice(2, 8)}.tmp`;
+  await writeFile(temp, JSON.stringify(meta, null, 2) + "\n", { flag: "wx" });
+  await rename(temp, target);
 }
 
 function buildRun(opts, config) {
@@ -530,6 +540,21 @@ export async function getRunStatus({ runId, staleMs = 30000, requesterRunId, sco
   return await reconcileRun(await readMetadata(runId), { staleMs });
 }
 
+export async function cancelRun({ runId, requesterRunId, scope } = {}) {
+  if (!runId) throw new Error("runId required");
+  const access = effectiveAccess(requesterRunId, scope, "TERRARIUM_STATUS_SCOPE");
+  await assertRunAccessible({ ...access, targetRunId: runId });
+  const meta = await readMetadata(runId);
+  if (meta.status !== "running") return { runId, status: meta.status, cancelled: false, note: "run is not active" };
+  await writeFile(cancelMarkerPath(runId), `${new Date().toISOString()}\n`, { flag: "wx" }).catch((error) => { if (error.code !== "EEXIST") throw error; });
+  const childPids = [...new Set([meta.childPid, meta.pid].filter(Boolean))];
+  if (childPids.length === 0 && meta.supervisorPid) signalProcessGroup(meta.supervisorPid, "SIGTERM");
+  for (const pid of childPids) signalProcessGroup(pid, "SIGTERM");
+  await new Promise((resolve) => setTimeout(resolve, 250));
+  for (const pid of childPids) if (isPidAlive(pid)) signalProcessGroup(pid, "SIGKILL");
+  return { runId, status: "cancel-requested", cancelled: true, requestedAt: new Date().toISOString() };
+}
+
 function childEnvironment(run) {
   return {
     ...process.env,
@@ -547,12 +572,12 @@ function childEnvironment(run) {
 
 export async function superviseTerrariumBackground({ run, parts, prompt, base, workspace, specPath } = {}) {
   const env = childEnvironment(run);
-  const child = spawn(parts[0], [...parts.slice(1), prompt], { stdio: ["ignore", "pipe", "pipe"], env, cwd: run.cwd });
+  const child = spawn(parts[0], [...parts.slice(1), prompt], { stdio: ["ignore", "pipe", "pipe"], env, cwd: run.cwd, detached: true });
   const started = { ok: true, ...base, status: "running", background: true, pid: child.pid, childPid: child.pid, supervisorPid: process.pid, lastSeenAt: new Date().toISOString() };
   await writeMetadata(started);
 
   return await new Promise((resolveRun) => {
-    const timer = run.timeoutMs > 0 ? setTimeout(() => child.kill("SIGTERM"), run.timeoutMs) : null;
+    const timer = run.timeoutMs > 0 ? setTimeout(() => signalProcessGroup(child.pid, "SIGTERM"), run.timeoutMs) : null;
     let stdout = "";
     let stderr = "";
     let settled = false;
@@ -587,8 +612,10 @@ export async function superviseTerrariumBackground({ run, parts, prompt, base, w
     });
     child.on("close", async (code, signal) => {
       const exitCode = code ?? (signal ? 128 : 0);
-      await log(run.logPath, `\nexit: ${exitCode}${signal ? ` signal: ${signal}` : ""}\n`);
-      await finish({ ok: exitCode === 0, status: exitCode === 0 ? "done" : "failed", exitCode, signal });
+      const cancelled = existsSync(cancelMarkerPath(run.runId));
+      await log(run.logPath, `\nexit: ${exitCode}${signal ? ` signal: ${signal}` : ""}${cancelled ? " cancelled" : ""}\n`);
+      await finish({ ok: cancelled ? false : exitCode === 0, status: cancelled ? "cancelled" : exitCode === 0 ? "done" : "failed", exitCode, signal });
+      if (cancelled) await rm(cancelMarkerPath(run.runId), { force: true });
     });
   });
 }
@@ -626,8 +653,9 @@ export async function runTerrarium(opts = {}) {
     let stderr = "";
     let settled = false;
     const env = childEnvironment(run);
-    const child = spawn(parts[0], [...parts.slice(1), prompt], { stdio: ["inherit", "pipe", "pipe"], env, cwd: run.cwd });
-    const timer = run.timeoutMs > 0 ? setTimeout(() => child.kill("SIGTERM"), run.timeoutMs) : null;
+    const child = spawn(parts[0], [...parts.slice(1), prompt], { stdio: ["inherit", "pipe", "pipe"], env, cwd: run.cwd, detached: true });
+    void writeMetadata({ ...base, status: "running", pid: child.pid, childPid: child.pid, lastSeenAt: new Date().toISOString() });
+    const timer = run.timeoutMs > 0 ? setTimeout(() => signalProcessGroup(child.pid, "SIGTERM"), run.timeoutMs) : null;
 
     child.stdout.on("data", async (d) => { const s = String(d); stdout += s; if (run.stream) process.stdout.write(d); await log(run.logPath, s); });
     child.stderr.on("data", async (d) => { const s = String(d); stderr += s; if (run.stream) process.stderr.write(d); await log(run.logPath, s); });
@@ -644,9 +672,11 @@ export async function runTerrarium(opts = {}) {
       settled = true;
       if (timer) clearTimeout(timer);
       const exitCode = code ?? (signal ? 128 : 0);
-      await log(run.logPath, `\nexit: ${exitCode}${signal ? ` signal: ${signal}` : ""}\n`);
+      const cancelled = existsSync(cancelMarkerPath(run.runId));
+      await log(run.logPath, `\nexit: ${exitCode}${signal ? ` signal: ${signal}` : ""}${cancelled ? " cancelled" : ""}\n`);
       const ws = await finalizeWorkspace(workspace, base);
-      resolve(await finishRun(base, { ok: exitCode === 0, status: exitCode === 0 ? "done" : "failed", exitCode, signal, stdoutTail: tail(stdout), stderrTail: tail(stderr), ...ws }));
+      resolve(await finishRun(base, { ok: cancelled ? false : exitCode === 0, status: cancelled ? "cancelled" : exitCode === 0 ? "done" : "failed", exitCode, signal, stdoutTail: tail(stdout), stderrTail: tail(stderr), ...ws }));
+      if (cancelled) await rm(cancelMarkerPath(run.runId), { force: true });
     });
   });
 }
@@ -691,9 +721,9 @@ async function recordedLogPath({ runId, logPath, kind }) {
   if (!logPath) throw new Error("runId or recorded logPath required");
   await mkdir(LOG_DIR, { recursive: true });
   const requested = resolve(logPath);
-  const files = (await readdir(LOG_DIR)).filter((file) => file.endsWith(".json"));
+  const files = (await readdir(LOG_DIR)).filter((file) => file.endsWith(".json") && !file.endsWith(".background.json"));
   for (const file of files) {
-    const meta = JSON.parse(await readFile(join(LOG_DIR, file), "utf8"));
+    let meta; try { meta = JSON.parse(await readFile(join(LOG_DIR, file), "utf8")); } catch { continue; }
     const expected = kind === "terrarium" ? meta.logPath : meta.mreLogPath;
     if (expected && resolve(expected) === requested) {
       if (!meta.logPathExternal && !meta.mreLogPathExternal) confinedLogPath(expected, "recorded log path");

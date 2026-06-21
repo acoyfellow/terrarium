@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { readFile } from "node:fs/promises";
-import { getRunStatus, listRuns, readRun, runTerrarium, VERSION } from "./core.js";
+import { cancelRun, getRunStatus, listRuns, readRun, runTerrarium, VERSION } from "./core.js";
+import { createRunGroup, getRunGroupStatus, readRunGroupLogs } from "./groups.js";
 import { campaignIssueDraft, createFixtureCampaign, DEFAULT_SANDBOX_IMAGE, FIXTURE_SCENARIO_IDS, FIXTURE_VARIANTS, listCampaignReceipts, readCampaignReceipt, runAttackExperiment, runSandboxScenario, SCENARIO_IDS, verifyCampaignReceipt, verifySandboxScenario } from "./sandbox.js";
 import { runManualHostile } from "./hostile-cli.js";
 import { runHealingLoop } from "./healing-cli.js";
@@ -32,6 +33,10 @@ Usage:
   terra status [runId]
   terra read <runId> [tailBytes]
   terra read <runId> mre [tailBytes]
+  terra cancel <runId>
+  terra group create <label> <runId...>
+  terra group status <groupId>
+  terra group read <groupId>
   terra probe <scenarioId> [--image node:22-alpine] [--json]
   terra verify <scenarioId> [--image node:22-alpine] [--json]
   terra attack <scenarioId> [--agent "opencode run"] [--json]
@@ -91,6 +96,7 @@ function parse(argv) {
     else if (a === "--version" || a === "-v") out.version = true;
     else if (a === "--dry-run") out.dryRun = true;
     else if (a === "--json") out.json = true;
+    else if (a === "--verbose") out.verbose = true;
     else if (a === "--keep-workspace") out.keepWorkspace = true;
     else if (a === "--unsafe-network") out.unsafeNetwork = true;
     else if (a === "--read-only" || a === "--readonly") out.readOnly = true;
@@ -119,6 +125,10 @@ else if (opts.version) console.log(VERSION);
 else if (cmd === "status" && rest[0]?.startsWith("ter_")) getRunStatus({ runId: rest[0] }).then((r) => console.log(JSON.stringify(r, null, 2)));
 else if (cmd === "status") listRuns({ limit: Number(rest[0] || 20) }).then((r) => console.log(JSON.stringify(r, null, 2)));
 else if (cmd === "read") readRun({ runId: rest[0], tailBytes: Number(rest[1] === "mre" ? rest[2] || 20000 : rest[1] || 20000), kind: rest[1] === "mre" ? "mre" : "terrarium" }).then((r) => console.log(r.text));
+else if (cmd === "cancel") cancelRun({ runId: rest[0] }).then((r) => console.log(JSON.stringify(r, null, 2))).catch((e) => { console.error(`terrarium: ${e.message}`); process.exit(1); });
+else if (cmd === "group" && rest[0] === "create") createRunGroup({ label: rest[1], runIds: rest.slice(2) }).then((r) => console.log(JSON.stringify(r, null, 2))).catch((e) => { console.error(`terrarium: ${e.message}`); process.exit(1); });
+else if (cmd === "group" && rest[0] === "status") getRunGroupStatus({ groupId: rest[1], verbose: opts.verbose }).then((r) => console.log(JSON.stringify(r, null, 2))).catch((e) => { console.error(`terrarium: ${e.message}`); process.exit(1); });
+else if (cmd === "group" && rest[0] === "read") readRunGroupLogs({ groupId: rest[1] }).then((r) => console.log(JSON.stringify(r, null, 2))).catch((e) => { console.error(`terrarium: ${e.message}`); process.exit(1); });
 else if (cmd === "probe") runSandboxScenario({ scenarioId: rest[0], image: opts.image, unsafeNetwork: opts.unsafeNetwork }).then((result) => {
   console.log(JSON.stringify(result, null, 2));
   process.exit(result.verdict === "inconclusive" ? 1 : 0);
