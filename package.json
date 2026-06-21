@@ -25,6 +25,9 @@
     "demo:smoke": "node scripts/smoke-demo.mjs",
     "deploy": "vite build && wrangler deploy"
   },
+  "pi": {
+    "extensions": ["./src/pi-extension.js"]
+  },
   "files": [
     "src",
     "docs/SECURE_V1.md",
@@ -37,7 +40,8 @@
     "agent",
     "orchestrator",
     "subagent",
-    "cli"
+    "cli",
+    "pi-package"
   ],
   "devDependencies": {
     "vite": "^7.3.3",

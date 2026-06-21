@@ -4,7 +4,7 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { cancelRun, getRunStatus, isPidAlive, readRun, runTerrarium, spawnTerrariumBackground } from '../src/core.js';
-import { createRunGroup, getRunGroupStatus, readRunGroupLogs } from '../src/groups.js';
+import { createRunGroup, getRunGroupStatus, listRunGroups, readRunGroupLogs } from '../src/groups.js';
 
 test('run groups preserve ordered independent runs and summarize status/logs', async () => {
   const a = await runTerrarium({ task: 'group alpha', dryRun: true, stream: false });
@@ -14,6 +14,8 @@ test('run groups preserve ordered independent runs and summarize status/logs', a
   const status = await getRunGroupStatus({ groupId: group.groupId });
   assert.equal(status.complete, true);
   assert.equal(status.counts.done, 2);
+  const listing = await listRunGroups({ limit: 100 });
+  assert.ok(listing.groups.some((item) => item.groupId === group.groupId));
   const logs = await readRunGroupLogs({ groupId: group.groupId, tailBytes: 200 });
   assert.equal(logs.results.length, 2);
   assert.ok(logs.results.every((result) => typeof result.text === 'string'));

@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { HOME, assertRunId, getRunStatus, readRun } from "./core.js";
@@ -25,6 +25,14 @@ export async function createRunGroup({ label = "Terrarium group", runIds, groupI
 export async function getRunGroup(groupId) {
   assertGroupId(groupId);
   return JSON.parse(await readFile(join(GROUP_DIR, `${groupId}.json`), "utf8"));
+}
+
+export async function listRunGroups({ limit = 20 } = {}) {
+  await mkdir(GROUP_DIR, { recursive: true });
+  const files = (await readdir(GROUP_DIR)).filter((file) => file.endsWith(".json")).sort().reverse().slice(0, Math.min(Math.max(Number(limit) || 20, 1), 100));
+  const groups = [];
+  for (const file of files) { try { groups.push(await getRunGroup(file.slice(0, -5))); } catch {} }
+  return { count: groups.length, groups };
 }
 
 export async function getRunGroupStatus({ groupId, verbose = false } = {}) {
