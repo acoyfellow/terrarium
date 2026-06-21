@@ -384,6 +384,7 @@ Tools:
 - `terrarium_read` — read a recorded run log; pass `kind: "mre"` for the MRE side log.
 - `terrarium_cancel` — cancel one active run and its descendant process group within the caller's lineage scope.
 - `terrarium_group` — create/status/read/cancel a parent-owned collection of already-started independent runs; it never spawns or hides fan-out.
+- `terrarium_callbacks` — subscribe to scoped run events, atomically claim each callback once, and acknowledge delivery.
 
 CLI equivalents:
 

@@ -44,7 +44,7 @@ planned
 → stopped
 ```
 
-Every public event is allowlisted and bounded. Raw model transcripts, private prompts, credentials, local paths, and private model identity remain private.
+Every public event is allowlisted and bounded. Callback subscriptions can filter by run, channel, workflow, and event type. Events receive deterministic IDs; duplicate routing is suppressed. Consumers atomically move callbacks from pending to inflight and explicitly acknowledge them, preventing duplicate injection in one consumer. Raw model transcripts, private prompts, credentials, local paths, and private model identity remain private.
 
 ## Artifacts
 
