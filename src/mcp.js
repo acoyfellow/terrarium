@@ -3,6 +3,7 @@ import { createInterface } from "node:readline";
 import { cancelRun, getRunStatus, isRunAccessible, listRuns, readRun, runTerrarium, spawnTerrariumBackground, VERSION } from "./core.js";
 import { createRunGroup, getRunGroupStatus, readRunGroupLogs } from "./groups.js";
 import { acknowledgeMailboxEvent, claimMailboxEvents, getMailboxStatus, getSubscriber, registerSubscriber, unregisterSubscriber } from "./router.js";
+import { diagnoseTerrarium } from "./doctor.js";
 
 const tools = [
   {
@@ -98,6 +99,11 @@ const tools = [
       },
       required: ["action", "subscriberId"]
     }
+  },
+  {
+    name: "terrarium_doctor",
+    description: "Run read-only diagnostics for storage, active/orphaned runs, attention signals, callback queues, groups, and stale child claims.",
+    inputSchema: { type: "object", properties: {} }
   }
 ];
 
@@ -112,7 +118,11 @@ function capabilityPolicy(env = process.env) {
 }
 
 function visibleTools(policy) {
-  return policy.allowSpawn ? tools : tools.filter((tool) => tool.name !== "terrarium_spawn");
+  return tools.filter((tool) => {
+    if (!policy.allowSpawn && tool.name === "terrarium_spawn") return false;
+    if (policy.requesterRunId && tool.name === "terrarium_doctor") return false;
+    return true;
+  });
 }
 
 const SPAWN_ARG_KEYS = new Set(["task", "agent", "model", "readOnly", "ephemeral", "profile", "cwd", "timeoutMs", "needsAttentionAfterMs", "maxDepth", "allowSpawn", "statusScope", "readScope", "dryRun", "background", "logPath", "mreLogPath", "verbose"]);
@@ -294,6 +304,10 @@ async function handle(msg) {
         if (args.action === "status") return send(msg.id, content(await getMailboxStatus(args.subscriberId)));
         if (args.action === "unsubscribe") { await unregisterSubscriber(args.subscriberId); return send(msg.id, content({ subscriberId: args.subscriberId, unsubscribed: true })); }
         throw new Error("unknown Terrarium callback action");
+      }
+      if (name === "terrarium_doctor") {
+        if (policy.requesterRunId) throw new Error("Terrarium doctor is available only to a top-level controller");
+        return send(msg.id, content(await diagnoseTerrarium()));
       }
       return error(msg.id, -32602, `unknown tool: ${name}`);
     } catch (e) {

@@ -13,6 +13,7 @@ import { generatePlans } from "./campaign-strategist.js";
 import { runSecureTask } from "./secure.js";
 import { verifyHardening } from "./hardening.js";
 import { runSecureAgent } from "./secure-agent.js";
+import { diagnoseTerrarium } from "./doctor.js";
 
 function help() {
   return `terrarium ${VERSION}
@@ -47,6 +48,7 @@ Usage:
   terra secure "task"
   terra secure-agent --model <id> "task"
   terra hardening verify
+  terra doctor
   terra campaign read <campaignId>
   terra campaign verify <campaignId>
   terra campaign issue-draft <campaignId>
@@ -143,6 +145,7 @@ else if (cmd === "attack") runAttackExperiment({ scenarioId: rest[0], agent: opt
 }).catch((e) => { console.error(`terrarium: ${e.message}`); process.exit(1); });
 else if (cmd === "secure-agent") runSecureAgent({ task: rest.join(" "), cwd: opts.cwd, model: opts.model, timeoutMs: opts.timeoutMs || undefined }).then((result) => console.log(JSON.stringify(result, null, 2))).catch((e) => { console.error(`terrarium: ${e.message}`); process.exit(1); });
 else if (cmd === "secure") runSecureTask({ task: rest.join(" "), cwd: opts.cwd, timeoutMs: opts.timeoutMs || undefined }).then((result) => console.log(JSON.stringify(result, null, 2))).catch((e) => { console.error(`terrarium: ${e.message}`); process.exit(1); });
+else if (cmd === "doctor") diagnoseTerrarium().then((result) => { console.log(JSON.stringify(result, null, 2)); process.exit(result.ok ? 0 : 1); }).catch((e) => { console.error(`terrarium: ${e.message}`); process.exit(1); });
 else if (cmd === "hardening" && rest[0] === "verify") verifyHardening({ cwd: opts.cwd }).then((result) => { console.log(JSON.stringify(result, null, 2)); process.exit(result.ok ? 0 : 1); }).catch((e) => { console.error(`terrarium: ${e.message}`); process.exit(1); });
 else if (cmd === "scenarios") console.log(JSON.stringify(scenarioCatalog(), null, 2));
 else if (cmd === "campaign" && rest[0] === "strategize") fetch(`${(opts.controller || process.env.TERRARIUM_CONTROLLER_URL || "https://terrarium.coey.dev").replace(/\/$/, "")}/api/demo`).then((r) => r.json()).then((campaign) => generatePlans({ memory: buildCampaignMemory(campaign.turns, { revision: campaign.turns.at(-1)?.sourceRevision }), catalog: scenarioCatalog(), count: opts.turns || 8, agent: opts.agent, model: opts.model, timeoutMs: opts.timeoutMs })).then((result) => console.log(JSON.stringify(result, null, 2))).catch((e) => { console.error(`terrarium: ${e.message}`); process.exit(1); });
