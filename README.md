@@ -379,7 +379,7 @@ Config at `~/.terrarium/config.json`:
 
 Tools:
 
-- `terrarium_spawn` — run one bounded child agent task. Non-dry MCP runs detach by default; poll the returned run ID instead of holding an MCP call open. Pass `background: false` only for short synchronous work. `maxRetries > 0` also selects synchronous execution unless `background` is explicitly set.
+- `terrarium_spawn` — run one bounded child agent task. Existing callers remain synchronous when `background` is omitted. Set `background: true` (or `TERRARIUM_BACKGROUND_BY_DEFAULT=true`) to detach by default and poll the returned run ID. Retries remain synchronous.
 - `terrarium_status` — inspect one run or list recent runs.
 - `terrarium_read` — read a recorded run log; pass `kind: "mre"` for the MRE side log.
 

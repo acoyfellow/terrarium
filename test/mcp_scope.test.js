@@ -46,12 +46,12 @@ test('child MCP removes spawn and denies sibling status/read', async () => {
   assert.match(toolText(responses.find((r) => r.id === 5)), /spawn capability denied/);
 });
 
-test('MCP defaults non-dry runs to detached background execution', async () => {
+test('MCP supports opt-in detached background execution without changing the synchronous default', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'terra-mcp-background-'));
   const agentPath = join(dir, 'slow.mjs');
   writeFileSync(agentPath, `setTimeout(()=>{},1000);`);
   try {
-    const { responses } = await rpc([{ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'terrarium_spawn', arguments: { task: 'detached default', agent: `${process.execPath} ${agentPath}` } } }]);
+    const { responses } = await rpc([{ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'terrarium_spawn', arguments: { task: 'detached default', agent: `${process.execPath} ${agentPath}` } } }], { TERRARIUM_BACKGROUND_BY_DEFAULT: 'true' });
     const result = JSON.parse(toolText(responses[0]));
     assert.equal(result.background, true);
     assert.match(result.runId, /^ter_/);

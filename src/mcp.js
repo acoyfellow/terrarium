@@ -5,7 +5,7 @@ import { getRunStatus, listRuns, readRun, runTerrarium, spawnTerrariumBackground
 const tools = [
   {
     name: "terrarium_spawn",
-    description: "Spawn exactly one child agent for one delegated task. Child recursion and status/read visibility are capability-scoped by run lineage. Process exit zero is accepted only with a matching run/task receipt. Normal runs detach by default and return a concise run pointer; poll with terrarium_status. Pass background=false only for short synchronous work.",
+    description: "Spawn exactly one child agent for one delegated task. Child recursion and status/read visibility are capability-scoped by run lineage. Process exit zero is accepted only with a matching run/task receipt. Set background=true (or TERRARIUM_BACKGROUND_BY_DEFAULT=true) to detach and return a concise run pointer; poll with terrarium_status. Omitted background remains synchronous for compatibility.",
     inputSchema: {
       type: "object",
       properties: {
@@ -194,7 +194,8 @@ async function handle(msg) {
       if (name === "terrarium_spawn") {
         if (!policy.allowSpawn) throw new Error("Terrarium spawn capability denied for this run");
         const maxRetries = Number(args.maxRetries ?? 0);
-        const background = args.background ?? (!args.dryRun && maxRetries === 0);
+        const backgroundDefault = process.env.TERRARIUM_BACKGROUND_BY_DEFAULT === "true";
+        const background = args.background ?? (backgroundDefault && !args.dryRun && maxRetries === 0);
         if (background && maxRetries > 0) throw new Error("background Terrarium runs do not support retries");
         if (policy.requesterRunId && maxRetries > 0) throw new Error("nested Terrarium runs do not support retries; the parent owns retry policy");
         const safeArgs = sanitizeSpawnArgs({ ...args, background });
