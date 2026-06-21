@@ -28,8 +28,11 @@ export function streamEvents() {
 }
 
 export function eventForRun(type, run, extra = {}) {
+  const terminal = new Set([TerrariumEventType.Completed, TerrariumEventType.Failed, TerrariumEventType.TimedOut, TerrariumEventType.Cancelled]);
+  const eventId = extra.eventId ?? (terminal.has(type) ? `evt_${run.runId}_${type}` : undefined);
   return {
     type,
+    ...(eventId ? { eventId } : {}),
     runId: run.runId,
     parentRunId: run.parentRunId ?? null,
     cwd: run.originalCwd ?? run.cwd,

@@ -6,6 +6,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runTerrarium } from '../src/core.js';
+import { MAILBOXES_DIR, SUBSCRIBERS_DIR } from '../src/router.js';
 
 const MCP_PATH = fileURLToPath(new URL('../src/mcp.js', import.meta.url));
 
@@ -41,12 +42,18 @@ test('child MCP removes spawn and denies sibling status/read', async () => {
     { jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'terrarium_status', arguments: { runId: b.runId } } },
     { jsonrpc: '2.0', id: 4, method: 'tools/call', params: { name: 'terrarium_read', arguments: { runId: b.runId } } },
     { jsonrpc: '2.0', id: 5, method: 'tools/call', params: { name: 'terrarium_spawn', arguments: { task: 'nope', dryRun: true } } },
+    { jsonrpc: '2.0', id: 6, method: 'tools/call', params: { name: 'terrarium_callbacks', arguments: { action: 'subscribe', subscriberId: `sub_${a.runId}`, runIds: [a.runId] } } },
+    { jsonrpc: '2.0', id: 7, method: 'tools/call', params: { name: 'terrarium_callbacks', arguments: { action: 'subscribe', subscriberId: `sub_bad_${a.runId}`, runIds: [b.runId] } } },
   ], env);
-  assert.deepEqual(responses.find((r) => r.id === 1).result.tools.map((t) => t.name), ['terrarium_status', 'terrarium_read', 'terrarium_cancel', 'terrarium_group']);
+  assert.deepEqual(responses.find((r) => r.id === 1).result.tools.map((t) => t.name), ['terrarium_status', 'terrarium_read', 'terrarium_cancel', 'terrarium_group', 'terrarium_callbacks']);
   assert.equal(JSON.parse(toolText(responses.find((r) => r.id === 2))).runId, a.runId);
   assert.match(toolText(responses.find((r) => r.id === 3)), /access denied/);
   assert.match(toolText(responses.find((r) => r.id === 4)), /access denied/);
   assert.match(toolText(responses.find((r) => r.id === 5)), /spawn capability denied/);
+  assert.equal(JSON.parse(toolText(responses.find((r) => r.id === 6))).ownerRunId, a.runId);
+  assert.match(toolText(responses.find((r) => r.id === 7)), /callback run access denied/);
+  rmSync(join(MAILBOXES_DIR, `sub_${a.runId}`), { recursive: true, force: true });
+  rmSync(join(SUBSCRIBERS_DIR, `sub_${a.runId}.json`), { force: true });
 });
 
 test('MCP supports opt-in detached background execution without changing the synchronous default', async () => {

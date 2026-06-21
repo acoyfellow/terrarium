@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 import { createInterface } from "node:readline";
-import { cancelRun, getRunStatus, listRuns, readRun, runTerrarium, spawnTerrariumBackground, VERSION } from "./core.js";
+import { cancelRun, getRunStatus, isRunAccessible, listRuns, readRun, runTerrarium, spawnTerrariumBackground, VERSION } from "./core.js";
 import { createRunGroup, getRunGroupStatus, readRunGroupLogs } from "./groups.js";
+import { acknowledgeMailboxEvent, claimMailboxEvents, getMailboxStatus, getSubscriber, registerSubscriber, unregisterSubscriber } from "./router.js";
 
 const tools = [
   {
@@ -76,6 +77,24 @@ const tools = [
         tailBytes: { type: "number" }
       },
       required: ["action"]
+    }
+  },
+  {
+    name: "terrarium_callbacks",
+    description: "Subscribe to scoped run callbacks and claim/ack each completion exactly once.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        action: { type: "string", enum: ["subscribe", "claim", "ack", "status", "unsubscribe"] },
+        subscriberId: { type: "string" },
+        runIds: { type: "array", items: { type: "string" }, maxItems: 100 },
+        channels: { type: "array", items: { type: "string" }, maxItems: 100 },
+        workflowIds: { type: "array", items: { type: "string" }, maxItems: 100 },
+        eventTypes: { type: "array", items: { type: "string" }, maxItems: 100 },
+        eventId: { type: "string" },
+        limit: { type: "number" }
+      },
+      required: ["action", "subscriberId"]
     }
   }
 ];
@@ -247,6 +266,23 @@ async function handle(msg) {
           return send(msg.id, content({ groupId: args.groupId, cancelled: results }));
         }
         throw new Error("unknown Terrarium group action");
+      }
+      if (name === "terrarium_callbacks") {
+        if (args.action === "subscribe") {
+          const runIds = args.runIds ?? (policy.requesterRunId ? [policy.requesterRunId] : ["*"]);
+          if (policy.requesterRunId) {
+            if (runIds.includes("*")) throw new Error("child callback subscriptions require explicit lineage run IDs");
+            for (const runId of runIds) if (!(await isRunAccessible({ requesterRunId: policy.requesterRunId, targetRunId: runId, scope: policy.statusScope }))) throw new Error("callback run access denied");
+          }
+          return send(msg.id, content(await registerSubscriber({ ...args, runIds, ownerRunId: policy.requesterRunId })));
+        }
+        const subscription = await getSubscriber(args.subscriberId);
+        if (policy.requesterRunId && subscription.ownerRunId !== policy.requesterRunId) throw new Error("callback subscriber access denied");
+        if (args.action === "claim") return send(msg.id, content(await claimMailboxEvents(args)));
+        if (args.action === "ack") return send(msg.id, content(await acknowledgeMailboxEvent(args)));
+        if (args.action === "status") return send(msg.id, content(await getMailboxStatus(args.subscriberId)));
+        if (args.action === "unsubscribe") { await unregisterSubscriber(args.subscriberId); return send(msg.id, content({ subscriberId: args.subscriberId, unsubscribed: true })); }
+        throw new Error("unknown Terrarium callback action");
       }
       return error(msg.id, -32602, `unknown tool: ${name}`);
     } catch (e) {
