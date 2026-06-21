@@ -384,7 +384,7 @@ Tools:
 - `terrarium_read` — read a recorded run log; pass `kind: "mre"` for the MRE side log.
 - `terrarium_cancel` — cancel one active run and its descendant process group within the caller's lineage scope.
 - `terrarium_group` — create/status/read/cancel a parent-owned collection of already-started independent runs; it never spawns or hides fan-out.
-- `terrarium_callbacks` — subscribe to scoped run events, atomically claim each callback once, and acknowledge delivery.
+- `terrarium_callbacks` — subscribe to scoped run events, atomically claim each callback once, acknowledge delivery, requeue abandoned inflight events, and prune old acknowledged/journal records.
 - `terrarium_doctor` — top-level-only diagnostics for storage, runs, attention, callbacks, groups, and stale claims.
 
 Pi children default to ephemeral `--no-session` runs unless the caller supplies an explicit `--session`/`--session-id` or sets `ephemeral: false`. `needsAttentionAfterMs` controls when an active run with no observed output is marked for attention; this is an inactivity signal, not a claim that the child is stuck.
