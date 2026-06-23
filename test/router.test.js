@@ -39,9 +39,11 @@ test('stale inflight callbacks can be requeued and acknowledged history can be p
     await registerSubscriber({ subscriberId, runIds: ['*'], eventTypes: ['Completed'], channels: ['*'], workflowIds: ['*'] });
     await routeEvent({ eventId, type: 'Completed', runId: `ter_${suffix}`, workflowId: 'w', channel: 'x', at: '2020-01-01T00:00:00.000Z' });
     await claimMailboxEvents({ subscriberId });
-    assert.equal((await requeueInflightEvents({ subscriberId, olderThanMs: 0 })).requeued, 1);
+    // This subscriber is a wildcard, so other concurrently-running test files may
+    // also land real Completed events here; assert on our own event, not exact totals.
+    assert.ok((await requeueInflightEvents({ subscriberId, olderThanMs: 0 })).requeued >= 1);
     const claimed = await claimMailboxEvents({ subscriberId });
-    assert.equal(claimed.events.length, 1);
+    assert.ok(claimed.events.some((e) => e.eventId === eventId));
     await acknowledgeMailboxEvent({ subscriberId, eventId });
     const pruned = await pruneRouter({ acknowledgedOlderThanMs: 0, journalOlderThanMs: 0, subscriberIds: [subscriberId], eventIds: [eventId] });
     assert.ok(pruned.acknowledgedRemoved >= 1);

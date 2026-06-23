@@ -2,6 +2,7 @@
 import { createInterface } from "node:readline";
 import { cancelRun, getRunStatus, isRunAccessible, listRuns, readRun, runTerrarium, spawnTerrariumBackground, VERSION } from "./core.js";
 import { createRunGroup, getRunGroupStatus, readRunGroupLogs } from "./groups.js";
+import { spawnBatch, BATCH_STRATEGIES } from "./batch.js";
 import { acknowledgeMailboxEvent, claimMailboxEvents, getMailboxStatus, getSubscriber, pruneRouter, registerSubscriber, requeueInflightEvents, unregisterSubscriber } from "./router.js";
 import { diagnoseTerrarium } from "./doctor.js";
 
@@ -33,6 +34,24 @@ const tools = [
         verbose: { type: "boolean", description: "Return the full unprojected result envelope. Default: false (concise projection)." }
       },
       required: ["task"]
+    }
+  },
+  {
+    name: "terrarium_spawn_batch",
+    description: "Fan out an array of jobs as independent background runs under one group, then resolve by join strategy. Each job is a normal single spawn (same options as terrarium_spawn). Strategies: all (every job must finish; ok if all succeed), allSettled (collect all outcomes, always ok), race (first terminal wins, cancel the rest), any (first success wins, cancel the rest), quorum (first k successes, cancel the rest). Winner-picking strategies cancel losing runs; prefer isolation copy|worktree for jobs with side effects. Capability-scoped like terrarium_spawn.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        jobs: { type: "array", minItems: 1, maxItems: 32, description: "Job option objects, each accepting the same fields as terrarium_spawn (task required).", items: { type: "object", properties: { task: { type: "string" }, agent: { type: "string" }, model: { type: "string" }, readOnly: { type: "boolean" }, ephemeral: { type: "boolean" }, profile: { type: "string", enum: ["default", "minimal"] }, cwd: { type: "string" }, timeoutMs: { type: "number" }, needsAttentionAfterMs: { type: "number" }, maxDepth: { type: "number" }, allowSpawn: { type: "boolean" }, statusScope: { type: "string", enum: ["self", "descendants", "all"] }, readScope: { type: "string", enum: ["self", "descendants", "all"] }, logPath: { type: "string" }, mreLogPath: { type: "string" } }, required: ["task"] } },
+        strategy: { type: "string", enum: BATCH_STRATEGIES, description: "Join strategy. Default: all." },
+        quorum: { type: "number", description: "Required successes for the quorum strategy (1..jobs.length)." },
+        concurrency: { type: "number", minimum: 1, description: "Max simultaneously launched runs. Default: launch all at once." },
+        label: { type: "string", description: "Group label." },
+        pollMs: { type: "number", description: "Status poll interval in ms. Default: 500." },
+        timeoutMs: { type: "number", description: "Overall batch wait budget in ms; on timeout, remaining runs are cancelled." },
+        verbose: { type: "boolean", description: "Return the full group envelope. Default: concise." }
+      },
+      required: ["jobs"]
     }
   },
   {
@@ -120,7 +139,7 @@ function capabilityPolicy(env = process.env) {
 
 function visibleTools(policy) {
   return tools.filter((tool) => {
-    if (!policy.allowSpawn && tool.name === "terrarium_spawn") return false;
+    if (!policy.allowSpawn && (tool.name === "terrarium_spawn" || tool.name === "terrarium_spawn_batch")) return false;
     if (policy.requesterRunId && tool.name === "terrarium_doctor") return false;
     return true;
   });
@@ -243,6 +262,27 @@ export function conciseListing(full) {
   };
 }
 
+export function conciseBatch(full) {
+  if (!full || typeof full !== "object") return full;
+  const group = full.group && typeof full.group === "object" ? full.group : {};
+  return defined({
+    ok: full.ok,
+    strategy: full.strategy,
+    groupId: full.groupId,
+    reason: full.reason,
+    winner: full.winner,
+    winners: full.winners,
+    timedOut: full.timedOut ? true : undefined,
+    successCount: full.successCount,
+    failureCount: full.failureCount,
+    quorum: full.quorum,
+    runIds: full.runIds,
+    counts: group.counts,
+    complete: group.complete,
+    runs: Array.isArray(group.runs) ? group.runs.map((r) => defined({ runId: r.runId, status: r.status, ok: r.ok, exitCode: r.exitCode, taskContractStatus: r.taskContractStatus, error: r.error, note: r.note })) : undefined,
+  });
+}
+
 function send(id, result) { process.stdout.write(JSON.stringify({ jsonrpc: "2.0", id, result }) + "\n"); }
 function error(id, code, message) { process.stdout.write(JSON.stringify({ jsonrpc: "2.0", id, error: { code, message } }) + "\n"); }
 function content(obj, isError = false) { return { content: [{ type: "text", text: typeof obj === "string" ? obj : JSON.stringify(obj, null, 2) }], isError }; }
@@ -265,6 +305,14 @@ async function handle(msg) {
         const safeArgs = sanitizeSpawnArgs({ ...args, background });
         const result = background ? await spawnTerrariumBackground(safeArgs) : await runWithBoundedRetries(safeArgs, maxRetries);
         const projected = verbose ? result : conciseSpawn(result);
+        return send(msg.id, content(projected, !result.ok));
+      }
+      if (name === "terrarium_spawn_batch") {
+        if (!policy.allowSpawn) throw new Error("Terrarium spawn capability denied for this run");
+        if (policy.requesterRunId) throw new Error("nested Terrarium runs cannot fan out a batch; the top-level owner fans out");
+        const jobs = Array.isArray(args.jobs) ? args.jobs.map((job) => ({ ...sanitizeSpawnArgs(job), background: true, dryRun: false })) : args.jobs;
+        const result = await spawnBatch({ jobs, strategy: args.strategy, quorum: args.quorum, concurrency: args.concurrency, label: args.label, pollMs: args.pollMs, timeoutMs: args.timeoutMs });
+        const projected = verbose ? result : conciseBatch(result);
         return send(msg.id, content(projected, !result.ok));
       }
       if (name === "terrarium_status") {

@@ -27,7 +27,13 @@ function toolText(response) { return response.result?.content?.[0]?.text || ''; 
 test('top-level MCP keeps the stable three-tool surface', async () => {
   const { responses } = await rpc([{ jsonrpc: '2.0', id: 1, method: 'tools/list' }]);
   const names = responses[0].result.tools.map((tool) => tool.name);
-  assert.deepEqual(names.slice(0, 3), ['terrarium_spawn', 'terrarium_status', 'terrarium_read']);
+  // Stable primitives remain present and ordered; additive tools may interleave.
+  assert.ok(names.includes('terrarium_spawn'));
+  assert.ok(names.includes('terrarium_status'));
+  assert.ok(names.includes('terrarium_read'));
+  assert.ok(names.indexOf('terrarium_spawn') < names.indexOf('terrarium_status'));
+  assert.ok(names.indexOf('terrarium_status') < names.indexOf('terrarium_read'));
+  assert.ok(names.includes('terrarium_spawn_batch'));
   assert.ok(names.includes('terrarium_cancel'));
   assert.ok(names.includes('terrarium_group'));
   assert.ok(names.includes('terrarium_callbacks'));
@@ -47,7 +53,9 @@ test('child MCP removes spawn and denies sibling status/read', async () => {
     { jsonrpc: '2.0', id: 6, method: 'tools/call', params: { name: 'terrarium_callbacks', arguments: { action: 'subscribe', subscriberId: `sub_${a.runId}`, runIds: [a.runId] } } },
     { jsonrpc: '2.0', id: 7, method: 'tools/call', params: { name: 'terrarium_callbacks', arguments: { action: 'subscribe', subscriberId: `sub_bad_${a.runId}`, runIds: [b.runId] } } },
   ], env);
-  assert.deepEqual(responses.find((r) => r.id === 1).result.tools.map((t) => t.name), ['terrarium_status', 'terrarium_read', 'terrarium_cancel', 'terrarium_group', 'terrarium_callbacks']);
+  const childNames = responses.find((r) => r.id === 1).result.tools.map((t) => t.name);
+  assert.deepEqual(childNames, ['terrarium_status', 'terrarium_read', 'terrarium_cancel', 'terrarium_group', 'terrarium_callbacks']);
+  assert.ok(!childNames.includes('terrarium_spawn_batch'), 'denied child must not see batch fan-out');
   assert.equal(JSON.parse(toolText(responses.find((r) => r.id === 2))).runId, a.runId);
   assert.match(toolText(responses.find((r) => r.id === 3)), /access denied/);
   assert.match(toolText(responses.find((r) => r.id === 4)), /access denied/);
