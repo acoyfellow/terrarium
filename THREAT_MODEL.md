@@ -2,7 +2,7 @@
 
 ## Status
 
-Terrarium is becoming a public automated laboratory for probing AI-agent containment. It does **not** currently claim to safely execute hostile agents. This document defines what a credible containment loop must defend, test, and refuse to overclaim.
+Terrarium's current product is a durable execution and callback layer. Ordinary runs inherit host authority and do **not** safely contain hostile agents. The opt-in secure-v1 Docker and Lab-backed paths enforce narrower documented boundaries, but neither turns copy/worktree isolation into a sandbox. The public automated laboratory is frozen historical provenance. This document remains the security contract for containment-related code and claims.
 
 ## Security objective
 

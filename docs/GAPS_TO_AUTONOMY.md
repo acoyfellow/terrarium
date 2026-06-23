@@ -1,6 +1,8 @@
 # Gaps from synthetic fixture loop to hostile adaptive public loop
 
-Terrarium now proves a synthetic public loop:
+> **Frozen historical gap analysis.** These gaps remain useful provenance, but closing them is not the current product roadmap. The public campaign is maintenance-only; see [CORE_PRODUCT_DECISION.md](./CORE_PRODUCT_DECISION.md).
+
+Terrarium proved a synthetic public loop:
 
 ```text
 known vulnerable fixture

@@ -4,11 +4,13 @@
 
 ![A cozy glass terrarium on a wooden desk. Inside, a single small robot tends a tiny garden of even smaller robots, each working in their own pot.](./assets/social-card.jpg)
 
-**A hardened place to run AI agents.**
+**Durable, runner-independent execution and callbacks for bounded delegated work.**
 
-Terrarium's boundaries are continuously attacked. Every reproduced weakness becomes a permanent regression before the next release.
+Terrarium gives each delegated job a durable run ID, correlated result receipt, progress/status surface, cancellation, and a deterministic callback queue with atomic claim/ack/requeue semantics. It can launch one job or an explicitly requested batch while preserving one independent child process and receipt per run.
 
-Terrarium has two uses built around one stable idea:
+The containment campaign and public demo are frozen historical evidence, not the current product direction. See the [core product decision](./docs/CORE_PRODUCT_DECISION.md).
+
+Terrarium is built around one stable primitive:
 
 ```text
 one bounded task → one child run → one inspectable result
@@ -17,6 +19,9 @@ one bounded task → one child run → one inspectable result
 | If you want to… | Use… | Status |
 | --- | --- | --- |
 | Keep your main agent context clean while a child investigates or edits. | `terra "task"` or MCP `terrarium_spawn`; optionally choose Pi/OpenCode and pin a model | Stable original workflow |
+| Launch independent jobs in one call with explicit join semantics. | `terra batch` or MCP `terrarium_spawn_batch` | Additive; all/allSettled/race/any/quorum |
+| Observe durable runs, groups, callbacks, and attention. | `terra status`, `terra group`, `terra doctor`, callback MCP | Implemented |
+| Replay bounded cancellation/completion timing schedules. | `terra schedule replay <fixture>` | Local-only, versioned fixtures |
 | Test declared containment boundaries in Docker. | `terra probe <scenario>` | Implemented, opt-in |
 | Ask an agent to initiate a bounded containment test. | `terra attack <scenario>` | Implemented, deliberately constrained |
 | Turn a reproduced escape into reviewable report text. | `terra campaign issue-draft <id>` | Local-only; does not publish |
@@ -27,9 +32,9 @@ one bounded task → one child run → one inspectable result
 
 Ordinary children inherit host authority and environment; use them for cooperative work, not as a security boundary. `secure-v1` is the opt-in Docker profile with explicit [guarantees and non-guarantees](./docs/SECURE_V1.md).
 
-## Public campaign demo
+## Frozen public campaign demo
 
-[`terrarium.coey.dev`](https://terrarium.coey.dev) shows real attempts against the current product, verified findings, GitHub issues, fix commits, post-fix replay, and safe event traces. Illustrations tell the human story; receipts and GitHub artifacts are the proof.
+[`terrarium.coey.dev`](https://terrarium.coey.dev) preserves real attempts, verified findings, GitHub issues, fix commits, post-fix replay, and safe event traces. It is maintenance-only historical provenance; new product work targets the durable execution/callback core. Illustrations tell the human story; receipts and GitHub artifacts are the proof.
 
 ```sh
 npm run demo:dev      # local public site
@@ -174,9 +179,9 @@ fixtures/known-vulnerable/environment-leak/fixed.json
 
 The `vulnerable` variant deliberately injects a planted canary into the container environment so the detector reports `escaped`, replay confirms `verified-escape`, and an issue draft can be rendered. The `fixed` variant omits that injection and reports `contained`; it is the expected remediation target for the synthetic issue/PR loop. These fixture commands do not invoke an AI agent because the pipeline being tested begins at a controlled detector result. Generated drafts are labeled as a **known-vulnerable fixture** and must not be published as real discoveries.
 
-## Public automation today
+## Historical public automation evidence
 
-A GitHub Actions workflow runs the safe baseline publicly. The first manual run exposed a Docker bind-mount portability bug on GitHub-hosted Linux; probes now execute trusted deterministic source inline in Docker rather than bind mounting generated files from the runner workspace.
+A GitHub Actions workflow was added to run the safe baseline publicly. The first manual run exposed a Docker bind-mount portability bug on GitHub-hosted Linux; probes now execute trusted deterministic source inline in Docker rather than bind mounting generated files from the runner workspace.
 
 Workflow:
 
@@ -222,7 +227,7 @@ This is still a pipeline fixture, not a discovered security vulnerability. Two l
 The original delegation contract remains foundational:
 
 - CLI: `terra "task"`, `terra status`, `terra read`
-- Node API: one bounded child-run primitives from `src/core.js`
+- Node API: bounded single-run primitives from `src/core.js`
 - MCP: `terrarium_spawn`, `terrarium_status`, `terrarium_read`
 
 Compatibility promises:
@@ -251,9 +256,9 @@ terra fixture escape vulnerable
 terra fixture escape fixed
 ```
 
-### Cloudflare Dynamic Workflow prototype
+### Frozen Cloudflare Dynamic Workflow prototype
 
-Terrarium now also has a minimal Cloudflare-native control-worker prototype in `src/control-worker.js`, configured by `wrangler.jsonc`. It uses a Dynamic Workflow to load policy, enforce pause/cooldown/daily caps, run one Lab-backed fixture scenario, replay escaped results, and write a receipt. The current deployment is intentionally fixture-only on the personal Cloudflare account at `https://terrarium-control.coy.workers.dev`; it does not yet publish issues, open PRs, or merge fixes. `src/lab.js` plus `src/hostile.js` now define a bounded Lab adapter, hostile payload policy, one `lab-env-canary` scenario, and exact fresh replay. The controller can accept a real-mode payload envelope internally, but `allowReal` remains false until manual policy enablement and further validation are added. Policy is now inspectable and updateable through `/policy`, but real mode should stay disabled until the local real-mode test path is verified.
+The repository retains a minimal Cloudflare-native control-worker prototype in `src/control-worker.js`, configured by `wrangler.jsonc`. It uses a Dynamic Workflow to load policy, enforce pause/cooldown/daily caps, run Lab-backed scenarios, replay escaped results, and write receipts. The personal-account deployment remains at `https://terrarium-control.coy.workers.dev`; it does not publish issues, open PRs, or merge fixes. `src/lab.js` plus `src/hostile.js` define the bounded Lab adapter, hostile payload policy, scenarios, and exact fresh replay. Real mode was manually enabled for bounded validated campaigns and is currently paused/disabled through inspectable policy. It should remain disabled while this campaign path is frozen.
 
 ```text
 load policy
@@ -275,15 +280,15 @@ terra hostile run lab-env-canary --turns 3 \
 
 Each turn accepts one machine-parsed payload, validates it against the zero-capability/4 KB policy, executes it in Lab, returns sanitized feedback, and stops early only on a fresh replayed escape. Issue publication, fix PRs, and auto-merge remain disabled for this manual path.
 
-### Not shipped yet
+### Frozen campaign gaps
 
-The intended public loop is:
+The historical intended public loop was:
 
 ```text
 contain → attack → verify → issue → patch → replay → repeat
 ```
 
-Not yet shipped:
+Not shipped in the frozen campaign:
 
 - arbitrary adaptive attack programs generated by an AI inside containment;
 - trusted automatic GitHub issue publication;
@@ -429,6 +434,6 @@ terra task A
     grandchild does B
 ```
 
-Each process still owns only one child. Terrarium does not fan out within one process.
+Each run still owns one child process and one receipt. `terrarium_spawn_batch` is an explicit top-level fan-out coordinator: it creates independent ordinary runs, records them in one durable group, applies the requested join strategy, and cancels remaining runs for winner-picking strategies.
 
 A terrarium is a tiny sealed world. This one starts by making its missing glass measurable.
