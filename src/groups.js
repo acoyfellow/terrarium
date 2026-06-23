@@ -29,10 +29,12 @@ export async function getRunGroup(groupId) {
 
 export async function listRunGroups({ limit = 20 } = {}) {
   await mkdir(GROUP_DIR, { recursive: true });
-  const files = (await readdir(GROUP_DIR)).filter((file) => file.endsWith(".json")).sort().reverse().slice(0, Math.min(Math.max(Number(limit) || 20, 1), 100));
+  const files = (await readdir(GROUP_DIR)).filter((file) => file.endsWith(".json"));
   const groups = [];
   for (const file of files) { try { groups.push(await getRunGroup(file.slice(0, -5))); } catch {} }
-  return { count: groups.length, groups };
+  groups.sort((a, b) => String(b.createdAt).localeCompare(String(a.createdAt)));
+  const bounded = groups.slice(0, Math.min(Math.max(Number(limit) || 20, 1), 100));
+  return { count: bounded.length, groups: bounded };
 }
 
 export async function getRunGroupStatus({ groupId, verbose = false } = {}) {

@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "id": "cancel-before-completion",
+  "affectedRevision": "fa4fba066653dd8a53b54daa7fead58b1000d7f5",
+  "initialState": {
+    "requireReceipt": true
+  },
+  "orderedInputs": [
+    { "type": "CancelRequested" },
+    { "type": "ChildExited", "exitCode": 0, "signal": "SIGTERM" },
+    { "type": "ReceiptObserved", "status": "verified" }
+  ],
+  "invariants": [
+    "at-most-one-terminal",
+    "at-most-one-callback",
+    "terminal-callback-paired"
+  ],
+  "expected": {
+    "terminalStatus": "cancelled"
+  }
+}
