@@ -40,7 +40,7 @@ These tools remain available with their present ordinary-run meaning:
 | `terrarium_read` | Read a recorded Terrarium or MRE log. |
 | `terrarium_cancel` | Additive control: cancel one active lineage-scoped run. |
 | `terrarium_group` | Additive view: group existing independent runs; never spawns children. |
-| `terrarium_callbacks` | Additive callback queue: scoped subscribe/claim/ack/status/requeue/prune/unsubscribe. |
+| `terrarium_callbacks` | Additive durable pull queue: scoped subscribe/claim/ack/status/requeue/recover/prune/unsubscribe; concrete subscriptions close finish-before-subscribe races. |
 | `terrarium_doctor` | Additive top-level diagnostics for durable state, active/orphaned runs, groups, callbacks, and stale claims. |
 
 Existing arguments preserve their semantics. Optional fields may be added later for sandbox selection, run role, scenario identity, or campaign identity; ordinary callers do not need them.
@@ -73,7 +73,7 @@ Higher-level coordination should compose these primitives or live in separate mo
 - Existing metadata, log, patch, and workspace receipts remain inspectable through the stable status/read flow by top-level callers. Child callers are restricted to self/descendant lineage unless the parent explicitly grants `all`.
 - MCP-spawned non-dry runs require a structured run/task receipt. Exit zero without correlation is returned as `inconclusive`/`ok:false`; concise and verbose response envelopes remain additive-compatible.
 - A batch job or campaign action must leave an ordinary Terrarium run ID and receipt behind.
-- A run emits at most one terminal result and one paired completion callback. Background terminal classification is driven by the pure run transition core; versioned schedule replay is diagnostic evidence, not a second persisted source of truth.
+- A run emits at most one terminal result and one deterministic terminal callback event. The journal is written even with no online subscriber; concrete late subscriptions can replay it, while acknowledged events remain suppressed. Background terminal classification is driven by the pure run transition core; versioned schedule replay is diagnostic evidence, not a second persisted source of truth.
 
 ## Security boundary distinction
 

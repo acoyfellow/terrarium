@@ -79,7 +79,7 @@ Optional `concurrency` bounds simultaneous launches. For write-capable winner-pi
 
 ## Terminal race invariants
 
-Detached background runs use `transition(state, input) -> { state, decisions }` to guarantee at most one terminal result and one paired completion callback. Cancellation intent is durable across the launcher/supervisor handoff. Versioned schedule fixtures exercise cancellation-before-completion, completion-before-cancellation, virtual deadlines, and seeded bounded permutations without process sleeps. See [RUN_SCHEDULES.md](./RUN_SCHEDULES.md).
+Detached background runs use `transition(state, input) -> { state, decisions }` to guarantee at most one terminal result and one deterministic completion event. The callback router journals that event without requiring an online subscriber. Concrete subscriptions replay a completion that raced ahead; Pi retains its session subscriber/mailbox across shutdown and requeues abandoned inflight claims on resume. Cancellation intent is durable across the launcher/supervisor handoff. Versioned schedule fixtures exercise cancellation-before-completion, completion-before-cancellation, virtual deadlines, and seeded bounded permutations without process sleeps. See [RUN_SCHEDULES.md](./RUN_SCHEDULES.md).
 
 ## Retry policy
 

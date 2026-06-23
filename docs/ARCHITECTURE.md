@@ -15,7 +15,7 @@ Parallel top-level runs keep separate metadata/logs and may execute concurrently
 
 ## Core run lifecycle
 
-One ordinary run owns one child process, metadata/log receipts, and at most one terminal result plus one paired completion callback. Detached background runs feed observed process, cancellation, deadline, and receipt facts into the pure transition core in `src/run-machine.js`; the supervisor executes returned decisions using real processes, clocks, metadata, and the callback router. Versioned fixtures in `fixtures/run-schedules/` replay bounded classification facts only and never become a second persisted run record.
+One ordinary run owns one child process, metadata/log receipts, and at most one terminal result plus one deterministic terminal callback event. Terminal events are durably journaled before secondary in-process observers, even when no subscriber is online. Concrete late subscriptions replay matching journal entries without redelivering acknowledged events. Detached background runs feed observed process, cancellation, deadline, and receipt facts into the pure transition core in `src/run-machine.js`; the supervisor executes returned decisions using real processes, clocks, metadata, and the callback router. Versioned fixtures in `fixtures/run-schedules/` replay bounded classification facts only and never become a second persisted run record.
 
 Explicit batch fan-out in `src/batch.js` creates independent background runs, stores their run IDs in one durable group, and applies `all`, `allSettled`, `race`, `any`, or `quorum` join semantics. Winner-picking strategies cancel remaining ordinary runs through the same cancellation primitive.
 
