@@ -1,17 +1,25 @@
 # Terrarium architecture
 
-Terrarium has two additive modes:
+Terrarium's current core is durable execution and callbacks, with additive coordination and security profiles:
 
 ```text
-terra "task"          cooperative one-child delegation (stable compatibility surface)
-terra secure "task"   hostile/untrusted secure-v1 validation profile
+terra "task"             one cooperative run (stable compatibility surface)
+terra batch ...           explicit fan-out into independent ordinary runs
+terra schedule replay ... deterministic terminal-semantics replay
+terra secure "task"      hostile/untrusted secure-v1 validation profile
 ```
 
 ## Ordinary-run isolation
 
 Parallel top-level runs keep separate metadata/logs and may execute concurrently. Each child receives a lineage-scoped capability policy: minimal/max-depth-one runs have no recursive spawn and self-only status/read; explicitly nested runs may see descendants but not siblings. MCP results require a run/task-correlated receipt, so process success is not automatically task success. See [CONCURRENCY_ISOLATION.md](./CONCURRENCY_ISOLATION.md).
 
-## Seven-minute model
+## Core run lifecycle
+
+One ordinary run owns one child process, metadata/log receipts, and at most one terminal result plus one paired completion callback. Detached background runs feed observed process, cancellation, deadline, and receipt facts into the pure transition core in `src/run-machine.js`; the supervisor executes returned decisions using real processes, clocks, metadata, and the callback router. Versioned fixtures in `fixtures/run-schedules/` replay bounded classification facts only and never become a second persisted run record.
+
+Explicit batch fan-out in `src/batch.js` creates independent background runs, stores their run IDs in one durable group, and applies `all`, `allSettled`, `race`, `any`, or `quorum` join semantics. Winner-picking strategies cancel remaining ordinary runs through the same cancellation primitive.
+
+## Historical campaign model
 
 ```text
 PLAN → RUN → CHECK → REPLAY → FIX → RECHECK → MERGE
@@ -26,7 +34,7 @@ PLAN → RUN → CHECK → REPLAY → FIX → RECHECK → MERGE
 - **Replay gate:** same payload, same detector, fresh environment.
 - **Merger:** serial trusted controller after tests and replay.
 
-## State machine
+## Historical campaign state machine
 
 ```text
 planned
@@ -64,7 +72,7 @@ Every public event is allowlisted and bounded. Callback subscriptions can filter
 
 ## Concurrency
 
-Independent runs may execute concurrently, but each Terrarium process still owns one child. Parents can register existing run IDs in a durable group to preserve ordering and display grouped status/log summaries without hidden fan-out. Cancellation targets the child's Unix process group so ordinary descendants are torn down together. Strategy rounds are separated by a memory barrier. Fixes may be generated concurrently but merge serially; every stale fix must replay against the current head.
+Independent runs may execute concurrently; each run still owns one child and one receipt. Parents can register existing run IDs in a durable group, or explicitly use `terrarium_spawn_batch` to launch 1–32 jobs and create the group in one call. `concurrency` bounds simultaneous launches. Cancellation records durable intent, keeps the supervisor alive through launch handoff, and targets the child's Unix process group so descendants are torn down together. Strategy rounds are separated by a memory barrier. Fixes may be generated concurrently but merge serially; every stale fix must replay against the current head.
 
 ## Secure agent composition
 
@@ -80,6 +88,8 @@ Pi (model transport; no built-in host tools)
 Terrarium remains the wrapper and capability broker; Pi remains the agent. Model credentials never enter Docker.
 
 ## Current limits
+
+The public campaign/state-machine sections above document frozen historical provenance. See [CORE_PRODUCT_DECISION.md](./CORE_PRODUCT_DECISION.md); they are not the current product roadmap.
 
 - secure-agent is proven on one dependency-free Node bug-fix fixture, not broad coding workloads yet.
 - Docker/Lab provide the execution boundary; copy/worktree alone do not.

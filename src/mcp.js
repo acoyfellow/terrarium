@@ -20,6 +20,8 @@ const tools = [
         ephemeral: { type: "boolean", description: "For Pi agents, append --no-session unless an explicit session flag is already present. Default true." },
         profile: { type: "string", enum: ["default", "minimal"], description: "Child prompt profile. 'default' (full structured contract) or 'minimal' (lean shell for bounded read-only digs). Orthogonal to agent/readOnly. Default: 'default'." },
         cwd: { type: "string", description: "Working directory for the child. Default: current directory." },
+        isolation: { type: "string", enum: ["none", "copy", "worktree"], description: "Workspace separation mode. This is not a security sandbox. Default: none." },
+        keepWorkspace: { type: "boolean", description: "Retain an isolated copy/worktree for inspection instead of cleaning it up." },
         timeoutMs: { type: "number", description: "Kill the child after this many milliseconds. Default: none." },
         needsAttentionAfterMs: { type: "number", minimum: 5000, maximum: 3600000, description: "Mark a running child needs-attention after this much time without observed output. Default: 60000." },
         maxDepth: { type: "number", description: "Maximum Terrarium recursion depth. Default: 3." },
@@ -42,7 +44,7 @@ const tools = [
     inputSchema: {
       type: "object",
       properties: {
-        jobs: { type: "array", minItems: 1, maxItems: 32, description: "Job option objects, each accepting the same fields as terrarium_spawn (task required).", items: { type: "object", properties: { task: { type: "string" }, agent: { type: "string" }, model: { type: "string" }, readOnly: { type: "boolean" }, ephemeral: { type: "boolean" }, profile: { type: "string", enum: ["default", "minimal"] }, cwd: { type: "string" }, timeoutMs: { type: "number" }, needsAttentionAfterMs: { type: "number" }, maxDepth: { type: "number" }, allowSpawn: { type: "boolean" }, statusScope: { type: "string", enum: ["self", "descendants", "all"] }, readScope: { type: "string", enum: ["self", "descendants", "all"] }, logPath: { type: "string" }, mreLogPath: { type: "string" } }, required: ["task"] } },
+        jobs: { type: "array", minItems: 1, maxItems: 32, description: "Job option objects, each accepting the same fields as terrarium_spawn (task required).", items: { type: "object", properties: { task: { type: "string" }, agent: { type: "string" }, model: { type: "string" }, readOnly: { type: "boolean" }, ephemeral: { type: "boolean" }, profile: { type: "string", enum: ["default", "minimal"] }, cwd: { type: "string" }, isolation: { type: "string", enum: ["none", "copy", "worktree"] }, keepWorkspace: { type: "boolean" }, timeoutMs: { type: "number" }, needsAttentionAfterMs: { type: "number" }, maxDepth: { type: "number" }, allowSpawn: { type: "boolean" }, statusScope: { type: "string", enum: ["self", "descendants", "all"] }, readScope: { type: "string", enum: ["self", "descendants", "all"] }, logPath: { type: "string" }, mreLogPath: { type: "string" } }, required: ["task"] } },
         strategy: { type: "string", enum: BATCH_STRATEGIES, description: "Join strategy. Default: all." },
         quorum: { type: "number", description: "Required successes for the quorum strategy (1..jobs.length)." },
         concurrency: { type: "number", minimum: 1, description: "Max simultaneously launched runs. Default: launch all at once." },
@@ -145,7 +147,7 @@ function visibleTools(policy) {
   });
 }
 
-const SPAWN_ARG_KEYS = new Set(["task", "agent", "model", "readOnly", "ephemeral", "profile", "cwd", "timeoutMs", "needsAttentionAfterMs", "maxDepth", "allowSpawn", "statusScope", "readScope", "dryRun", "background", "logPath", "mreLogPath", "verbose"]);
+const SPAWN_ARG_KEYS = new Set(["task", "agent", "model", "readOnly", "ephemeral", "profile", "cwd", "isolation", "keepWorkspace", "timeoutMs", "needsAttentionAfterMs", "maxDepth", "allowSpawn", "statusScope", "readScope", "dryRun", "background", "logPath", "mreLogPath", "verbose"]);
 function sanitizeSpawnArgs(args) {
   const out = {};
   for (const [key, value] of Object.entries(args)) if (SPAWN_ARG_KEYS.has(key)) out[key] = value;

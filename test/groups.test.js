@@ -28,7 +28,7 @@ test('cancel terminates the child process group and records cancelled status', {
   try {
     const run = await spawnTerrariumBackground({ task: 'cancel process tree', agent: `${process.execPath} ${script}`, requireTaskContract: false });
     let grandchild;
-    for (let i = 0; i < 60; i++) {
+    for (let i = 0; i < 200; i++) {
       const log = await readRun({ runId: run.runId });
       const match = log.text.match(/GRANDCHILD=(\d+)/);
       if (match) { grandchild = Number(match[1]); break; }

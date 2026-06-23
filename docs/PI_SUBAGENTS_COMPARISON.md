@@ -5,7 +5,7 @@ Reviewed against `pi-subagents` 0.30.0 on 2026-06-21. The projects should not ha
 | Surface | Terrarium | pi-subagents | Current leader |
 |---|---|---|---|
 | Single bounded child | Runner-independent process with durable run/task receipt | Pi-native focused child session | Different strengths |
-| Parallel launch | Parent launches independent runs, then registers a durable group; no hidden fan-out | One native `tasks[]`/`parallel` call with concurrency | **pi-subagents** |
+| Parallel launch | One `terrarium_spawn_batch` call creates independent durable runs/group with bounded concurrency and all/allSettled/race/any/quorum joins | One native `tasks[]`/`parallel` call with concurrency | Different: Terrarium has durable external joins/cancellation; pi-subagents has richer Pi-native UX |
 | Group status | Durable ordered group, concise per-run state/logs/attention/cancel plus native Pi group widget/command | Rich grouped chain/parallel status tree | Match for status; pi-subagents richer chain rendering |
 | Progress | Durable heartbeat/output activity/idle/attention plus native Pi active-run widget and completion messages | Native live Pi widget and per-agent progress | Match for core progress; pi-subagents richer animation/detail |
 | Cancellation | Hard process-group termination, durable cancelled receipt, group cancel | Soft interrupt/pause plus nested targeting/resume | Different: Terrarium hard stop; pi-subagents recovery |
@@ -18,7 +18,7 @@ Reviewed against `pi-subagents` 0.30.0 on 2026-06-21. The projects should not ha
 | Duplicate suppression | deterministic callback IDs, atomic queue claims | completionSeen/result coalescing | Match |
 | Durability | JSON metadata/logs/patches/groups/journal/mailboxes usable outside Pi | Pi session + async run artifacts | **Terrarium** outside Pi |
 | Runner support | Pi, OpenCode, custom commands, Node API, CLI, MCP, CI | Pi only | **Terrarium** |
-| Chains/dynamic fanout | Intentionally out of scope; one child per process | core feature with static/dynamic fanout | **pi-subagents** |
+| Chains/dynamic fanout | Explicit flat batch only; no chains or dynamic workflow DSL; one child per run | core feature with static/dynamic fanout | **pi-subagents** for orchestration depth |
 | Agent roles/config | Caller supplies command/prompt/profile | built-in roles, overrides, skills, fallbacks | **pi-subagents** |
 | Diagnostics | top-level doctor for runs/storage/callbacks/claims | `/subagents-doctor` for Pi runtime and intercom | Match within scope |
 
@@ -40,7 +40,7 @@ Terrarium's package extension provides:
 ## What Terrarium should not copy
 
 - Agent-role management.
-- Hidden fan-out inside one Terrarium process.
+- Role-driven, recursive, or hidden fan-out beyond the explicit flat batch call.
 - Chains or dynamic orchestration DSLs.
 - Parent-session forking/resume semantics.
 - A second intercom/memory system.
@@ -49,4 +49,4 @@ Those features are already better served by pi-subagents and would blur Terrariu
 
 ## Honest conclusion
 
-Terrarium is not better in every way. pi-subagents is clearly better for Pi-native orchestration, parallel launch ergonomics, forked context, resume, and chain UX. Terrarium is sharper as a runner-independent durable execution/callback substrate. The justified Pi-native presentation layer now exists. Remaining pi-subagents advantages—parallel launch, chains, fork/resume, role agents, and clarification UI—are intentionally not Terrarium scope.
+Terrarium is not better in every way. Terrarium now has one-call flat batch launch, but pi-subagents remains better for Pi-native orchestration UX, forked context, resume, roles, and chains. Terrarium is sharper as a runner-independent durable execution/callback substrate. The justified Pi-native presentation layer now exists. Remaining pi-subagents advantages—richer live parallel UX, chains, fork/resume, role agents, and clarification UI—are intentionally not Terrarium scope.

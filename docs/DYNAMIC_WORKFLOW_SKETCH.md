@@ -1,6 +1,8 @@
 # Dynamic workflow sketch
 
-This is the intended Cloudflare-native control flow after Terrarium gains a Lab adapter.
+> **Frozen historical design.** Terrarium gained the bounded Lab/control-worker pieces described here, but the public autonomous campaign is now maintenance-only provenance. This sketch is not the current roadmap; see [CORE_PRODUCT_DECISION.md](./CORE_PRODUCT_DECISION.md).
+
+This was the intended Cloudflare-native control flow for the campaign path.
 
 ```text
 Cloudflare Dynamic Workflow

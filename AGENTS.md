@@ -4,9 +4,9 @@ You are likely here because Terrarium is installed as an MCP server and you are 
 
 ## What Terrarium is
 
-At its stable core, Terrarium is a one-level orchestrator. You give it one task. It spawns exactly one child agent. The child returns a summary. Your context stays clean.
+At its stable core, Terrarium is a durable execution and callback layer. One ordinary run receives one bounded task, owns one child process, and produces one correlated receipt. Your context stays clean while status, logs, cancellation, and callbacks remain inspectable outside the parent agent.
 
-Terrarium is also becoming a public containment laboratory: attacker, verifier, and fixer work will be expressed as bounded child runs with inspectable receipts. This does not change the ordinary MCP contract and does not mean current workspace isolation safely contains hostile code.
+For explicit top-level parallel work, `terrarium_spawn_batch` accepts an array of jobs and creates independent ordinary runs under one durable group. It does not change the one-child-per-run contract. The public containment laboratory is frozen maintenance-only provenance; do not extend it unless the product decision changes.
 
 ## When to reach for it
 
@@ -16,14 +16,14 @@ Call `terrarium_spawn` when the subtask would pollute your context. Good signals
 - Repo archaeology, log digs, design research
 - Failing test diagnosis (read-only)
 - Adversarial reviews from multiple personas
-- Anything where the user said "in parallel" or "research" and you'd otherwise hold the noise yourself
+- Anything where the user said "in parallel" or "research" and you'd otherwise hold the noise yourself; use `terrarium_spawn_batch` when one explicit array call is clearer than repeated independent spawns
 
 ## When not to reach for it
 
 - The task is under ~5 minutes of work
 - You need to iterate with the user conversationally
 - You can verify the summary as cheaply as just doing it
-- You need memory, continuity, or a handoff — that is out of scope for Terrarium
+- You need conversation memory, session continuation, or interactive handoff; Terrarium persists run results/callbacks but does not resume an agent conversation
 
 ## How to call it well
 
@@ -38,7 +38,7 @@ Call `terrarium_spawn` when the subtask would pollute your context. Good signals
 
 - `--isolation copy` and `--isolation worktree` prevent checkout collisions; they are not security sandboxes.
 - Current ordinary children inherit host authority and environment. Do not use the ordinary path for hostile agents or real-secret red teaming.
-- In a future containment campaign, treat attacker output as a claim until a separate trusted verifier reproduces it.
+- In containment-related code, treat attacker output as a claim until a separate trusted detector/verifier reproduces it.
 - Never give an attacker child GitHub write, merge, release, or genuine secret-bearing credentials.
 
 Read `THREAT_MODEL.md` and `docs/AUTONOMOUS_LOOP.md` before adding containment or public automation features.
@@ -47,4 +47,4 @@ Read `THREAT_MODEL.md` and `docs/AUTONOMOUS_LOOP.md` before adding containment o
 
 Terrarium isolates execution for ordinary delegation. It does not own memory, continuity, or handoffs — pair it with whatever continuity/memory system you already use.
 
-Do not make Terrarium a memory system. Do not fan out. One child per process. Preserve `terrarium_spawn`, `terrarium_status`, and `terrarium_read` as the stable base interface. Runner/model selection remains part of that same bounded spawn contract.
+Do not make Terrarium a memory system or general workflow DSL. Preserve `terrarium_spawn`, `terrarium_status`, and `terrarium_read` as the stable base interface. Keep one child and receipt per run. Explicit batch fan-out must compose ordinary runs, durable groups, cancellation, and callbacks rather than inventing a second execution path. Runner/model selection remains part of the bounded spawn contract.

@@ -41,7 +41,7 @@ Defaults:
 - top-level controller MCP: all visibility;
 - inherited scopes cannot be widened by a child.
 
-The child MCP removes `terrarium_spawn` from `tools/list` when denied. Direct calls fail closed. Core lineage checks also protect direct CLI/Node status/read calls that inherit Terrarium environment variables.
+The child MCP removes both `terrarium_spawn` and `terrarium_spawn_batch` from `tools/list` when spawn is denied. Batch fan-out is top-level owned; nested callers cannot invoke it even when ordinary nested spawn is available. Direct calls fail closed. Core lineage checks also protect direct CLI/Node status/read calls that inherit Terrarium environment variables.
 
 Child-slot claiming happens after non-mutating validation. A failure after claiming releases the slot and removes partial metadata/log files.
 
@@ -62,6 +62,24 @@ taskContractStatus: missing|malformed|mismatch
 ```
 
 This proves output/run/task correlation, not semantic truth. Parents must still verify substantive claims.
+
+## Explicit batch fan-out
+
+`terrarium_spawn_batch` accepts 1–32 job objects and launches each through the normal detached spawn path. Every job keeps its own run ID, task contract, metadata, logs, terminal callback, and lineage. One durable group provides correlation.
+
+Join strategies are:
+
+- `all`: wait for all jobs; success only when all succeed;
+- `allSettled`: wait for and collect every outcome;
+- `race`: first terminal result wins, then cancel remaining runs;
+- `any`: first successful result wins, then cancel remaining runs;
+- `quorum`: first requested number of successes wins, then cancel remaining runs.
+
+Optional `concurrency` bounds simultaneous launches. For write-capable winner-picking jobs, use copy/worktree isolation so cancellation does not leave competing edits in the caller's checkout.
+
+## Terminal race invariants
+
+Detached background runs use `transition(state, input) -> { state, decisions }` to guarantee at most one terminal result and one paired completion callback. Cancellation intent is durable across the launcher/supervisor handoff. Versioned schedule fixtures exercise cancellation-before-completion, completion-before-cancellation, virtual deadlines, and seeded bounded permutations without process sleeps. See [RUN_SCHEDULES.md](./RUN_SCHEDULES.md).
 
 ## Retry policy
 

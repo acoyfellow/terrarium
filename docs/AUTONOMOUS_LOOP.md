@@ -1,5 +1,7 @@
 # Automated containment loop
 
+> **Frozen historical design.** The public containment loop is maintenance-only provenance, not Terrarium's current roadmap. The core product is durable execution, batches, callbacks, and replayable terminal semantics. See [CORE_PRODUCT_DECISION.md](./CORE_PRODUCT_DECISION.md).
+
 ## Purpose
 
 Terrarium's public red-team loop is a workflow composed from the stable one-child run primitive:

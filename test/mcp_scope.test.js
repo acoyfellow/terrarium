@@ -34,6 +34,10 @@ test('top-level MCP keeps the stable three-tool surface', async () => {
   assert.ok(names.indexOf('terrarium_spawn') < names.indexOf('terrarium_status'));
   assert.ok(names.indexOf('terrarium_status') < names.indexOf('terrarium_read'));
   assert.ok(names.includes('terrarium_spawn_batch'));
+  const spawnSchema = responses[0].result.tools.find((tool) => tool.name === 'terrarium_spawn').inputSchema;
+  const batchSchema = responses[0].result.tools.find((tool) => tool.name === 'terrarium_spawn_batch').inputSchema;
+  assert.deepEqual(spawnSchema.properties.isolation.enum, ['none', 'copy', 'worktree']);
+  assert.deepEqual(batchSchema.properties.jobs.items.properties.isolation.enum, ['none', 'copy', 'worktree']);
   assert.ok(names.includes('terrarium_cancel'));
   assert.ok(names.includes('terrarium_group'));
   assert.ok(names.includes('terrarium_callbacks'));
