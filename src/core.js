@@ -7,6 +7,7 @@ import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { publishEvent, eventForRun, TerrariumEventType } from "./event-runtime.js";
 import { routeEvent } from "./router.js";
+import { initialRunState, transition } from "./run-machine.js";
 
 export const VERSION = "0.0.1";
 export const HOME = join(homedir(), ".terrarium");
@@ -428,7 +429,8 @@ async function emitCompletionEvent(result) {
       logPath: result.logPath,
       channel: channel ?? null,
     };
-    const typed = eventForRun(result.ok ? TerrariumEventType.Completed : TerrariumEventType.Failed, result, {
+    const completionType = result.status === "cancelled" ? TerrariumEventType.Cancelled : result.ok ? TerrariumEventType.Completed : TerrariumEventType.Failed;
+    const typed = eventForRun(completionType, result, {
       channel: result.channel ?? basename(result.originalCwd ?? result.cwd),
       status: result.status,
       ok: result.ok,
@@ -458,9 +460,11 @@ export function validateTaskContractOutput(output, expected) {
   return { status: "verified", summary: receipt.summary.trim() };
 }
 
-async function finishRun(base, patch) {
+async function persistFinishedRun(base, patch) {
   let result = { ...base, ...patch, finishedAt: patch.finishedAt ?? new Date().toISOString() };
-  if (patch.dryRun === true && base.taskContractStatus === "pending") result.taskContractStatus = "not-applicable";
+  if (patch.taskContractStatus != null) {
+    // A run-machine adapter already made the contract/terminal decision.
+  } else if (patch.dryRun === true && base.taskContractStatus === "pending") result.taskContractStatus = "not-applicable";
   else if (base.taskContractStatus === "pending") {
     const contract = validateTaskContractOutput(result.stdoutTail, base.taskContract);
     result.taskContractStatus = contract.status;
@@ -469,10 +473,14 @@ async function finishRun(base, patch) {
   }
   delete result.taskContract;
   await writeMetadata(result);
-  await emitCompletionEvent(result);
   return result;
 }
 
+async function finishRun(base, patch) {
+  const result = await persistFinishedRun(base, patch);
+  await emitCompletionEvent(result);
+  return result;
+}
 
 export function isPidAlive(pid) {
   if (!pid) return false;
@@ -561,7 +569,8 @@ export async function cancelRun({ runId, requesterRunId, scope } = {}) {
   if (meta.status !== "running") return { runId, status: meta.status, cancelled: false, note: "run is not active" };
   await writeFile(cancelMarkerPath(runId), `${new Date().toISOString()}\n`, { flag: "wx" }).catch((error) => { if (error.code !== "EEXIST") throw error; });
   const childPids = [...new Set([meta.childPid, meta.pid].filter(Boolean))];
-  if (childPids.length === 0 && meta.supervisorPid) signalProcessGroup(meta.supervisorPid, "SIGTERM");
+  // Never kill the supervisor directly: during the launch handoff it may be the
+  // only process capable of observing the durable cancel marker and finalizing.
   for (const pid of childPids) signalProcessGroup(pid, "SIGTERM");
   await new Promise((resolve) => setTimeout(resolve, 250));
   for (const pid of childPids) if (isPidAlive(pid)) signalProcessGroup(pid, "SIGKILL");
@@ -590,14 +599,21 @@ export async function superviseTerrariumBackground({ run, parts, prompt, base, w
   await writeMetadata(started);
 
   return await new Promise((resolveRun) => {
-    const timer = run.timeoutMs > 0 ? setTimeout(() => signalProcessGroup(child.pid, "SIGTERM"), run.timeoutMs) : null;
+    let machine = initialRunState({ requireReceipt: run.requireTaskContract });
     let stdout = "";
     let stderr = "";
-    let settled = false;
     let lastProgressAt = 0;
     let progressBuffer = "";
+    let finishing = false;
     void emitProgressEvent(run, 'started');
     const heartbeat = setInterval(() => { void emitProgressEvent(run, 'running', { activity: false }); }, 3000);
+    let cancelObserved = false;
+    const cancelWatcher = setInterval(() => {
+      if (!cancelObserved && existsSync(cancelMarkerPath(run.runId))) {
+        cancelObserved = true;
+        void observe({ type: "CancelRequested" });
+      }
+    }, 50);
     const progress = async (s) => {
       progressBuffer += s;
       const now = Date.now();
@@ -607,27 +623,47 @@ export async function superviseTerrariumBackground({ run, parts, prompt, base, w
       progressBuffer = "";
       if (lines.length) await emitProgressEvent(run, lines.slice(-3).join("\n"));
     };
-    const finish = async (patch) => {
-      if (settled) return;
-      settled = true;
-      if (timer) clearTimeout(timer);
-      clearInterval(heartbeat);
-      const ws = await finalizeWorkspace(workspace, base);
-      const result = await finishRun(base, { background: true, pid: child.pid, childPid: child.pid, supervisorPid: process.pid, stdoutTail: tail(stdout), stderrTail: tail(stderr), ...patch, ...ws });
-      if (specPath) await rm(specPath, { force: true });
-      resolveRun(result);
+    let finalResult = null;
+    const execute = async (decisions) => {
+      for (const decision of decisions) {
+        if (decision.type === "TerminateChild") signalProcessGroup(child.pid, "SIGTERM");
+        if (decision.type === "Finalize" && !finishing) {
+          finishing = true;
+          if (timer) clearTimeout(timer);
+          clearInterval(heartbeat);
+          clearInterval(cancelWatcher);
+          const ws = await finalizeWorkspace(workspace, base);
+          const { type: _type, reason: _reason, ...terminal } = decision;
+          finalResult = await persistFinishedRun(base, { background: true, pid: child.pid, childPid: child.pid, supervisorPid: process.pid, stdoutTail: tail(stdout), stderrTail: tail(stderr), ...terminal, ...ws });
+          if (specPath) await rm(specPath, { force: true });
+        }
+        if (decision.type === "QueueCallback" && finalResult) {
+          await emitCompletionEvent(finalResult);
+          resolveRun(finalResult);
+        }
+      }
     };
+    const observe = async (input) => {
+      const step = transition(machine, input);
+      machine = step.state;
+      await execute(step.decisions);
+    };
+    const timer = run.timeoutMs > 0 ? setTimeout(() => { void observe({ type: "DeadlineReached" }); }, run.timeoutMs) : null;
     child.stdout.on("data", async (d) => { const s = String(d); stdout += s; await log(run.logPath, s); await progress(s); });
     child.stderr.on("data", async (d) => { const s = String(d); stderr += s; await log(run.logPath, s); await progress(s); });
     child.on("error", async (e) => {
       await log(run.logPath, `\nerror: ${e.message}\n`);
-      await finish({ ok: false, status: "error", exitCode: 127, error: e.message });
+      const receipt = validateTaskContractOutput(stdout, base.taskContract);
+      if (run.requireTaskContract) await observe({ type: "ReceiptObserved", ...receipt });
+      await observe({ type: "RuntimeError", exitCode: 127, error: e.message });
     });
     child.on("close", async (code, signal) => {
       const exitCode = code ?? (signal ? 128 : 0);
       const cancelled = existsSync(cancelMarkerPath(run.runId));
+      if (cancelled) await observe({ type: "CancelRequested" });
       await log(run.logPath, `\nexit: ${exitCode}${signal ? ` signal: ${signal}` : ""}${cancelled ? " cancelled" : ""}\n`);
-      await finish({ ok: cancelled ? false : exitCode === 0, status: cancelled ? "cancelled" : exitCode === 0 ? "done" : "failed", exitCode, signal });
+      await observe({ type: "ChildExited", exitCode, signal });
+      if (run.requireTaskContract) await observe({ type: "ReceiptObserved", ...validateTaskContractOutput(stdout, base.taskContract) });
       if (cancelled) await rm(cancelMarkerPath(run.runId), { force: true });
     });
   });

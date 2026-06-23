@@ -402,7 +402,10 @@ terra group create "research batch" <runIdA> <runIdB>
 terra group status <groupId>
 terra group read <groupId>
 terra doctor
+terra schedule replay fixtures/run-schedules/cancel-before-completion.v1.json
 ```
+
+Run-schedule replay is local-only and does not add an MCP surface. It replays bounded classification facts against the same pure transition function used by the background supervisor; it does not claim that a real model or process will reproduce those facts. See [Replayable run schedules](./docs/RUN_SCHEDULES.md).
 
 Spawn and status default to concise responses so parent transcripts stay small. The full envelope remains on disk under `~/.terrarium/runs/<runId>.json`, or can be requested inline with `verbose: true`.
 

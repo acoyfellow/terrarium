@@ -37,7 +37,9 @@
     "docs/CONCURRENCY_ISOLATION.md",
     "docs/PI_SUBAGENTS_COMPARISON.md",
     "docs/CORE_PRODUCT_DECISION.md",
-    "fixtures/secure-agent-parser"
+    "docs/RUN_SCHEDULES.md",
+    "fixtures/secure-agent-parser",
+    "fixtures/run-schedules"
   ],
   "keywords": [
     "agent",
