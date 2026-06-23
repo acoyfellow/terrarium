@@ -2,7 +2,7 @@ import { access, mkdir, readFile, readdir } from "node:fs/promises";
 import { constants, existsSync } from "node:fs";
 import { CONFIG_PATH, EVENT_DIR, HOME, LOG_DIR, WORKSPACE_DIR, listRuns } from "./core.js";
 import { GROUP_DIR } from "./groups.js";
-import { MAILBOXES_DIR, ROUTER_DIR, SUBSCRIBERS_DIR } from "./router.js";
+import { JOURNAL_DIR, MAILBOXES_DIR, ROUTER_DIR, SUBSCRIBERS_DIR } from "./router.js";
 
 async function writable(path) {
   try { await mkdir(path, { recursive: true }); await access(path, constants.R_OK | constants.W_OK); return true; } catch { return false; }
@@ -24,8 +24,14 @@ export async function diagnoseTerrarium() {
     subscribers: await count(SUBSCRIBERS_DIR, (file) => file.endsWith(".json")),
     pendingCallbacks: 0,
     inflightCallbacks: 0,
+    missingTerminalCallbacks: 0,
     staleChildClaims: 0,
   };
+  for (const run of runs.runs) {
+    if (["running", "orphaned"].includes(run.status)) continue;
+    const type = run.status === "cancelled" ? "Cancelled" : run.ok ? "Completed" : "Failed";
+    if (!existsSync(`${JOURNAL_DIR}/evt_${run.runId}_${type}.json`)) checks.missingTerminalCallbacks++;
+  }
   try {
     for (const subscriber of await readdir(MAILBOXES_DIR)) {
       checks.pendingCallbacks += await count(`${MAILBOXES_DIR}/${subscriber}/pending`, (file) => file.endsWith(".json"));
@@ -45,6 +51,7 @@ export async function diagnoseTerrarium() {
   if (checks.needsAttentionRuns) warnings.push(`${checks.needsAttentionRuns} active run(s) need attention`);
   if (checks.pendingCallbacks) warnings.push(`${checks.pendingCallbacks} callback(s) are pending delivery`);
   if (checks.inflightCallbacks) warnings.push(`${checks.inflightCallbacks} callback(s) are claimed but unacknowledged`);
+  if (checks.missingTerminalCallbacks) warnings.push(`${checks.missingTerminalCallbacks} terminal run(s) are missing durable callback events; recover those run IDs`);
   if (checks.staleChildClaims) warnings.push(`${checks.staleChildClaims} stale child-slot claim(s) exist from older runs`);
   return { ok: warnings.length === 0, checks, warnings, paths: { home: HOME, logs: LOG_DIR, workspaces: WORKSPACE_DIR, events: EVENT_DIR, router: ROUTER_DIR } };
 }

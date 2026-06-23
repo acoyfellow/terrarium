@@ -9,7 +9,7 @@ test('callbacks route, deduplicate, claim, and acknowledge exactly once', async 
   const suffix = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
   const subscriberId = `sub_${suffix}`;
   const runId = `ter_${suffix}`;
-  const event = { eventId: `evt_${suffix}`, type: 'Completed', runId, workflowId: runId, channel: 'test', at: new Date().toISOString(), status: 'done', exitCode: 0 };
+  const event = { eventId: `evt_${suffix}`, type: 'Completed', runId, workflowId: runId, channel: 'test', at: new Date().toISOString(), status: 'done', exitCode: 0, task: 'private prompt', cwd: '/private/path', output: 'private output' };
   try {
     await registerSubscriber({ subscriberId, runIds: [runId], eventTypes: ['Completed'], channels: ['test'], workflowIds: ['*'] });
     const first = await routeEvent(event);
@@ -19,6 +19,9 @@ test('callbacks route, deduplicate, claim, and acknowledge exactly once', async 
     const claimed = await claimMailboxEvents({ subscriberId });
     assert.equal(claimed.events.length, 1);
     assert.equal(claimed.events[0].eventId, event.eventId);
+    assert.equal('task' in claimed.events[0], false);
+    assert.equal('cwd' in claimed.events[0], false);
+    assert.equal('output' in claimed.events[0], false);
     assert.equal((await claimMailboxEvents({ subscriberId })).events.length, 0);
     const ack = await acknowledgeMailboxEvent({ subscriberId, eventId: event.eventId });
     assert.equal(ack.acknowledged, true);
@@ -106,6 +109,42 @@ test('prune removes stale pending and inflight callbacks and expires empty subsc
     await unregisterSubscriber(subscriberId).catch(() => {});
     await rm(join(JOURNAL_DIR, `${pendingId}.json`), { force: true });
     await rm(join(JOURNAL_DIR, `${inflightId}.json`), { force: true });
+  }
+});
+
+test('concrete subscriptions replay a terminal event that finished before subscribe', async () => {
+  const suffix = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+  const subscriberId = `sub_late_${suffix}`;
+  const runId = `ter_late_${suffix}`;
+  const eventId = `evt_late_${suffix}`;
+  try {
+    const routed = await routeEvent({ eventId, type: 'Completed', runId, workflowId: runId, channel: 'x', at: new Date().toISOString() });
+    assert.equal(routed.delivered, 0);
+    const subscription = await registerSubscriber({ subscriberId, runIds: [runId], eventTypes: ['Completed'], channels: ['*'], workflowIds: ['*'] });
+    assert.equal(subscription.replayed, 1);
+    const claimed = await claimMailboxEvents({ subscriberId });
+    assert.deepEqual(claimed.events.map((event) => event.eventId), [eventId]);
+    await acknowledgeMailboxEvent({ subscriberId, eventId });
+    const registeredAgain = await registerSubscriber({ subscriberId, runIds: [runId], eventTypes: ['Completed'], channels: ['*'], workflowIds: ['*'] });
+    assert.equal(registeredAgain.replayed, 0, 'acknowledged events must not be redelivered');
+  } finally {
+    await unregisterSubscriber(subscriberId).catch(() => {});
+    await rm(join(JOURNAL_DIR, `${eventId}.json`), { force: true });
+  }
+});
+
+test('new wildcard subscriptions do not replay unrelated historical terminal events', async () => {
+  const suffix = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+  const subscriberId = `sub_wild_late_${suffix}`;
+  const eventId = `evt_wild_late_${suffix}`;
+  try {
+    await routeEvent({ eventId, type: 'Completed', runId: `ter_${suffix}`, workflowId: 'w', channel: 'x', at: '2020-01-01T00:00:00.000Z' });
+    const subscription = await registerSubscriber({ subscriberId, runIds: ['*'], eventTypes: ['Completed'], channels: ['*'], workflowIds: ['*'] });
+    assert.equal(subscription.replayed, 0);
+    assert.equal((await claimMailboxEvents({ subscriberId })).events.length, 0);
+  } finally {
+    await unregisterSubscriber(subscriberId).catch(() => {});
+    await rm(join(JOURNAL_DIR, `${eventId}.json`), { force: true });
   }
 });
 

@@ -2,11 +2,12 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runTerrarium } from '../src/core.js';
-import { MAILBOXES_DIR, SUBSCRIBERS_DIR } from '../src/router.js';
+import { JOURNAL_DIR, MAILBOXES_DIR, SUBSCRIBERS_DIR } from '../src/router.js';
 
 const MCP_PATH = fileURLToPath(new URL('../src/mcp.js', import.meta.url));
 
@@ -68,6 +69,31 @@ test('child MCP removes spawn and denies sibling status/read', async () => {
   assert.match(toolText(responses.find((r) => r.id === 7)), /callback run access denied/);
   rmSync(join(MAILBOXES_DIR, `sub_${a.runId}`), { recursive: true, force: true });
   rmSync(join(SUBSCRIBERS_DIR, `sub_${a.runId}.json`), { force: true });
+});
+
+test('MCP concrete callback subscribe recovers completion that raced ahead', async () => {
+  const suffix = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+  const runId = `ter_mcp_callback_${suffix}`;
+  const subscriberId = `sub_mcp_callback_${suffix}`;
+  const run = await runTerrarium({ runId, task: 'callback race', dryRun: true, stream: false });
+  assert.equal(run.status, 'done');
+  try {
+    const subscribed = await rpc([
+      { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'terrarium_callbacks', arguments: { action: 'subscribe', subscriberId, runIds: [runId] } } },
+    ]);
+    const subscription = JSON.parse(toolText(subscribed.responses.find((r) => r.id === 1)));
+    assert.equal(subscription.replayed, 1);
+    assert.equal(subscription.recovered[0].duplicate, true);
+    const claimedResponse = await rpc([
+      { jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'terrarium_callbacks', arguments: { action: 'claim', subscriberId } } },
+    ]);
+    const claimed = JSON.parse(toolText(claimedResponse.responses.find((r) => r.id === 2)));
+    assert.deepEqual(claimed.events.map((event) => event.runId), [runId]);
+  } finally {
+    rmSync(join(MAILBOXES_DIR, subscriberId), { recursive: true, force: true });
+    rmSync(join(SUBSCRIBERS_DIR, `${subscriberId}.json`), { force: true });
+    await rm(join(JOURNAL_DIR, `evt_${runId}_Completed.json`), { force: true });
+  }
 });
 
 test('MCP supports opt-in detached background execution without changing the synchronous default', async () => {

@@ -27,6 +27,11 @@ function eventId(event) {
   if (event.eventId) return assertId(event.eventId, 'event id');
   return `evt_${createHash('sha256').update(JSON.stringify([event.runId, event.type, event.at, event.status, event.exitCode])).digest('hex').slice(0, 32)}`;
 }
+function sanitizeCallbackEvent(event) {
+  const allowed = ['type', 'eventId', 'runId', 'parentRunId', 'taskFingerprint', 'workflowId', 'sessionId', 'channel', 'at', 'status', 'ok', 'exitCode', 'signal', 'dryRun'];
+  return Object.fromEntries(allowed.filter((key) => event[key] !== undefined).map((key) => [key, event[key]]));
+}
+
 async function atomicJson(path, value) {
   const temp = `${path}.${process.pid}.${Math.random().toString(36).slice(2, 8)}.tmp`;
   await writeFile(temp, `${JSON.stringify(value, null, 2)}\n`, { flag: 'wx' });
@@ -38,6 +43,8 @@ const TERMINAL_EVENT_TYPES = ['Completed', 'Failed', 'TimedOut', 'Cancelled'];
 export async function registerSubscriber(subscription) {
   const subscriberId = assertId(subscription.subscriberId, 'subscriber id');
   if (subscription.ownerRunId != null && !/^ter_[A-Za-z0-9_]+$/.test(subscription.ownerRunId)) throw new Error('invalid subscriber owner run id');
+  let existing = null;
+  try { existing = await getSubscriber(subscriberId); } catch {}
   const normalized = {
     version: 1,
     subscriberId,
@@ -45,14 +52,16 @@ export async function registerSubscriber(subscription) {
     workflowIds: boundedList(subscription.workflowIds),
     eventTypes: boundedList(subscription.eventTypes, TERMINAL_EVENT_TYPES),
     runIds: boundedList(subscription.runIds),
-    ownerRunId: subscription.ownerRunId ?? null,
-    createdAt: subscription.createdAt ?? new Date().toISOString(),
+    ownerRunId: subscription.ownerRunId ?? existing?.ownerRunId ?? null,
+    createdAt: existing?.createdAt ?? subscription.createdAt ?? new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
   };
   await mkdir(SUBSCRIBERS_DIR, { recursive: true });
   const dirs = mailboxDirs(subscriberId);
   await Promise.all([mkdir(dirs.pending, { recursive: true }), mkdir(dirs.inflight, { recursive: true }), mkdir(dirs.acked, { recursive: true })]);
   await atomicJson(join(SUBSCRIBERS_DIR, `${subscriberId}.json`), normalized);
-  return normalized;
+  const replayed = await replayJournalToSubscriber(normalized, { concreteRuns: !normalized.runIds.includes('*') });
+  return { ...normalized, replayed };
 }
 
 export async function getSubscriber(subscriberId) {
@@ -87,19 +96,39 @@ export function matches(subscription, event) {
     (runs.includes('*') || runs.includes(event.runId));
 }
 
+async function enqueueEvent(subscriberId, event) {
+  const dirs = mailboxDirs(subscriberId);
+  const file = `${event.eventId}.json`;
+  if ([dirs.pending, dirs.inflight, dirs.acked].some((dir) => existsSync(join(dir, file)))) return false;
+  await mkdir(dirs.pending, { recursive: true });
+  try { await writeFile(join(dirs.pending, file), `${JSON.stringify(event)}\n`, { flag: 'wx' }); return true; }
+  catch (error) { if (error.code === 'EEXIST') return false; throw error; }
+}
+
+async function replayJournalToSubscriber(subscription, { concreteRuns = false } = {}) {
+  // Wildcard subscribers start at registration time. Only explicit run IDs may
+  // replay history, which closes finish-before-subscribe without flooding a new
+  // consumer with every historical terminal event.
+  if (!concreteRuns || !existsSync(JOURNAL_DIR)) return 0;
+  let replayed = 0;
+  for (const file of (await readdir(JOURNAL_DIR)).filter((name) => name.endsWith('.json')).sort()) {
+    let event; try { event = sanitizeCallbackEvent(JSON.parse(await readFile(join(JOURNAL_DIR, file), 'utf8'))); } catch { continue; }
+    if (!TERMINAL_EVENT_TYPES.includes(event.type) || !matches(subscription, event)) continue;
+    if (await enqueueEvent(subscription.subscriberId, event)) replayed++;
+  }
+  return replayed;
+}
+
 export async function routeEvent(event) {
   const id = eventId(event);
-  const routed = { ...event, eventId: id };
+  const routed = sanitizeCallbackEvent({ ...event, eventId: id });
   await mkdir(JOURNAL_DIR, { recursive: true });
   try { await writeFile(join(JOURNAL_DIR, `${id}.json`), `${JSON.stringify(routed)}\n`, { flag: 'wx' }); }
   catch (error) { if (error.code === 'EEXIST') return { eventId: id, duplicate: true, delivered: 0 }; throw error; }
   let delivered = 0;
   for (const sub of await listSubscribers()) {
     if (!matches(sub, routed)) continue;
-    const dirs = mailboxDirs(sub.subscriberId);
-    await mkdir(dirs.pending, { recursive: true });
-    try { await writeFile(join(dirs.pending, `${id}.json`), `${JSON.stringify(routed)}\n`, { flag: 'wx' }); delivered++; }
-    catch (error) { if (error.code !== 'EEXIST') throw error; }
+    if (await enqueueEvent(sub.subscriberId, routed)) delivered++;
   }
   return { eventId: id, duplicate: false, delivered };
 }

@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { cancelRun, getRunStatus, listRuns } from "./core.js";
 import { getRunGroupStatus, listRunGroups } from "./groups.js";
-import { acknowledgeMailboxEvent, claimMailboxEvents, registerSubscriber, unregisterSubscriber } from "./router.js";
+import { acknowledgeMailboxEvent, claimMailboxEvents, registerSubscriber, requeueInflightEvents } from "./router.js";
 
 const WIDGET = "terrarium-runs";
 
@@ -61,6 +61,7 @@ export default function terrariumPiExtension(pi) {
   pi.on("session_start", async (_event, ctx) => {
     currentSubscriber = subscriberId(ctx);
     await registerSubscriber({ subscriberId: currentSubscriber, runIds: ["*"], channels: ["*"], workflowIds: ["*"], eventTypes: ["Completed", "Failed", "TimedOut", "Cancelled"] });
+    await requeueInflightEvents({ subscriberId: currentSubscriber, olderThanMs: 0 });
     await refresh(ctx);
     timer = setInterval(() => { void refresh(ctx); }, 1500);
     timer.unref?.();
@@ -70,7 +71,8 @@ export default function terrariumPiExtension(pi) {
     if (timer) clearInterval(timer);
     timer = null;
     if (ctx.hasUI) ctx.ui.setWidget(WIDGET, undefined);
-    if (currentSubscriber) await unregisterSubscriber(currentSubscriber);
+    // Keep the durable subscriber/mailbox across session shutdown so terminal
+    // callbacks that arrive while Pi is closed can be claimed on resume.
     currentSubscriber = null;
   });
 

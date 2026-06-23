@@ -31,7 +31,7 @@ test('validates inputs', async () => {
   assert.deepEqual(BATCH_STRATEGIES, ['all', 'allSettled', 'race', 'any', 'quorum']);
 });
 
-test('all: resolves ok only when every job succeeds', { timeout: 20000 }, async () => {
+test('all: resolves ok only when every job succeeds', { timeout: 45000 }, async () => {
   const good = await spawnBatch({ jobs: [job(ok()), job(ok())], strategy: 'all', pollMs: 100 });
   assert.equal(good.ok, true);
   assert.equal(good.group.counts.done, 2);
@@ -42,14 +42,14 @@ test('all: resolves ok only when every job succeeds', { timeout: 20000 }, async 
   assert.equal(mixed.group.counts.failed, 1);
 });
 
-test('allSettled: always ok, collects successes and failures', { timeout: 20000 }, async () => {
+test('allSettled: always ok, collects successes and failures', { timeout: 45000 }, async () => {
   const r = await spawnBatch({ jobs: [job(ok()), job(fail())], strategy: 'allSettled', pollMs: 100 });
   assert.equal(r.ok, true);
   assert.equal(r.successCount, 1);
   assert.equal(r.failureCount, 1);
 });
 
-test('any: first success wins and losers are cancelled', { timeout: 20000 }, async () => {
+test('any: first success wins and losers are cancelled', { timeout: 45000 }, async () => {
   const r = await spawnBatch({ jobs: [job(slow(8000)), job(ok()), job(slow(8000))], strategy: 'any', pollMs: 100 });
   assert.equal(r.ok, true);
   assert.equal(r.reason, 'any-success');
@@ -58,13 +58,13 @@ test('any: first success wins and losers are cancelled', { timeout: 20000 }, asy
   assert.ok(status.counts.cancelled >= 1, 'slow losers should be cancelled');
 });
 
-test('any: fails when all jobs fail', { timeout: 20000 }, async () => {
+test('any: fails when all jobs fail', { timeout: 45000 }, async () => {
   const r = await spawnBatch({ jobs: [job(fail()), job(fail())], strategy: 'any', pollMs: 100 });
   assert.equal(r.ok, false);
   assert.equal(r.reason, 'any-exhausted');
 });
 
-test('quorum: resolves when k successes reached, cancels the rest', { timeout: 20000 }, async () => {
+test('quorum: resolves when k successes reached, cancels the rest', { timeout: 45000 }, async () => {
   const r = await spawnBatch({ jobs: [job(ok()), job(ok()), job(slow(8000))], strategy: 'quorum', quorum: 2, pollMs: 100 });
   assert.equal(r.ok, true);
   assert.equal(r.reason, 'quorum-reached');
@@ -73,8 +73,10 @@ test('quorum: resolves when k successes reached, cancels the rest', { timeout: 2
   assert.equal(status.counts.running, 0);
 });
 
-test('concurrency caps simultaneous launches', { timeout: 20000 }, async () => {
-  const r = await spawnBatch({ jobs: [job(ok()), job(ok()), job(ok())], strategy: 'all', concurrency: 1, pollMs: 100 });
+test('concurrency holds a slot until the active run is terminal', { timeout: 45000 }, async () => {
+  const started = Date.now();
+  const r = await spawnBatch({ jobs: [job(slow(250)), job(slow(250)), job(slow(250))], strategy: 'all', concurrency: 1, pollMs: 50 });
   assert.equal(r.ok, true);
   assert.equal(r.runIds.length, 3);
+  assert.ok(Date.now() - started >= 700, 'concurrency=1 must serialize active child lifetimes, not just launcher calls');
 });

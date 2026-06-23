@@ -115,6 +115,18 @@ test("runTerrarium dry-run minimal profile produces a leaner child invocation", 
   assert.doesNotMatch(min.invocation, /You are a Terrarium child agent/);
 });
 
+test("callback correlation defaults to caller cwd and accepts explicit safe identifiers", async () => {
+  const callerChannel = process.cwd().split("/").at(-1);
+  const implicit = await runTerrarium({ task: "callback correlation", cwd: tmpdir(), dryRun: true, stream: false });
+  assert.equal(implicit.channel, callerChannel);
+  assert.notEqual(implicit.channel, tmpdir().split("/").at(-1));
+  const explicit = await runTerrarium({ task: "callback correlation explicit", dryRun: true, stream: false, channel: "parent-channel", workflowId: "workflow_1", sessionId: "session_1" });
+  assert.equal(explicit.channel, "parent-channel");
+  assert.equal(explicit.workflowId, "workflow_1");
+  assert.equal(explicit.sessionId, "session_1");
+  await assert.rejects(() => runTerrarium({ task: "bad channel", dryRun: true, stream: false, channel: "../outside" }), /invalid Terrarium channel/);
+});
+
 test("runTerrarium rejects an unknown profile name", async () => {
   await assert.rejects(() => runTerrarium({ task: "x", profile: "tiny", dryRun: true, stream: false, config: {} }), /unknown prompt profile/);
 });

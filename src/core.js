@@ -147,6 +147,12 @@ export function assertRunId(runId) {
   return runId;
 }
 
+function correlationValue(value, label) {
+  if (value == null || value === "") return null;
+  if (typeof value !== "string" || !/^[A-Za-z0-9_.-]{1,120}$/.test(value)) throw new Error(`invalid Terrarium ${label}`);
+  return value;
+}
+
 function confinedLogPath(path, label = "log path") {
   const root = resolve(LOG_DIR);
   const candidate = resolve(path);
@@ -270,7 +276,11 @@ function buildRun(opts, config) {
   const taskContract = requireTaskContract ? { runId, taskFingerprint: taskFingerprint(task), nonce: randomUUID() } : null;
   const needsAttentionAfterMs = Number(opts.needsAttentionAfterMs ?? config.needsAttentionAfterMs ?? 60000);
   if (!Number.isFinite(needsAttentionAfterMs) || needsAttentionAfterMs < 5000 || needsAttentionAfterMs > 3600000) throw new Error("needsAttentionAfterMs must be between 5000 and 3600000");
-  return { runId, parentRunId, depth, maxDepth, agent, model, profile, readOnly, timeoutMs, task, dryRun, cwd, originalCwd: cwd, stream, logPath, mreLogPath, isolation, keepWorkspace, callerSpawnAllowed, allowSpawn, statusScope, readScope, requireTaskContract, taskContract, needsAttentionAfterMs };
+  const callerChannel = basename(process.cwd()).replace(/[^A-Za-z0-9_.-]/g, "_").slice(0, 120) || "default";
+  const channel = correlationValue(opts.channel ?? process.env.TERRARIUM_EVENT_CHANNEL ?? callerChannel, "channel");
+  const workflowId = correlationValue(opts.workflowId ?? parentRunId ?? runId, "workflow id");
+  const sessionId = correlationValue(opts.sessionId ?? process.env.TERRARIUM_SESSION_ID ?? null, "session id");
+  return { runId, parentRunId, depth, maxDepth, agent, model, profile, readOnly, timeoutMs, task, dryRun, cwd, originalCwd: cwd, stream, logPath, mreLogPath, isolation, keepWorkspace, callerSpawnAllowed, allowSpawn, statusScope, readScope, requireTaskContract, taskContract, needsAttentionAfterMs, channel, workflowId, sessionId };
 }
 
 async function workspaceExcludes() {
@@ -373,7 +383,7 @@ async function prepareRun(opts = {}) {
   run.logPath ??= await defaultLogPath(run.runId);
   run.mreLogPath ??= await defaultMreLogPath(run.runId);
   const startedAt = new Date().toISOString();
-  const base = { runId: run.runId, parentRunId: run.parentRunId, depth: run.depth, maxDepth: run.maxDepth, version: VERSION, agent: run.agent, model: run.model, profile: run.profile, readOnly: run.readOnly, task: run.task, cwd: run.cwd, originalCwd: run.originalCwd, isolation: run.isolation, workspace, logPath: run.logPath, mreLogPath: run.mreLogPath, startedAt, lastActivityAt: startedAt, progressText: "started", needsAttentionAfterMs: run.needsAttentionAfterMs, status: "running", git: await gitInfo(run.cwd), allowSpawn: run.allowSpawn, statusScope: run.statusScope, readScope: run.readScope, taskFingerprint: run.taskContract?.taskFingerprint ?? taskFingerprint(run.task), taskContractStatus: run.requireTaskContract ? "pending" : "not-required", taskContract: run.taskContract };
+  const base = { runId: run.runId, parentRunId: run.parentRunId, depth: run.depth, maxDepth: run.maxDepth, version: VERSION, agent: run.agent, model: run.model, profile: run.profile, readOnly: run.readOnly, task: run.task, cwd: run.cwd, originalCwd: run.originalCwd, isolation: run.isolation, workspace, logPath: run.logPath, mreLogPath: run.mreLogPath, startedAt, lastActivityAt: startedAt, progressText: "started", needsAttentionAfterMs: run.needsAttentionAfterMs, status: "running", git: await gitInfo(run.cwd), allowSpawn: run.allowSpawn, statusScope: run.statusScope, readScope: run.readScope, channel: run.channel, workflowId: run.workflowId, sessionId: run.sessionId, taskFingerprint: run.taskContract?.taskFingerprint ?? taskFingerprint(run.task), taskContractStatus: run.requireTaskContract ? "pending" : "not-required", taskContract: run.taskContract };
   let claimPath = null;
   try {
     claimPath = await claimChildSlot(run);
@@ -416,7 +426,6 @@ async function emitProgressEvent(run, text, { activity = true } = {}) {
 }
 
 async function emitCompletionEvent(result) {
-  try {
     const channel = result.channel ?? process.env.TERRARIUM_EVENT_CHANNEL;
     const event = {
       type: "terrarium.completed",
@@ -426,10 +435,8 @@ async function emitCompletionEvent(result) {
       exitCode: result.exitCode,
       signal: result.signal ?? null,
       dryRun: result.dryRun === true,
-      cwd: result.originalCwd ?? result.cwd,
-      task: result.task,
+      taskFingerprint: result.taskFingerprint ?? null,
       finishedAt: result.finishedAt,
-      logPath: result.logPath,
       channel: channel ?? null,
     };
     const completionType = result.status === "cancelled" ? TerrariumEventType.Cancelled : result.ok ? TerrariumEventType.Completed : TerrariumEventType.Failed;
@@ -441,13 +448,18 @@ async function emitCompletionEvent(result) {
       signal: result.signal ?? null,
       dryRun: result.dryRun === true,
     });
-    await publishEvent(typed);
-    await routeEvent(typed);
-    if (!channel) return;
-    const dir = join(EVENT_DIR, channel);
-    await mkdir(dir, { recursive: true });
-    await writeFile(join(dir, `${result.runId}.json`), `${JSON.stringify(event)}\n`, { flag: "wx" });
-  } catch {}
+    // Persist and route first. The in-process Effect bus and legacy channel
+    // mirror are secondary observers and must never prevent durable callbacks.
+    const routed = await routeEvent(typed);
+    try { await publishEvent(typed); } catch {}
+    if (channel) {
+      try {
+        const dir = join(EVENT_DIR, channel);
+        await mkdir(dir, { recursive: true });
+        await writeFile(join(dir, `${result.runId}.json`), `${JSON.stringify(event)}\n`, { flag: "wx" });
+      } catch (error) { if (error.code !== "EEXIST") throw error; }
+    }
+    return routed;
 }
 
 export function validateTaskContractOutput(output, expected) {
@@ -562,6 +574,13 @@ export async function getRunStatus({ runId, staleMs = 30000, requesterRunId, sco
   const access = effectiveAccess(requesterRunId, scope, "TERRARIUM_STATUS_SCOPE");
   await assertRunAccessible({ ...access, targetRunId: runId });
   return await reconcileRun(await readMetadata(runId), { staleMs });
+}
+
+export async function ensureTerminalCallback({ runId, requesterRunId, scope } = {}) {
+  const result = await getRunStatus({ runId, requesterRunId, scope });
+  if (result.status === "running") return { runId, terminal: false, routed: false, note: "run is still active" };
+  const routed = await emitCompletionEvent(result);
+  return { runId, terminal: true, routed: !routed.duplicate, duplicate: routed.duplicate === true, eventId: routed.eventId, delivered: routed.delivered };
 }
 
 export async function cancelRun({ runId, requesterRunId, scope } = {}) {

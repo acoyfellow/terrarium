@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { LOG_DIR, getRunStatus, readRun, runTerrarium } from '../src/core.js';
+import { LOG_DIR, getRunStatus, readRun, runTerrarium, taskFingerprint } from '../src/core.js';
 import { JOURNAL_DIR } from '../src/router.js';
 
 function withEnv(values, fn) {
@@ -37,7 +37,8 @@ test('four parallel top-level runs keep exact tasks and verified contracts', asy
       assert.ok(file, `missing completion event for ${results[i].runId}`);
       const event = JSON.parse(readFileSync(join(JOURNAL_DIR, file), 'utf8'));
       assert.equal(event.runId, results[i].runId);
-      assert.equal(event.task, tasks[i]);
+      assert.equal(event.taskFingerprint, taskFingerprint(tasks[i]));
+      assert.equal('task' in event, false);
     }
   } finally { agent.cleanup(); }
 });

@@ -2,8 +2,9 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { initialRunState, transition } from '../src/run-machine.js';
 import { spawnTerrariumBackground, cancelRun, getRunStatus } from '../src/core.js';
-import { registerSubscriber, claimMailboxEvents, unregisterSubscriber } from '../src/router.js';
-import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { JOURNAL_DIR, registerSubscriber, claimMailboxEvents, unregisterSubscriber } from '../src/router.js';
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { replayScheduleFile, replayScheduleFixture } from '../src/schedule-replay.js';
@@ -101,6 +102,74 @@ test('real background cancel emits exactly one terminal callback', { timeout: 15
     assert.equal(terminal[0].type, 'Cancelled');
   } finally {
     await unregisterSubscriber(subscriberId).catch(() => {});
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('callback channel follows the parent caller rather than the child cwd', { timeout: 15000 }, async () => {
+  const suffix = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+  const runId = `ter_parent_channel_${suffix}`;
+  const subscriberId = `sub_parent_channel_${suffix}`;
+  const eventId = `evt_${runId}_Completed`;
+  const parentChannel = process.cwd().split('/').at(-1);
+  const dir = mkdtempSync(join(tmpdir(), 'terra-child-cwd-'));
+  const script = join(dir, 'done.mjs');
+  writeFileSync(script, `console.log('done');`);
+  await registerSubscriber({ subscriberId, runIds: [runId], eventTypes: ['Completed'], channels: [parentChannel], workflowIds: ['*'] });
+  try {
+    await spawnTerrariumBackground({ runId, task: 'parent callback channel', cwd: dir, agent: `${process.execPath} ${script}`, requireTaskContract: false });
+    let status;
+    for (let i = 0; i < 400; i++) {
+      status = await getRunStatus({ runId, staleMs: 1000 });
+      if (status.status !== 'running') break;
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+    assert.equal(status.status, 'done');
+    assert.equal(status.channel, parentChannel);
+    let callbackEvents = [];
+    for (let i = 0; i < 40; i++) {
+      callbackEvents.push(...(await claimMailboxEvents({ subscriberId })).events);
+      if (callbackEvents.some((event) => event.runId === runId)) break;
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+    assert.deepEqual(callbackEvents.filter((event) => event.runId === runId).map((event) => event.runId), [runId]);
+  } finally {
+    await unregisterSubscriber(subscriberId).catch(() => {});
+    await rm(join(JOURNAL_DIR, `${eventId}.json`), { force: true });
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('terminal callback is journaled without subscribers and late concrete subscribe replays it', { timeout: 15000 }, async () => {
+  const suffix = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+  const runId = `ter_late_callback_${suffix}`;
+  const subscriberId = `sub_late_callback_${suffix}`;
+  const eventId = `evt_${runId}_Completed`;
+  const dir = mkdtempSync(join(tmpdir(), 'terra-late-callback-'));
+  const script = join(dir, 'done.mjs');
+  writeFileSync(script, `console.log('done');`);
+  try {
+    await spawnTerrariumBackground({ runId, task: 'late callback recovery', agent: `${process.execPath} ${script}`, requireTaskContract: false });
+    let status;
+    for (let i = 0; i < 400; i++) {
+      status = await getRunStatus({ runId, staleMs: 1000 });
+      if (status.status !== 'running') break;
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+    assert.equal(status.status, 'done');
+    const journalPath = join(JOURNAL_DIR, `${eventId}.json`);
+    assert.equal(existsSync(journalPath), true);
+    const journalEvent = JSON.parse(await readFile(journalPath, 'utf8'));
+    assert.equal('task' in journalEvent, false);
+    assert.equal('cwd' in journalEvent, false);
+    assert.equal(typeof journalEvent.taskFingerprint, 'string');
+    const subscription = await registerSubscriber({ subscriberId, runIds: [runId], eventTypes: ['Completed'], channels: ['*'], workflowIds: ['*'] });
+    assert.equal(subscription.replayed, 1);
+    const claimed = await claimMailboxEvents({ subscriberId });
+    assert.deepEqual(claimed.events.map((event) => event.eventId), [eventId]);
+  } finally {
+    await unregisterSubscriber(subscriberId).catch(() => {});
+    await rm(join(JOURNAL_DIR, `${eventId}.json`), { force: true });
     rmSync(dir, { recursive: true, force: true });
   }
 });

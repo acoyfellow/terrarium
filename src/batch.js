@@ -80,13 +80,26 @@ async function launchBounded(jobs, limit) {
     while (true) {
       const index = next++;
       if (index >= jobs.length) return;
-      // Force background so launch returns immediately with a running run.
-      results[index] = await spawnTerrariumBackground({ ...jobs[index], stream: false });
+      // A slot remains occupied until its run is terminal. Merely awaiting the
+      // detached spawn would only bound launcher calls, not active children.
+      const run = await spawnTerrariumBackground({ ...jobs[index], stream: false });
+      results[index] = run;
+      if (limit < jobs.length) await waitUntilTerminal(run.runId);
     }
   }
   const workers = Array.from({ length: Math.min(limit, jobs.length) }, () => worker());
   await Promise.all(workers);
   return results;
+}
+
+async function waitUntilTerminal(runId, maxWaitMs = 30000) {
+  const deadline = Date.now() + maxWaitMs;
+  while (true) {
+    const run = await getRunStatus({ runId });
+    if (isTerminal(run.status)) return run;
+    if (Date.now() >= deadline) throw new Error(`run did not become terminal after cancellation: ${runId}`);
+    await sleep(100);
+  }
 }
 
 async function awaitStrategy({ groupId, strategy, quorumTarget, pollMs, timeoutMs }) {
@@ -149,7 +162,10 @@ async function cancelLosers(status, { all = false } = {}) {
   if (!all) {
     // keep none running; winners are already terminal
   }
-  await Promise.all(targets.map((run) => cancelRun({ runId: run.runId }).catch(() => {})));
+  await Promise.all(targets.map(async (run) => {
+    await cancelRun({ runId: run.runId }).catch(() => {});
+    await waitUntilTerminal(run.runId).catch(() => {});
+  }));
 }
 
 function sleep(ms) { return new Promise((resolve) => setTimeout(resolve, ms)); }

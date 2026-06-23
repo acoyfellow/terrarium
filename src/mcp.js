@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { createInterface } from "node:readline";
-import { cancelRun, getRunStatus, isRunAccessible, listRuns, readRun, runTerrarium, spawnTerrariumBackground, VERSION } from "./core.js";
+import { cancelRun, ensureTerminalCallback, getRunStatus, isRunAccessible, listRuns, readRun, runTerrarium, spawnTerrariumBackground, VERSION } from "./core.js";
 import { createRunGroup, getRunGroupStatus, readRunGroupLogs } from "./groups.js";
 import { spawnBatch, BATCH_STRATEGIES } from "./batch.js";
 import { acknowledgeMailboxEvent, claimMailboxEvents, getMailboxStatus, getSubscriber, pruneRouter, registerSubscriber, requeueInflightEvents, unregisterSubscriber } from "./router.js";
@@ -20,6 +20,9 @@ const tools = [
         ephemeral: { type: "boolean", description: "For Pi agents, append --no-session unless an explicit session flag is already present. Default true." },
         profile: { type: "string", enum: ["default", "minimal"], description: "Child prompt profile. 'default' (full structured contract) or 'minimal' (lean shell for bounded read-only digs). Orthogonal to agent/readOnly. Default: 'default'." },
         cwd: { type: "string", description: "Working directory for the child. Default: current directory." },
+        channel: { type: "string", description: "Callback channel. Defaults to the caller's working-directory basename, not the child cwd." },
+        workflowId: { type: "string", description: "Optional external workflow correlation ID." },
+        sessionId: { type: "string", description: "Optional parent session correlation ID." },
         isolation: { type: "string", enum: ["none", "copy", "worktree"], description: "Workspace separation mode. This is not a security sandbox. Default: none." },
         keepWorkspace: { type: "boolean", description: "Retain an isolated copy/worktree for inspection instead of cleaning it up." },
         timeoutMs: { type: "number", description: "Kill the child after this many milliseconds. Default: none." },
@@ -44,7 +47,7 @@ const tools = [
     inputSchema: {
       type: "object",
       properties: {
-        jobs: { type: "array", minItems: 1, maxItems: 32, description: "Job option objects, each accepting the same fields as terrarium_spawn (task required).", items: { type: "object", properties: { task: { type: "string" }, agent: { type: "string" }, model: { type: "string" }, readOnly: { type: "boolean" }, ephemeral: { type: "boolean" }, profile: { type: "string", enum: ["default", "minimal"] }, cwd: { type: "string" }, isolation: { type: "string", enum: ["none", "copy", "worktree"] }, keepWorkspace: { type: "boolean" }, timeoutMs: { type: "number" }, needsAttentionAfterMs: { type: "number" }, maxDepth: { type: "number" }, allowSpawn: { type: "boolean" }, statusScope: { type: "string", enum: ["self", "descendants", "all"] }, readScope: { type: "string", enum: ["self", "descendants", "all"] }, logPath: { type: "string" }, mreLogPath: { type: "string" } }, required: ["task"] } },
+        jobs: { type: "array", minItems: 1, maxItems: 32, description: "Job option objects, each accepting the same fields as terrarium_spawn (task required).", items: { type: "object", properties: { task: { type: "string" }, agent: { type: "string" }, model: { type: "string" }, readOnly: { type: "boolean" }, ephemeral: { type: "boolean" }, profile: { type: "string", enum: ["default", "minimal"] }, cwd: { type: "string" }, channel: { type: "string" }, workflowId: { type: "string" }, sessionId: { type: "string" }, isolation: { type: "string", enum: ["none", "copy", "worktree"] }, keepWorkspace: { type: "boolean" }, timeoutMs: { type: "number" }, needsAttentionAfterMs: { type: "number" }, maxDepth: { type: "number" }, allowSpawn: { type: "boolean" }, statusScope: { type: "string", enum: ["self", "descendants", "all"] }, readScope: { type: "string", enum: ["self", "descendants", "all"] }, logPath: { type: "string" }, mreLogPath: { type: "string" } }, required: ["task"] } },
         strategy: { type: "string", enum: BATCH_STRATEGIES, description: "Join strategy. Default: all." },
         quorum: { type: "number", description: "Required successes for the quorum strategy (1..jobs.length)." },
         concurrency: { type: "number", minimum: 1, description: "Max simultaneously launched runs. Default: launch all at once." },
@@ -105,17 +108,18 @@ const tools = [
   },
   {
     name: "terrarium_callbacks",
-    description: "Create a durable pull subscription for terminal run callbacks; consumers must claim/ack completions. Subscribing does not wake a conversation.",
+    description: "Create a durable pull subscription for terminal callbacks. Terminal events are journaled without an online consumer; concrete run subscriptions replay finish-before-subscribe races. Consumers claim/ack delivery, or recover a missing terminal event by run ID. Subscribing alone does not wake a conversation.",
     inputSchema: {
       type: "object",
       properties: {
-        action: { type: "string", enum: ["subscribe", "claim", "ack", "status", "requeue", "prune", "unsubscribe"] },
+        action: { type: "string", enum: ["subscribe", "claim", "ack", "status", "requeue", "recover", "prune", "unsubscribe"] },
         subscriberId: { type: "string" },
         runIds: { type: "array", items: { type: "string" }, maxItems: 100 },
         channels: { type: "array", items: { type: "string" }, maxItems: 100 },
         workflowIds: { type: "array", items: { type: "string" }, maxItems: 100 },
         eventTypes: { type: "array", items: { type: "string" }, maxItems: 100 },
         eventId: { type: "string" },
+        runId: { type: "string", description: "Terminal run to recover into the durable callback journal and matching mailboxes." },
         limit: { type: "number" },
         olderThanMs: { type: "number" }
       },
@@ -147,7 +151,7 @@ function visibleTools(policy) {
   });
 }
 
-const SPAWN_ARG_KEYS = new Set(["task", "agent", "model", "readOnly", "ephemeral", "profile", "cwd", "isolation", "keepWorkspace", "timeoutMs", "needsAttentionAfterMs", "maxDepth", "allowSpawn", "statusScope", "readScope", "dryRun", "background", "logPath", "mreLogPath", "verbose"]);
+const SPAWN_ARG_KEYS = new Set(["task", "agent", "model", "readOnly", "ephemeral", "profile", "cwd", "channel", "workflowId", "sessionId", "isolation", "keepWorkspace", "timeoutMs", "needsAttentionAfterMs", "maxDepth", "allowSpawn", "statusScope", "readScope", "dryRun", "background", "logPath", "mreLogPath", "verbose"]);
 function sanitizeSpawnArgs(args) {
   const out = {};
   for (const [key, value] of Object.entries(args)) if (SPAWN_ARG_KEYS.has(key)) out[key] = value;
@@ -346,8 +350,12 @@ async function handle(msg) {
             if (runIds.includes("*")) throw new Error("child callback subscriptions require explicit lineage run IDs");
             for (const runId of runIds) if (!(await isRunAccessible({ requesterRunId: policy.requesterRunId, targetRunId: runId, scope: policy.statusScope }))) throw new Error("callback run access denied");
           }
-          return send(msg.id, content(await registerSubscriber({ ...args, runIds, ownerRunId: policy.requesterRunId })));
+          const subscriber = await registerSubscriber({ ...args, runIds, ownerRunId: policy.requesterRunId });
+          const recovered = [];
+          if (!runIds.includes("*")) for (const runId of runIds) recovered.push(await ensureTerminalCallback({ runId, requesterRunId: policy.requesterRunId, scope: policy.statusScope }));
+          return send(msg.id, content({ ...subscriber, recovered }));
         }
+        if (args.action === "recover") return send(msg.id, content(await ensureTerminalCallback({ runId: args.runId, requesterRunId: policy.requesterRunId, scope: policy.statusScope })));
         if (args.action === "prune") {
           if (policy.requesterRunId) throw new Error("callback pruning is available only to a top-level controller");
           return send(msg.id, content(await pruneRouter({
