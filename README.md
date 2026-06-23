@@ -380,6 +380,7 @@ Config at `~/.terrarium/config.json`:
 Tools:
 
 - `terrarium_spawn` — run one bounded child agent task. Existing callers remain synchronous when `background` is omitted. Set `background: true` (or `TERRARIUM_BACKGROUND_BY_DEFAULT=true`) to detach by default and poll the returned run ID. Retries remain synchronous.
+- `terrarium_spawn_batch` — fan out an array of jobs (each a normal `terrarium_spawn`) as independent background runs under one group, then resolve by a join strategy: `all` (every job finishes; ok only if all succeed), `allSettled` (collect every outcome, always ok), `race` (first terminal wins; cancel the rest), `any` (first success wins; cancel the rest), `quorum` (first `k` successes; cancel the rest). Winner-picking strategies cancel losing runs via the existing cancel primitive — prefer `isolation: copy|worktree` for jobs with side effects. Optional `concurrency` bounds simultaneous launches. Top-level only; capability-scoped like `terrarium_spawn`.
 - `terrarium_status` — inspect one run or list recent runs, including last activity, concise progress, idle time, and a factual needs-attention flag.
 - `terrarium_read` — read a recorded run log; pass `kind: "mre"` for the MRE side log.
 - `terrarium_cancel` — cancel one active run and its descendant process group within the caller's lineage scope.
@@ -395,6 +396,8 @@ CLI equivalents:
 
 ```sh
 terra cancel <runId>
+terra batch --strategy any "try approach A" "try approach B" "try approach C"
+terra batch --strategy quorum --quorum 2 --concurrency 2 "job1" "job2" "job3"
 terra group create "research batch" <runIdA> <runIdB>
 terra group status <groupId>
 terra group read <groupId>
