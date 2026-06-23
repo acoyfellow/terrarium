@@ -1,9 +1,9 @@
 import { createHash } from 'node:crypto';
 import { mkdir, readFile, readdir, rename, rm, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, resolve } from 'node:path';
 import { homedir } from 'node:os';
-const HOME = join(homedir(), '.terrarium');
+const HOME = process.env.TERRARIUM_HOME ? resolve(process.env.TERRARIUM_HOME) : join(homedir(), '.terrarium');
 
 export const ROUTER_DIR = join(HOME, 'router');
 export const JOURNAL_DIR = join(ROUTER_DIR, 'journal');
@@ -33,6 +33,8 @@ async function atomicJson(path, value) {
   await rename(temp, path);
 }
 
+const TERMINAL_EVENT_TYPES = ['Completed', 'Failed', 'TimedOut', 'Cancelled'];
+
 export async function registerSubscriber(subscription) {
   const subscriberId = assertId(subscription.subscriberId, 'subscriber id');
   if (subscription.ownerRunId != null && !/^ter_[A-Za-z0-9_]+$/.test(subscription.ownerRunId)) throw new Error('invalid subscriber owner run id');
@@ -41,7 +43,7 @@ export async function registerSubscriber(subscription) {
     subscriberId,
     channels: boundedList(subscription.channels),
     workflowIds: boundedList(subscription.workflowIds),
-    eventTypes: boundedList(subscription.eventTypes),
+    eventTypes: boundedList(subscription.eventTypes, TERMINAL_EVENT_TYPES),
     runIds: boundedList(subscription.runIds),
     ownerRunId: subscription.ownerRunId ?? null,
     createdAt: subscription.createdAt ?? new Date().toISOString(),
@@ -60,7 +62,10 @@ export async function getSubscriber(subscriberId) {
 
 export async function unregisterSubscriber(subscriberId) {
   assertId(subscriberId, 'subscriber id');
-  await rm(join(SUBSCRIBERS_DIR, `${subscriberId}.json`), { force: true });
+  await Promise.all([
+    rm(join(SUBSCRIBERS_DIR, `${subscriberId}.json`), { force: true }),
+    rm(mailboxDirs(subscriberId).root, { recursive: true, force: true }),
+  ]);
 }
 
 export async function listSubscribers() {
@@ -149,18 +154,35 @@ export async function requeueInflightEvents({ subscriberId, olderThanMs = 300000
   return { subscriberId, requeued };
 }
 
-export async function pruneRouter({ acknowledgedOlderThanMs = 7 * 86400000, journalOlderThanMs = 7 * 86400000, subscriberIds, eventIds } = {}) {
+function eventAge(now, event) {
+  const timestamp = Date.parse(event.claimedAt || event.at || '');
+  return Number.isFinite(timestamp) ? now - timestamp : Infinity;
+}
+
+export async function pruneRouter({ acknowledgedOlderThanMs = 7 * 86400000, journalOlderThanMs = 7 * 86400000, callbackOlderThanMs = 7 * 86400000, subscriberOlderThanMs = 7 * 86400000, subscriberIds, eventIds } = {}) {
   const now = Date.now();
-  let acknowledgedRemoved = 0, journalRemoved = 0;
+  let acknowledgedRemoved = 0, pendingRemoved = 0, inflightRemoved = 0, journalRemoved = 0, subscribersRemoved = 0;
+  const callbackCutoff = Math.max(0, Number(callbackOlderThanMs) || 0);
+  const subscriberCutoff = Math.max(0, Number(subscriberOlderThanMs) || 0);
   try {
     for (const subscriber of await readdir(MAILBOXES_DIR)) {
       if (Array.isArray(subscriberIds) && !subscriberIds.includes(subscriber)) continue;
       const dirs = mailboxDirs(subscriber);
-      let files = []; try { files = (await readdir(dirs.acked)).filter((file) => file.endsWith('.json')); } catch {}
-      for (const file of files) {
-        if (Array.isArray(eventIds) && !eventIds.includes(file.slice(0, -5))) continue;
-        let event; try { event = JSON.parse(await readFile(join(dirs.acked, file), 'utf8')); } catch { continue; }
-        if (now - Date.parse(event.at || new Date(now).toISOString()) >= acknowledgedOlderThanMs) { await rm(join(dirs.acked, file), { force: true }); acknowledgedRemoved++; }
+      for (const [kind, dir, cutoff] of [
+        ['acked', dirs.acked, acknowledgedOlderThanMs],
+        ['pending', dirs.pending, callbackCutoff],
+        ['inflight', dirs.inflight, callbackCutoff],
+      ]) {
+        let files = []; try { files = (await readdir(dir)).filter((file) => file.endsWith('.json')); } catch {}
+        for (const file of files) {
+          if (Array.isArray(eventIds) && !eventIds.includes(file.slice(0, -5))) continue;
+          let event; try { event = JSON.parse(await readFile(join(dir, file), 'utf8')); } catch { event = {}; }
+          if (eventAge(now, event) < Math.max(0, Number(cutoff) || 0)) continue;
+          await rm(join(dir, file), { force: true });
+          if (kind === 'acked') acknowledgedRemoved++;
+          else if (kind === 'pending') pendingRemoved++;
+          else inflightRemoved++;
+        }
       }
     }
   } catch {}
@@ -171,5 +193,16 @@ export async function pruneRouter({ acknowledgedOlderThanMs = 7 * 86400000, jour
       if (now - Date.parse(event.at || new Date(now).toISOString()) >= journalOlderThanMs) { await rm(join(JOURNAL_DIR, file), { force: true }); journalRemoved++; }
     }
   } catch {}
-  return { acknowledgedRemoved, journalRemoved };
+  try {
+    for (const sub of await listSubscribers()) {
+      if (Array.isArray(subscriberIds) && !subscriberIds.includes(sub.subscriberId)) continue;
+      const age = now - Date.parse(sub.createdAt || '');
+      if (!Number.isFinite(age) || age < subscriberCutoff) continue;
+      const status = await getMailboxStatus(sub.subscriberId);
+      if (status.pending || status.inflight) continue;
+      await unregisterSubscriber(sub.subscriberId);
+      subscribersRemoved++;
+    }
+  } catch {}
+  return { acknowledgedRemoved, pendingRemoved, inflightRemoved, journalRemoved, subscribersRemoved };
 }

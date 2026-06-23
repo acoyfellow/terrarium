@@ -100,7 +100,7 @@ test('real background cancel emits exactly one terminal callback', { timeout: 15
     assert.equal(terminal.length, 1);
     assert.equal(terminal[0].type, 'Cancelled');
   } finally {
-    await unregisterSubscriber({ subscriberId }).catch(() => {});
+    await unregisterSubscriber(subscriberId).catch(() => {});
     rmSync(dir, { recursive: true, force: true });
   }
 });

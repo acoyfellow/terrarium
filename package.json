@@ -10,7 +10,7 @@
   },
   "scripts": {
     "start": "node src/cli.js",
-    "test": "node --test test/*.test.js",
+    "test": "node scripts/test-isolated.mjs",
     "demo": "node src/cli.js \"write a haiku about delegated context\" --dry-run",
     "probe": "node src/cli.js probe filesystem-write-outside-workspace --json",
     "probe:all": "node src/cli.js probe filesystem-write-outside-workspace --json && node src/cli.js probe environment-canary --json && node src/cli.js probe network-disabled --json && node src/cli.js probe filesystem-read-canary --json && node src/cli.js probe process-persistence --json",
