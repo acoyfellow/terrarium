@@ -105,7 +105,7 @@ const tools = [
   },
   {
     name: "terrarium_callbacks",
-    description: "Subscribe to scoped run callbacks and claim/ack each completion exactly once.",
+    description: "Create a durable pull subscription for terminal run callbacks; consumers must claim/ack completions. Subscribing does not wake a conversation.",
     inputSchema: {
       type: "object",
       properties: {
@@ -350,7 +350,12 @@ async function handle(msg) {
         }
         if (args.action === "prune") {
           if (policy.requesterRunId) throw new Error("callback pruning is available only to a top-level controller");
-          return send(msg.id, content(await pruneRouter({ acknowledgedOlderThanMs: args.olderThanMs, journalOlderThanMs: args.olderThanMs })));
+          return send(msg.id, content(await pruneRouter({
+            acknowledgedOlderThanMs: args.olderThanMs,
+            journalOlderThanMs: args.olderThanMs,
+            callbackOlderThanMs: args.olderThanMs,
+            subscriberOlderThanMs: args.olderThanMs,
+          })));
         }
         const subscription = await getSubscriber(args.subscriberId);
         if (policy.requesterRunId && subscription.ownerRunId !== policy.requesterRunId) throw new Error("callback subscriber access denied");

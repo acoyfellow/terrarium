@@ -2,10 +2,9 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { homedir } from "node:os";
-import { listRuns } from "../src/core.js";
+import { listRuns, LOG_DIR } from "../src/core.js";
 
-const runsDir = join(homedir(), ".terrarium", "runs");
+const runsDir = LOG_DIR;
 
 test("listRuns ignores background specs and reports active runs independently of page limit", async () => {
   const suffix = `${process.pid}-${Date.now()}`;

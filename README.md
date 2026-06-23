@@ -390,7 +390,7 @@ Tools:
 - `terrarium_read` — read a recorded run log; pass `kind: "mre"` for the MRE side log.
 - `terrarium_cancel` — cancel one active run and its descendant process group within the caller's lineage scope.
 - `terrarium_group` — create/status/read/cancel a parent-owned collection of already-started independent runs; it never spawns or hides fan-out.
-- `terrarium_callbacks` — subscribe to scoped run events, atomically claim each callback once, acknowledge delivery, requeue abandoned inflight events, and prune old acknowledged/journal records.
+- `terrarium_callbacks` — create a durable **pull** subscription for terminal run events, atomically claim each callback, acknowledge delivery, requeue abandoned inflight events, and prune stale pending/inflight/acknowledged/journal state. Subscribing does not wake or resume a Pi conversation; consumers must claim the queue. High-frequency progress remains available through run status/logs and is not persisted to callback mailboxes.
 - `terrarium_doctor` — top-level-only diagnostics for storage, runs, attention, callbacks, groups, and stale claims.
 
 When installed as a Pi package, Terrarium adds a thin native widget for active runs/groups, exactly-once completion messages, and `/terrarium-status`, `/terrarium-groups`, and `/terrarium-cancel`. Spawned children do not load this observer layer.

@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { rm } from 'node:fs/promises';
 import { join } from 'node:path';
-import { JOURNAL_DIR, MAILBOXES_DIR, SUBSCRIBERS_DIR, acknowledgeMailboxEvent, claimMailboxEvents, getMailboxStatus, pruneRouter, registerSubscriber, requeueInflightEvents, routeEvent } from '../src/router.js';
+import { existsSync } from 'node:fs';
+import { JOURNAL_DIR, MAILBOXES_DIR, SUBSCRIBERS_DIR, acknowledgeMailboxEvent, claimMailboxEvents, getMailboxStatus, pruneRouter, registerSubscriber, requeueInflightEvents, routeEvent, unregisterSubscriber } from '../src/router.js';
 
 test('callbacks route, deduplicate, claim, and acknowledge exactly once', async () => {
   const suffix = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
@@ -52,6 +53,59 @@ test('stale inflight callbacks can be requeued and acknowledged history can be p
     await rm(join(MAILBOXES_DIR, subscriberId), { recursive: true, force: true });
     await rm(join(SUBSCRIBERS_DIR, `${subscriberId}.json`), { force: true });
     await rm(join(JOURNAL_DIR, `${eventId}.json`), { force: true });
+  }
+});
+
+test('callback subscriptions default to terminal events rather than progress heartbeats', async () => {
+  const suffix = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+  const subscriberId = `sub_terminal_${suffix}`;
+  const runId = `ter_terminal_${suffix}`;
+  const progressId = `evt_progress_${suffix}`;
+  const completedId = `evt_completed_${suffix}`;
+  try {
+    const subscription = await registerSubscriber({ subscriberId, runIds: [runId] });
+    assert.deepEqual(subscription.eventTypes, ['Completed', 'Failed', 'TimedOut', 'Cancelled']);
+    assert.equal((await routeEvent({ eventId: progressId, type: 'Progress', runId, workflowId: runId, channel: 'x', at: new Date().toISOString() })).delivered, 0);
+    assert.equal((await routeEvent({ eventId: completedId, type: 'Completed', runId, workflowId: runId, channel: 'x', at: new Date().toISOString() })).delivered, 1);
+  } finally {
+    await unregisterSubscriber(subscriberId);
+    await rm(join(JOURNAL_DIR, `${progressId}.json`), { force: true });
+    await rm(join(JOURNAL_DIR, `${completedId}.json`), { force: true });
+  }
+});
+
+test('unsubscribe removes subscriber metadata and its entire mailbox', async () => {
+  const suffix = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+  const subscriberId = `sub_remove_${suffix}`;
+  const eventId = `evt_remove_${suffix}`;
+  await registerSubscriber({ subscriberId, runIds: ['*'] });
+  await routeEvent({ eventId, type: 'Completed', runId: `ter_${suffix}`, workflowId: 'w', channel: 'x', at: new Date().toISOString() });
+  assert.equal((await getMailboxStatus(subscriberId)).pending, 1);
+  await unregisterSubscriber(subscriberId);
+  assert.equal(existsSync(join(SUBSCRIBERS_DIR, `${subscriberId}.json`)), false);
+  assert.equal(existsSync(join(MAILBOXES_DIR, subscriberId)), false);
+  await rm(join(JOURNAL_DIR, `${eventId}.json`), { force: true });
+});
+
+test('prune removes stale pending and inflight callbacks and expires empty subscribers', async () => {
+  const suffix = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+  const subscriberId = `sub_prune_${suffix}`;
+  const pendingId = `evt_pending_${suffix}`;
+  const inflightId = `evt_inflight_${suffix}`;
+  try {
+    await registerSubscriber({ subscriberId, runIds: ['*'], createdAt: '2020-01-01T00:00:00.000Z' });
+    await routeEvent({ eventId: pendingId, type: 'Completed', runId: `ter_p_${suffix}`, workflowId: 'w', channel: 'x', at: '2020-01-01T00:00:00.000Z' });
+    await routeEvent({ eventId: inflightId, type: 'Completed', runId: `ter_i_${suffix}`, workflowId: 'w', channel: 'x', at: '2020-01-01T00:00:00.000Z' });
+    await claimMailboxEvents({ subscriberId, limit: 1 });
+    const pruned = await pruneRouter({ callbackOlderThanMs: 0, subscriberOlderThanMs: 0, journalOlderThanMs: 0, subscriberIds: [subscriberId], eventIds: [pendingId, inflightId] });
+    assert.equal(pruned.pendingRemoved, 1);
+    assert.equal(pruned.inflightRemoved, 1);
+    assert.equal(pruned.subscribersRemoved, 1);
+    assert.equal(existsSync(join(MAILBOXES_DIR, subscriberId)), false);
+  } finally {
+    await unregisterSubscriber(subscriberId).catch(() => {});
+    await rm(join(JOURNAL_DIR, `${pendingId}.json`), { force: true });
+    await rm(join(JOURNAL_DIR, `${inflightId}.json`), { force: true });
   }
 });
 

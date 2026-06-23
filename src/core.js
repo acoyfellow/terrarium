@@ -10,7 +10,7 @@ import { routeEvent } from "./router.js";
 import { initialRunState, transition } from "./run-machine.js";
 
 export const VERSION = "0.0.1";
-export const HOME = join(homedir(), ".terrarium");
+export const HOME = process.env.TERRARIUM_HOME ? resolve(process.env.TERRARIUM_HOME) : join(homedir(), ".terrarium");
 export const LOG_DIR = join(HOME, "runs");
 export const CONFIG_PATH = join(HOME, "config.json");
 export const WORKSPACE_DIR = join(HOME, "workspaces");
@@ -404,7 +404,10 @@ async function emitProgressEvent(run, text, { activity = true } = {}) {
     const event = { type: "terrarium.progress", runId: run.runId, cwd: run.originalCwd ?? run.cwd, task: run.task, text, at: new Date().toISOString(), channel: channel ?? null };
     const typed = eventForRun(TerrariumEventType.Progress, run, { text, channel: run.channel ?? basename(run.originalCwd ?? run.cwd) });
     await publishEvent(typed);
-    await routeEvent(typed);
+    // Progress is high-frequency and already persisted as latest-run metadata
+    // plus one channel progress file. Durable callback mailboxes are reserved
+    // for terminal lifecycle events; routing 3-second heartbeats created an
+    // unbounded queue that buried completion signals.
     if (!channel) return;
     const dir = join(EVENT_DIR, channel);
     await mkdir(dir, { recursive: true });
