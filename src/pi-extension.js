@@ -4,6 +4,7 @@ import { getRunGroupStatus, listRunGroups } from "./groups.js";
 import { acknowledgeMailboxEvent, claimMailboxEvents, registerSubscriber, requeueInflightEvents } from "./router.js";
 
 const WIDGET = "terrarium-runs";
+const TERMINAL_TYPES = ["Completed", "Failed", "TimedOut", "Cancelled"];
 
 function subscriberId(ctx) {
   const source = ctx.sessionManager.getSessionFile() || ctx.cwd;
@@ -19,6 +20,15 @@ function runLine(run) {
   const progress = run.progressText && run.progressText !== "started" ? ` · ${String(run.progressText).replace(/\s+/g, " ").slice(0, 50)}` : "";
   return `${icon} ${run.runId.slice(-8)} ${elapsed(run.startedAt)} · ${task}${progress}`;
 }
+function callbackMessage(run) {
+  const label = run.status === "done" ? "completed" : run.status;
+  return {
+    customType: "terrarium-notify",
+    content: `Terrarium ${label}: ${run.runId}\n${run.taskResultSummary || run.note || run.task || ""}`.trim(),
+    display: true,
+    details: { runId: run.runId, status: run.status, taskContractStatus: run.taskContractStatus },
+  };
+}
 
 export default function terrariumPiExtension(pi) {
   // Spawned children receive no parent observer/widget. Their MCP capabilities are
@@ -27,6 +37,14 @@ export default function terrariumPiExtension(pi) {
   let timer = null;
   let currentSubscriber = null;
   let busy = false;
+
+  async function subscribeRun(runId, ctx) {
+    if (!currentSubscriber) return;
+    const existing = await registerSubscriber({ subscriberId: currentSubscriber, runIds: [runId], channels: ["*"], workflowIds: ["*"], eventTypes: TERMINAL_TYPES, narrowWildcardRunIds: true });
+    // The host observer is durable. A concrete run filter also replays a finish
+    // that won the spawn/subscribe race; the normal refresh claims it.
+    if (existing.replayed && ctx.hasUI) ctx.ui.notify(`Terrarium completion queued: ${runId}`, "info");
+  }
 
   async function refresh(ctx) {
     if (busy) return;
@@ -50,8 +68,10 @@ export default function terrariumPiExtension(pi) {
         const claimed = await claimMailboxEvents({ subscriberId: currentSubscriber, limit: 20 });
         for (const event of claimed.events) {
           let run; try { run = await getRunStatus({ runId: event.runId }); } catch { run = { runId: event.runId, status: event.type }; }
-          const label = run.status === "done" ? "completed" : run.status;
-          pi.sendMessage({ customType: "terrarium-notify", content: `Terrarium ${label}: ${run.runId}\n${run.taskResultSummary || run.note || run.task || ""}`.trim(), display: true, details: { runId: run.runId, status: run.status, taskContractStatus: run.taskContractStatus } }, { deliverAs: "followUp", triggerTurn: false });
+          // Pi supports an immediate model turn for extension messages. followUp
+          // queues safely when a turn is active; triggerTurn wakes an idle session.
+          // Ack only after Pi accepted the message, so a throw is replayable.
+          pi.sendMessage(callbackMessage(run), { deliverAs: "followUp", triggerTurn: true });
           await acknowledgeMailboxEvent({ subscriberId: currentSubscriber, eventId: event.eventId });
         }
       }
@@ -60,12 +80,38 @@ export default function terrariumPiExtension(pi) {
 
   pi.on("session_start", async (_event, ctx) => {
     currentSubscriber = subscriberId(ctx);
-    await registerSubscriber({ subscriberId: currentSubscriber, runIds: ["*"], channels: ["*"], workflowIds: ["*"], eventTypes: ["Completed", "Failed", "TimedOut", "Cancelled"] });
+    // Do not create a wildcard run subscription. This Pi session should only
+    // wake for concrete runs it spawned; otherwise callbacks leak into sibling
+    // Pi sessions that share a channel/cwd.
     await requeueInflightEvents({ subscriberId: currentSubscriber, olderThanMs: 0 });
     await refresh(ctx);
     timer = setInterval(() => { void refresh(ctx); }, 1500);
     timer.unref?.();
   });
+
+  pi.on("tool_result", async (event, ctx) => {
+    if (!["terrarium_spawn", "terrarium_terrarium_spawn", "terrarium_spawn_batch", "terrarium_terrarium_spawn_batch"].includes(event.toolName) || event.isError) return;
+    let payload;
+    try {
+      const text = event.content?.find?.((item) => item.type === "text")?.text;
+      payload = typeof text === "string" ? JSON.parse(text) : null;
+    } catch { return; }
+    const runIds = new Set();
+    const collect = (value) => {
+      if (!value || typeof value !== "object") return;
+      if (typeof value.runId === "string" && value.runId.startsWith("ter_")) runIds.add(value.runId);
+      for (const item of Object.values(value)) {
+        if (Array.isArray(item)) for (const child of item) collect(child);
+        else collect(item);
+      }
+    };
+    collect(payload);
+    if (!payload?.background && runIds.size === 0) return;
+    for (const runId of runIds) await subscribeRun(runId, ctx);
+    await refresh(ctx);
+  });
+
+  pi.on("agent_end", async (_event, ctx) => { await refresh(ctx); });
 
   pi.on("session_shutdown", async (_event, ctx) => {
     if (timer) clearInterval(timer);

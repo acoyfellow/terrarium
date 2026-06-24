@@ -9,7 +9,7 @@ import { diagnoseTerrarium } from "./doctor.js";
 const tools = [
   {
     name: "terrarium_spawn",
-    description: "Spawn exactly one child agent for one delegated task. Child recursion and status/read visibility are capability-scoped by run lineage. Process exit zero is accepted only with a matching run/task receipt. Set background=true (or TERRARIUM_BACKGROUND_BY_DEFAULT=true) to detach and return a concise run pointer; poll with terrarium_status. Omitted background remains synchronous for compatibility.",
+    description: "Spawn exactly one child agent for one bounded task. For background=true, do not sleep or poll: terminal callbacks only. The Terrarium Pi extension automatically subscribes this session, durably claims/acks completion exactly once, and triggers an idle Pi turn (or queues a follow-up while busy). Without that host extension, use terrarium_callbacks pull claim/ack or terrarium_status. Omitted background remains synchronous.",
     inputSchema: {
       type: "object",
       properties: {
@@ -32,7 +32,7 @@ const tools = [
         statusScope: { type: "string", enum: ["self", "descendants", "all"], description: "Run-status visibility granted to the child. Default: descendants when spawn is allowed, otherwise self." },
         readScope: { type: "string", enum: ["self", "descendants", "all"], description: "Run-log visibility granted to the child. Default: descendants when spawn is allowed, otherwise self." },
         dryRun: { type: "boolean", description: "Print the child invocation without running it." },
-        background: { type: "boolean", description: "Detach and return immediately with a concise run pointer by default. Pass verbose=true for pid/logPath fields. Required for long agent tasks; poll via terrarium_status." },
+        background: { type: "boolean", description: "Detach immediately. In Pi, the extension auto-subscribes and surfaces terminal completion; do not sleep/poll. Other hosts must pull callbacks or status. Pass verbose=true for pid/logPath fields." },
         logPath: { type: "string", description: "Override log file path. Default: ~/.terrarium/runs/<runId>.log" },
         mreLogPath: { type: "string", description: "Override MRE log file path passed to the child as TERRARIUM_MRE_LOG_PATH. Default: ~/.terrarium/runs/<runId>.mre.log" },
         maxRetries: { type: "number", minimum: 0, maximum: 2, description: "Bounded retries for missing/mismatched task receipts. Default: 0; background runs cannot retry." },
@@ -108,7 +108,7 @@ const tools = [
   },
   {
     name: "terrarium_callbacks",
-    description: "Create a durable pull subscription for terminal callbacks. Terminal events are journaled without an online consumer; concrete run subscriptions replay finish-before-subscribe races. Consumers claim/ack delivery, or recover a missing terminal event by run ID. Subscribing alone does not wake a conversation.",
+    description: "Low-level durable pull callbacks, terminal-only by default. Concrete run subscriptions replay finish-before-subscribe and offline/restart races; consumers atomically claim then ack exactly once. Subscribing alone does not wake a host. In Pi, prefer background terrarium_spawn: its extension auto-subscribes and triggers/queues delivery. Never sleep waiting for callbacks.",
     inputSchema: {
       type: "object",
       properties: {
