@@ -17,6 +17,8 @@ Parallel top-level runs keep separate metadata/logs and may execute concurrently
 
 One ordinary run owns one child process, metadata/log receipts, and at most one terminal result plus one deterministic terminal callback event. Terminal events are durably journaled before secondary in-process observers, even when no subscriber is online. Concrete late subscriptions replay matching journal entries without redelivering acknowledged events. Detached background runs feed observed process, cancellation, deadline, and receipt facts into the pure transition core in `src/run-machine.js`; the supervisor executes returned decisions using real processes, clocks, metadata, and the callback router. Versioned fixtures in `fixtures/run-schedules/` replay bounded classification facts only and never become a second persisted run record.
 
+MCP callback subscriptions are a durable pull primitive and do not wake a host by themselves. The Pi extension is the host-delivery adapter: after a background spawn result it adds the concrete run to that session's durable subscription, claims only terminal events, injects a visible follow-up with Pi's `triggerTurn: true`, and acknowledges only after injection succeeds. Pi starts immediately if idle or drains the follow-up after its active turn; offline sessions replay on resume. Other MCP hosts must claim/ack callbacks or inspect status themselves.
+
 Explicit batch fan-out in `src/batch.js` creates independent background runs, stores their run IDs in one durable group, and applies `all`, `allSettled`, `race`, `any`, or `quorum` join semantics. Winner-picking strategies cancel remaining ordinary runs through the same cancellation primitive.
 
 ## Historical campaign model

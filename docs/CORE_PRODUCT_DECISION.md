@@ -18,7 +18,7 @@ Core surfaces:
 - pure terminal transition semantics plus bounded, versioned timing-schedule replay;
 - external callback queues with claim/ack/requeue/retention;
 - runner independence and CI/headless use;
-- thin Pi-native status/group/cancel presentation.
+- thin Pi-native status/group/cancel presentation and terminal callback host delivery (idle turn trigger or queued follow-up; durable replay on session resume).
 
 ## Public breakout UI
 

@@ -45,13 +45,21 @@ export async function registerSubscriber(subscription) {
   if (subscription.ownerRunId != null && !/^ter_[A-Za-z0-9_]+$/.test(subscription.ownerRunId)) throw new Error('invalid subscriber owner run id');
   let existing = null;
   try { existing = await getSubscriber(subscriberId); } catch {}
+  const mergeFilters = (requested, prior, fallback, { narrowWildcard = false } = {}) => {
+    const next = boundedList(requested, fallback);
+    if (!prior) return next;
+    const previous = boundedList(prior, fallback);
+    if (next.includes('*')) return ['*'];
+    if (previous.includes('*')) return narrowWildcard ? next : ['*'];
+    return [...new Set([...previous, ...next])];
+  };
   const normalized = {
     version: 1,
     subscriberId,
-    channels: boundedList(subscription.channels),
-    workflowIds: boundedList(subscription.workflowIds),
-    eventTypes: boundedList(subscription.eventTypes, TERMINAL_EVENT_TYPES),
-    runIds: boundedList(subscription.runIds),
+    channels: mergeFilters(subscription.channels, existing?.channels, ['*']),
+    workflowIds: mergeFilters(subscription.workflowIds, existing?.workflowIds, ['*']),
+    eventTypes: mergeFilters(subscription.eventTypes, existing?.eventTypes, TERMINAL_EVENT_TYPES),
+    runIds: mergeFilters(subscription.runIds, existing?.runIds, ['*'], { narrowWildcard: subscription.narrowWildcardRunIds === true }),
     ownerRunId: subscription.ownerRunId ?? existing?.ownerRunId ?? null,
     createdAt: existing?.createdAt ?? subscription.createdAt ?? new Date().toISOString(),
     updatedAt: new Date().toISOString(),
@@ -60,7 +68,15 @@ export async function registerSubscriber(subscription) {
   const dirs = mailboxDirs(subscriberId);
   await Promise.all([mkdir(dirs.pending, { recursive: true }), mkdir(dirs.inflight, { recursive: true }), mkdir(dirs.acked, { recursive: true })]);
   await atomicJson(join(SUBSCRIBERS_DIR, `${subscriberId}.json`), normalized);
-  const replayed = await replayJournalToSubscriber(normalized, { concreteRuns: !normalized.runIds.includes('*') });
+  const requestedRuns = boundedList(subscription.runIds);
+  const requestedSubscription = {
+    ...normalized,
+    channels: boundedList(subscription.channels),
+    workflowIds: boundedList(subscription.workflowIds),
+    eventTypes: boundedList(subscription.eventTypes, TERMINAL_EVENT_TYPES),
+    runIds: requestedRuns,
+  };
+  const replayed = await replayJournalToSubscriber(requestedSubscription, { concreteRuns: !requestedRuns.includes('*') });
   return { ...normalized, replayed };
 }
 
