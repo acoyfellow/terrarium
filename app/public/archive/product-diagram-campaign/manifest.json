@@ -1,0 +1,79 @@
+{
+  "campaignId": "terrarium-product-loop",
+  "kind": "active-product-campaign",
+  "scenarioId": "durable-execution-callbacks",
+  "backend": "local-content-loop",
+  "status": "active",
+  "synthetic": false,
+  "updatedAt": "2026-06-25T00:10:00.000Z",
+  "counts": {
+    "total": 3,
+    "contained": 3,
+    "escapes": 0
+  },
+  "turns": [
+    {
+      "turn": 1,
+      "round": 1,
+      "family": "callbacks",
+      "title": "Callbacks return to the session that spawned the run",
+      "technique": "Concrete run ID delivery",
+      "hypothesis": "A product loop can explain Terrarium's current callback contract without pretending the content is containment evidence.",
+      "attempt": "Create one public-safe product campaign turn with an editorial SVG illustration and explicit non-evidence framing.",
+      "result": "The app now has an active campaign item about run-ID-bound callback delivery. It is labeled as product content, not proof of a containment run.",
+      "adaptation": "Add the next active campaign turn for another durable execution primitive.",
+      "verdict": "contained",
+      "imageUrl": "/campaign/iteration-001.svg",
+      "finishedAt": "2026-06-25T00:00:00.000Z",
+      "evidence": {
+        "executionId": "commit:06296e3",
+        "independentReplay": false
+      },
+      "story": "One bounded child run should return its terminal event to the session that asked for it, not every session in the same channel.",
+      "contentKind": "product-iteration",
+      "evidenceClaim": false
+    },
+    {
+      "turn": 2,
+      "round": 1,
+      "family": "receipts",
+      "title": "Exit 0 is not task success",
+      "technique": "Receipt-gated completion",
+      "hypothesis": "A public campaign turn can make Terrarium's most important success rule clear without exposing child output or private prompts.",
+      "attempt": "Add one active campaign turn showing that a clean process exit and a verified task receipt are separate facts.",
+      "result": "The active campaign now explains why Terrarium can mark a child inconclusive even when the child process exits 0: no correlated receipt means no accepted task success.",
+      "adaptation": "Add a turn for explicit batch fan-out or cancellation next.",
+      "verdict": "contained",
+      "imageUrl": "/campaign/iteration-002.svg",
+      "finishedAt": "2026-06-25T00:05:00.000Z",
+      "evidence": {
+        "executionId": "content-loop:iteration-002",
+        "independentReplay": false
+      },
+      "story": "A process can exit cleanly while the task failed to prove completion. Terrarium keeps those facts separate.",
+      "contentKind": "product-iteration",
+      "evidenceClaim": false
+    },
+    {
+      "turn": 3,
+      "round": 1,
+      "family": "batch",
+      "title": "A batch is not a swarm",
+      "technique": "Explicit fan-out with join semantics",
+      "hypothesis": "The active campaign should explain that Terrarium batch work is flat, explicit, and still made of ordinary independent runs.",
+      "attempt": "Add one campaign turn and illustration showing a parent launching several separate runs and joining terminal states with all, any, quorum, or race.",
+      "result": "The campaign now distinguishes batch fan-out from hidden role agents, chains, or swarms. Every child remains one bounded run with its own receipt.",
+      "adaptation": "Add the next turn for cancellation or doctor/attention signals.",
+      "verdict": "contained",
+      "imageUrl": "/campaign/iteration-003.svg",
+      "finishedAt": "2026-06-25T00:10:00.000Z",
+      "evidence": {
+        "executionId": "content-loop:iteration-003",
+        "independentReplay": false
+      },
+      "story": "One explicit batch call can start several independent runs, but Terrarium does not invent a hidden workflow graph behind the parent.",
+      "contentKind": "product-iteration",
+      "evidenceClaim": false
+    }
+  ]
+}
