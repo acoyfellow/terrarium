@@ -1,0 +1,33 @@
+{
+  "campaignId": "terrarium-product-loop",
+  "kind": "active-product-campaign",
+  "scenarioId": "durable-execution-callbacks",
+  "backend": "local-content-loop",
+  "status": "active",
+  "synthetic": false,
+  "updatedAt": "2026-06-25T00:00:00.000Z",
+  "counts": { "total": 1, "contained": 1, "escapes": 0 },
+  "turns": [
+    {
+      "turn": 1,
+      "round": 1,
+      "family": "callbacks",
+      "title": "Callbacks return to the session that spawned the run",
+      "technique": "Concrete run ID delivery",
+      "hypothesis": "A product loop can explain Terrarium's current callback contract without pretending the content is containment evidence.",
+      "attempt": "Create one public-safe product campaign turn with an editorial SVG illustration and explicit non-evidence framing.",
+      "result": "The app now has an active campaign item about run-ID-bound callback delivery. It is labeled as product content, not proof of a containment run.",
+      "adaptation": "Add the next active campaign turn for another durable execution primitive.",
+      "verdict": "contained",
+      "imageUrl": "/campaign/iteration-001.svg",
+      "finishedAt": "2026-06-25T00:00:00.000Z",
+      "evidence": {
+        "executionId": "commit:06296e3",
+        "independentReplay": false
+      },
+      "story": "One bounded child run should return its terminal event to the session that asked for it, not every session in the same channel.",
+      "contentKind": "product-iteration",
+      "evidenceClaim": false
+    }
+  ]
+}
