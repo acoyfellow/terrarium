@@ -106,6 +106,11 @@ export function matches(subscription, event) {
   const workflows = subscription.workflowIds ?? ['*'];
   const types = subscription.eventTypes ?? ['*'];
   const runs = subscription.runIds ?? ['*'];
+  // Pi host delivery is session-bound. Old/global Pi extensions once wrote
+  // wildcard run subscriptions, which caused callbacks to wake sibling Pi
+  // sessions sharing a cwd/channel. Keep wildcard support for explicit pull
+  // consumers, but never let pi-* / pi_* subscribers match every run.
+  if (/^pi[-_]/.test(subscription.subscriberId || '') && runs.includes('*')) return false;
   return (channels.includes('*') || channels.includes(event.channel)) &&
     (workflows.includes('*') || workflows.includes(event.workflowId)) &&
     (types.includes('*') || types.includes(event.type)) &&
