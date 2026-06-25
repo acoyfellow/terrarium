@@ -148,6 +148,26 @@ test('new wildcard subscriptions do not replay unrelated historical terminal eve
   }
 });
 
+test('Pi wildcard run subscriptions do not receive unrelated callbacks', async () => {
+  const suffix = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+  const piSubscriberId = `pi-${suffix}`;
+  const pullSubscriberId = `sub_pull_${suffix}`;
+  const runId = `ter_${suffix}`;
+  const eventId = `evt_pi_wild_${suffix}`;
+  try {
+    await registerSubscriber({ subscriberId: piSubscriberId, runIds: ['*'], eventTypes: ['Completed'], channels: ['*'], workflowIds: ['*'] });
+    await registerSubscriber({ subscriberId: pullSubscriberId, runIds: ['*'], eventTypes: ['Completed'], channels: ['*'], workflowIds: ['*'] });
+    const result = await routeEvent({ eventId, type: 'Completed', runId, workflowId: runId, channel: 'cloudflare', at: new Date().toISOString() });
+    assert.equal(result.delivered, 1, 'only the non-Pi wildcard pull subscriber should receive the event');
+    assert.equal((await getMailboxStatus(piSubscriberId)).pending, 0);
+    assert.equal((await getMailboxStatus(pullSubscriberId)).pending, 1);
+  } finally {
+    await unregisterSubscriber(piSubscriberId).catch(() => {});
+    await unregisterSubscriber(pullSubscriberId).catch(() => {});
+    await rm(join(JOURNAL_DIR, `${eventId}.json`), { force: true });
+  }
+});
+
 test('callback filters do not deliver unrelated runs', async () => {
   const suffix = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
   const subscriberId = `sub_filter_${suffix}`;

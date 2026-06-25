@@ -93,6 +93,7 @@ test('Pi subscriber survives shutdown and surfaces an offline callback on resume
   const h = host(sessionFile);
   try {
     await h.handlers.session_start({}, h.ctx);
+    await h.handlers.tool_result({ toolName: 'terrarium_spawn', isError: false, content: [{ type: 'text', text: JSON.stringify({ runId, background: true, status: 'running' }) }] }, h.ctx);
     await h.handlers.session_shutdown({}, h.ctx);
     await routeEvent({ eventId: `evt_${runId}_Completed`, type: 'Completed', runId, workflowId: runId, channel: 'test', at: new Date().toISOString(), status: 'done', ok: true, exitCode: 0 });
     assert.ok((await getMailboxStatus(subscriberId)).pending >= 1);
