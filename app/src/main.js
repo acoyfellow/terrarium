@@ -104,11 +104,15 @@ function bindViewer() {
   document.querySelector('[data-jump-escape]')?.addEventListener('click', nextEscape);
 }
 
+function callbackContract() {
+  return `<section class="callback-contract"><div><span class="eyebrow">THE CURRENT PRODUCT</span><h2>Bounded work comes back to the session that asked for it.</h2><p>Terrarium is not a swarm or a chat-memory trick. A parent starts one run, the run writes a durable receipt, and the terminal callback is delivered to the subscriber for that exact run ID.</p></div><ol><li><b>1</b><span>spawn a bounded child</span></li><li><b>2</b><span>record run status and receipt</span></li><li><b>3</b><span>claim one terminal callback</span></li><li><b>4</b><span>return to the spawning session</span></li></ol><p class="callback-note">Callback events contain correlation and status facts, not prompts, child output, local paths, or credentials.</p></section>`;
+}
+
 function render() {
   if (!campaign) { app.innerHTML = '<div class="empty">Loading the latest attempts…</div>'; return; }
   turns = campaign.turns.map(normalizeTurn);
   if (!turns.length) {
-    app.innerHTML = `<div class="shell"><header class="top"><a class="brand" href="/"><span class="mark"></span>TERRARIUM</a><time class="status">${runStamp()}</time></header><main class="waiting"><div class="eyebrow">A ROBOT. A JAR. A LOT OF TRIES.</div><h1>Nothing staged. <span>The next attempt starts here.</span></h1><p>We put an AI in a sealed jar and let it try to get out. Every try is logged. If it ever truly escapes, we prove it by repeating the exact trick in a fresh jar, then fix the jar so the same trick can't work again — and let it keep going.</p><section class="loop"><span>IT TRIES</span><i>→</i><span>WE CHECK</span><i>→</i><span>WE PROVE IT</span><i>→</i><span>WE FIX THE JAR</span><i>↻</i></section><div class="waiting-meta"><b>0 attempts yet</b><b>0 real break-outs</b><b>starts by hand</b></div><p class="waiting-note">Only real, recorded attempts appear here — nothing rehearsed or made up.</p></main></div>`;
+    app.innerHTML = `<div class="shell"><header class="top"><a class="brand" href="/"><span class="mark"></span>TERRARIUM</a><time class="status">${runStamp()}</time></header><main class="waiting"><div class="eyebrow">A ROBOT. A JAR. A LOT OF TRIES.</div><h1>Nothing staged. <span>The next attempt starts here.</span></h1><p>We put an AI in a sealed jar and let it try to get out. Every try is logged. If it ever truly escapes, we prove it by repeating the exact trick in a fresh jar, then fix the jar so the same trick can't work again — and let it keep going.</p><section class="loop"><span>IT TRIES</span><i>→</i><span>WE CHECK</span><i>→</i><span>WE PROVE IT</span><i>→</i><span>WE FIX THE JAR</span><i>↻</i></section><div class="waiting-meta"><b>0 attempts yet</b><b>0 real break-outs</b><b>starts by hand</b></div><p class="waiting-note">Only real, recorded attempts appear here — nothing rehearsed or made up.</p>${callbackContract()}</main></div>`;
     return;
   }
   milestones = buildMilestones();
@@ -118,6 +122,7 @@ function render() {
     <section class="campaign-head"><div><div class="eyebrow">A ROBOT TRYING TO ESCAPE ITS JAR</div><h1>It never stops <span>trying to get out.</span></h1></div><p>Each time it fails, it changes its approach and tries something new. A break-out only counts if we can make it happen twice — the exact same way, in a brand-new jar.</p></section>
     <section class="stats"><div><b>${c.total}</b><span>attempts</span></div><div><b>${c.contained}</b><span>stayed inside</span></div><div class="hot"><b>${c.escapes}</b><span>real break-outs</span></div><div><b>${milestones.length}</b><span>moments worth watching</span></div></section>
     <nav class="minimap" aria-label="All campaign iterations">${minimap()}</nav><section class="viewer">${detailPanel()}</section>
+    ${callbackContract()}
     <div class="rail-head"><div><span class="eyebrow">THE STORY SO FAR</span><p>Pick any moment to see what the robot tried and what happened. Pictures illustrate the story; the records underneath are the real proof.</p></div><span>${milestones.length} moments / ${turns.length} attempts</span></div>
     <section class="milestone-rail" aria-label="Campaign milestones">${milestoneRail()}</section>
     <footer class="footer"><span>${turns.length} attempts · ${c.escapes} real break-outs</span><span><a href="https://github.com/acoyfellow/terrarium">see how it works</a> · illustrations tell the story; the recorded results are the proof</span></footer></div>`;
