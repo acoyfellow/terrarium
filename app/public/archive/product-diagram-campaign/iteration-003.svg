@@ -1,0 +1,50 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" role="img" aria-labelledby="title desc">
+  <title id="title">Explicit batch fan-out</title>
+  <desc id="desc">Editorial diagram of one parent starting several independent Terrarium runs and joining their terminal receipts.</desc>
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="28%" r="74%">
+      <stop offset="0" stop-color="#253f2e"/>
+      <stop offset="0.58" stop-color="#0b1710"/>
+      <stop offset="1" stop-color="#040806"/>
+    </radialGradient>
+    <filter id="glow"><feGaussianBlur stdDeviation="7" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  </defs>
+  <rect width="1600" height="900" fill="url(#bg)"/>
+  <ellipse cx="800" cy="790" rx="690" ry="70" fill="#020503" opacity="0.68"/>
+  <path d="M400 150 C400 88 1200 88 1200 150 L1310 735 C1310 805 290 805 290 735 Z" fill="#8ff0ad10" stroke="#8ff0ad66" stroke-width="3"/>
+  <text x="800" y="118" text-anchor="middle" fill="#e8f3eb" font-family="Manrope, system-ui, sans-serif" font-size="58" font-weight="700" letter-spacing="-2">A batch is not a swarm.</text>
+  <text x="800" y="170" text-anchor="middle" fill="#9cb1a1" font-family="Manrope, system-ui, sans-serif" font-size="25">It is one explicit parent call that starts independent ordinary runs and joins their terminal states.</text>
+  <g transform="translate(675 250)" filter="url(#glow)">
+    <rect width="250" height="92" rx="24" fill="#0d1912" stroke="#8ff0ad" stroke-width="4"/>
+    <text x="125" y="57" text-anchor="middle" fill="#8ff0ad" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="25" letter-spacing="3">PARENT</text>
+  </g>
+  <g fill="none" stroke="#789181" stroke-width="5" stroke-linecap="round" stroke-dasharray="14 18">
+    <path d="M715 350 C600 405 520 445 450 515"/>
+    <path d="M800 350 V500"/>
+    <path d="M885 350 C1000 405 1080 445 1150 515"/>
+  </g>
+  <g font-family="ui-monospace, SFMono-Regular, Menlo, monospace" text-anchor="middle">
+    <g transform="translate(330 520)">
+      <rect width="240" height="150" rx="22" fill="#07100c" stroke="#31543a" stroke-width="3"/>
+      <circle cx="120" cy="56" r="26" fill="#8ff0ad" opacity="0.9"/>
+      <text x="120" y="62" font-size="22" fill="#07100c">A</text>
+      <text x="120" y="112" font-size="21" fill="#c8d8cc">run + receipt</text>
+    </g>
+    <g transform="translate(680 520)">
+      <rect width="240" height="150" rx="22" fill="#07100c" stroke="#31543a" stroke-width="3"/>
+      <circle cx="120" cy="56" r="26" fill="#8ff0ad" opacity="0.9"/>
+      <text x="120" y="62" font-size="22" fill="#07100c">B</text>
+      <text x="120" y="112" font-size="21" fill="#c8d8cc">run + receipt</text>
+    </g>
+    <g transform="translate(1030 520)">
+      <rect width="240" height="150" rx="22" fill="#07100c" stroke="#31543a" stroke-width="3"/>
+      <circle cx="120" cy="56" r="26" fill="#8ff0ad" opacity="0.9"/>
+      <text x="120" y="62" font-size="22" fill="#07100c">C</text>
+      <text x="120" y="112" font-size="21" fill="#c8d8cc">run + receipt</text>
+    </g>
+  </g>
+  <g transform="translate(570 720)">
+    <rect width="460" height="62" rx="31" fill="#0d1912" stroke="#8ff0ad" stroke-width="3"/>
+    <text x="230" y="39" text-anchor="middle" fill="#a8dbb5" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="18" letter-spacing="2">join: all / any / quorum / race</text>
+  </g>
+</svg>
