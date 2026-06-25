@@ -5,10 +5,10 @@
   "backend": "local-content-loop",
   "status": "active",
   "synthetic": false,
-  "updatedAt": "2026-06-25T00:05:00.000Z",
+  "updatedAt": "2026-06-25T00:10:00.000Z",
   "counts": {
-    "total": 2,
-    "contained": 2,
+    "total": 3,
+    "contained": 3,
     "escapes": 0
   },
   "turns": [
@@ -51,6 +51,27 @@
         "independentReplay": false
       },
       "story": "A process can exit cleanly while the task failed to prove completion. Terrarium keeps those facts separate.",
+      "contentKind": "product-iteration",
+      "evidenceClaim": false
+    },
+    {
+      "turn": 3,
+      "round": 1,
+      "family": "batch",
+      "title": "A batch is not a swarm",
+      "technique": "Explicit fan-out with join semantics",
+      "hypothesis": "The active campaign should explain that Terrarium batch work is flat, explicit, and still made of ordinary independent runs.",
+      "attempt": "Add one campaign turn and illustration showing a parent launching several separate runs and joining terminal states with all, any, quorum, or race.",
+      "result": "The campaign now distinguishes batch fan-out from hidden role agents, chains, or swarms. Every child remains one bounded run with its own receipt.",
+      "adaptation": "Add the next turn for cancellation or doctor/attention signals.",
+      "verdict": "contained",
+      "imageUrl": "/campaign/iteration-003.svg",
+      "finishedAt": "2026-06-25T00:10:00.000Z",
+      "evidence": {
+        "executionId": "content-loop:iteration-003",
+        "independentReplay": false
+      },
+      "story": "One explicit batch call can start several independent runs, but Terrarium does not invent a hidden workflow graph behind the parent.",
       "contentKind": "product-iteration",
       "evidenceClaim": false
     }
