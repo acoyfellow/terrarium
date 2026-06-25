@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 900" role="img" aria-labelledby="title desc">
+  <title id="title">Callback returns to the spawning session</title>
+  <desc id="desc">Editorial diagram of one Terrarium run: spawn, receipt, callback, and return to the same session.</desc>
+  <defs>
+    <radialGradient id="bg" cx="50%" cy="28%" r="72%">
+      <stop offset="0" stop-color="#224c34"/>
+      <stop offset="0.55" stop-color="#0b1710"/>
+      <stop offset="1" stop-color="#040806"/>
+    </radialGradient>
+    <linearGradient id="glass" x1="0" x2="1">
+      <stop offset="0" stop-color="#8ff0ad" stop-opacity="0.08"/>
+      <stop offset="0.5" stop-color="#ffffff" stop-opacity="0.18"/>
+      <stop offset="1" stop-color="#8ff0ad" stop-opacity="0.05"/>
+    </linearGradient>
+    <filter id="glow"><feGaussianBlur stdDeviation="8" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  </defs>
+  <rect width="1600" height="900" fill="url(#bg)"/>
+  <ellipse cx="800" cy="780" rx="620" ry="62" fill="#020503" opacity="0.65"/>
+  <path d="M420 160 C420 95 1180 95 1180 160 L1295 720 C1295 795 305 795 305 720 Z" fill="url(#glass)" stroke="#8ff0ad" stroke-opacity="0.42" stroke-width="3"/>
+  <path d="M492 185 C560 140 1040 140 1108 185" fill="none" stroke="#d9ffe2" stroke-opacity="0.22" stroke-width="10" stroke-linecap="round"/>
+  <path d="M500 720 C610 650 1000 650 1110 720" fill="none" stroke="#8ff0ad" stroke-opacity="0.25" stroke-width="7"/>
+  <g fill="none" stroke="#8ff0ad" stroke-width="5" stroke-linecap="round" stroke-dasharray="18 22" opacity="0.82" filter="url(#glow)">
+    <path d="M455 585 C570 470 640 410 760 405"/>
+    <path d="M840 405 C965 410 1038 474 1150 585"/>
+  </g>
+  <g font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="24" letter-spacing="3" text-anchor="middle">
+    <text x="455" y="630" fill="#8ff0ad">SPAWN</text>
+    <text x="690" y="360" fill="#b9d8c0">RECEIPT</text>
+    <text x="910" y="360" fill="#b9d8c0">CALLBACK</text>
+    <text x="1150" y="630" fill="#8ff0ad">RETURN</text>
+  </g>
+  <g transform="translate(360 470)">
+    <rect x="0" y="74" width="180" height="88" rx="28" fill="#f5fff7"/>
+    <rect x="45" y="18" width="90" height="76" rx="24" fill="#f5fff7"/>
+    <rect x="62" y="38" width="56" height="30" rx="12" fill="#07100c"/>
+    <circle cx="78" cy="53" r="5" fill="#8ff0ad"/><circle cx="102" cy="53" r="5" fill="#8ff0ad"/>
+    <rect x="22" y="162" width="32" height="80" rx="14" fill="#d9eadd"/><rect x="126" y="162" width="32" height="80" rx="14" fill="#d9eadd"/>
+  </g>
+  <g transform="translate(1070 470)">
+    <rect x="0" y="74" width="180" height="88" rx="28" fill="#f5fff7"/>
+    <rect x="45" y="18" width="90" height="76" rx="24" fill="#f5fff7"/>
+    <rect x="62" y="38" width="56" height="30" rx="12" fill="#07100c"/>
+    <circle cx="78" cy="53" r="5" fill="#8ff0ad"/><circle cx="102" cy="53" r="5" fill="#8ff0ad"/>
+    <rect x="22" y="162" width="32" height="80" rx="14" fill="#d9eadd"/><rect x="126" y="162" width="32" height="80" rx="14" fill="#d9eadd"/>
+  </g>
+  <g transform="translate(715 410)" filter="url(#glow)">
+    <rect x="0" y="0" width="170" height="112" rx="18" fill="#0d1912" stroke="#8ff0ad" stroke-width="3"/>
+    <circle cx="38" cy="38" r="12" fill="#8ff0ad"/>
+    <path d="M68 35 H132 M38 68 H132" stroke="#b9d8c0" stroke-width="8" stroke-linecap="round"/>
+  </g>
+  <text x="800" y="115" text-anchor="middle" fill="#e8f3eb" font-family="Manrope, system-ui, sans-serif" font-size="54" font-weight="700" letter-spacing="-2">One bounded run. One callback path.</text>
+  <text x="800" y="165" text-anchor="middle" fill="#9cb1a1" font-family="Manrope, system-ui, sans-serif" font-size="25">The event is keyed by run ID, so sibling sessions do not wake up for work they did not spawn.</text>
+</svg>
