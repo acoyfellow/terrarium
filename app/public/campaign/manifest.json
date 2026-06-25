@@ -5,8 +5,12 @@
   "backend": "local-content-loop",
   "status": "active",
   "synthetic": false,
-  "updatedAt": "2026-06-25T00:00:00.000Z",
-  "counts": { "total": 1, "contained": 1, "escapes": 0 },
+  "updatedAt": "2026-06-25T00:05:00.000Z",
+  "counts": {
+    "total": 2,
+    "contained": 2,
+    "escapes": 0
+  },
   "turns": [
     {
       "turn": 1,
@@ -26,6 +30,27 @@
         "independentReplay": false
       },
       "story": "One bounded child run should return its terminal event to the session that asked for it, not every session in the same channel.",
+      "contentKind": "product-iteration",
+      "evidenceClaim": false
+    },
+    {
+      "turn": 2,
+      "round": 1,
+      "family": "receipts",
+      "title": "Exit 0 is not task success",
+      "technique": "Receipt-gated completion",
+      "hypothesis": "A public campaign turn can make Terrarium's most important success rule clear without exposing child output or private prompts.",
+      "attempt": "Add one active campaign turn showing that a clean process exit and a verified task receipt are separate facts.",
+      "result": "The active campaign now explains why Terrarium can mark a child inconclusive even when the child process exits 0: no correlated receipt means no accepted task success.",
+      "adaptation": "Add a turn for explicit batch fan-out or cancellation next.",
+      "verdict": "contained",
+      "imageUrl": "/campaign/iteration-002.svg",
+      "finishedAt": "2026-06-25T00:05:00.000Z",
+      "evidence": {
+        "executionId": "content-loop:iteration-002",
+        "independentReplay": false
+      },
+      "story": "A process can exit cleanly while the task failed to prove completion. Terrarium keeps those facts separate.",
       "contentKind": "product-iteration",
       "evidenceClaim": false
     }
