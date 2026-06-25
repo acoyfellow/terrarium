@@ -43,6 +43,8 @@ npm run demo:smoke    # local smoke check
 npm run deploy        # personal Cloudflare account + custom domain
 ```
 
+`demo:smoke` prints which data source it checked. Local Vite uses `source: "/demo/manifest.json"` because it does not run the Worker API route; the deployed Worker should report `source: "/api/demo"`.
+
 Start with [Architecture](./docs/ARCHITECTURE.md) and the [core product decision](./docs/CORE_PRODUCT_DECISION.md). See [concurrency and context isolation](./docs/CONCURRENCY_ISOLATION.md), the [pi-subagents comparison](./docs/PI_SUBAGENTS_COMPARISON.md), the [secure-agent proof](./docs/SECURE_AGENT_PROOF.md), and [landscape research](./docs/SECURE_AGENT_LANDSCAPE.md).
 
 ## Quick start: ordinary delegation
