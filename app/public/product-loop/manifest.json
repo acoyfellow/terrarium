@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "kind": "product-content-loop",
+  "title": "Terrarium product loop",
+  "description": "Editorial product-content artifacts about Terrarium's current durable execution and callback layer. These are illustrations and copy, not containment evidence.",
+  "updatedAt": "2026-06-25T00:00:00.000Z",
+  "items": [
+    {
+      "iteration": 1,
+      "title": "Callbacks return to the session that spawned the run",
+      "summary": "A background run is attached by concrete run ID. Its terminal callback is claimed by the spawning session, not broadcast to every Pi session in the same channel.",
+      "imageUrl": "/product-loop/iteration-001.svg",
+      "artifactType": "editorial-illustration",
+      "evidence": false,
+      "topics": ["callbacks", "run-id", "session delivery"]
+    }
+  ]
+}
