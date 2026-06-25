@@ -1,6 +1,11 @@
 const base = process.env.TERRARIUM_DEMO_URL || 'http://127.0.0.1:5178';
 
 async function fetchCampaign(baseUrl) {
+  const active = await fetch(`${baseUrl}/campaign/manifest.json`);
+  if (active.ok && (active.headers.get('content-type') || '').includes('application/json')) {
+    return { campaign: await active.json(), source: '/campaign/manifest.json' };
+  }
+
   const api = await fetch(`${baseUrl}/api/demo`);
   if (api.ok && (api.headers.get('content-type') || '').includes('application/json')) {
     return { campaign: await api.json(), source: '/api/demo' };
@@ -10,7 +15,7 @@ async function fetchCampaign(baseUrl) {
   // public static manifest so `npm run demo:dev` + `npm run demo:smoke` remains
   // a truthful quick-start check instead of failing with an HTML parse error.
   const manifest = await fetch(`${baseUrl}/demo/manifest.json`);
-  if (!manifest.ok) throw new Error(`campaign API failed and static manifest failed: ${api.status}/${manifest.status}`);
+  if (!manifest.ok) throw new Error(`campaign API failed and static manifest failed: ${active.status}/${api.status}/${manifest.status}`);
   return { campaign: await manifest.json(), source: '/demo/manifest.json' };
 }
 
