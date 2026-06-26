@@ -1,0 +1,56 @@
+{
+  "schema": "terrarium.product-loop.receipt.v0.1",
+  "iterationId": "ph-20260626084000",
+  "intent": "harden terra doctor diagnostics against malformed child-claim storage",
+  "phases": [
+    "OBSERVE",
+    "SELECT",
+    "EXECUTE",
+    "VERIFY",
+    "RECORD",
+    "PUBLIC_SUMMARIZE",
+    "OPTIONAL_DEPLOY"
+  ],
+  "selectedWork": {
+    "kind": "doctor-hardening",
+    "reason": "Diagnostics must keep working when local run metadata is partially malformed."
+  },
+  "childRuns": [
+    {
+      "runId": "ter_20260626082925166_fw5tok",
+      "status": "done",
+      "selected": true,
+      "summary": "Doctor malformed child-claim hardening."
+    }
+  ],
+  "health": {
+    "repoCleanAtStart": true,
+    "doctorTestsOk": true,
+    "buildOk": true,
+    "validationOk": true
+  },
+  "commands": [
+    {
+      "command": "node --test test/doctor.test.js",
+      "ok": true
+    },
+    {
+      "command": "npm run product-loop:validate",
+      "ok": true
+    },
+    {
+      "command": "npm run demo:build",
+      "ok": true
+    }
+  ],
+  "publicSummary": {
+    "iterationId": "ph-20260626084000",
+    "contentKind": "product-summary",
+    "evidenceClaim": true,
+    "evidenceRef": "terrarium-run:ter_20260626082925166_fw5tok",
+    "title": "Doctor keeps working through malformed child claims",
+    "summary": "The reconciler integrated a verified doctor hardening change so malformed .children paths are skipped instead of crashing diagnostics."
+  },
+  "canPublishStory": true,
+  "createdAt": "2026-06-26T08:47:53.336Z"
+}

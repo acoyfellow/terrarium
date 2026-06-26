@@ -38,13 +38,16 @@ export async function diagnoseTerrarium() {
       checks.inflightCallbacks += await count(`${MAILBOXES_DIR}/${subscriber}/inflight`, (file) => file.endsWith(".json"));
     }
   } catch {}
-  for (const entry of await readdir(LOG_DIR)) if (entry.endsWith(".children")) {
-    const dir = `${LOG_DIR}/${entry}`;
-    for (const slot of await readdir(dir)) {
-      let childId = ""; try { childId = (await readFile(`${dir}/${slot}`, "utf8")).trim(); } catch {}
-      if (!childId || !existsSync(`${LOG_DIR}/${childId}.json`)) checks.staleChildClaims++;
+  try {
+    for (const entry of await readdir(LOG_DIR)) if (entry.endsWith(".children")) {
+      const dir = `${LOG_DIR}/${entry}`;
+      let slots = []; try { slots = await readdir(dir); } catch { continue; }
+      for (const slot of slots) {
+        let childId = ""; try { childId = (await readFile(`${dir}/${slot}`, "utf8")).trim(); } catch {}
+        if (!childId || !existsSync(`${LOG_DIR}/${childId}.json`)) checks.staleChildClaims++;
+      }
     }
-  }
+  } catch {}
   const warnings = [];
   if (!checks.homeWritable || !checks.logsWritable || !checks.workspaceWritable || !checks.routerWritable) warnings.push("Terrarium storage is not readable/writable");
   if (checks.orphanedRuns) warnings.push(`${checks.orphanedRuns} orphaned run(s) need inspection`);
