@@ -93,6 +93,11 @@ test('public evidence claims require a typed, checkable evidence reference', () 
   }
 });
 
+test('public campaign keeps agent/model column without publishing model identity', async () => {
+  const manifest = JSON.parse(await readFile(new URL('../app/public/campaign/manifest.json', import.meta.url), 'utf8'));
+  for (const turn of manifest.turns) assert.equal(turn.agentModel, 'not published', `turn ${turn.turn} must not publish model identity`);
+});
+
 test('dry run evaluates health without writing receipts', async () => {
   const result = await createIterationReceipt({ dryRun: true });
   assert.equal(result.dryRun, true);

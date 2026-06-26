@@ -89,11 +89,14 @@ export async function diagnoseTerrarium() {
       checks.malformedInflightCallbacks += inflight.malformed;
       checks.acknowledgedCallbacks += acknowledged.valid;
       checks.malformedAcknowledgedCallbacks += acknowledged.malformed;
-      checks.routerRepairCandidates += pending.malformed + inflight.malformed + acknowledged.malformed;
+      checks.routerRepairCandidates += pending.malformed + inflight.malformed;
       try {
         for (const file of (await readdir(`${MAILBOXES_DIR}/${subscriber}/inflight`)).filter((name) => name.endsWith('.json'))) {
           let event; try { event = JSON.parse(await readFile(`${MAILBOXES_DIR}/${subscriber}/inflight/${file}`, 'utf8')); } catch { continue; }
-          if (validClaimedEvent(event, file) && Date.now() - Date.parse(event.claimedAt) >= 300000) checks.staleInflightCallbacks++;
+          if (validClaimedEvent(event, file) && Date.now() - Date.parse(event.claimedAt) >= 300000) {
+            checks.staleInflightCallbacks++;
+            checks.routerRepairCandidates++;
+          }
         }
       } catch {}
     }

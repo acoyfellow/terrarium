@@ -151,10 +151,33 @@ test('doctor mirrors router validation for acknowledged, stale inflight, and rep
     assert.ok(result.checks.acknowledgedCallbacks >= 1);
     assert.ok(result.checks.malformedAcknowledgedCallbacks >= 1);
     assert.ok(result.checks.staleInflightCallbacks >= 1);
-    assert.ok(result.checks.routerRepairCandidates >= result.checks.malformedAcknowledgedCallbacks);
+    assert.ok(result.checks.routerRepairCandidates >= result.checks.staleInflightCallbacks);
     assert.ok(result.warnings.some((warning) => warning.includes('malformed acknowledged callback')));
     assert.ok(result.warnings.some((warning) => warning.includes('repair candidates for requeue')));
     assert.equal(JSON.stringify(result).includes('privateMetadata'), false);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test('doctor repair candidates include requeueable stale inflight but exclude retained malformed acked records', async () => {
+  const suffix = `${process.pid}_${Date.now()}_candidate_semantics`;
+  const subscriberId = `doctor_candidate_${suffix}`;
+  const root = `${MAILBOXES_DIR}/${subscriberId}`;
+  const staleId = `evt_stale_candidate_${suffix}`;
+  const malformedAckedId = `evt_malformed_acked_${suffix}`;
+  const baseline = await diagnoseTerrarium();
+  const base = { type: 'Completed', runId: `ter_${suffix}`, at: '2020-01-01T00:00:00.000Z', claimedAt: '2020-01-01T00:00:00.000Z' };
+  await Promise.all([mkdir(`${root}/inflight`, { recursive: true }), mkdir(`${root}/acked`, { recursive: true })]);
+  await Promise.all([
+    writeFile(`${root}/inflight/${staleId}.json`, JSON.stringify({ ...base, eventId: staleId })),
+    writeFile(`${root}/acked/${malformedAckedId}.json`, JSON.stringify({ ...base, eventId: malformedAckedId, privateMetadata: 'retained' })),
+  ]);
+  try {
+    const result = await diagnoseTerrarium();
+    assert.equal(result.checks.staleInflightCallbacks, baseline.checks.staleInflightCallbacks + 1);
+    assert.equal(result.checks.malformedAcknowledgedCallbacks, baseline.checks.malformedAcknowledgedCallbacks + 1);
+    assert.equal(result.checks.routerRepairCandidates, baseline.checks.routerRepairCandidates + 1);
   } finally {
     await rm(root, { recursive: true, force: true });
   }

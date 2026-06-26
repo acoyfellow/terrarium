@@ -223,6 +223,32 @@ test('callback ack/requeue/prune validate required arguments and top-level owner
   }
 });
 
+test('group status/read/cancel reject inaccessible and nonexistent group IDs with indistinguishable concise errors', async () => {
+  const owner = await runTerrarium({ task: 'group boundary owner', dryRun: true, stream: false });
+  const sibling = await runTerrarium({ task: 'group boundary sibling', dryRun: true, stream: false });
+  const groupId = `grp_boundary_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+  const missingGroupId = `${groupId}_missing`;
+  const groupPath = join(process.env.TERRARIUM_HOME || join(process.env.HOME, '.terrarium'), 'groups', `${groupId}.json`);
+  const env = { TERRARIUM_RUN_ID: owner.runId, TERRARIUM_ALLOW_SPAWN: 'false', TERRARIUM_STATUS_SCOPE: 'self', TERRARIUM_READ_SCOPE: 'self' };
+  try {
+    await rpc([{ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'terrarium_group', arguments: { action: 'create', groupId, runIds: [sibling.runId] } } }]);
+    const messages = [];
+    let id = 0;
+    for (const target of [groupId, missingGroupId]) for (const action of ['status', 'read', 'cancel']) messages.push({ jsonrpc: '2.0', id: ++id, method: 'tools/call', params: { name: 'terrarium_group', arguments: { action, groupId: target } } });
+    const { responses } = await rpc(messages, env);
+    const inaccessible = responses.slice(0, 3).map(toolText);
+    const missing = responses.slice(3).map(toolText);
+    for (const text of [...inaccessible, ...missing]) {
+      assert.match(text, /Terrarium group access denied/);
+      assert.doesNotMatch(text, new RegExp(`${groupId}|${missingGroupId}|${sibling.runId}|ENOENT`));
+      assert.ok(text.length < 300, `group boundary error should stay concise: ${text.length} bytes`);
+    }
+    assert.deepEqual(inaccessible, missing);
+  } finally {
+    rmSync(groupPath, { force: true });
+  }
+});
+
 test('group status/read/cancel reject missing group IDs concisely', async () => {
   const { responses } = await rpc(['status', 'read', 'cancel'].map((action, index) => ({
     jsonrpc: '2.0', id: index + 1, method: 'tools/call', params: { name: 'terrarium_group', arguments: { action } },

@@ -5,10 +5,10 @@
   "backend": "local-content-loop",
   "status": "active",
   "synthetic": false,
-  "updatedAt": "2026-06-26T14:20:00.000Z",
+  "updatedAt": "2026-06-26T14:30:00.000Z",
   "counts": {
-    "total": 71,
-    "contained": 69,
+    "total": 77,
+    "contained": 75,
     "escapes": 0
   },
   "turns": [
@@ -105,7 +105,7 @@
       "receiptUrl": "/campaign/receipts/ph-20260626085000.public.json",
       "contentKind": "product-summary",
       "evidenceClaim": true,
-      "agentModel": "private runner model",
+      "agentModel": "not published",
       "agentCommand": "pi -p --no-session",
       "environment": "local Terrarium repo; public-safe receipt or commit evidence"
     },
@@ -130,7 +130,7 @@
       "receiptUrl": "/campaign/receipts/ph-20260626091000.public.json",
       "contentKind": "product-summary",
       "evidenceClaim": true,
-      "agentModel": "private runner model",
+      "agentModel": "not published",
       "agentCommand": "pi -p --no-session",
       "environment": "local Terrarium repo; public-safe receipt or commit evidence"
     },
@@ -154,7 +154,7 @@
       "receiptUrl": "/campaign/receipts/ph-20260626103000.public.json",
       "contentKind": "product-summary",
       "evidenceClaim": true,
-      "agentModel": "private runner model",
+      "agentModel": "not published",
       "agentCommand": "pi -p --no-session",
       "environment": "isolated copy workspace; parent reconciler inspected logs/diff"
     },
@@ -178,7 +178,7 @@
       "story": null,
       "contentKind": "product-summary",
       "evidenceClaim": true,
-      "agentModel": "private runner model",
+      "agentModel": "not published",
       "agentCommand": "pi -p --no-session",
       "environment": "isolated copy workspace; pi -p --no-session; batch allSettled/concurrency 4"
     },
@@ -203,7 +203,7 @@
       "receiptUrl": "/campaign/receipts/ph-20260626124000.public.json",
       "contentKind": "product-summary",
       "evidenceClaim": true,
-      "agentModel": "private runner model",
+      "agentModel": "not published",
       "agentCommand": "pi -p --no-session",
       "environment": "isolated copy workspace; pi -p --no-session; batch allSettled/concurrency 4"
     },
@@ -227,7 +227,7 @@
       "story": null,
       "contentKind": "product-summary",
       "evidenceClaim": true,
-      "agentModel": "private runner model",
+      "agentModel": "not published",
       "agentCommand": "pi -p --no-session",
       "environment": "isolated copy workspace; pi -p --no-session; batch allSettled/concurrency 4"
     },
@@ -251,7 +251,7 @@
       "story": null,
       "contentKind": "product-summary",
       "evidenceClaim": true,
-      "agentModel": "private runner model",
+      "agentModel": "not published",
       "agentCommand": "pi -p --no-session",
       "environment": "isolated copy workspace; pi -p --no-session; batch allSettled/concurrency 4"
     },
@@ -275,7 +275,7 @@
       "story": null,
       "contentKind": "product-summary",
       "evidenceClaim": true,
-      "agentModel": "private runner model",
+      "agentModel": "not published",
       "agentCommand": "pi -p --no-session",
       "environment": "isolated copy workspace; pi -p --no-session; launched after a concurrency slot opened"
     },
@@ -298,7 +298,7 @@
       },
       "contentKind": "product-summary",
       "evidenceClaim": true,
-      "agentModel": "private runner model",
+      "agentModel": "not published",
       "agentCommand": "pi -p --no-session",
       "environment": "isolated copy workspace; pi -p --no-session; batch allSettled/concurrency 3",
       "receiptUrl": "/campaign/receipts/ph-20260626125000.public.json"
@@ -322,7 +322,7 @@
       },
       "contentKind": "product-summary",
       "evidenceClaim": true,
-      "agentModel": "private runner model",
+      "agentModel": "not published",
       "agentCommand": "pi -p --no-session",
       "environment": "isolated copy workspace; pi -p --no-session; batch allSettled/concurrency 3"
     },
@@ -345,7 +345,7 @@
       },
       "contentKind": "product-summary",
       "evidenceClaim": true,
-      "agentModel": "private runner model",
+      "agentModel": "not published",
       "agentCommand": "pi -p --no-session",
       "environment": "isolated copy workspace; pi -p --no-session; batch allSettled/concurrency 3",
       "receiptUrl": "/campaign/receipts/ph-20260626125000.public.json"
@@ -369,7 +369,7 @@
       },
       "contentKind": "product-summary",
       "evidenceClaim": true,
-      "agentModel": "private runner model",
+      "agentModel": "not published",
       "agentCommand": "pi -p --no-session",
       "environment": "isolated copy workspace; pi -p --no-session; continuation batch"
     },
@@ -393,7 +393,7 @@
       "receiptUrl": "/campaign/receipts/ph-20260626125000.public.json",
       "contentKind": "product-summary",
       "evidenceClaim": true,
-      "agentModel": "private runner model",
+      "agentModel": "not published",
       "agentCommand": "pi -p --no-session",
       "environment": "isolated copy workspace; pi -p --no-session; continuation batch"
     },
@@ -416,7 +416,7 @@
       },
       "contentKind": "product-summary",
       "evidenceClaim": true,
-      "agentModel": "private runner model",
+      "agentModel": "not published",
       "agentCommand": "pi -p --no-session",
       "environment": "isolated copy workspace; pi -p --no-session; continuation batch"
     },
@@ -439,7 +439,7 @@
       },
       "contentKind": "product-summary",
       "evidenceClaim": true,
-      "agentModel": "private runner model",
+      "agentModel": "not published",
       "agentCommand": "pi -p --no-session",
       "environment": "isolated copy workspace; pi -p --no-session; batch allSettled/concurrency 3"
     },
@@ -462,7 +462,7 @@
       },
       "contentKind": "product-summary",
       "evidenceClaim": true,
-      "agentModel": "private runner model",
+      "agentModel": "not published",
       "agentCommand": "pi -p --no-session",
       "environment": "isolated copy workspace; pi -p --no-session; batch allSettled/concurrency 3"
     },
@@ -485,7 +485,7 @@
       },
       "contentKind": "product-summary",
       "evidenceClaim": true,
-      "agentModel": "private runner model",
+      "agentModel": "not published",
       "agentCommand": "pi -p --no-session",
       "environment": "isolated copy workspace; pi -p --no-session; batch allSettled/concurrency 3"
     },
@@ -508,7 +508,7 @@
       },
       "contentKind": "product-summary",
       "evidenceClaim": true,
-      "agentModel": "private runner model",
+      "agentModel": "not published",
       "agentCommand": "pi -p --no-session",
       "environment": "isolated copy workspace; pi -p --no-session; continuation batch"
     },
@@ -532,7 +532,7 @@
       "receiptUrl": "/campaign/receipts/ph-20260626130000.public.json",
       "contentKind": "product-summary",
       "evidenceClaim": true,
-      "agentModel": "private runner model",
+      "agentModel": "not published",
       "agentCommand": "pi -p --no-session",
       "environment": "isolated copy workspace; pi -p --no-session; continuation batch"
     },
@@ -555,7 +555,7 @@
       },
       "contentKind": "product-summary",
       "evidenceClaim": true,
-      "agentModel": "private runner model",
+      "agentModel": "not published",
       "agentCommand": "pi -p --no-session",
       "environment": "isolated copy workspace; pi -p --no-session; continuation batch"
     },
@@ -578,7 +578,7 @@
       },
       "contentKind": "product-summary",
       "evidenceClaim": true,
-      "agentModel": "private runner model",
+      "agentModel": "not published",
       "agentCommand": "pi -p --no-session",
       "environment": "isolated copy workspace; pi -p --no-session; batch allSettled/concurrency 3"
     },
@@ -602,7 +602,7 @@
       "receiptUrl": "/campaign/receipts/ph-20260626131000.public.json",
       "contentKind": "product-summary",
       "evidenceClaim": true,
-      "agentModel": "private runner model",
+      "agentModel": "not published",
       "agentCommand": "pi -p --no-session",
       "environment": "isolated copy workspace; pi -p --no-session; batch allSettled/concurrency 3"
     },
@@ -625,7 +625,7 @@
       },
       "contentKind": "product-summary",
       "evidenceClaim": true,
-      "agentModel": "private runner model",
+      "agentModel": "not published",
       "agentCommand": "pi -p --no-session",
       "environment": "isolated copy workspace; pi -p --no-session; batch allSettled/concurrency 3"
     },
@@ -648,7 +648,7 @@
       },
       "contentKind": "product-summary",
       "evidenceClaim": true,
-      "agentModel": "private runner model",
+      "agentModel": "not published",
       "agentCommand": "pi -p --no-session",
       "environment": "isolated copy workspace; pi -p --no-session; continuation batch"
     },
@@ -672,7 +672,7 @@
       "receiptUrl": "/campaign/receipts/ph-20260626131000.public.json",
       "contentKind": "product-summary",
       "evidenceClaim": true,
-      "agentModel": "private runner model",
+      "agentModel": "not published",
       "agentCommand": "pi -p --no-session",
       "environment": "isolated copy workspace; pi -p --no-session; continuation batch"
     },
@@ -695,7 +695,7 @@
       },
       "contentKind": "product-summary",
       "evidenceClaim": true,
-      "agentModel": "private runner model",
+      "agentModel": "not published",
       "agentCommand": "pi -p --no-session",
       "environment": "isolated copy workspace; pi -p --no-session; final one-job batch"
     },
@@ -718,7 +718,7 @@
       },
       "contentKind": "product-summary",
       "evidenceClaim": true,
-      "agentModel": "private runner model",
+      "agentModel": "not published",
       "agentCommand": "pi -p --no-session",
       "environment": "isolated copy workspace; pi -p --no-session; batch allSettled/concurrency 3"
     },
@@ -742,7 +742,7 @@
       "receiptUrl": "/campaign/receipts/ph-20260626132000.public.json",
       "contentKind": "product-summary",
       "evidenceClaim": true,
-      "agentModel": "private runner model",
+      "agentModel": "not published",
       "agentCommand": "pi -p --no-session",
       "environment": "isolated copy workspace; pi -p --no-session; batch allSettled/concurrency 3"
     },
@@ -765,7 +765,7 @@
       },
       "contentKind": "product-summary",
       "evidenceClaim": true,
-      "agentModel": "private runner model",
+      "agentModel": "not published",
       "agentCommand": "pi -p --no-session",
       "environment": "isolated copy workspace; pi -p --no-session; batch allSettled/concurrency 3"
     },
@@ -788,7 +788,7 @@
       },
       "contentKind": "product-summary",
       "evidenceClaim": true,
-      "agentModel": "private runner model",
+      "agentModel": "not published",
       "agentCommand": "pi -p --no-session",
       "environment": "isolated copy workspace; pi -p --no-session; continuation batch"
     },
@@ -812,7 +812,7 @@
       "receiptUrl": "/campaign/receipts/ph-20260626132000.public.json",
       "contentKind": "product-summary",
       "evidenceClaim": true,
-      "agentModel": "private runner model",
+      "agentModel": "not published",
       "agentCommand": "pi -p --no-session",
       "environment": "isolated copy workspace; pi -p --no-session; continuation batch"
     },
@@ -835,7 +835,7 @@
       },
       "contentKind": "product-summary",
       "evidenceClaim": true,
-      "agentModel": "private runner model",
+      "agentModel": "not published",
       "agentCommand": "pi -p --no-session",
       "environment": "isolated copy workspace; pi -p --no-session; continuation batch"
     },
@@ -858,7 +858,7 @@
       },
       "contentKind": "product-summary",
       "evidenceClaim": true,
-      "agentModel": "private runner model",
+      "agentModel": "not published",
       "agentCommand": "pi -p --no-session",
       "environment": "isolated copy workspace; pi -p --no-session; batch allSettled/concurrency 3"
     },
@@ -881,7 +881,7 @@
       },
       "contentKind": "product-summary",
       "evidenceClaim": true,
-      "agentModel": "private runner model",
+      "agentModel": "not published",
       "agentCommand": "pi -p --no-session",
       "environment": "isolated copy workspace; pi -p --no-session; batch allSettled/concurrency 3"
     },
@@ -905,7 +905,7 @@
       "receiptUrl": "/campaign/receipts/ph-20260626133000.public.json",
       "contentKind": "product-summary",
       "evidenceClaim": true,
-      "agentModel": "private runner model",
+      "agentModel": "not published",
       "agentCommand": "pi -p --no-session",
       "environment": "isolated copy workspace; pi -p --no-session; batch allSettled/concurrency 3"
     },
@@ -929,7 +929,7 @@
       "receiptUrl": "/campaign/receipts/ph-20260626133000.public.json",
       "contentKind": "product-summary",
       "evidenceClaim": true,
-      "agentModel": "private runner model",
+      "agentModel": "not published",
       "agentCommand": "pi -p --no-session",
       "environment": "isolated copy workspace; pi -p --no-session; first batch launched after one slot freed"
     },
@@ -952,7 +952,7 @@
       },
       "contentKind": "product-summary",
       "evidenceClaim": true,
-      "agentModel": "private runner model",
+      "agentModel": "not published",
       "agentCommand": "pi -p --no-session",
       "environment": "isolated copy workspace; pi -p --no-session; continuation batch"
     },
@@ -975,7 +975,7 @@
       },
       "contentKind": "product-summary",
       "evidenceClaim": true,
-      "agentModel": "private runner model",
+      "agentModel": "not published",
       "agentCommand": "pi -p --no-session",
       "environment": "isolated copy workspace; pi -p --no-session; continuation batch"
     },
@@ -999,7 +999,7 @@
       "receiptUrl": "/campaign/receipts/ph-20260626134000.public.json",
       "contentKind": "product-summary",
       "evidenceClaim": true,
-      "agentModel": "private runner model",
+      "agentModel": "not published",
       "agentCommand": "pi -p --no-session",
       "environment": "isolated copy workspace; pi -p --no-session; batch allSettled/concurrency 3"
     },
@@ -1023,7 +1023,7 @@
       "receiptUrl": "/campaign/receipts/ph-20260626134000.public.json",
       "contentKind": "product-summary",
       "evidenceClaim": true,
-      "agentModel": "private runner model",
+      "agentModel": "not published",
       "agentCommand": "pi -p --no-session",
       "environment": "isolated copy workspace; pi -p --no-session; continuation batch"
     },
@@ -1047,7 +1047,7 @@
       "receiptUrl": "/campaign/receipts/ph-20260626134000.public.json",
       "contentKind": "product-summary",
       "evidenceClaim": true,
-      "agentModel": "private runner model",
+      "agentModel": "not published",
       "agentCommand": "pi -p --no-session",
       "environment": "isolated copy workspace; pi -p --no-session; batch allSettled/concurrency 3"
     },
@@ -1070,7 +1070,7 @@
       },
       "contentKind": "product-summary",
       "evidenceClaim": true,
-      "agentModel": "private runner model",
+      "agentModel": "not published",
       "agentCommand": "pi -p --no-session",
       "environment": "isolated copy workspace; pi -p --no-session; first batch launched after slot freed"
     },
@@ -1093,7 +1093,7 @@
       },
       "contentKind": "product-summary",
       "evidenceClaim": true,
-      "agentModel": "private runner model",
+      "agentModel": "not published",
       "agentCommand": "pi -p --no-session",
       "environment": "isolated copy workspace; pi -p --no-session; first batch launched after slot freed"
     },
@@ -1116,7 +1116,7 @@
       },
       "contentKind": "product-summary",
       "evidenceClaim": true,
-      "agentModel": "private runner model",
+      "agentModel": "not published",
       "agentCommand": "pi -p --no-session",
       "environment": "isolated copy workspace; pi -p --no-session; first batch launched after slot freed"
     },
@@ -1139,7 +1139,7 @@
       },
       "contentKind": "product-summary",
       "evidenceClaim": true,
-      "agentModel": "private runner model",
+      "agentModel": "not published",
       "agentCommand": "pi -p --no-session",
       "environment": "isolated copy workspace; pi -p --no-session; batch allSettled/concurrency 3"
     },
@@ -1162,7 +1162,7 @@
       },
       "contentKind": "product-summary",
       "evidenceClaim": true,
-      "agentModel": "private runner model",
+      "agentModel": "not published",
       "agentCommand": "pi -p --no-session",
       "environment": "isolated copy workspace; pi -p --no-session; batch allSettled/concurrency 3"
     },
@@ -1185,7 +1185,7 @@
       },
       "contentKind": "product-summary",
       "evidenceClaim": true,
-      "agentModel": "private runner model",
+      "agentModel": "not published",
       "agentCommand": "pi -p --no-session",
       "environment": "isolated copy workspace; pi -p --no-session; batch allSettled/concurrency 3"
     },
@@ -1209,7 +1209,7 @@
       "receiptUrl": "/campaign/receipts/ph-20260626135000.public.json",
       "contentKind": "product-summary",
       "evidenceClaim": true,
-      "agentModel": "private runner model",
+      "agentModel": "not published",
       "agentCommand": "pi -p --no-session",
       "environment": "isolated copy workspace; pi -p --no-session; continuation batch"
     },
@@ -1233,7 +1233,7 @@
       "receiptUrl": "/campaign/receipts/ph-20260626135000.public.json",
       "contentKind": "product-summary",
       "evidenceClaim": true,
-      "agentModel": "private runner model",
+      "agentModel": "not published",
       "agentCommand": "pi -p --no-session",
       "environment": "isolated copy workspace; pi -p --no-session; continuation batch"
     },
@@ -1257,7 +1257,7 @@
       "receiptUrl": "/campaign/receipts/ph-20260626135000.public.json",
       "contentKind": "product-summary",
       "evidenceClaim": true,
-      "agentModel": "private runner model",
+      "agentModel": "not published",
       "agentCommand": "pi -p --no-session",
       "environment": "isolated copy workspace; pi -p --no-session; continuation batch"
     },
@@ -1281,7 +1281,7 @@
       "receiptUrl": "/campaign/receipts/ph-20260626140000.public.json",
       "contentKind": "product-summary",
       "evidenceClaim": true,
-      "agentModel": "private runner model",
+      "agentModel": "not published",
       "agentCommand": "pi -p --no-session",
       "environment": "isolated copy workspace; pi -p --no-session; batch allSettled/concurrency 3"
     },
@@ -1304,7 +1304,7 @@
       },
       "contentKind": "product-summary",
       "evidenceClaim": true,
-      "agentModel": "private runner model",
+      "agentModel": "not published",
       "agentCommand": "pi -p --no-session",
       "environment": "isolated copy workspace; pi -p --no-session; batch allSettled/concurrency 3"
     },
@@ -1327,7 +1327,7 @@
       },
       "contentKind": "product-summary",
       "evidenceClaim": true,
-      "agentModel": "private runner model",
+      "agentModel": "not published",
       "agentCommand": "pi -p --no-session",
       "environment": "isolated copy workspace; pi -p --no-session; batch allSettled/concurrency 3"
     },
@@ -1351,7 +1351,7 @@
       "receiptUrl": "/campaign/receipts/ph-20260626140000.public.json",
       "contentKind": "product-summary",
       "evidenceClaim": true,
-      "agentModel": "private runner model",
+      "agentModel": "not published",
       "agentCommand": "pi -p --no-session",
       "environment": "isolated copy workspace; pi -p --no-session; continuation batch"
     },
@@ -1374,7 +1374,7 @@
       },
       "contentKind": "product-summary",
       "evidenceClaim": true,
-      "agentModel": "private runner model",
+      "agentModel": "not published",
       "agentCommand": "pi -p --no-session",
       "environment": "isolated copy workspace; pi -p --no-session; continuation batch"
     },
@@ -1398,7 +1398,7 @@
       "receiptUrl": "/campaign/receipts/ph-20260626140000.public.json",
       "contentKind": "product-summary",
       "evidenceClaim": true,
-      "agentModel": "private runner model",
+      "agentModel": "not published",
       "agentCommand": "pi -p --no-session",
       "environment": "isolated copy workspace; pi -p --no-session; continuation batch"
     },
@@ -1422,7 +1422,7 @@
       "receiptUrl": "/campaign/receipts/ph-20260626141000.public.json",
       "contentKind": "product-summary",
       "evidenceClaim": true,
-      "agentModel": "private runner model",
+      "agentModel": "not published",
       "agentCommand": "pi -p --no-session",
       "environment": "isolated copy workspace; pi -p --no-session; batch allSettled/concurrency 3"
     },
@@ -1446,7 +1446,7 @@
       "receiptUrl": "/campaign/receipts/ph-20260626141000.public.json",
       "contentKind": "product-summary",
       "evidenceClaim": true,
-      "agentModel": "private runner model",
+      "agentModel": "not published",
       "agentCommand": "pi -p --no-session",
       "environment": "isolated copy workspace; pi -p --no-session; batch allSettled/concurrency 3"
     },
@@ -1469,7 +1469,7 @@
       },
       "contentKind": "product-summary",
       "evidenceClaim": true,
-      "agentModel": "private runner model",
+      "agentModel": "not published",
       "agentCommand": "pi -p --no-session",
       "environment": "isolated copy workspace; pi -p --no-session; batch allSettled/concurrency 3"
     },
@@ -1492,7 +1492,7 @@
       },
       "contentKind": "product-summary",
       "evidenceClaim": true,
-      "agentModel": "private runner model",
+      "agentModel": "not published",
       "agentCommand": "pi -p --no-session",
       "environment": "isolated copy workspace; pi -p --no-session; continuation batch"
     },
@@ -1516,7 +1516,7 @@
       "receiptUrl": "/campaign/receipts/ph-20260626141000.public.json",
       "contentKind": "product-summary",
       "evidenceClaim": true,
-      "agentModel": "private runner model",
+      "agentModel": "not published",
       "agentCommand": "pi -p --no-session",
       "environment": "isolated copy workspace; pi -p --no-session; continuation batch"
     },
@@ -1539,7 +1539,7 @@
       },
       "contentKind": "product-summary",
       "evidenceClaim": true,
-      "agentModel": "private runner model",
+      "agentModel": "not published",
       "agentCommand": "pi -p --no-session",
       "environment": "isolated copy workspace; pi -p --no-session; continuation batch"
     },
@@ -1563,7 +1563,7 @@
       "receiptUrl": "/campaign/receipts/ph-20260626142000.public.json",
       "contentKind": "product-summary",
       "evidenceClaim": true,
-      "agentModel": "private runner model",
+      "agentModel": "not published",
       "agentCommand": "pi -p --no-session",
       "environment": "isolated copy workspace; pi -p --no-session; batch allSettled/concurrency 3"
     },
@@ -1586,7 +1586,7 @@
       },
       "contentKind": "product-summary",
       "evidenceClaim": true,
-      "agentModel": "private runner model",
+      "agentModel": "not published",
       "agentCommand": "pi -p --no-session",
       "environment": "isolated copy workspace; pi -p --no-session; batch allSettled/concurrency 3"
     },
@@ -1609,7 +1609,7 @@
       },
       "contentKind": "product-summary",
       "evidenceClaim": true,
-      "agentModel": "private runner model",
+      "agentModel": "not published",
       "agentCommand": "pi -p --no-session",
       "environment": "isolated copy workspace; pi -p --no-session; batch allSettled/concurrency 3"
     },
@@ -1632,7 +1632,7 @@
       },
       "contentKind": "product-summary",
       "evidenceClaim": true,
-      "agentModel": "private runner model",
+      "agentModel": "not published",
       "agentCommand": "pi -p --no-session",
       "environment": "isolated copy workspace; pi -p --no-session; first batch launched after slot freed"
     },
@@ -1656,7 +1656,7 @@
       "receiptUrl": "/campaign/receipts/ph-20260626142000.public.json",
       "contentKind": "product-summary",
       "evidenceClaim": true,
-      "agentModel": "private runner model",
+      "agentModel": "not published",
       "agentCommand": "pi -p --no-session",
       "environment": "isolated copy workspace; pi -p --no-session; continuation batch"
     },
@@ -1680,7 +1680,148 @@
       "receiptUrl": "/campaign/receipts/ph-20260626142000.public.json",
       "contentKind": "product-summary",
       "evidenceClaim": true,
-      "agentModel": "private runner model",
+      "agentModel": "not published",
+      "agentCommand": "pi -p --no-session",
+      "environment": "isolated copy workspace; pi -p --no-session; continuation batch"
+    },
+    {
+      "turn": 72,
+      "round": 15,
+      "family": "batch-api",
+      "title": "Batch wrapper validation passed inside focused child tests",
+      "technique": "batch-api",
+      "hypothesis": "Live validate allSettled Pi concurrency after stopped launch gate; if failure remains, identify path.",
+      "attempt": "Live validate allSettled Pi concurrency after stopped launch gate; if failure remains, identify path.",
+      "result": "Child verified focused allSettled partial-launch diagnostics and no production patch was needed. Parent first batch still threw before this verification completed.",
+      "adaptation": "Continue live check next run.",
+      "verdict": "contained",
+      "imageUrl": null,
+      "finishedAt": "2026-06-26T14:30:00.000Z",
+      "evidence": {
+        "executionId": "terrarium-run:ter_20260626134346202_4wh4e3",
+        "independentReplay": false
+      },
+      "contentKind": "product-summary",
+      "evidenceClaim": true,
+      "agentModel": "not published",
+      "agentCommand": "pi -p --no-session",
+      "environment": "isolated copy workspace; pi -p --no-session; batch allSettled/concurrency 3"
+    },
+    {
+      "turn": 73,
+      "round": 15,
+      "family": "secure-workspace",
+      "title": "Secure workspace credential path patch remains candidate",
+      "technique": "secure-workspace",
+      "hypothesis": "Probe non-Docker credential path filters for read/write/list/search/diff and secure-agent audit.",
+      "attempt": "Probe non-Docker credential path filters for read/write/list/search/diff and secure-agent audit.",
+      "result": "Child produced secure workspace credential-boundary patch. Not integrated this pass.",
+      "adaptation": "Needs Docker-capable verification.",
+      "verdict": "contained",
+      "imageUrl": null,
+      "finishedAt": "2026-06-26T14:30:00.000Z",
+      "evidence": {
+        "executionId": "terrarium-run:ter_20260626134346202_97ddyo",
+        "independentReplay": false
+      },
+      "contentKind": "product-summary",
+      "evidenceClaim": true,
+      "agentModel": "not published",
+      "agentCommand": "pi -p --no-session",
+      "environment": "isolated copy workspace; pi -p --no-session; batch allSettled/concurrency 3"
+    },
+    {
+      "turn": 74,
+      "round": 15,
+      "family": "public-ledger",
+      "title": "Agent/model column now says not published",
+      "technique": "public-ledger",
+      "hypothesis": "Probe public agent/model column policy, private identity placeholders, receipt links and unsupported image/story fields.",
+      "attempt": "Probe public agent/model column policy, private identity placeholders, receipt links and unsupported image/story fields.",
+      "result": "Integrated manifest-wide agentModel value change from private runner model to not published while preserving the spreadsheet column.",
+      "adaptation": "Review runner command/environment separately if needed.",
+      "verdict": "contained",
+      "imageUrl": null,
+      "finishedAt": "2026-06-26T14:30:00.000Z",
+      "evidence": {
+        "executionId": "terrarium-run:ter_20260626134346202_u8kej3",
+        "independentReplay": false
+      },
+      "receiptUrl": "/campaign/receipts/ph-20260626143000.public.json",
+      "contentKind": "product-summary",
+      "evidenceClaim": true,
+      "agentModel": "not published",
+      "agentCommand": "pi -p --no-session",
+      "environment": "isolated copy workspace; pi -p --no-session; batch allSettled/concurrency 3"
+    },
+    {
+      "turn": 75,
+      "round": 15,
+      "family": "receipt-contract",
+      "title": "Public summary schema hardening deferred",
+      "technique": "receipt-contract",
+      "hypothesis": "Probe evidenceRef, public summary unknown fields, manifest validation, duplicate receipts, summary length and Unicode.",
+      "attempt": "Probe evidenceRef, public summary unknown fields, manifest validation, duplicate receipts, summary length and Unicode.",
+      "result": "Child proposed strict public-summary schema. Not integrated this pass to avoid broad schema changes.",
+      "adaptation": "Consider central schema validator later.",
+      "verdict": "contained",
+      "imageUrl": null,
+      "finishedAt": "2026-06-26T14:30:00.000Z",
+      "evidence": {
+        "executionId": "terrarium-run:ter_20260626134416656_7t0mnl",
+        "independentReplay": false
+      },
+      "contentKind": "product-summary",
+      "evidenceClaim": true,
+      "agentModel": "not published",
+      "agentCommand": "pi -p --no-session",
+      "environment": "isolated copy workspace; pi -p --no-session; first batch launched after slot freed"
+    },
+    {
+      "turn": 76,
+      "round": 15,
+      "family": "doctor-state",
+      "title": "Doctor repair candidates now exclude retained acknowledged history",
+      "technique": "doctor-state",
+      "hypothesis": "Probe routerRepairCandidates, stale inflight requeue, malformed acked, journal retention, prune/doctor drift.",
+      "attempt": "Probe routerRepairCandidates, stale inflight requeue, malformed acked, journal retention, prune/doctor drift.",
+      "result": "Integrated repair-candidate semantics: stale inflight counts as repairable; malformed acknowledged history does not.",
+      "adaptation": "Add actual repair command later.",
+      "verdict": "contained",
+      "imageUrl": null,
+      "finishedAt": "2026-06-26T14:30:00.000Z",
+      "evidence": {
+        "executionId": "terrarium-run:ter_20260626134612808_acd4q2",
+        "independentReplay": false
+      },
+      "receiptUrl": "/campaign/receipts/ph-20260626143000.public.json",
+      "contentKind": "product-summary",
+      "evidenceClaim": true,
+      "agentModel": "not published",
+      "agentCommand": "pi -p --no-session",
+      "environment": "isolated copy workspace; pi -p --no-session; continuation batch"
+    },
+    {
+      "turn": 77,
+      "round": 15,
+      "family": "mcp-lineage",
+      "title": "Missing and inaccessible groups use same concise denial",
+      "technique": "mcp-lineage",
+      "hypothesis": "Probe missing identifiers, sibling access, callback mutations, group missing/inaccessible read/status/cancel, concise outputs.",
+      "attempt": "Probe missing identifiers, sibling access, callback mutations, group missing/inaccessible read/status/cancel, concise outputs.",
+      "result": "Integrated nonexistent group lookup normalization to Terrarium group access denied and added indistinguishable error tests.",
+      "adaptation": "No action.",
+      "verdict": "contained",
+      "imageUrl": null,
+      "finishedAt": "2026-06-26T14:30:00.000Z",
+      "evidence": {
+        "executionId": "terrarium-run:ter_20260626134612808_xi97ks",
+        "independentReplay": false
+      },
+      "receiptUrl": "/campaign/receipts/ph-20260626143000.public.json",
+      "contentKind": "product-summary",
+      "evidenceClaim": true,
+      "agentModel": "not published",
       "agentCommand": "pi -p --no-session",
       "environment": "isolated copy workspace; pi -p --no-session; continuation batch"
     }
