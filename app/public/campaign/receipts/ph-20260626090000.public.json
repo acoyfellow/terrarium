@@ -1,0 +1,8 @@
+{
+  "iterationId": "ph-20260626090000",
+  "contentKind": "product-summary",
+  "evidenceClaim": true,
+  "evidenceRef": "terrarium-run:ter_20260626085721564_f6fiks",
+  "title": "The loop can rehearse before it writes",
+  "summary": "The reconciler integrated a product-loop dry-run command so the health gate can be previewed without creating receipts or public summaries."
+}
