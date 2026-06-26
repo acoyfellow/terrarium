@@ -5,10 +5,10 @@
   "backend": "local-content-loop",
   "status": "active",
   "synthetic": false,
-  "updatedAt": "2026-06-26T14:40:00.000Z",
+  "updatedAt": "2026-06-26T14:50:00.000Z",
   "counts": {
-    "total": 84,
-    "contained": 82,
+    "total": 90,
+    "contained": 88,
     "escapes": 0
   },
   "turns": [
@@ -106,7 +106,7 @@
       "contentKind": "product-summary",
       "evidenceClaim": true,
       "agentModel": "not published",
-      "agentCommand": "pi -p --no-session",
+      "agentCommand": "not published",
       "environment": "local Terrarium repo; public-safe receipt or commit evidence"
     },
     {
@@ -131,7 +131,7 @@
       "contentKind": "product-summary",
       "evidenceClaim": true,
       "agentModel": "not published",
-      "agentCommand": "pi -p --no-session",
+      "agentCommand": "not published",
       "environment": "local Terrarium repo; public-safe receipt or commit evidence"
     },
     {
@@ -155,7 +155,7 @@
       "contentKind": "product-summary",
       "evidenceClaim": true,
       "agentModel": "not published",
-      "agentCommand": "pi -p --no-session",
+      "agentCommand": "not published",
       "environment": "isolated copy workspace; parent reconciler inspected logs/diff"
     },
     {
@@ -179,7 +179,7 @@
       "contentKind": "product-summary",
       "evidenceClaim": true,
       "agentModel": "not published",
-      "agentCommand": "pi -p --no-session",
+      "agentCommand": "not published",
       "environment": "isolated copy workspace; pi -p --no-session; batch allSettled/concurrency 4"
     },
     {
@@ -204,7 +204,7 @@
       "contentKind": "product-summary",
       "evidenceClaim": true,
       "agentModel": "not published",
-      "agentCommand": "pi -p --no-session",
+      "agentCommand": "not published",
       "environment": "isolated copy workspace; pi -p --no-session; batch allSettled/concurrency 4"
     },
     {
@@ -228,7 +228,7 @@
       "contentKind": "product-summary",
       "evidenceClaim": true,
       "agentModel": "not published",
-      "agentCommand": "pi -p --no-session",
+      "agentCommand": "not published",
       "environment": "isolated copy workspace; pi -p --no-session; batch allSettled/concurrency 4"
     },
     {
@@ -252,7 +252,7 @@
       "contentKind": "product-summary",
       "evidenceClaim": true,
       "agentModel": "not published",
-      "agentCommand": "pi -p --no-session",
+      "agentCommand": "not published",
       "environment": "isolated copy workspace; pi -p --no-session; batch allSettled/concurrency 4"
     },
     {
@@ -276,7 +276,7 @@
       "contentKind": "product-summary",
       "evidenceClaim": true,
       "agentModel": "not published",
-      "agentCommand": "pi -p --no-session",
+      "agentCommand": "not published",
       "environment": "isolated copy workspace; pi -p --no-session; launched after a concurrency slot opened"
     },
     {
@@ -299,7 +299,7 @@
       "contentKind": "product-summary",
       "evidenceClaim": true,
       "agentModel": "not published",
-      "agentCommand": "pi -p --no-session",
+      "agentCommand": "not published",
       "environment": "isolated copy workspace; pi -p --no-session; batch allSettled/concurrency 3",
       "receiptUrl": "/campaign/receipts/ph-20260626125000.public.json"
     },
@@ -323,7 +323,7 @@
       "contentKind": "product-summary",
       "evidenceClaim": true,
       "agentModel": "not published",
-      "agentCommand": "pi -p --no-session",
+      "agentCommand": "not published",
       "environment": "isolated copy workspace; pi -p --no-session; batch allSettled/concurrency 3"
     },
     {
@@ -346,7 +346,7 @@
       "contentKind": "product-summary",
       "evidenceClaim": true,
       "agentModel": "not published",
-      "agentCommand": "pi -p --no-session",
+      "agentCommand": "not published",
       "environment": "isolated copy workspace; pi -p --no-session; batch allSettled/concurrency 3",
       "receiptUrl": "/campaign/receipts/ph-20260626125000.public.json"
     },
@@ -370,7 +370,7 @@
       "contentKind": "product-summary",
       "evidenceClaim": true,
       "agentModel": "not published",
-      "agentCommand": "pi -p --no-session",
+      "agentCommand": "not published",
       "environment": "isolated copy workspace; pi -p --no-session; continuation batch"
     },
     {
@@ -394,7 +394,7 @@
       "contentKind": "product-summary",
       "evidenceClaim": true,
       "agentModel": "not published",
-      "agentCommand": "pi -p --no-session",
+      "agentCommand": "not published",
       "environment": "isolated copy workspace; pi -p --no-session; continuation batch"
     },
     {
@@ -417,7 +417,7 @@
       "contentKind": "product-summary",
       "evidenceClaim": true,
       "agentModel": "not published",
-      "agentCommand": "pi -p --no-session",
+      "agentCommand": "not published",
       "environment": "isolated copy workspace; pi -p --no-session; continuation batch"
     },
     {
@@ -440,7 +440,7 @@
       "contentKind": "product-summary",
       "evidenceClaim": true,
       "agentModel": "not published",
-      "agentCommand": "pi -p --no-session",
+      "agentCommand": "not published",
       "environment": "isolated copy workspace; pi -p --no-session; batch allSettled/concurrency 3"
     },
     {
@@ -463,7 +463,7 @@
       "contentKind": "product-summary",
       "evidenceClaim": true,
       "agentModel": "not published",
-      "agentCommand": "pi -p --no-session",
+      "agentCommand": "not published",
       "environment": "isolated copy workspace; pi -p --no-session; batch allSettled/concurrency 3"
     },
     {
@@ -486,7 +486,7 @@
       "contentKind": "product-summary",
       "evidenceClaim": true,
       "agentModel": "not published",
-      "agentCommand": "pi -p --no-session",
+      "agentCommand": "not published",
       "environment": "isolated copy workspace; pi -p --no-session; batch allSettled/concurrency 3"
     },
     {
@@ -509,7 +509,7 @@
       "contentKind": "product-summary",
       "evidenceClaim": true,
       "agentModel": "not published",
-      "agentCommand": "pi -p --no-session",
+      "agentCommand": "not published",
       "environment": "isolated copy workspace; pi -p --no-session; continuation batch"
     },
     {
@@ -533,7 +533,7 @@
       "contentKind": "product-summary",
       "evidenceClaim": true,
       "agentModel": "not published",
-      "agentCommand": "pi -p --no-session",
+      "agentCommand": "not published",
       "environment": "isolated copy workspace; pi -p --no-session; continuation batch"
     },
     {
@@ -556,7 +556,7 @@
       "contentKind": "product-summary",
       "evidenceClaim": true,
       "agentModel": "not published",
-      "agentCommand": "pi -p --no-session",
+      "agentCommand": "not published",
       "environment": "isolated copy workspace; pi -p --no-session; continuation batch"
     },
     {
@@ -579,7 +579,7 @@
       "contentKind": "product-summary",
       "evidenceClaim": true,
       "agentModel": "not published",
-      "agentCommand": "pi -p --no-session",
+      "agentCommand": "not published",
       "environment": "isolated copy workspace; pi -p --no-session; batch allSettled/concurrency 3"
     },
     {
@@ -603,7 +603,7 @@
       "contentKind": "product-summary",
       "evidenceClaim": true,
       "agentModel": "not published",
-      "agentCommand": "pi -p --no-session",
+      "agentCommand": "not published",
       "environment": "isolated copy workspace; pi -p --no-session; batch allSettled/concurrency 3"
     },
     {
@@ -626,7 +626,7 @@
       "contentKind": "product-summary",
       "evidenceClaim": true,
       "agentModel": "not published",
-      "agentCommand": "pi -p --no-session",
+      "agentCommand": "not published",
       "environment": "isolated copy workspace; pi -p --no-session; batch allSettled/concurrency 3"
     },
     {
@@ -649,7 +649,7 @@
       "contentKind": "product-summary",
       "evidenceClaim": true,
       "agentModel": "not published",
-      "agentCommand": "pi -p --no-session",
+      "agentCommand": "not published",
       "environment": "isolated copy workspace; pi -p --no-session; continuation batch"
     },
     {
@@ -673,7 +673,7 @@
       "contentKind": "product-summary",
       "evidenceClaim": true,
       "agentModel": "not published",
-      "agentCommand": "pi -p --no-session",
+      "agentCommand": "not published",
       "environment": "isolated copy workspace; pi -p --no-session; continuation batch"
     },
     {
@@ -696,7 +696,7 @@
       "contentKind": "product-summary",
       "evidenceClaim": true,
       "agentModel": "not published",
-      "agentCommand": "pi -p --no-session",
+      "agentCommand": "not published",
       "environment": "isolated copy workspace; pi -p --no-session; final one-job batch"
     },
     {
@@ -719,7 +719,7 @@
       "contentKind": "product-summary",
       "evidenceClaim": true,
       "agentModel": "not published",
-      "agentCommand": "pi -p --no-session",
+      "agentCommand": "not published",
       "environment": "isolated copy workspace; pi -p --no-session; batch allSettled/concurrency 3"
     },
     {
@@ -743,7 +743,7 @@
       "contentKind": "product-summary",
       "evidenceClaim": true,
       "agentModel": "not published",
-      "agentCommand": "pi -p --no-session",
+      "agentCommand": "not published",
       "environment": "isolated copy workspace; pi -p --no-session; batch allSettled/concurrency 3"
     },
     {
@@ -766,7 +766,7 @@
       "contentKind": "product-summary",
       "evidenceClaim": true,
       "agentModel": "not published",
-      "agentCommand": "pi -p --no-session",
+      "agentCommand": "not published",
       "environment": "isolated copy workspace; pi -p --no-session; batch allSettled/concurrency 3"
     },
     {
@@ -789,7 +789,7 @@
       "contentKind": "product-summary",
       "evidenceClaim": true,
       "agentModel": "not published",
-      "agentCommand": "pi -p --no-session",
+      "agentCommand": "not published",
       "environment": "isolated copy workspace; pi -p --no-session; continuation batch"
     },
     {
@@ -813,7 +813,7 @@
       "contentKind": "product-summary",
       "evidenceClaim": true,
       "agentModel": "not published",
-      "agentCommand": "pi -p --no-session",
+      "agentCommand": "not published",
       "environment": "isolated copy workspace; pi -p --no-session; continuation batch"
     },
     {
@@ -836,7 +836,7 @@
       "contentKind": "product-summary",
       "evidenceClaim": true,
       "agentModel": "not published",
-      "agentCommand": "pi -p --no-session",
+      "agentCommand": "not published",
       "environment": "isolated copy workspace; pi -p --no-session; continuation batch"
     },
     {
@@ -859,7 +859,7 @@
       "contentKind": "product-summary",
       "evidenceClaim": true,
       "agentModel": "not published",
-      "agentCommand": "pi -p --no-session",
+      "agentCommand": "not published",
       "environment": "isolated copy workspace; pi -p --no-session; batch allSettled/concurrency 3"
     },
     {
@@ -882,7 +882,7 @@
       "contentKind": "product-summary",
       "evidenceClaim": true,
       "agentModel": "not published",
-      "agentCommand": "pi -p --no-session",
+      "agentCommand": "not published",
       "environment": "isolated copy workspace; pi -p --no-session; batch allSettled/concurrency 3"
     },
     {
@@ -906,7 +906,7 @@
       "contentKind": "product-summary",
       "evidenceClaim": true,
       "agentModel": "not published",
-      "agentCommand": "pi -p --no-session",
+      "agentCommand": "not published",
       "environment": "isolated copy workspace; pi -p --no-session; batch allSettled/concurrency 3"
     },
     {
@@ -930,7 +930,7 @@
       "contentKind": "product-summary",
       "evidenceClaim": true,
       "agentModel": "not published",
-      "agentCommand": "pi -p --no-session",
+      "agentCommand": "not published",
       "environment": "isolated copy workspace; pi -p --no-session; first batch launched after one slot freed"
     },
     {
@@ -953,7 +953,7 @@
       "contentKind": "product-summary",
       "evidenceClaim": true,
       "agentModel": "not published",
-      "agentCommand": "pi -p --no-session",
+      "agentCommand": "not published",
       "environment": "isolated copy workspace; pi -p --no-session; continuation batch"
     },
     {
@@ -976,7 +976,7 @@
       "contentKind": "product-summary",
       "evidenceClaim": true,
       "agentModel": "not published",
-      "agentCommand": "pi -p --no-session",
+      "agentCommand": "not published",
       "environment": "isolated copy workspace; pi -p --no-session; continuation batch"
     },
     {
@@ -1000,7 +1000,7 @@
       "contentKind": "product-summary",
       "evidenceClaim": true,
       "agentModel": "not published",
-      "agentCommand": "pi -p --no-session",
+      "agentCommand": "not published",
       "environment": "isolated copy workspace; pi -p --no-session; batch allSettled/concurrency 3"
     },
     {
@@ -1024,7 +1024,7 @@
       "contentKind": "product-summary",
       "evidenceClaim": true,
       "agentModel": "not published",
-      "agentCommand": "pi -p --no-session",
+      "agentCommand": "not published",
       "environment": "isolated copy workspace; pi -p --no-session; continuation batch"
     },
     {
@@ -1048,7 +1048,7 @@
       "contentKind": "product-summary",
       "evidenceClaim": true,
       "agentModel": "not published",
-      "agentCommand": "pi -p --no-session",
+      "agentCommand": "not published",
       "environment": "isolated copy workspace; pi -p --no-session; batch allSettled/concurrency 3"
     },
     {
@@ -1071,7 +1071,7 @@
       "contentKind": "product-summary",
       "evidenceClaim": true,
       "agentModel": "not published",
-      "agentCommand": "pi -p --no-session",
+      "agentCommand": "not published",
       "environment": "isolated copy workspace; pi -p --no-session; first batch launched after slot freed"
     },
     {
@@ -1094,7 +1094,7 @@
       "contentKind": "product-summary",
       "evidenceClaim": true,
       "agentModel": "not published",
-      "agentCommand": "pi -p --no-session",
+      "agentCommand": "not published",
       "environment": "isolated copy workspace; pi -p --no-session; first batch launched after slot freed"
     },
     {
@@ -1117,7 +1117,7 @@
       "contentKind": "product-summary",
       "evidenceClaim": true,
       "agentModel": "not published",
-      "agentCommand": "pi -p --no-session",
+      "agentCommand": "not published",
       "environment": "isolated copy workspace; pi -p --no-session; first batch launched after slot freed"
     },
     {
@@ -1140,7 +1140,7 @@
       "contentKind": "product-summary",
       "evidenceClaim": true,
       "agentModel": "not published",
-      "agentCommand": "pi -p --no-session",
+      "agentCommand": "not published",
       "environment": "isolated copy workspace; pi -p --no-session; batch allSettled/concurrency 3"
     },
     {
@@ -1163,7 +1163,7 @@
       "contentKind": "product-summary",
       "evidenceClaim": true,
       "agentModel": "not published",
-      "agentCommand": "pi -p --no-session",
+      "agentCommand": "not published",
       "environment": "isolated copy workspace; pi -p --no-session; batch allSettled/concurrency 3"
     },
     {
@@ -1186,7 +1186,7 @@
       "contentKind": "product-summary",
       "evidenceClaim": true,
       "agentModel": "not published",
-      "agentCommand": "pi -p --no-session",
+      "agentCommand": "not published",
       "environment": "isolated copy workspace; pi -p --no-session; batch allSettled/concurrency 3"
     },
     {
@@ -1210,7 +1210,7 @@
       "contentKind": "product-summary",
       "evidenceClaim": true,
       "agentModel": "not published",
-      "agentCommand": "pi -p --no-session",
+      "agentCommand": "not published",
       "environment": "isolated copy workspace; pi -p --no-session; continuation batch"
     },
     {
@@ -1234,7 +1234,7 @@
       "contentKind": "product-summary",
       "evidenceClaim": true,
       "agentModel": "not published",
-      "agentCommand": "pi -p --no-session",
+      "agentCommand": "not published",
       "environment": "isolated copy workspace; pi -p --no-session; continuation batch"
     },
     {
@@ -1258,7 +1258,7 @@
       "contentKind": "product-summary",
       "evidenceClaim": true,
       "agentModel": "not published",
-      "agentCommand": "pi -p --no-session",
+      "agentCommand": "not published",
       "environment": "isolated copy workspace; pi -p --no-session; continuation batch"
     },
     {
@@ -1282,7 +1282,7 @@
       "contentKind": "product-summary",
       "evidenceClaim": true,
       "agentModel": "not published",
-      "agentCommand": "pi -p --no-session",
+      "agentCommand": "not published",
       "environment": "isolated copy workspace; pi -p --no-session; batch allSettled/concurrency 3"
     },
     {
@@ -1305,7 +1305,7 @@
       "contentKind": "product-summary",
       "evidenceClaim": true,
       "agentModel": "not published",
-      "agentCommand": "pi -p --no-session",
+      "agentCommand": "not published",
       "environment": "isolated copy workspace; pi -p --no-session; batch allSettled/concurrency 3"
     },
     {
@@ -1328,7 +1328,7 @@
       "contentKind": "product-summary",
       "evidenceClaim": true,
       "agentModel": "not published",
-      "agentCommand": "pi -p --no-session",
+      "agentCommand": "not published",
       "environment": "isolated copy workspace; pi -p --no-session; batch allSettled/concurrency 3"
     },
     {
@@ -1352,7 +1352,7 @@
       "contentKind": "product-summary",
       "evidenceClaim": true,
       "agentModel": "not published",
-      "agentCommand": "pi -p --no-session",
+      "agentCommand": "not published",
       "environment": "isolated copy workspace; pi -p --no-session; continuation batch"
     },
     {
@@ -1375,7 +1375,7 @@
       "contentKind": "product-summary",
       "evidenceClaim": true,
       "agentModel": "not published",
-      "agentCommand": "pi -p --no-session",
+      "agentCommand": "not published",
       "environment": "isolated copy workspace; pi -p --no-session; continuation batch"
     },
     {
@@ -1399,7 +1399,7 @@
       "contentKind": "product-summary",
       "evidenceClaim": true,
       "agentModel": "not published",
-      "agentCommand": "pi -p --no-session",
+      "agentCommand": "not published",
       "environment": "isolated copy workspace; pi -p --no-session; continuation batch"
     },
     {
@@ -1423,7 +1423,7 @@
       "contentKind": "product-summary",
       "evidenceClaim": true,
       "agentModel": "not published",
-      "agentCommand": "pi -p --no-session",
+      "agentCommand": "not published",
       "environment": "isolated copy workspace; pi -p --no-session; batch allSettled/concurrency 3"
     },
     {
@@ -1447,7 +1447,7 @@
       "contentKind": "product-summary",
       "evidenceClaim": true,
       "agentModel": "not published",
-      "agentCommand": "pi -p --no-session",
+      "agentCommand": "not published",
       "environment": "isolated copy workspace; pi -p --no-session; batch allSettled/concurrency 3"
     },
     {
@@ -1470,7 +1470,7 @@
       "contentKind": "product-summary",
       "evidenceClaim": true,
       "agentModel": "not published",
-      "agentCommand": "pi -p --no-session",
+      "agentCommand": "not published",
       "environment": "isolated copy workspace; pi -p --no-session; batch allSettled/concurrency 3"
     },
     {
@@ -1493,7 +1493,7 @@
       "contentKind": "product-summary",
       "evidenceClaim": true,
       "agentModel": "not published",
-      "agentCommand": "pi -p --no-session",
+      "agentCommand": "not published",
       "environment": "isolated copy workspace; pi -p --no-session; continuation batch"
     },
     {
@@ -1517,7 +1517,7 @@
       "contentKind": "product-summary",
       "evidenceClaim": true,
       "agentModel": "not published",
-      "agentCommand": "pi -p --no-session",
+      "agentCommand": "not published",
       "environment": "isolated copy workspace; pi -p --no-session; continuation batch"
     },
     {
@@ -1540,7 +1540,7 @@
       "contentKind": "product-summary",
       "evidenceClaim": true,
       "agentModel": "not published",
-      "agentCommand": "pi -p --no-session",
+      "agentCommand": "not published",
       "environment": "isolated copy workspace; pi -p --no-session; continuation batch"
     },
     {
@@ -1564,7 +1564,7 @@
       "contentKind": "product-summary",
       "evidenceClaim": true,
       "agentModel": "not published",
-      "agentCommand": "pi -p --no-session",
+      "agentCommand": "not published",
       "environment": "isolated copy workspace; pi -p --no-session; batch allSettled/concurrency 3"
     },
     {
@@ -1587,7 +1587,7 @@
       "contentKind": "product-summary",
       "evidenceClaim": true,
       "agentModel": "not published",
-      "agentCommand": "pi -p --no-session",
+      "agentCommand": "not published",
       "environment": "isolated copy workspace; pi -p --no-session; batch allSettled/concurrency 3"
     },
     {
@@ -1610,7 +1610,7 @@
       "contentKind": "product-summary",
       "evidenceClaim": true,
       "agentModel": "not published",
-      "agentCommand": "pi -p --no-session",
+      "agentCommand": "not published",
       "environment": "isolated copy workspace; pi -p --no-session; batch allSettled/concurrency 3"
     },
     {
@@ -1633,7 +1633,7 @@
       "contentKind": "product-summary",
       "evidenceClaim": true,
       "agentModel": "not published",
-      "agentCommand": "pi -p --no-session",
+      "agentCommand": "not published",
       "environment": "isolated copy workspace; pi -p --no-session; first batch launched after slot freed"
     },
     {
@@ -1657,7 +1657,7 @@
       "contentKind": "product-summary",
       "evidenceClaim": true,
       "agentModel": "not published",
-      "agentCommand": "pi -p --no-session",
+      "agentCommand": "not published",
       "environment": "isolated copy workspace; pi -p --no-session; continuation batch"
     },
     {
@@ -1681,7 +1681,7 @@
       "contentKind": "product-summary",
       "evidenceClaim": true,
       "agentModel": "not published",
-      "agentCommand": "pi -p --no-session",
+      "agentCommand": "not published",
       "environment": "isolated copy workspace; pi -p --no-session; continuation batch"
     },
     {
@@ -1704,7 +1704,7 @@
       "contentKind": "product-summary",
       "evidenceClaim": true,
       "agentModel": "not published",
-      "agentCommand": "pi -p --no-session",
+      "agentCommand": "not published",
       "environment": "isolated copy workspace; pi -p --no-session; batch allSettled/concurrency 3"
     },
     {
@@ -1727,7 +1727,7 @@
       "contentKind": "product-summary",
       "evidenceClaim": true,
       "agentModel": "not published",
-      "agentCommand": "pi -p --no-session",
+      "agentCommand": "not published",
       "environment": "isolated copy workspace; pi -p --no-session; batch allSettled/concurrency 3"
     },
     {
@@ -1751,7 +1751,7 @@
       "contentKind": "product-summary",
       "evidenceClaim": true,
       "agentModel": "not published",
-      "agentCommand": "pi -p --no-session",
+      "agentCommand": "not published",
       "environment": "isolated copy workspace; pi -p --no-session; batch allSettled/concurrency 3"
     },
     {
@@ -1774,7 +1774,7 @@
       "contentKind": "product-summary",
       "evidenceClaim": true,
       "agentModel": "not published",
-      "agentCommand": "pi -p --no-session",
+      "agentCommand": "not published",
       "environment": "isolated copy workspace; pi -p --no-session; first batch launched after slot freed"
     },
     {
@@ -1798,7 +1798,7 @@
       "contentKind": "product-summary",
       "evidenceClaim": true,
       "agentModel": "not published",
-      "agentCommand": "pi -p --no-session",
+      "agentCommand": "not published",
       "environment": "isolated copy workspace; pi -p --no-session; continuation batch"
     },
     {
@@ -1822,7 +1822,7 @@
       "contentKind": "product-summary",
       "evidenceClaim": true,
       "agentModel": "not published",
-      "agentCommand": "pi -p --no-session",
+      "agentCommand": "not published",
       "environment": "isolated copy workspace; pi -p --no-session; continuation batch"
     },
     {
@@ -1845,7 +1845,7 @@
       "contentKind": "product-summary",
       "evidenceClaim": true,
       "agentModel": "not published",
-      "agentCommand": "pi -p --no-session",
+      "agentCommand": "not published",
       "environment": "isolated copy workspace; pi -p --no-session; batch allSettled/concurrency 3"
     },
     {
@@ -1868,7 +1868,7 @@
       "contentKind": "product-summary",
       "evidenceClaim": true,
       "agentModel": "not published",
-      "agentCommand": "pi -p --no-session",
+      "agentCommand": "not published",
       "environment": "isolated copy workspace; pi -p --no-session; batch allSettled/concurrency 3"
     },
     {
@@ -1891,7 +1891,7 @@
       "contentKind": "product-summary",
       "evidenceClaim": true,
       "agentModel": "not published",
-      "agentCommand": "pi -p --no-session",
+      "agentCommand": "not published",
       "environment": "isolated copy workspace; pi -p --no-session; batch allSettled/concurrency 3"
     },
     {
@@ -1914,7 +1914,7 @@
       "contentKind": "product-summary",
       "evidenceClaim": true,
       "agentModel": "not published",
-      "agentCommand": "pi -p --no-session",
+      "agentCommand": "not published",
       "environment": "isolated copy workspace; pi -p --no-session; continuation batch"
     },
     {
@@ -1937,7 +1937,7 @@
       "contentKind": "product-summary",
       "evidenceClaim": true,
       "agentModel": "not published",
-      "agentCommand": "pi -p --no-session",
+      "agentCommand": "not published",
       "environment": "isolated copy workspace; pi -p --no-session; continuation batch"
     },
     {
@@ -1960,7 +1960,7 @@
       "contentKind": "product-summary",
       "evidenceClaim": true,
       "agentModel": "not published",
-      "agentCommand": "pi -p --no-session",
+      "agentCommand": "not published",
       "environment": "isolated copy workspace; pi -p --no-session; continuation batch"
     },
     {
@@ -1981,8 +1981,149 @@
       "contentKind": "product-summary",
       "evidenceClaim": true,
       "agentModel": "not published",
-      "agentCommand": "parent workspace",
+      "agentCommand": "not published",
       "environment": "parent workspace; local docs and Vite app"
+    },
+    {
+      "turn": 85,
+      "round": 17,
+      "family": "batch-api",
+      "title": "Batch wrapper issue is a synchronous MCP timeout contract",
+      "technique": "batch-api",
+      "hypothesis": "Focus on MCP/tool cancellation path rather than src/batch core; patch only if verified.",
+      "attempt": "Focus on MCP/tool cancellation path rather than src/batch core; patch only if verified.",
+      "result": "Child traced the error to batch cancellation wait outliving the parent MCP/tool timeout. No code patch integrated.",
+      "adaptation": "Document or add detached batch API only after a reproducible MCP integration test.",
+      "verdict": "contained",
+      "imageUrl": null,
+      "finishedAt": "2026-06-26T14:50:00.000Z",
+      "evidence": {
+        "executionId": "terrarium-run:ter_20260626135556970_nszu57",
+        "independentReplay": false
+      },
+      "contentKind": "product-summary",
+      "evidenceClaim": true,
+      "agentModel": "not published",
+      "agentCommand": "not published",
+      "environment": "isolated copy workspace; pi -p --no-session; batch allSettled/concurrency 3"
+    },
+    {
+      "turn": 86,
+      "round": 17,
+      "family": "secure-workspace",
+      "title": "Secure workspace credential boundary remains pending",
+      "technique": "secure-workspace",
+      "hypothesis": "Verify non-Docker credential path patch and minimize integration risk.",
+      "attempt": "Verify non-Docker credential path patch and minimize integration risk.",
+      "result": "Child produced a focused secure workspace patch. Not integrated because full dependency/Docker verification is still needed.",
+      "adaptation": "Run secure workspace tests on Docker-capable host.",
+      "verdict": "contained",
+      "imageUrl": null,
+      "finishedAt": "2026-06-26T14:50:00.000Z",
+      "evidence": {
+        "executionId": "terrarium-run:ter_20260626135556970_geijs1",
+        "independentReplay": false
+      },
+      "contentKind": "product-summary",
+      "evidenceClaim": true,
+      "agentModel": "not published",
+      "agentCommand": "not published",
+      "environment": "isolated copy workspace; pi -p --no-session; batch allSettled/concurrency 3"
+    },
+    {
+      "turn": 87,
+      "round": 17,
+      "family": "docs",
+      "title": "README and changelog now state Pi extension is opt-in",
+      "technique": "docs",
+      "hypothesis": "Audit README and CHANGELOG against implementation, public site, CLI/MCP surfaces, and known limitations.",
+      "attempt": "Audit README and CHANGELOG against implementation, public site, CLI/MCP surfaces, and known limitations.",
+      "result": "Integrated README and changelog wording: Terrarium does not auto-load the Pi extension; hosts may explicitly install it.",
+      "adaptation": "Keep docs/changelog in every behavior-changing loop.",
+      "verdict": "contained",
+      "imageUrl": null,
+      "finishedAt": "2026-06-26T14:50:00.000Z",
+      "evidence": {
+        "executionId": "terrarium-run:ter_20260626135556970_uoavz5",
+        "independentReplay": false
+      },
+      "receiptUrl": "/campaign/receipts/ph-20260626145000.public.json",
+      "contentKind": "product-summary",
+      "evidenceClaim": true,
+      "agentModel": "not published",
+      "agentCommand": "not published",
+      "environment": "isolated copy workspace; pi -p --no-session; batch allSettled/concurrency 3"
+    },
+    {
+      "turn": 88,
+      "round": 17,
+      "family": "public-ledger",
+      "title": "Runner command cells now say not published",
+      "technique": "public-ledger",
+      "hypothesis": "Probe strict public-summary schema, changelog page, manifest counts, not-published cells, receipt links and evidenceRef validation.",
+      "attempt": "Probe strict public-summary schema, changelog page, manifest counts, not-published cells, receipt links and evidenceRef validation.",
+      "result": "Integrated manifest-wide agentCommand redaction to not published and test coverage for unpublished runner command identity.",
+      "adaptation": "Consider strict public-summary schema separately.",
+      "verdict": "contained",
+      "imageUrl": null,
+      "finishedAt": "2026-06-26T14:50:00.000Z",
+      "evidence": {
+        "executionId": "terrarium-run:ter_20260626135623618_jbz6zc",
+        "independentReplay": false
+      },
+      "receiptUrl": "/campaign/receipts/ph-20260626145000.public.json",
+      "contentKind": "product-summary",
+      "evidenceClaim": true,
+      "agentModel": "not published",
+      "agentCommand": "not published",
+      "environment": "isolated copy workspace; pi -p --no-session; first batch launched after slot freed"
+    },
+    {
+      "turn": 89,
+      "round": 17,
+      "family": "doctor-state",
+      "title": "Doctor/router repair probes found no drift",
+      "technique": "doctor-state",
+      "hypothesis": "Probe requeue candidates, acknowledged malformed retention, journal retention, doctor counts, callback privacy and ownership.",
+      "attempt": "Probe requeue candidates, acknowledged malformed retention, journal retention, doctor counts, callback privacy and ownership.",
+      "result": "Child verified current doctor/router repair behavior with 34 passing tests. No code changes integrated.",
+      "adaptation": "No action.",
+      "verdict": "contained",
+      "imageUrl": null,
+      "finishedAt": "2026-06-26T14:50:00.000Z",
+      "evidence": {
+        "executionId": "terrarium-run:ter_20260626135817038_hzipk7",
+        "independentReplay": false
+      },
+      "contentKind": "product-summary",
+      "evidenceClaim": true,
+      "agentModel": "not published",
+      "agentCommand": "not published",
+      "environment": "isolated copy workspace; pi -p --no-session; continuation batch"
+    },
+    {
+      "turn": 90,
+      "round": 17,
+      "family": "mcp-lineage",
+      "title": "Missing callback subscribers deny like inaccessible subscribers",
+      "technique": "mcp-lineage",
+      "hypothesis": "Probe missing/inaccessible group equivalence, callback mutation identifiers, sibling subscriber access, concise outputs.",
+      "attempt": "Probe missing/inaccessible group equivalence, callback mutation identifiers, sibling subscriber access, concise outputs.",
+      "result": "Integrated missing subscriber normalization to callback subscriber access denied and lineage regression coverage.",
+      "adaptation": "No action.",
+      "verdict": "contained",
+      "imageUrl": null,
+      "finishedAt": "2026-06-26T14:50:00.000Z",
+      "evidence": {
+        "executionId": "terrarium-run:ter_20260626135817039_z2u44k",
+        "independentReplay": false
+      },
+      "receiptUrl": "/campaign/receipts/ph-20260626145000.public.json",
+      "contentKind": "product-summary",
+      "evidenceClaim": true,
+      "agentModel": "not published",
+      "agentCommand": "not published",
+      "environment": "isolated copy workspace; pi -p --no-session; continuation batch"
     }
   ]
 }

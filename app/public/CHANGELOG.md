@@ -7,6 +7,9 @@ Succinct, product-facing changes to Terrarium. This is not a full commit log; it
 - Added a public changelog page to the site and linked it from the run ledger.
 - Added `CHANGELOG.md` as the source of truth for concise release notes.
 - Added a documentation-hardening expectation to the README: update README and changelog when behavior or public surfaces change.
+- Clarified README/CHANGELOG wording for the opt-in Pi host extension: it is not auto-loaded, but hosts may install it explicitly.
+- Redacted public runner command cells to `not published` while keeping the spreadsheet column.
+- Normalized missing callback subscribers to the same concise denial as inaccessible subscribers.
 
 ## 2026-06-26
 
@@ -25,7 +28,7 @@ Succinct, product-facing changes to Terrarium. This is not a full commit log; it
 - Fixed group truthfulness: missing members are not complete, and `ok` requires every member to be `done` with `ok: true`.
 - Hardened callback subscriber ownership: subscribers cannot be hijacked, adopted, or pruned across owner boundaries.
 - Bound Pi callback delivery to concrete spawned run IDs instead of wildcard channel delivery.
-- Disabled auto-loaded Pi extension behavior; callback consumption is now explicit/manual.
+- Stopped auto-loading the Pi host extension. Callback consumption is manual by default; hosts may explicitly install `src/pi-extension.js` for concrete-run subscriptions and callback-triggered Pi follow-ups.
 - Made terminal callbacks durable across finish-before-subscribe and restart races.
 - Sanitized callback journals/mailboxes so task prompts, cwd, output, and log paths are not stored.
 - Hardened callback mailbox validation by state: pending, inflight, and acknowledged records have distinct accepted shapes.
