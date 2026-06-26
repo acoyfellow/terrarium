@@ -1,0 +1,8 @@
+{
+  "iterationId": "ph-20260626090500",
+  "contentKind": "product-summary",
+  "evidenceClaim": true,
+  "evidenceRef": "terrarium-run:ter_20260626085721564_ceov5r",
+  "title": "Runner failures show their retry ticket",
+  "summary": "The reconciler integrated concise MCP/status projection fields so runner failures surface failureKind and retryable instead of hiding actionable classification."
+}
