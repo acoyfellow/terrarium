@@ -71,7 +71,14 @@ function githubProof(t) {
 }
 
 function proofPanel(t) {
-  return `<details class="proof-details"><summary>Inspect the receipt</summary><dl><div><dt>Attempt fingerprint</dt><dd>${t.payloadHash ?? 'recorded'}</dd></div><div><dt>Run ID</dt><dd>${t.evidence?.executionId ?? 'recorded'}</dd></div><div><dt>Version tested</dt><dd>${t.sourceRevision?.slice(0, 12) ?? 'recorded'}</dd></div><div><dt>Finished</dt><dd>${t.finishedAt ? new Date(t.finishedAt).toISOString() : 'recorded'}</dd></div><div><dt>Independent replay</dt><dd>${t.evidence?.independentReplay ? 'matched the first result' : 'not recorded'}</dd></div></dl>${t.trace?.url ? `<a class="trace-link" href="${t.trace.url}" target="_blank" rel="noreferrer">Open the run trace</a>` : ''}</details>`;
+  const hasFingerprint = Boolean(t.payloadHash);
+  const hasRunId = Boolean(t.evidence?.executionId);
+  const hasRevision = Boolean(t.sourceRevision);
+  const hasFinishedAt = Boolean(t.finishedAt);
+  const hasReplay = Boolean(t.evidence?.independentReplay);
+  const fields = [hasRunId, hasRevision, hasFinishedAt, hasFingerprint, hasReplay];
+  const recorded = fields.filter(Boolean).length;
+  return `<section class="receipt-inspector" aria-label="Public receipt inspection"><header><div><span class="eyebrow">PUBLIC RECEIPT</span><h3>What this page can verify</h3></div><b>${recorded}/${fields.length} fields recorded</b></header><dl><div><dt>Run ID</dt><dd class="${hasRunId ? 'recorded' : 'missing'}">${t.evidence?.executionId ?? 'not published'}</dd></div><div><dt>Source revision</dt><dd class="${hasRevision ? 'recorded' : 'missing'}">${t.sourceRevision?.slice(0, 12) ?? 'not published'}</dd></div><div><dt>Finished</dt><dd class="${hasFinishedAt ? 'recorded' : 'missing'}">${hasFinishedAt ? new Date(t.finishedAt).toISOString() : 'not published'}</dd></div><div><dt>Attempt fingerprint</dt><dd class="${hasFingerprint ? 'recorded' : 'missing'}">${t.payloadHash ?? 'not published'}</dd></div><div><dt>Fresh replay</dt><dd class="${hasReplay ? 'recorded' : 'missing'}">${hasReplay ? 'matched the first result' : 'not recorded'}</dd></div></dl><p>Published fields support this turn's claim. Missing fields are shown as missing, not inferred from the copy.</p>${t.trace?.url ? `<a class="trace-link" href="${t.trace.url}" target="_blank" rel="noreferrer">Open the run trace</a>` : ''}</section>`;
 }
 
 function detailPanel() {
