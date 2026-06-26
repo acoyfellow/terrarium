@@ -1,0 +1,8 @@
+{
+  "iterationId": "ph-20260626091500",
+  "contentKind": "product-summary",
+  "evidenceClaim": true,
+  "evidenceRef": "terrarium-run:ter_20260626091226642_1ryk8z",
+  "title": "The reconciler can check the three-child plan before launch",
+  "summary": "The reconciler integrated a non-spawning product-loop plan check so the outer loop can validate exactly three bounded child roles before starting work."
+}

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { createIterationReceipt } from '../scripts/product-loop.mjs';
+import { createIterationReceipt, reconcileOuterLoop } from '../scripts/product-loop.mjs';
 
 function validateReceipt(receipt) {
   assert.equal(receipt.schema, 'terrarium.product-loop.receipt.v0.1');
@@ -23,6 +23,29 @@ function validatePublicSummary(summary) {
     assert.equal(serialized.includes(`"${forbidden}"`), false, `public summary leaks ${forbidden}`);
   }
 }
+
+test('outer loop reconciler checks the three roles without spawning children', () => {
+  const result = reconcileOuterLoop({ roles: [
+    { role: 'investigator', task: 'Diagnose one bounded failure without editing files.' },
+    { role: 'implementer', task: 'Implement the selected small fix.' },
+    { role: 'reviewer', task: 'Review the patch and verification evidence.' },
+  ] });
+  assert.equal(result.ok, true);
+  assert.equal(result.spawnsChildren, false);
+  assert.deepEqual(result.errors, []);
+});
+
+test('outer loop reconciler rejects incomplete and duplicate plans', () => {
+  const result = reconcileOuterLoop({ roles: [
+    { role: 'investigator', task: 'Diagnose.' },
+    { role: 'investigator', task: '' },
+  ] });
+  assert.equal(result.ok, false);
+  assert.match(result.errors.join('\n'), /exactly 3 roles/);
+  assert.match(result.errors.join('\n'), /missing roles: implementer, reviewer/);
+  assert.match(result.errors.join('\n'), /duplicate roles: investigator/);
+  assert.match(result.errors.join('\n'), /missing bounded tasks/);
+});
 
 test('product loop receipt schema separates public summary from private details', () => {
   validateReceipt({

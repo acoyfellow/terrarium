@@ -1,0 +1,7 @@
+{
+  "roles": [
+    { "role": "investigator", "task": "Inspect one bounded Terrarium product-hardening target and report evidence. Do not edit public campaign assets." },
+    { "role": "implementer", "task": "Implement the selected small hardening change in isolation and run targeted verification. Do not deploy." },
+    { "role": "reviewer", "task": "Review the candidate patch, tests, and receipt. Report whether the outer reconciler should integrate it." }
+  ]
+}

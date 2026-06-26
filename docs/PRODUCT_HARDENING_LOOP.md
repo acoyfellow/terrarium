@@ -17,6 +17,16 @@ OBSERVE -> SELECT -> EXECUTE -> VERIFY -> RECORD -> PUBLIC_SUMMARIZE -> OPTIONAL
 5. Public summaries must not contain private run metadata, task prompts, child output, cwd, or log paths.
 6. Editorial images are allowed only as illustrations. They are not evidence.
 
+## Check a three-child outer-loop plan
+
+Before an operator spawns anything, reconcile a JSON plan containing exactly one bounded task for each role: `investigator`, `implementer`, and `reviewer`.
+
+```sh
+npm run product-loop:check -- path/to/plan.json
+```
+
+The command only validates and reports the plan; it never spawns children or writes receipts. It exits non-zero for missing, duplicate, unknown, or taskless roles.
+
 ## Run one iteration
 
 Preview the full health gate without creating either receipt:
