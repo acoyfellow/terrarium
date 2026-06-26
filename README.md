@@ -8,7 +8,7 @@
 
 Terrarium gives each delegated job a durable run ID, correlated result receipt, progress/status surface, cancellation, and a deterministic callback queue with atomic claim/ack/requeue semantics. It can launch one job or an explicitly requested batch while preserving one independent child process and receipt per run.
 
-The containment campaign and public demo are frozen historical evidence, not the current product direction. See the [core product decision](./docs/CORE_PRODUCT_DECISION.md).
+The public site is now a compact run ledger plus changelog for real hardening work. Older campaign/story material is archived as historical evidence, not the current product direction. See the [core product decision](./docs/CORE_PRODUCT_DECISION.md) and [CHANGELOG.md](./CHANGELOG.md).
 
 Terrarium is built around one stable primitive:
 
@@ -32,9 +32,9 @@ one bounded task → one child run → one inspectable result
 
 Ordinary children inherit host authority and environment; use them for cooperative work, not as a security boundary. `secure-v1` is the opt-in Docker profile with explicit [guarantees and non-guarantees](./docs/SECURE_V1.md).
 
-## Frozen public campaign demo
+## Public run ledger and changelog
 
-[`terrarium.coey.dev`](https://terrarium.coey.dev) preserves real attempts, verified findings, GitHub issues, fix commits, post-fix replay, and safe event traces. It is maintenance-only historical provenance; new product work targets the durable execution/callback core. Illustrations tell the human story; receipts and GitHub artifacts are the proof.
+[`terrarium.coey.dev`](https://terrarium.coey.dev) shows a boring spreadsheet-style ledger of hardening runs against the runner, callbacks, receipts, batches, groups, and boundary behavior. It also exposes the same concise product changelog kept in [CHANGELOG.md](./CHANGELOG.md). The site is a public/dev presentation layer over safe manifest and receipt files; it is not authoritative proof by itself. Receipts, run IDs, tests, and commits are the evidence.
 
 ```sh
 npm run demo:dev      # local public site
@@ -43,7 +43,9 @@ npm run demo:smoke    # local smoke check
 npm run deploy        # personal Cloudflare account + custom domain
 ```
 
-`demo:smoke` prints which data source it checked. Local Vite uses `source: "/demo/manifest.json"` because it does not run the Worker API route; the deployed Worker should report `source: "/api/demo"`.
+`demo:smoke` prints which data source it checked. Local Vite should report `source: "/campaign/manifest.json"` for the active run ledger.
+
+Documentation rule: when behavior, public surfaces, safety semantics, or CLI/MCP outputs change, update this README if the getting-started or product description changes, and update [CHANGELOG.md](./CHANGELOG.md) with a concise entry. The product-hardening loop should include this documentation check before committing.
 
 Start with [Architecture](./docs/ARCHITECTURE.md) and the [core product decision](./docs/CORE_PRODUCT_DECISION.md). See [concurrency and context isolation](./docs/CONCURRENCY_ISOLATION.md), the [pi-subagents comparison](./docs/PI_SUBAGENTS_COMPARISON.md), the [secure-agent proof](./docs/SECURE_AGENT_PROOF.md), and [landscape research](./docs/SECURE_AGENT_LANDSCAPE.md).
 

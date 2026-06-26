@@ -1,0 +1,87 @@
+{
+  "schema": "terrarium.product-loop.receipt.v0.1",
+  "iterationId": "ph-20260626144000",
+  "intent": "parallel attacker run 13 plus explicit documentation hardening request",
+  "phases": [
+    "OBSERVE",
+    "BATCH_ATTACK",
+    "SELECT",
+    "EXECUTE",
+    "VERIFY",
+    "RECORD",
+    "LOCAL_TABLE_UPDATE"
+  ],
+  "selectedWork": {
+    "kind": "documentation-and-public-changelog",
+    "reason": "User identified missing documentation-hardening step and missing changelog/public changelog page."
+  },
+  "childRuns": [
+    {
+      "runId": "ter_20260626135025744_2ysul2",
+      "status": "done",
+      "selected": false,
+      "summary": "Child identified the remaining issue as likely outside core spawnBatch result construction. No production patch integrated from this run."
+    },
+    {
+      "runId": "ter_20260626135025744_04xgbb",
+      "status": "done",
+      "selected": false,
+      "summary": "Child produced secure workspace patch. Not integrated; still needs dependency/Docker-capable verification."
+    },
+    {
+      "runId": "ter_20260626135025744_kxa8lj",
+      "status": "done",
+      "selected": false,
+      "summary": "Child found legacy presentation fields but no active spreadsheet rendering issue. Not integrated."
+    },
+    {
+      "runId": "ter_20260626135242664_5af7se",
+      "status": "done",
+      "selected": false,
+      "summary": "Child proposed stricter public-summary schema. Not integrated during this documentation-focused turn."
+    },
+    {
+      "runId": "ter_20260626135242665_3l9tdn",
+      "status": "done",
+      "selected": false,
+      "summary": "Child did not produce a minimal command worth integrating. Existing diagnostics remain payload-free."
+    },
+    {
+      "runId": "ter_20260626135242665_rwbcty",
+      "status": "done",
+      "selected": false,
+      "summary": "Child found current lineage coverage adequate. No code changes integrated."
+    }
+  ],
+  "health": {
+    "productLoopValidateOk": true,
+    "buildOk": true,
+    "localSmokeOk": true,
+    "changelogPublicFileOk": true
+  },
+  "commands": [
+    {
+      "command": "terrarium_spawn_batch allSettled concurrency 3 plus continuation for six attacker jobs",
+      "ok": false,
+      "note": "first batch still hit cancellation wait; continuation completed"
+    },
+    {
+      "command": "npm run product-loop:validate && npm run demo:build && npm run demo:smoke",
+      "ok": true
+    },
+    {
+      "command": "curl http://127.0.0.1:5178/CHANGELOG.md",
+      "ok": true
+    }
+  ],
+  "publicSummary": {
+    "iterationId": "ph-20260626144000",
+    "contentKind": "product-summary",
+    "evidenceClaim": true,
+    "evidenceRef": "test:README.md",
+    "title": "Documentation hardening added to loop",
+    "summary": "Run 13 added CHANGELOG.md, exposed it as a public changelog page, linked the run ledger to it, and updated README to require docs/changelog updates when behavior or public surfaces change."
+  },
+  "canPublishStory": true,
+  "createdAt": "2026-06-26T13:55:22.691Z"
+}
