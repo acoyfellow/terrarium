@@ -1,0 +1,8 @@
+{
+  "iterationId": "ph-20260626094000",
+  "contentKind": "product-summary",
+  "evidenceClaim": true,
+  "evidenceRef": "terrarium-run:ter_20260626093417413_7wueaq",
+  "title": "Public copy now starts from receipts, not theater",
+  "summary": "The reconciler integrated a public-app rewrite that names bounded runs, correlated receipts, and run-ID callbacks instead of unsupported escape/self-hardening language."
+}

@@ -6,8 +6,8 @@
   <meta name="theme-color" content="#07100c" />
   <meta name="color-scheme" content="dark" />
 
-  <title>Terrarium — a robot that keeps trying to escape its jar</title>
-  <meta name="description" content="We put an AI in a sealed jar and let it try to get out. Every try is logged. If it truly escapes, we prove it twice, fix the jar, and let it keep going. Watch it live." />
+  <title>Terrarium — bounded agent runs with durable receipts</title>
+  <meta name="description" content="Terrarium starts bounded agent runs, records correlated receipts, and delivers terminal callbacks to the session that requested each run." />
   <link rel="canonical" href="https://terrarium.coey.dev/" />
   <meta name="keywords" content="AI containment, AI sandbox, agent security, red team, self-healing, autonomous patching, LLM safety, Cloudflare, orchestration" />
   <meta name="author" content="Jordan Coeyman" />
@@ -16,8 +16,8 @@
   <!-- Open Graph -->
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="Terrarium" />
-  <meta property="og:title" content="Terrarium — a robot that keeps trying to escape its jar" />
-  <meta property="og:description" content="It never stops trying to get out. Every attempt is logged. A break-out only counts if it happens twice — same trick, brand-new jar." />
+  <meta property="og:title" content="Terrarium — bounded agent runs with durable receipts" />
+  <meta property="og:description" content="One bounded run, one correlated receipt, and a terminal callback delivered by run ID." />
   <meta property="og:url" content="https://terrarium.coey.dev/" />
   <meta property="og:image" content="https://terrarium.coey.dev/og.jpg" />
   <meta property="og:image:width" content="1200" />
@@ -26,8 +26,8 @@
 
   <!-- Twitter / X -->
   <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content="Terrarium — a robot that keeps trying to escape its jar" />
-  <meta name="twitter:description" content="It never stops trying to get out. A break-out only counts if it happens twice — same trick, brand-new jar." />
+  <meta name="twitter:title" content="Terrarium — bounded agent runs with durable receipts" />
+  <meta name="twitter:description" content="One bounded run, one correlated receipt, and a terminal callback delivered by run ID." />
   <meta name="twitter:image" content="https://terrarium.coey.dev/og.jpg" />
 
   <!-- Icons + PWA -->
@@ -50,7 +50,7 @@
     "applicationCategory": "DeveloperApplication",
     "operatingSystem": "Any",
     "url": "https://terrarium.coey.dev/",
-    "description": "A self-hardening AI orchestration primitive that adversarially attacks its own boundaries, independently reproduces verified findings, and patches itself.",
+    "description": "A durable execution and callback layer for bounded agent runs, correlated receipts, status inspection, logs, and cancellation.",
     "author": { "@type": "Person", "name": "Jordan Coeyman" },
     "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
     "sameAs": ["https://github.com/acoyfellow/terrarium"]
@@ -61,7 +61,7 @@
 </head>
 <body>
   <main id="app"></main>
-  <noscript>Terrarium puts an AI in a sealed jar and lets it try to get out. Every attempt is recorded. If it truly escapes, we prove it by repeating the exact trick in a fresh jar, then fix the jar so it can't work again. Source: https://github.com/acoyfellow/terrarium</noscript>
+  <noscript>Terrarium starts bounded agent runs, records correlated receipts, and delivers terminal callbacks by run ID. Source: https://github.com/acoyfellow/terrarium</noscript>
   <script>
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", () => navigator.serviceWorker.register("/sw.js").catch(() => {}));
