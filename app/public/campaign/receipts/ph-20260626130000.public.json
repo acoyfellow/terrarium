@@ -1,0 +1,8 @@
+{
+  "iterationId": "ph-20260626130000",
+  "contentKind": "product-summary",
+  "evidenceClaim": true,
+  "evidenceRef": "terrarium-run:ter_20260626125402549_66te2b",
+  "title": "Doctor now reports malformed router JSON",
+  "summary": "A parallel attacker found malformed subscriber and callback journal JSON could be hidden from doctor, and malformed pending callbacks could strand claims. The fix normalizes subscriber errors, keeps malformed pending files pending, and adds doctor JSON-health counters."
+}

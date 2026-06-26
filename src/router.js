@@ -87,7 +87,12 @@ export async function registerSubscriber(subscription) {
 
 export async function getSubscriber(subscriberId) {
   assertId(subscriberId, 'subscriber id');
-  const subscription = JSON.parse(await readFile(join(SUBSCRIBERS_DIR, `${subscriberId}.json`), 'utf8'));
+  let subscription;
+  try { subscription = JSON.parse(await readFile(join(SUBSCRIBERS_DIR, `${subscriberId}.json`), 'utf8')); }
+  catch (error) {
+    if (error.code === 'ENOENT') throw error;
+    throw new Error('invalid callback subscriber record');
+  }
   if (!subscription || subscription.subscriberId !== subscriberId ||
       !Object.hasOwn(subscription, 'ownerRunId') ||
       (subscription.ownerRunId !== null && !/^ter_[A-Za-z0-9_]+$/.test(subscription.ownerRunId))) {
@@ -114,7 +119,12 @@ export async function listSubscribers() {
   if (!existsSync(SUBSCRIBERS_DIR)) return [];
   const files = (await readdir(SUBSCRIBERS_DIR)).filter((f) => f.endsWith('.json'));
   const values = [];
-  for (const file of files) { try { values.push(JSON.parse(await readFile(join(SUBSCRIBERS_DIR, file), 'utf8'))); } catch {} }
+  for (const file of files) {
+    try {
+      const subscriberId = file.slice(0, -5);
+      values.push(await getSubscriber(subscriberId));
+    } catch {}
+  }
   return values;
 }
 
@@ -181,7 +191,13 @@ export async function claimMailboxEvents({ subscriberId, limit = 20, ownerRunId 
     try {
       const target = join(dirs.inflight, file);
       await rename(join(dirs.pending, file), target);
-      const event = { ...JSON.parse(await readFile(target, 'utf8')), claimedAt: new Date().toISOString() };
+      let parsed;
+      try { parsed = JSON.parse(await readFile(target, 'utf8')); }
+      catch {
+        await rename(target, join(dirs.pending, file)).catch(() => {});
+        continue;
+      }
+      const event = { ...parsed, claimedAt: new Date().toISOString() };
       await atomicJson(target, event);
       events.push(event);
     } catch (error) { if (error.code !== 'ENOENT') throw error; }

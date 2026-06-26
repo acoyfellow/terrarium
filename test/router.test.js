@@ -209,6 +209,20 @@ test('unowned controllers cannot adopt an owned subscriber or inspect and mutate
   }
 });
 
+test('malformed subscriber JSON fails closed with the stable validation error', async () => {
+  const suffix = `${process.pid}_${Date.now()}_json`;
+  const subscriberId = `sub_malformed_${suffix}`;
+  await mkdir(SUBSCRIBERS_DIR, { recursive: true });
+  try {
+    await writeFile(join(SUBSCRIBERS_DIR, `${subscriberId}.json`), '{bad');
+    await assert.rejects(registerSubscriber({ subscriberId, ownerRunId: `ter_owner_${suffix}`, runIds: ['*'] }), /invalid callback subscriber record/);
+    await assert.rejects(getMailboxStatus(subscriberId, { ownerRunId: `ter_owner_${suffix}` }), /invalid callback subscriber record/);
+  } finally {
+    await rm(join(MAILBOXES_DIR, subscriberId), { recursive: true, force: true });
+    await rm(join(SUBSCRIBERS_DIR, `${subscriberId}.json`), { force: true });
+  }
+});
+
 test('malformed subscriber records cannot become controller-owned mailboxes', async () => {
   const suffix = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
   const subscriberId = `sub_malformed_${suffix}`;
