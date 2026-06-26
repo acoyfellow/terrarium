@@ -1,0 +1,72 @@
+{
+  "schema": "terrarium.product-loop.receipt.v0.1",
+  "iterationId": "ph-20260626095000",
+  "intent": "remove containment labels from active product campaign UI",
+  "phases": [
+    "OBSERVE",
+    "SELECT",
+    "EXECUTE",
+    "VERIFY",
+    "RECORD",
+    "PUBLIC_SUMMARIZE",
+    "OPTIONAL_DEPLOY"
+  ],
+  "selectedWork": {
+    "kind": "presentation-hardening",
+    "reason": "Active product turns were still displayed with containment labels that made product updates look like escape probes."
+  },
+  "childRuns": [
+    {
+      "runId": "ter_20260626093944446_2ji2dh",
+      "status": "done",
+      "selected": true,
+      "summary": "De-cringed active product campaign labels while preserving historical containment UI."
+    },
+    {
+      "runId": "ter_20260626093944446_t74slb",
+      "status": "done",
+      "selected": false,
+      "summary": "Manifest rewrite already integrated in run 2."
+    },
+    {
+      "runId": "ter_20260626093944446_5dnuof",
+      "status": "done",
+      "selected": false,
+      "summary": "Receipt inspector candidate."
+    }
+  ],
+  "health": {
+    "repoCleanAtStart": true,
+    "productLoopValidateOk": true,
+    "buildOk": true,
+    "localSmokeOk": true
+  },
+  "commands": [
+    {
+      "command": "terrarium_spawn_batch x3 isolated children",
+      "ok": true
+    },
+    {
+      "command": "npm run product-loop:validate",
+      "ok": true
+    },
+    {
+      "command": "npm run demo:build",
+      "ok": true
+    },
+    {
+      "command": "npm run demo:smoke against local Vite",
+      "ok": true
+    }
+  ],
+  "publicSummary": {
+    "iterationId": "ph-20260626095000",
+    "contentKind": "product-summary",
+    "evidenceClaim": true,
+    "evidenceRef": "terrarium-run:ter_20260626093944446_2ji2dh",
+    "title": "Product turns no longer use containment labels",
+    "summary": "The reconciler changed active product-campaign labels from containment language such as stayed inside to change recorded, while keeping historical containment rendering available."
+  },
+  "canPublishStory": true,
+  "createdAt": "2026-06-26T09:45:04.353Z"
+}
