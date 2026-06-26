@@ -483,6 +483,7 @@ export function validateTaskContractOutput(output, expected) {
   let receipt;
   try { receipt = JSON.parse(lines[0].trim().slice("TERRARIUM_RESULT=".length)); }
   catch { return { status: "malformed" }; }
+  if (!receipt || typeof receipt !== "object" || Array.isArray(receipt)) return { status: "malformed" };
   if (receipt.runId !== expected.runId || receipt.taskFingerprint !== expected.taskFingerprint || receipt.nonce !== expected.nonce) return { status: "mismatch" };
   if (typeof receipt.summary !== "string" || !receipt.summary.trim() || receipt.summary.length > 2000) return { status: "malformed" };
   return { status: "verified", summary: receipt.summary.trim() };

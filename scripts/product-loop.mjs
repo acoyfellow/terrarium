@@ -22,10 +22,21 @@ function run(command, args, options = {}) {
   };
 }
 
-function assertPublicSummary(summary) {
+const EVIDENCE_REF_PATTERNS = Object.freeze([
+  /^commit:[a-f0-9]{7,40}$/i,
+  /^terrarium-run:ter_\d{17}_[a-z0-9]+$/i,
+  /^test:[A-Za-z0-9][A-Za-z0-9._:/-]*$/,
+  /^replay:[A-Za-z0-9][A-Za-z0-9._:/-]*$/,
+]);
+
+export function assertPublicSummary(summary) {
   if (!summary || typeof summary !== 'object') throw new Error('public summary must be an object');
   if (!summary.iterationId) throw new Error('public summary missing iterationId');
-  if (summary.evidenceClaim === true && !summary.evidenceRef) throw new Error('evidenceClaim true requires evidenceRef');
+  if (summary.evidenceClaim === true) {
+    if (typeof summary.evidenceRef !== 'string' || !EVIDENCE_REF_PATTERNS.some((pattern) => pattern.test(summary.evidenceRef))) {
+      throw new Error('evidenceClaim true requires a checkable evidenceRef');
+    }
+  }
   for (const key of ['privateRunMetadata', 'task', 'prompt', 'cwd', 'logPath', 'output']) {
     if (JSON.stringify(summary).includes(`"${key}"`)) throw new Error(`public summary leaks ${key}`);
   }
@@ -97,6 +108,10 @@ export async function createIterationReceipt({ intent = 'product hardening loop 
     createdAt: new Date().toISOString(),
   };
   assertPublicSummary(receipt.publicSummary);
+  if (receipt.publicSummary.iterationId !== iterationId) throw new Error('public summary iterationId must match its receipt');
+  if (receipt.publicSummary.evidenceClaim === true && !canPublishStory) {
+    throw new Error('cannot publish an evidence claim while product-loop health is red');
+  }
   const privatePath = join(receiptDir, `${iterationId}.json`);
   const publicPath = join(publicDir, `${iterationId}.public.json`);
   if (!dryRun) {
