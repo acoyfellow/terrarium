@@ -378,7 +378,10 @@ async function handle(msg) {
           if (!runIds.includes("*")) for (const runId of runIds) recovered.push(await ensureTerminalCallback({ runId, requesterRunId: policy.requesterRunId, scope: policy.statusScope }));
           return send(msg.id, content({ ...subscriber, recovered }));
         }
-        if (args.action === "recover") return send(msg.id, content(await ensureTerminalCallback({ runId: args.runId, requesterRunId: policy.requesterRunId, scope: policy.statusScope })));
+        if (args.action === "recover") {
+          if (!args.runId) throw new Error("callback recover requires runId");
+          return send(msg.id, content(await ensureTerminalCallback({ runId: args.runId, requesterRunId: policy.requesterRunId, scope: policy.statusScope })));
+        }
         if (args.action === "prune") {
           if (policy.requesterRunId) throw new Error("callback pruning is available only to a top-level controller");
           return send(msg.id, content(await pruneRouter({
@@ -388,6 +391,7 @@ async function handle(msg) {
             subscriberOlderThanMs: args.olderThanMs,
           })));
         }
+        if (!args.subscriberId) throw new Error(`callback ${args.action} requires subscriberId`);
         const subscription = await getSubscriber(args.subscriberId);
         if (subscription.ownerRunId !== policy.requesterRunId) throw new Error("callback subscriber access denied");
         const ownedArgs = { subscriberId: args.subscriberId, ownerRunId: policy.requesterRunId };

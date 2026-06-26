@@ -176,6 +176,33 @@ test('child callback recover and subscriber status enforce lineage ownership', a
   }
 });
 
+test('callback status/claim narrow arguments and reject missing identifiers without leaking sibling data', async () => {
+  const owner = await runTerrarium({ task: 'callback narrowing owner', dryRun: true, stream: false });
+  const sibling = await runTerrarium({ task: 'callback narrowing sibling secret', dryRun: true, stream: false });
+  const subscriberId = `sub_callback_narrow_${owner.runId}`;
+  const env = { TERRARIUM_RUN_ID: owner.runId, TERRARIUM_ALLOW_SPAWN: 'false', TERRARIUM_STATUS_SCOPE: 'self', TERRARIUM_READ_SCOPE: 'self' };
+  try {
+    await rpc([{ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'terrarium_callbacks', arguments: { action: 'subscribe', subscriberId, runIds: [owner.runId] } } }], env);
+    const { responses } = await rpc([
+      { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'terrarium_callbacks', arguments: { action: 'status', subscriberId, runId: sibling.runId, runIds: [sibling.runId], eventId: 'evt_sibling', limit: 999, olderThanMs: 0 } } },
+      { jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'terrarium_callbacks', arguments: { action: 'claim', subscriberId, runId: sibling.runId, runIds: [sibling.runId], eventId: 'evt_sibling', limit: 1, olderThanMs: 0 } } },
+      { jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'terrarium_callbacks', arguments: { action: 'status' } } },
+      { jsonrpc: '2.0', id: 4, method: 'tools/call', params: { name: 'terrarium_callbacks', arguments: { action: 'claim' } } },
+      { jsonrpc: '2.0', id: 5, method: 'tools/call', params: { name: 'terrarium_callbacks', arguments: { action: 'recover' } } },
+    ], env);
+    for (const id of [1, 2]) {
+      const text = toolText(responses.find((r) => r.id === id));
+      assert.doesNotMatch(text, new RegExp(`${sibling.runId}|callback narrowing sibling secret|evt_sibling`));
+    }
+    assert.match(toolText(responses.find((r) => r.id === 3)), /status requires subscriberId/);
+    assert.match(toolText(responses.find((r) => r.id === 4)), /claim requires subscriberId/);
+    assert.match(toolText(responses.find((r) => r.id === 5)), /recover requires runId/);
+  } finally {
+    rmSync(join(MAILBOXES_DIR, subscriberId), { recursive: true, force: true });
+    rmSync(join(SUBSCRIBERS_DIR, `${subscriberId}.json`), { force: true });
+  }
+});
+
 test('MCP concrete callback subscribe recovers completion that raced ahead', async () => {
   const suffix = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
   const runId = `ter_mcp_callback_${suffix}`;

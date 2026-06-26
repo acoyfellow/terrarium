@@ -1,0 +1,8 @@
+{
+  "iterationId": "ph-20260626140000",
+  "contentKind": "product-summary",
+  "evidenceClaim": true,
+  "evidenceRef": "terrarium-run:ter_20260626132508273_nga70w",
+  "title": "Batch cleanup returns durable metadata; doctor and MCP validation tightened",
+  "summary": "Run 9 integrated batch cleanup metadata for cancellation/partial-launch paths, state-specific doctor callback validation, and explicit MCP callback identifiers. Targeted tests and local smoke passed."
+}

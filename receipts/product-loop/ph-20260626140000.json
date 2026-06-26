@@ -1,0 +1,87 @@
+{
+  "schema": "terrarium.product-loop.receipt.v0.1",
+  "iterationId": "ph-20260626140000",
+  "intent": "parallel attacker run 9 against batch wrapper, cancellation handoff, secure workspace artifacts, doctor malformed state, public ledger contract, and MCP callback boundaries",
+  "phases": [
+    "OBSERVE",
+    "BATCH_ATTACK",
+    "SELECT",
+    "EXECUTE",
+    "VERIFY",
+    "RECORD",
+    "LOCAL_TABLE_UPDATE"
+  ],
+  "selectedWork": {
+    "kind": "batch-doctor-mcp-hardening",
+    "reason": "Three verified non-conflicting fixes passed targeted parent tests."
+  },
+  "childRuns": [
+    {
+      "runId": "ter_20260626132508273_nga70w",
+      "status": "done",
+      "selected": true,
+      "summary": "Integrated collection of cleanupErrors for settled strategies/timeouts and partial-launch metadata path; removed brittle launch-failure fixture after parent verification."
+    },
+    {
+      "runId": "ter_20260626132508273_3l24ld",
+      "status": "done",
+      "selected": false,
+      "summary": "Child produced cancel-handoff patch. Not integrated this pass to keep commit focused on batch/doctor/MCP."
+    },
+    {
+      "runId": "ter_20260626132508273_vzdta6",
+      "status": "done",
+      "selected": false,
+      "summary": "Child produced secure artifact filtering patch. Not integrated this pass."
+    },
+    {
+      "runId": "ter_20260626132723864_xkhubw",
+      "status": "done",
+      "selected": true,
+      "summary": "Integrated state-specific doctor validation for pending/inflight callbacks and stale empty/missing child claim coverage."
+    },
+    {
+      "runId": "ter_20260626132723864_s178lz",
+      "status": "done",
+      "selected": false,
+      "summary": "Child proposed a larger public projection refactor. Not integrated this pass."
+    },
+    {
+      "runId": "ter_20260626132723864_2kgasc",
+      "status": "done",
+      "selected": true,
+      "summary": "Integrated explicit runId/subscriberId requirements for callback operations and privacy regression coverage."
+    }
+  ],
+  "health": {
+    "batchTestsOk": true,
+    "doctorTestsOk": true,
+    "mcpScopeTestsOk": true,
+    "routerTestsOk": true,
+    "groupsTestsOk": true,
+    "productLoopValidateOk": true,
+    "buildOk": true,
+    "localSmokeOk": true
+  },
+  "commands": [
+    {
+      "command": "terrarium_spawn_batch allSettled concurrency 3 plus continuation for six attacker jobs",
+      "ok": false,
+      "note": "first batch still hit cancellation wait before integration; continuation completed"
+    },
+    {
+      "command": "node --test test/batch.test.js test/doctor.test.js test/mcp_scope.test.js test/router.test.js test/groups.test.js",
+      "ok": true
+    }
+  ],
+  "publicSummary": {
+    "iterationId": "ph-20260626140000",
+    "contentKind": "product-summary",
+    "evidenceClaim": true,
+    "evidenceRef": "terrarium-run:ter_20260626132508273_nga70w",
+    "title": "Batch cleanup returns durable metadata; doctor and MCP validation tightened",
+    "summary": "Run 9 integrated batch cleanup metadata for cancellation/partial-launch paths, state-specific doctor callback validation, and explicit MCP callback identifiers. Targeted tests and local smoke passed."
+  },
+  "canPublishStory": true,
+  "createdAt": "2026-06-26T13:30:57.535Z"
+}

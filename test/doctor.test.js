@@ -86,6 +86,69 @@ test('doctor rejects private fields in subscriber, journal, and mailbox records 
   }
 });
 
+test('doctor applies callback validation for pending and inflight states', async () => {
+  const suffix = `${process.pid}_${Date.now()}_state`;
+  const subscriberId = `doctor_state_${suffix}`;
+  const pendingDir = `${MAILBOXES_DIR}/${subscriberId}/pending`;
+  const inflightDir = `${MAILBOXES_DIR}/${subscriberId}/inflight`;
+  const pendingId = `evt_pending_${suffix}`;
+  const inflightId = `evt_inflight_${suffix}`;
+  const base = { type: 'Completed', runId: `ter_${suffix}`, at: '2020-01-01T00:00:00.000Z' };
+  await Promise.all([mkdir(pendingDir, { recursive: true }), mkdir(inflightDir, { recursive: true })]);
+  await Promise.all([
+    writeFile(`${pendingDir}/${pendingId}.json`, JSON.stringify({ ...base, eventId: pendingId, claimedAt: '2020-01-01T00:00:00.000Z' })),
+    writeFile(`${inflightDir}/${inflightId}.json`, JSON.stringify({ ...base, eventId: inflightId })),
+  ]);
+  try {
+    const result = await diagnoseTerrarium();
+    assert.ok(result.checks.malformedPendingCallbacks >= 1);
+    assert.ok(result.checks.malformedInflightCallbacks >= 1);
+    assert.ok(result.warnings.some((warning) => warning.includes('malformed pending callback')));
+    assert.ok(result.warnings.some((warning) => warning.includes('malformed inflight callback')));
+  } finally {
+    await rm(`${MAILBOXES_DIR}/${subscriberId}`, { recursive: true, force: true });
+  }
+});
+
+test('doctor counts valid state-specific callbacks', async () => {
+  const suffix = `${process.pid}_${Date.now()}_valid_state`;
+  const subscriberId = `doctor_valid_state_${suffix}`;
+  const pendingDir = `${MAILBOXES_DIR}/${subscriberId}/pending`;
+  const inflightDir = `${MAILBOXES_DIR}/${subscriberId}/inflight`;
+  const pendingId = `evt_pending_valid_${suffix}`;
+  const inflightId = `evt_inflight_valid_${suffix}`;
+  const base = { type: 'Completed', runId: `ter_${suffix}`, at: '2020-01-01T00:00:00.000Z' };
+  await Promise.all([mkdir(pendingDir, { recursive: true }), mkdir(inflightDir, { recursive: true })]);
+  await Promise.all([
+    writeFile(`${pendingDir}/${pendingId}.json`, JSON.stringify({ ...base, eventId: pendingId })),
+    writeFile(`${inflightDir}/${inflightId}.json`, JSON.stringify({ ...base, eventId: inflightId, claimedAt: '2020-01-01T00:00:00.000Z' })),
+  ]);
+  try {
+    const result = await diagnoseTerrarium();
+    assert.ok(result.checks.pendingCallbacks >= 1);
+    assert.ok(result.checks.inflightCallbacks >= 1);
+  } finally {
+    await rm(`${MAILBOXES_DIR}/${subscriberId}`, { recursive: true, force: true });
+  }
+});
+
+test('doctor counts stale empty and missing child claims', async () => {
+  const suffix = `${process.pid}_${Date.now()}_claims`;
+  const claimsDir = `${LOG_DIR}/doctor-${suffix}.children`;
+  await mkdir(claimsDir, { recursive: true });
+  await Promise.all([
+    writeFile(`${claimsDir}/empty`, ''),
+    writeFile(`${claimsDir}/missing`, `ter_missing_${suffix}`),
+  ]);
+  try {
+    const result = await diagnoseTerrarium();
+    assert.ok(result.checks.staleChildClaims >= 2);
+    assert.ok(result.warnings.some((warning) => warning.includes('stale child-slot claim')));
+  } finally {
+    await rm(claimsDir, { recursive: true, force: true });
+  }
+});
+
 test('doctor tolerates a child-claim path that is not a readable directory', async () => {
   const claimPath = `${LOG_DIR}/doctor-malformed.children`;
   await mkdir(LOG_DIR, { recursive: true });
