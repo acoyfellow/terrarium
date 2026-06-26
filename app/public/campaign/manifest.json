@@ -31,7 +31,10 @@
       },
       "story": "The callback carries the run ID of the session that requested it.",
       "contentKind": "product-iteration",
-      "evidenceClaim": false
+      "evidenceClaim": false,
+      "agentModel": "not published",
+      "agentCommand": "not published",
+      "environment": "local Terrarium repo; public-safe receipt or commit evidence"
     },
     {
       "turn": 2,
@@ -52,7 +55,10 @@
       },
       "story": "A zero exit code reports process state. The correlated receipt reports task completion.",
       "contentKind": "product-iteration",
-      "evidenceClaim": false
+      "evidenceClaim": false,
+      "agentModel": "not published",
+      "agentCommand": "not published",
+      "environment": "local Terrarium repo; public-safe receipt or commit evidence"
     },
     {
       "turn": 3,
@@ -73,7 +79,10 @@
       },
       "story": "Batch fan-out creates separate runs, each with its own state and receipt.",
       "contentKind": "product-iteration",
-      "evidenceClaim": false
+      "evidenceClaim": false,
+      "agentModel": "not published",
+      "agentCommand": "not published",
+      "environment": "local Terrarium repo; public-safe receipt or commit evidence"
     },
     {
       "turn": 4,
@@ -95,7 +104,10 @@
       "story": "When a verified receipt supplies a summary, the summary must be a non-empty string.",
       "receiptUrl": "/campaign/receipts/ph-20260626085000.public.json",
       "contentKind": "product-summary",
-      "evidenceClaim": true
+      "evidenceClaim": true,
+      "agentModel": "private runner model",
+      "agentCommand": "pi -p --no-session",
+      "environment": "local Terrarium repo; public-safe receipt or commit evidence"
     },
     {
       "turn": 5,
@@ -117,7 +129,10 @@
       "story": "A model lookup or configuration failure requires a configuration change, not another attempt with the same settings.",
       "receiptUrl": "/campaign/receipts/ph-20260626091000.public.json",
       "contentKind": "product-summary",
-      "evidenceClaim": true
+      "evidenceClaim": true,
+      "agentModel": "private runner model",
+      "agentCommand": "pi -p --no-session",
+      "environment": "local Terrarium repo; public-safe receipt or commit evidence"
     },
     {
       "turn": 6,
@@ -138,7 +153,10 @@
       "story": "The agent did not write a better slogan. It found a callback ownership bug: a different run could try to take over an existing subscriber ID.",
       "receiptUrl": "/campaign/receipts/ph-20260626103000.public.json",
       "contentKind": "product-summary",
-      "evidenceClaim": true
+      "evidenceClaim": true,
+      "agentModel": "private runner model",
+      "agentCommand": "pi -p --no-session",
+      "environment": "isolated copy workspace; parent reconciler inspected logs/diff"
     }
   ]
 }
