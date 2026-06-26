@@ -477,11 +477,11 @@ async function emitCompletionEvent(result) {
 
 export function validateTaskContractOutput(output, expected) {
   if (!expected) return { status: "not-required" };
-  const lines = String(output ?? "").split(/\r?\n/).filter((value) => value.trim().startsWith("TERRARIUM_RESULT="));
+  const lines = String(output ?? "").split(/[\n\r\u2028\u2029]/).filter((value) => value.startsWith("TERRARIUM_RESULT="));
   if (lines.length === 0) return { status: "missing" };
   if (lines.length !== 1) return { status: "malformed" };
   let receipt;
-  try { receipt = JSON.parse(lines[0].trim().slice("TERRARIUM_RESULT=".length)); }
+  try { receipt = JSON.parse(lines[0].slice("TERRARIUM_RESULT=".length)); }
   catch { return { status: "malformed" }; }
   if (!receipt || typeof receipt !== "object" || Array.isArray(receipt)) return { status: "malformed" };
   if (receipt.runId !== expected.runId || receipt.taskFingerprint !== expected.taskFingerprint || receipt.nonce !== expected.nonce) return { status: "mismatch" };

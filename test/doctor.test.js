@@ -55,6 +55,37 @@ test('doctor validates semantic records and malformed pending and inflight callb
   }
 });
 
+test('doctor rejects private fields in subscriber, journal, and mailbox records without leaking payloads', async () => {
+  const suffix = `${process.pid}_${Date.now()}_private`;
+  const subscriberId = `doctor_private_${suffix}`;
+  const eventId = `evt_doctor_private_${suffix}`;
+  const subscriber = `${SUBSCRIBERS_DIR}/${subscriberId}.json`;
+  const journal = `${JOURNAL_DIR}/${eventId}.json`;
+  const pendingDir = `${MAILBOXES_DIR}/${subscriberId}/pending`;
+  const secret = `PRIVATE_PAYLOAD_${suffix}`;
+  const event = { eventId, type: 'Completed', runId: `ter_${suffix}`, payload: secret };
+  await Promise.all([mkdir(SUBSCRIBERS_DIR, { recursive: true }), mkdir(JOURNAL_DIR, { recursive: true }), mkdir(pendingDir, { recursive: true })]);
+  await Promise.all([
+    writeFile(subscriber, JSON.stringify({ subscriberId, ownerRunId: null, privateMetadata: secret })),
+    writeFile(journal, JSON.stringify(event)),
+    writeFile(`${pendingDir}/${eventId}.json`, JSON.stringify(event)),
+  ]);
+  try {
+    const result = await diagnoseTerrarium();
+    assert.ok(result.checks.malformedSubscribers >= 1);
+    assert.ok(result.checks.malformedJournalEvents >= 1);
+    assert.ok(result.checks.malformedPendingCallbacks >= 1);
+    assert.ok(result.warnings.some((warning) => warning.includes('malformed subscriber')));
+    assert.ok(result.warnings.some((warning) => warning.includes('malformed callback journal')));
+    assert.ok(result.warnings.some((warning) => warning.includes('malformed pending callback')));
+    assert.equal(JSON.stringify(result).includes(secret), false);
+    assert.equal(JSON.stringify(result).includes('privateMetadata'), false);
+    assert.equal(JSON.stringify(result).includes('payload'), false);
+  } finally {
+    await Promise.all([rm(subscriber, { force: true }), rm(journal, { force: true }), rm(`${MAILBOXES_DIR}/${subscriberId}`, { recursive: true, force: true })]);
+  }
+});
+
 test('doctor tolerates a child-claim path that is not a readable directory', async () => {
   const claimPath = `${LOG_DIR}/doctor-malformed.children`;
   await mkdir(LOG_DIR, { recursive: true });

@@ -52,6 +52,27 @@ test('allSettled: completes every job without disguising child failures', { time
   assert.equal(r.failureCount, 1);
 });
 
+test('allSettled timeout preserves the durable batch result when cancellation settlement fails', { timeout: 45000 }, async () => {
+  const r = await spawnBatch({
+    jobs: [job(slow(35000))],
+    strategy: 'allSettled',
+    pollMs: 10,
+    timeoutMs: 1,
+  });
+
+  assert.equal(r.ok, false);
+  assert.equal(r.reason, 'timeout');
+  assert.equal(r.timedOut, true);
+  assert.match(r.groupId, /^grp_/);
+  assert.equal(r.runIds.length, 1);
+  assert.equal(r.group.groupId, r.groupId);
+  assert.equal(r.group.runs[0].runId, r.runIds[0]);
+  if (r.cleanupErrors !== undefined) {
+    assert.ok(Array.isArray(r.cleanupErrors));
+    assert.match(r.cleanupErrors[0], new RegExp(`^${r.runIds[0]}: run did not become terminal after cancellation`));
+  }
+});
+
 test('any: first success wins and losers are cancelled', { timeout: 45000 }, async () => {
   const r = await spawnBatch({ jobs: [job(slow(8000)), job(ok()), job(slow(8000))], strategy: 'any', pollMs: 100 });
   assert.equal(r.ok, true);
