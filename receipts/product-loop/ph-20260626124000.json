@@ -1,0 +1,78 @@
+{
+  "schema": "terrarium.product-loop.receipt.v0.1",
+  "iterationId": "ph-20260626124000",
+  "intent": "parallel attacker batch against Terrarium callback, receipt, cancellation, batch, and doctor surfaces",
+  "phases": [
+    "OBSERVE",
+    "BATCH_ATTACK",
+    "SELECT",
+    "EXECUTE",
+    "VERIFY",
+    "RECORD",
+    "LOCAL_TABLE_UPDATE"
+  ],
+  "selectedWork": {
+    "kind": "callback-privacy-hardening",
+    "reason": "The callback attacker found the highest-severity clean fix: mailbox operations did not enforce subscriber owner identity for top-level/unowned controllers."
+  },
+  "childRuns": [
+    {
+      "runId": "ter_20260626123317546_6ojync",
+      "status": "done",
+      "selected": false,
+      "summary": "Child found summary normalization issues: length checked before trim and escaped line separators accepted. Not integrated this pass; candidate remains."
+    },
+    {
+      "runId": "ter_20260626123317547_zsf0gn",
+      "status": "done",
+      "selected": true,
+      "summary": "Integrated router and MCP owner checks so an unowned controller cannot adopt, inspect, claim, requeue, acknowledge, or delete a child-owned subscriber."
+    },
+    {
+      "runId": "ter_20260626123317547_t4vb18",
+      "status": "done",
+      "selected": false,
+      "summary": "Child found a cancellation handoff race and produced a larger fix with passing run-machine tests. Not integrated this pass."
+    },
+    {
+      "runId": "ter_20260626123317547_f0smv4",
+      "status": "cancelled",
+      "selected": false,
+      "summary": "The run became stale and was cancelled by the parent. The batch tool itself returned an error while trying to cancel a non-terminal run."
+    },
+    {
+      "runId": "ter_20260626123344945_t8fvpg",
+      "status": "done",
+      "selected": false,
+      "summary": "Child hardened doctor diagnostics for malformed run/subscriber/callback state. Not integrated this pass."
+    }
+  ],
+  "health": {
+    "routerTestsOk": true,
+    "mcpScopeTestsOk": true,
+    "productLoopValidateOk": true,
+    "buildOk": true,
+    "localSmokeOk": true
+  },
+  "commands": [
+    {
+      "command": "terrarium_spawn_batch allSettled concurrency 4 with attacker jobs",
+      "ok": false,
+      "note": "batch returned a cancellation wait error after launching first attacker set; parent reconciled durable runs directly"
+    },
+    {
+      "command": "node --test test/router.test.js test/mcp_scope.test.js",
+      "ok": true
+    }
+  ],
+  "publicSummary": {
+    "iterationId": "ph-20260626124000",
+    "contentKind": "product-summary",
+    "evidenceClaim": true,
+    "evidenceRef": "terrarium-run:ter_20260626123317547_zsf0gn",
+    "title": "Callback mailbox ownership is enforced in router and MCP",
+    "summary": "A parallel attacker found that unowned controllers could inspect or mutate owned callback subscriber mailboxes. The integrated fix requires exact ownerRunId for registration and mailbox operations."
+  },
+  "canPublishStory": true,
+  "createdAt": "2026-06-26T12:38:20.564Z"
+}

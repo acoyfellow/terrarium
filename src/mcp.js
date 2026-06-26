@@ -372,12 +372,13 @@ async function handle(msg) {
           })));
         }
         const subscription = await getSubscriber(args.subscriberId);
-        if (policy.requesterRunId && subscription.ownerRunId !== policy.requesterRunId) throw new Error("callback subscriber access denied");
-        if (args.action === "claim") return send(msg.id, content(await claimMailboxEvents(args)));
-        if (args.action === "ack") return send(msg.id, content(await acknowledgeMailboxEvent(args)));
-        if (args.action === "status") return send(msg.id, content(await getMailboxStatus(args.subscriberId)));
-        if (args.action === "requeue") return send(msg.id, content(await requeueInflightEvents({ subscriberId: args.subscriberId, olderThanMs: args.olderThanMs })));
-        if (args.action === "unsubscribe") { await unregisterSubscriber(args.subscriberId); return send(msg.id, content({ subscriberId: args.subscriberId, unsubscribed: true })); }
+        if (subscription.ownerRunId !== policy.requesterRunId) throw new Error("callback subscriber access denied");
+        const ownedArgs = { ...args, ownerRunId: policy.requesterRunId };
+        if (args.action === "claim") return send(msg.id, content(await claimMailboxEvents(ownedArgs)));
+        if (args.action === "ack") return send(msg.id, content(await acknowledgeMailboxEvent(ownedArgs)));
+        if (args.action === "status") return send(msg.id, content(await getMailboxStatus(args.subscriberId, ownedArgs)));
+        if (args.action === "requeue") return send(msg.id, content(await requeueInflightEvents(ownedArgs)));
+        if (args.action === "unsubscribe") { await unregisterSubscriber(args.subscriberId, ownedArgs); return send(msg.id, content({ subscriberId: args.subscriberId, unsubscribed: true })); }
         throw new Error("unknown Terrarium callback action");
       }
       if (name === "terrarium_doctor") {
