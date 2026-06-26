@@ -25,6 +25,7 @@
     "demo:smoke": "node scripts/smoke-demo.mjs",
     "product-loop:once": "node scripts/product-loop.mjs",
     "product-loop:dry-run": "node scripts/product-loop.mjs --dry-run",
+    "product-loop:check": "node scripts/product-loop.mjs check",
     "product-loop:validate": "node --test test/product-loop.test.js",
     "deploy": "vite build && wrangler deploy"
   },

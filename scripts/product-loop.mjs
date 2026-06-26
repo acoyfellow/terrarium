@@ -31,6 +31,32 @@ function assertPublicSummary(summary) {
   }
 }
 
+export const OUTER_LOOP_ROLES = Object.freeze(['investigator', 'implementer', 'reviewer']);
+
+export function reconcileOuterLoop(plan = {}) {
+  const roles = Array.isArray(plan.roles) ? plan.roles : [];
+  const roleNames = roles.map((role) => role?.role);
+  const missingRoles = OUTER_LOOP_ROLES.filter((role) => !roleNames.includes(role));
+  const duplicateRoles = [...new Set(roleNames.filter((role, index) => roleNames.indexOf(role) !== index))];
+  const invalidRoles = roleNames.filter((role) => !OUTER_LOOP_ROLES.includes(role));
+  const unboundedRoles = roles
+    .filter((role) => !role?.task || typeof role.task !== 'string' || !role.task.trim())
+    .map((role) => role?.role ?? null);
+  const errors = [];
+  if (roles.length !== 3) errors.push(`expected exactly 3 roles, received ${roles.length}`);
+  if (missingRoles.length) errors.push(`missing roles: ${missingRoles.join(', ')}`);
+  if (duplicateRoles.length) errors.push(`duplicate roles: ${duplicateRoles.join(', ')}`);
+  if (invalidRoles.length) errors.push(`invalid roles: ${invalidRoles.join(', ')}`);
+  if (unboundedRoles.length) errors.push(`roles missing bounded tasks: ${unboundedRoles.join(', ')}`);
+  return {
+    schema: 'terrarium.product-loop.plan-check.v0.1',
+    ok: errors.length === 0,
+    spawnsChildren: false,
+    expectedRoles: OUTER_LOOP_ROLES,
+    errors,
+  };
+}
+
 export async function createIterationReceipt({ intent = 'product hardening loop bootstrap', selectedWork = null, publicSummary = null, dryRun = false } = {}) {
   if (!dryRun) {
     await mkdir(receiptDir, { recursive: true });
@@ -81,7 +107,17 @@ export async function createIterationReceipt({ intent = 'product hardening loop 
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-  const dryRun = process.argv.slice(2).includes('--dry-run');
-  const result = await createIterationReceipt({ dryRun });
-  console.log(JSON.stringify({ ok: true, dryRun, iterationId: result.receipt.iterationId, canPublishStory: result.receipt.canPublishStory, privatePath: result.privatePath, publicPath: result.publicPath }, null, 2));
+  const args = process.argv.slice(2);
+  if (args[0] === 'check') {
+    const planPath = args[1];
+    if (!planPath) throw new Error('usage: product-loop.mjs check <plan.json>');
+    const plan = JSON.parse(await readFile(planPath, 'utf8'));
+    const result = reconcileOuterLoop(plan);
+    console.log(JSON.stringify(result, null, 2));
+    if (!result.ok) process.exitCode = 1;
+  } else {
+    const dryRun = args.includes('--dry-run');
+    const result = await createIterationReceipt({ dryRun });
+    console.log(JSON.stringify({ ok: true, dryRun, iterationId: result.receipt.iterationId, canPublishStory: result.receipt.canPublishStory, privatePath: result.privatePath, publicPath: result.publicPath }, null, 2));
+  }
 }
