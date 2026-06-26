@@ -1,0 +1,56 @@
+{
+  "schema": "terrarium.product-loop.receipt.v0.1",
+  "iterationId": "ph-20260626085000",
+  "intent": "harden verified receipt validation",
+  "phases": [
+    "OBSERVE",
+    "SELECT",
+    "EXECUTE",
+    "VERIFY",
+    "RECORD",
+    "PUBLIC_SUMMARIZE",
+    "OPTIONAL_DEPLOY"
+  ],
+  "selectedWork": {
+    "kind": "receipt-hardening",
+    "reason": "Verified receipts are part of Terrarium proof; malformed summaries should not pass as meaningful evidence."
+  },
+  "childRuns": [
+    {
+      "runId": "ter_20260626082925166_ek7h96",
+      "status": "done",
+      "selected": true,
+      "summary": "Validated supplied verified-receipt summaries as non-empty strings."
+    }
+  ],
+  "health": {
+    "repoCleanAtStart": true,
+    "runMachineTestsOk": true,
+    "buildOk": true,
+    "validationOk": true
+  },
+  "commands": [
+    {
+      "command": "node --test --test-name-pattern='verified receipt summaries|exit waits for receipt|versioned cancellation' test/run-machine.test.js",
+      "ok": true
+    },
+    {
+      "command": "npm run product-loop:validate",
+      "ok": true
+    },
+    {
+      "command": "npm run demo:build",
+      "ok": true
+    }
+  ],
+  "publicSummary": {
+    "iterationId": "ph-20260626085000",
+    "contentKind": "product-summary",
+    "evidenceClaim": true,
+    "evidenceRef": "terrarium-run:ter_20260626082925166_ek7h96",
+    "title": "Verified receipts must say something real",
+    "summary": "The reconciler integrated receipt validation so a verified receipt cannot carry an empty or non-string summary when it supplies one."
+  },
+  "canPublishStory": true,
+  "createdAt": "2026-06-26T08:53:27.789Z"
+}

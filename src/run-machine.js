@@ -114,4 +114,5 @@ function assertInput(input) {
   if (!input || !valid.includes(input.type)) throw new Error("invalid observed run input");
   if (input.type === "ChildExited" && !Number.isInteger(input.exitCode)) throw new Error("ChildExited requires integer exitCode");
   if (input.type === "ReceiptObserved" && !["verified", "missing", "mismatch", "malformed", "not-required"].includes(input.status)) throw new Error("invalid receipt status");
+  if (input.type === "ReceiptObserved" && input.status === "verified" && input.summary !== undefined && (typeof input.summary !== "string" || input.summary.trim() === "")) throw new Error("verified receipt summary must be a non-empty string");
 }

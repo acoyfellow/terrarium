@@ -58,6 +58,17 @@ test('exit waits for receipt classification instead of trusting process success'
   assert.equal(missing.state.terminal.ok, false);
 });
 
+test('verified receipt summaries cannot be empty or non-string', () => {
+  for (const summary of ['', '   ', 42]) {
+    assert.throws(
+      () => transition(initialRunState(), { type: 'ReceiptObserved', status: 'verified', summary }),
+      /verified receipt summary must be a non-empty string/,
+    );
+  }
+  assert.doesNotThrow(() => transition(initialRunState(), { type: 'ReceiptObserved', status: 'verified' }));
+  assert.doesNotThrow(() => transition(initialRunState(), receipt));
+});
+
 test('deadline is virtual and immediate; no timer or sleep required', () => {
   const r = replay([{ type: 'DeadlineReached' }, { type: 'ProcessTerminated' }, { type: 'ChildExited', exitCode: 128, signal: 'SIGTERM' }], { requireReceipt: false });
   assert.equal(r.state.terminal.status, 'failed');
