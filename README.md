@@ -19,7 +19,7 @@ one bounded task → one child run → one inspectable result
 | If you want to… | Use… | Status |
 | --- | --- | --- |
 | Keep your main agent context clean while a child investigates or edits. | `terra "task"` or MCP `terrarium_spawn`; optionally choose Pi/OpenCode and pin a model | Stable original workflow |
-| Launch independent jobs in one call with explicit join semantics. | `terra batch` or MCP `terrarium_spawn_batch` | Additive; all/allSettled/race/any/quorum |
+| Launch independent jobs in one call with explicit join semantics. | `terra batch` or MCP `terrarium_spawn_batch` | Additive; all/allSettled/race/any/quorum; cancellation settlement is bounded |
 | Observe durable runs, groups, callbacks, and attention. | `terra status`, `terra group`, `terra doctor`, callback MCP | Implemented |
 | Replay bounded cancellation/completion timing schedules. | `terra schedule replay <fixture>` | Local-only, versioned fixtures |
 | Test declared containment boundaries in Docker. | `terra probe <scenario>` | Implemented, opt-in |
@@ -233,6 +233,8 @@ The original delegation contract remains foundational:
 - CLI: `terra "task"`, `terra status`, `terra read`
 - Node API: bounded single-run primitives from `src/core.js`
 - MCP: `terrarium_spawn`, `terrarium_status`, `terrarium_read`
+
+Batch calls wait for the selected join strategy. `timeoutMs` bounds that join; when cancellation is needed, `cleanupTimeoutMs` (default 5000 ms) separately bounds synchronous settlement so an MCP client can receive durable `groupId`/`runIds` before its own request deadline. Any runs still settling are reported in `cleanupErrors` and remain inspectable through `terrarium_group`/`terrarium_status`.
 
 Compatibility promises:
 

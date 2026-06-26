@@ -29,13 +29,26 @@ const EVIDENCE_REF_PATTERNS = Object.freeze([
   /^replay:[A-Za-z0-9][A-Za-z0-9._-]*$/,
 ]);
 
+const PUBLIC_SUMMARY_KEYS = Object.freeze(['iterationId', 'contentKind', 'evidenceClaim', 'evidenceRef', 'title', 'summary']);
+
 export function assertPublicSummary(summary) {
-  if (!summary || typeof summary !== 'object') throw new Error('public summary must be an object');
-  if (!summary.iterationId) throw new Error('public summary missing iterationId');
+  if (!summary || typeof summary !== 'object' || Array.isArray(summary)) throw new Error('public summary must be an object');
+  const unknownKeys = Object.keys(summary).filter((key) => !PUBLIC_SUMMARY_KEYS.includes(key));
+  if (unknownKeys.length) throw new Error(`public summary has unknown fields: ${unknownKeys.join(', ')}`);
+  if (typeof summary.iterationId !== 'string' || !/^ph-\d{14}$/.test(summary.iterationId)) throw new Error('public summary has invalid iterationId');
+  if (summary.contentKind !== 'product-summary') throw new Error('public summary has invalid contentKind');
+  if (typeof summary.evidenceClaim !== 'boolean') throw new Error('public summary evidenceClaim must be boolean');
+  for (const key of ['title', 'summary']) {
+    if (typeof summary[key] !== 'string' || !summary[key].trim() || summary[key] !== summary[key].trim() || /[\r\n\u2028\u2029]/u.test(summary[key])) {
+      throw new Error(`public summary has invalid ${key}`);
+    }
+  }
   if (summary.evidenceClaim === true) {
     if (typeof summary.evidenceRef !== 'string' || !EVIDENCE_REF_PATTERNS.some((pattern) => pattern.test(summary.evidenceRef))) {
       throw new Error('evidenceClaim true requires a checkable evidenceRef');
     }
+  } else if ('evidenceRef' in summary) {
+    throw new Error('evidenceClaim false must omit evidenceRef');
   }
   for (const key of ['privateRunMetadata', 'task', 'prompt', 'cwd', 'logPath', 'output']) {
     if (JSON.stringify(summary).includes(`"${key}"`)) throw new Error(`public summary leaks ${key}`);

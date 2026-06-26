@@ -43,7 +43,7 @@ const tools = [
   },
   {
     name: "terrarium_spawn_batch",
-    description: "Fan out an array of jobs as independent background runs under one group, then resolve by join strategy. Each job is a normal single spawn (same options as terrarium_spawn). Strategies: all (every job must finish; ok if all succeed), allSettled (collect all outcomes, always ok), race (first terminal wins, cancel the rest), any (first success wins, cancel the rest), quorum (first k successes, cancel the rest). Winner-picking strategies cancel losing runs; prefer isolation copy|worktree for jobs with side effects. Capability-scoped like terrarium_spawn.",
+    description: "Fan out an array of jobs as independent background runs under one group, then resolve by join strategy. Each job is a normal single spawn (same options as terrarium_spawn). Strategies: all (every job must finish; ok if all succeed), allSettled (collect all outcomes), race (first terminal wins), any (first success wins), quorum (first k successes). Winner-picking strategies cancel losing runs; cancellation settlement is synchronously bounded and cleanupErrors report runs still settling. Prefer isolation copy|worktree for jobs with side effects. Capability-scoped like terrarium_spawn.",
     inputSchema: {
       type: "object",
       properties: {
@@ -54,6 +54,7 @@ const tools = [
         label: { type: "string", description: "Group label." },
         pollMs: { type: "number", description: "Status poll interval in ms. Default: 500." },
         timeoutMs: { type: "number", description: "Overall batch wait budget in ms; on timeout, remaining runs are cancelled." },
+        cleanupTimeoutMs: { type: "number", minimum: 0, description: "Maximum synchronous wait for cancellation settlement in ms. Default: 5000; unfinished cleanup is returned in cleanupErrors." },
         verbose: { type: "boolean", description: "Return the full group envelope. Default: concise." }
       },
       required: ["jobs"]
@@ -341,7 +342,7 @@ async function handle(msg) {
         if (!policy.allowSpawn) throw new Error("Terrarium spawn capability denied for this run");
         if (policy.requesterRunId) throw new Error("nested Terrarium runs cannot fan out a batch; the top-level owner fans out");
         const jobs = Array.isArray(args.jobs) ? args.jobs.map((job) => ({ ...sanitizeSpawnArgs(job), background: true, dryRun: false })) : args.jobs;
-        const result = await spawnBatch({ jobs, strategy: args.strategy, quorum: args.quorum, concurrency: args.concurrency, label: args.label, pollMs: args.pollMs, timeoutMs: args.timeoutMs });
+        const result = await spawnBatch({ jobs, strategy: args.strategy, quorum: args.quorum, concurrency: args.concurrency, label: args.label, pollMs: args.pollMs, timeoutMs: args.timeoutMs, cleanupTimeoutMs: args.cleanupTimeoutMs });
         const projected = verbose ? result : conciseBatch(result);
         return send(msg.id, content(projected, !result.ok));
       }

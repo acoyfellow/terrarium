@@ -1,0 +1,8 @@
+{
+  "iterationId": "ph-20260626150000",
+  "contentKind": "product-summary",
+  "evidenceClaim": true,
+  "evidenceRef": "terrarium-run:ter_20260626140220782_x4267h",
+  "title": "Batch cleanup timeout and public summary schema hardened",
+  "summary": "Run 15 added cleanupTimeoutMs for bounded batch cancellation settlement and made public summaries an exact schema. Targeted tests, changelog sync, build, and local smoke passed."
+}
