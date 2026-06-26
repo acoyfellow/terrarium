@@ -13,6 +13,7 @@ test('run groups preserve ordered independent runs and summarize status/logs', a
   assert.deepEqual(group.runIds, [a.runId, b.runId]);
   const status = await getRunGroupStatus({ groupId: group.groupId });
   assert.equal(status.complete, true);
+  assert.equal(status.ok, true);
   assert.equal(status.counts.done, 2);
   const listing = await listRunGroups({ limit: 100 });
   assert.ok(listing.groups.some((item) => item.groupId === group.groupId));
@@ -47,5 +48,10 @@ test('cancel terminates the child process group and records cancelled status', {
     assert.equal(status.status, 'cancelled');
     assert.equal(status.ok, false);
     assert.equal(isPidAlive(grandchild), false);
+    const group = await createRunGroup({ label: 'cancelled child', runIds: [run.runId] });
+    const groupStatus = await getRunGroupStatus({ groupId: group.groupId });
+    assert.equal(groupStatus.complete, true, 'cancelled is terminal, not stale running');
+    assert.equal(groupStatus.ok, false, 'cancelled is not successful');
+    assert.equal(groupStatus.counts.cancelled, 1);
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });

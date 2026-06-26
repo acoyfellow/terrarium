@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFile, rm } from 'node:fs/promises';
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { existsSync } from 'node:fs';
 import { JOURNAL_DIR, MAILBOXES_DIR, SUBSCRIBERS_DIR, acknowledgeMailboxEvent, claimMailboxEvents, getMailboxStatus, pruneRouter, registerSubscriber, requeueInflightEvents, routeEvent, unregisterSubscriber } from '../src/router.js';
@@ -203,6 +203,38 @@ test('unowned controllers cannot adopt an owned subscriber or inspect and mutate
     const claimed = await claimMailboxEvents({ subscriberId, ownerRunId });
     assert.deepEqual(claimed.events.map((event) => event.eventId), [eventId]);
     await acknowledgeMailboxEvent({ subscriberId, eventId, ownerRunId });
+  } finally {
+    await unregisterSubscriber(subscriberId, { ownerRunId }).catch(() => {});
+    await rm(join(JOURNAL_DIR, `${eventId}.json`), { force: true });
+  }
+});
+
+test('malformed subscriber records cannot become controller-owned mailboxes', async () => {
+  const suffix = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+  const subscriberId = `sub_malformed_${suffix}`;
+  await mkdir(SUBSCRIBERS_DIR, { recursive: true });
+  try {
+    await writeFile(join(SUBSCRIBERS_DIR, `${subscriberId}.json`), JSON.stringify({ subscriberId, runIds: ['*'] }));
+    await assert.rejects(registerSubscriber({ subscriberId, runIds: ['*'] }), /invalid callback subscriber record/);
+    await assert.rejects(getMailboxStatus(subscriberId), /invalid callback subscriber record/);
+  } finally {
+    await rm(join(MAILBOXES_DIR, subscriberId), { recursive: true, force: true });
+    await rm(join(SUBSCRIBERS_DIR, `${subscriberId}.json`), { force: true });
+  }
+});
+
+test('controller prune skips child-owned mailboxes', async () => {
+  const suffix = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+  const subscriberId = `sub_owned_prune_${suffix}`;
+  const ownerRunId = `ter_owned_prune_${suffix}`;
+  const eventId = `evt_owned_prune_${suffix}`;
+  try {
+    await registerSubscriber({ subscriberId, ownerRunId, runIds: [ownerRunId], createdAt: '2020-01-01T00:00:00.000Z' });
+    await routeEvent({ eventId, type: 'Completed', runId: ownerRunId, at: '2020-01-01T00:00:00.000Z' });
+    const pruned = await pruneRouter({ acknowledgedOlderThanMs: 0, callbackOlderThanMs: 0, subscriberOlderThanMs: 0, subscriberIds: [subscriberId], eventIds: [eventId] });
+    assert.equal(pruned.pendingRemoved, 0);
+    assert.equal(pruned.subscribersRemoved, 0);
+    assert.equal((await getMailboxStatus(subscriberId, { ownerRunId })).pending, 1);
   } finally {
     await unregisterSubscriber(subscriberId, { ownerRunId }).catch(() => {});
     await rm(join(JOURNAL_DIR, `${eventId}.json`), { force: true });

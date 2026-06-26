@@ -87,11 +87,18 @@ export async function registerSubscriber(subscription) {
 
 export async function getSubscriber(subscriberId) {
   assertId(subscriberId, 'subscriber id');
-  return JSON.parse(await readFile(join(SUBSCRIBERS_DIR, `${subscriberId}.json`), 'utf8'));
+  const subscription = JSON.parse(await readFile(join(SUBSCRIBERS_DIR, `${subscriberId}.json`), 'utf8'));
+  if (!subscription || subscription.subscriberId !== subscriberId ||
+      !Object.hasOwn(subscription, 'ownerRunId') ||
+      (subscription.ownerRunId !== null && !/^ter_[A-Za-z0-9_]+$/.test(subscription.ownerRunId))) {
+    throw new Error('invalid callback subscriber record');
+  }
+  return subscription;
 }
 
 function assertSubscriberOwner(subscription, ownerRunId) {
-  if (subscription.ownerRunId !== (ownerRunId ?? null)) throw new Error('callback subscriber access denied');
+  const storedOwner = subscription.ownerRunId ?? null;
+  if (storedOwner !== (ownerRunId ?? null)) throw new Error('callback subscriber access denied');
 }
 
 export async function unregisterSubscriber(subscriberId, { ownerRunId } = {}) {
@@ -223,7 +230,7 @@ function eventAge(now, event) {
   return Number.isFinite(timestamp) ? now - timestamp : Infinity;
 }
 
-export async function pruneRouter({ acknowledgedOlderThanMs = 7 * 86400000, journalOlderThanMs = 7 * 86400000, callbackOlderThanMs = 7 * 86400000, subscriberOlderThanMs = 7 * 86400000, subscriberIds, eventIds } = {}) {
+export async function pruneRouter({ acknowledgedOlderThanMs = 7 * 86400000, journalOlderThanMs = 7 * 86400000, callbackOlderThanMs = 7 * 86400000, subscriberOlderThanMs = 7 * 86400000, subscriberIds, eventIds, ownerRunId } = {}) {
   const now = Date.now();
   let acknowledgedRemoved = 0, pendingRemoved = 0, inflightRemoved = 0, journalRemoved = 0, subscribersRemoved = 0;
   const callbackCutoff = Math.max(0, Number(callbackOlderThanMs) || 0);
@@ -231,6 +238,8 @@ export async function pruneRouter({ acknowledgedOlderThanMs = 7 * 86400000, jour
   try {
     for (const subscriber of await readdir(MAILBOXES_DIR)) {
       if (Array.isArray(subscriberIds) && !subscriberIds.includes(subscriber)) continue;
+      let subscription; try { subscription = await getSubscriber(subscriber); } catch { continue; }
+      assertSubscriberOwner(subscription, ownerRunId);
       const dirs = mailboxDirs(subscriber);
       for (const [kind, dir, cutoff] of [
         ['acked', dirs.acked, acknowledgedOlderThanMs],
@@ -260,6 +269,7 @@ export async function pruneRouter({ acknowledgedOlderThanMs = 7 * 86400000, jour
   try {
     for (const sub of await listSubscribers()) {
       if (Array.isArray(subscriberIds) && !subscriberIds.includes(sub.subscriberId)) continue;
+      assertSubscriberOwner(sub, ownerRunId);
       const age = now - Date.parse(sub.createdAt || '');
       if (!Number.isFinite(age) || age < subscriberCutoff) continue;
       const status = await getMailboxStatus(sub.subscriberId, { ownerRunId: sub.ownerRunId });

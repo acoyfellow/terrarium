@@ -287,8 +287,8 @@
       "technique": "callback-router",
       "hypothesis": "Probe remaining ways to claim/status/requeue/ack/unsubscribe owned mailboxes, malformed subscriber records, prune ownership, top-level vs child requester.",
       "attempt": "Probe remaining ways to claim/status/requeue/ack/unsubscribe owned mailboxes, malformed subscriber records, prune ownership, top-level vs child requester.",
-      "result": "Child found prune could delete child-owned mailbox records and malformed subscriber owner values were ambiguous. Not integrated this pass.",
-      "adaptation": "Review after group lineage fix.",
+      "result": "Integrated stricter subscriber record validation and prune ownership checks so controller prune skips child-owned mailboxes.",
+      "adaptation": "Keep prune explicit about ownership or add a separate privileged maintenance capability.",
       "verdict": "contained",
       "imageUrl": null,
       "finishedAt": "2026-06-26T12:50:00.000Z",
@@ -300,7 +300,8 @@
       "evidenceClaim": true,
       "agentModel": "private runner model",
       "agentCommand": "pi -p --no-session",
-      "environment": "isolated copy workspace; pi -p --no-session; batch allSettled/concurrency 3"
+      "environment": "isolated copy workspace; pi -p --no-session; batch allSettled/concurrency 3",
+      "receiptUrl": "/campaign/receipts/ph-20260626125000.public.json"
     },
     {
       "turn": 13,
@@ -333,8 +334,8 @@
       "technique": "batch-settlement",
       "hypothesis": "Probe allSettled wrapper errors, cancellation wait errors, complete-vs-ok, stale running children, cancelled run table semantics.",
       "attempt": "Probe allSettled wrapper errors, cancellation wait errors, complete-vs-ok, stale running children, cancelled run table semantics.",
-      "result": "Child found allSettled ok conflated settlement with success and cancellation errors could be swallowed. Not integrated this pass.",
-      "adaptation": "Review with the observed batch wrapper cancellation error.",
+      "result": "Integrated batch/group truthfulness changes: allSettled no longer reports ok when children fail, cancellation settle errors are surfaced, and groups expose ok separately from complete.",
+      "adaptation": "Use complete for terminal state and ok for successful outcome in parent loops.",
       "verdict": "contained",
       "imageUrl": null,
       "finishedAt": "2026-06-26T12:50:00.000Z",
@@ -346,7 +347,8 @@
       "evidenceClaim": true,
       "agentModel": "private runner model",
       "agentCommand": "pi -p --no-session",
-      "environment": "isolated copy workspace; pi -p --no-session; batch allSettled/concurrency 3"
+      "environment": "isolated copy workspace; pi -p --no-session; batch allSettled/concurrency 3",
+      "receiptUrl": "/campaign/receipts/ph-20260626125000.public.json"
     },
     {
       "turn": 15,
