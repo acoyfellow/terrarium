@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { rm } from 'node:fs/promises';
+import { readFile, rm } from 'node:fs/promises';
 import { join } from 'node:path';
 import { existsSync } from 'node:fs';
 import { JOURNAL_DIR, MAILBOXES_DIR, SUBSCRIBERS_DIR, acknowledgeMailboxEvent, claimMailboxEvents, getMailboxStatus, pruneRouter, registerSubscriber, requeueInflightEvents, routeEvent, unregisterSubscriber } from '../src/router.js';
@@ -165,6 +165,24 @@ test('Pi wildcard run subscriptions do not receive unrelated callbacks', async (
     await unregisterSubscriber(piSubscriberId).catch(() => {});
     await unregisterSubscriber(pullSubscriberId).catch(() => {});
     await rm(join(JOURNAL_DIR, `${eventId}.json`), { force: true });
+  }
+});
+
+test('a subscriber owned by one run cannot be hijacked by another run', async () => {
+  const suffix = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+  const subscriberId = `sub_owned_${suffix}`;
+  const ownerRunId = `ter_owner_${suffix}`;
+  try {
+    await registerSubscriber({ subscriberId, ownerRunId, runIds: [ownerRunId] });
+    await assert.rejects(
+      registerSubscriber({ subscriberId, ownerRunId: `ter_attacker_${suffix}`, runIds: ['*'] }),
+      /subscriber is owned by another run/,
+    );
+    const stored = JSON.parse(await readFile(join(SUBSCRIBERS_DIR, `${subscriberId}.json`), 'utf8'));
+    assert.equal(stored.ownerRunId, ownerRunId);
+    assert.deepEqual(stored.runIds, [ownerRunId]);
+  } finally {
+    await unregisterSubscriber(subscriberId).catch(() => {});
   }
 });
 
