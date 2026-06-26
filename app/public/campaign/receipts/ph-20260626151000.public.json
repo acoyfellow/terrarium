@@ -1,0 +1,8 @@
+{
+  "iterationId": "ph-20260626151000",
+  "contentKind": "product-summary",
+  "evidenceClaim": true,
+  "evidenceRef": "terrarium-run:ter_20260626141247359_hq7kcl",
+  "title": "Batch cleanup coverage and doctor timestamp validation added",
+  "summary": "Run 16 added race/quorum cleanupTimeoutMs regression tests and hardened doctor diagnostics for malformed timestamps and acknowledged callback repair candidates. Targeted tests, build, and local smoke passed."
+}
