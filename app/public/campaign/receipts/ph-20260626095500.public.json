@@ -1,0 +1,8 @@
+{
+  "iterationId": "ph-20260626095500",
+  "contentKind": "product-summary",
+  "evidenceClaim": true,
+  "evidenceRef": "terrarium-run:ter_20260626093944446_5dnuof",
+  "title": "The page shows which receipt fields are public",
+  "summary": "The reconciler added a public receipt inspector that marks run ID, revision, finish time, fingerprint, and replay as recorded or missing instead of implying evidence from prose."
+}

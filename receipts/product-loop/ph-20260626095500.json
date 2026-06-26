@@ -1,0 +1,61 @@
+{
+  "schema": "terrarium.product-loop.receipt.v0.1",
+  "iterationId": "ph-20260626095500",
+  "intent": "make public evidence boundaries visible in the app",
+  "phases": [
+    "OBSERVE",
+    "SELECT",
+    "EXECUTE",
+    "VERIFY",
+    "RECORD",
+    "PUBLIC_SUMMARIZE",
+    "OPTIONAL_DEPLOY"
+  ],
+  "selectedWork": {
+    "kind": "presentation-hardening",
+    "reason": "The writing guide favors inspectable artifacts; the app should show public receipt fields directly instead of asking prose to carry evidence."
+  },
+  "childRuns": [
+    {
+      "runId": "ter_20260626093944446_5dnuof",
+      "status": "done",
+      "selected": true,
+      "summary": "Added public-safe receipt inspector with recorded/missing states."
+    }
+  ],
+  "health": {
+    "repoCleanAtStart": true,
+    "nodeCheckOk": true,
+    "productLoopValidateOk": true,
+    "buildOk": true,
+    "localSmokeOk": true
+  },
+  "commands": [
+    {
+      "command": "node --check app/src/main.js",
+      "ok": true
+    },
+    {
+      "command": "npm run product-loop:validate",
+      "ok": true
+    },
+    {
+      "command": "npm run demo:build",
+      "ok": true
+    },
+    {
+      "command": "npm run demo:smoke against local Vite",
+      "ok": true
+    }
+  ],
+  "publicSummary": {
+    "iterationId": "ph-20260626095500",
+    "contentKind": "product-summary",
+    "evidenceClaim": true,
+    "evidenceRef": "terrarium-run:ter_20260626093944446_5dnuof",
+    "title": "The page shows which receipt fields are public",
+    "summary": "The reconciler added a public receipt inspector that marks run ID, revision, finish time, fingerprint, and replay as recorded or missing instead of implying evidence from prose."
+  },
+  "canPublishStory": true,
+  "createdAt": "2026-06-26T09:50:54.413Z"
+}
