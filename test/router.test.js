@@ -176,13 +176,36 @@ test('a subscriber owned by one run cannot be hijacked by another run', async ()
     await registerSubscriber({ subscriberId, ownerRunId, runIds: [ownerRunId] });
     await assert.rejects(
       registerSubscriber({ subscriberId, ownerRunId: `ter_attacker_${suffix}`, runIds: ['*'] }),
-      /subscriber is owned by another run/,
+      /subscriber is owned by another run or controller/,
     );
     const stored = JSON.parse(await readFile(join(SUBSCRIBERS_DIR, `${subscriberId}.json`), 'utf8'));
     assert.equal(stored.ownerRunId, ownerRunId);
     assert.deepEqual(stored.runIds, [ownerRunId]);
   } finally {
-    await unregisterSubscriber(subscriberId).catch(() => {});
+    await unregisterSubscriber(subscriberId, { ownerRunId }).catch(() => {});
+  }
+});
+
+test('unowned controllers cannot adopt an owned subscriber or inspect and mutate its mailbox', async () => {
+  const suffix = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+  const subscriberId = `sub_private_${suffix}`;
+  const ownerRunId = `ter_private_${suffix}`;
+  const eventId = `evt_private_${suffix}`;
+  try {
+    await registerSubscriber({ subscriberId, ownerRunId, runIds: [ownerRunId] });
+    await routeEvent({ eventId, type: 'Completed', runId: ownerRunId, workflowId: 'w', channel: 'x', at: new Date().toISOString() });
+    await assert.rejects(registerSubscriber({ subscriberId, runIds: ['*'] }), /owned by another run or controller/);
+    await assert.rejects(claimMailboxEvents({ subscriberId }), /access denied/);
+    await assert.rejects(getMailboxStatus(subscriberId), /access denied/);
+    await assert.rejects(requeueInflightEvents({ subscriberId, olderThanMs: 0 }), /access denied/);
+    await assert.rejects(unregisterSubscriber(subscriberId), /access denied/);
+    assert.equal((await getMailboxStatus(subscriberId, { ownerRunId })).pending, 1);
+    const claimed = await claimMailboxEvents({ subscriberId, ownerRunId });
+    assert.deepEqual(claimed.events.map((event) => event.eventId), [eventId]);
+    await acknowledgeMailboxEvent({ subscriberId, eventId, ownerRunId });
+  } finally {
+    await unregisterSubscriber(subscriberId, { ownerRunId }).catch(() => {});
+    await rm(join(JOURNAL_DIR, `${eventId}.json`), { force: true });
   }
 });
 

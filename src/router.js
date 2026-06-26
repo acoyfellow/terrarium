@@ -44,7 +44,8 @@ export async function registerSubscriber(subscription) {
   const subscriberId = assertId(subscription.subscriberId, 'subscriber id');
   if (subscription.ownerRunId != null && !/^ter_[A-Za-z0-9_]+$/.test(subscription.ownerRunId)) throw new Error('invalid subscriber owner run id');
   let existing = null;
-  try { existing = await getSubscriber(subscriberId); } catch {}
+  try { existing = await getSubscriber(subscriberId); }
+  catch (error) { if (error.code !== 'ENOENT') throw error; }
   const mergeFilters = (requested, prior, fallback, { narrowWildcard = false } = {}) => {
     const next = boundedList(requested, fallback);
     if (!prior) return next;
@@ -54,8 +55,8 @@ export async function registerSubscriber(subscription) {
     return [...new Set([...previous, ...next])];
   };
   const ownerRunId = subscription.ownerRunId ?? existing?.ownerRunId ?? null;
-  if (existing?.ownerRunId && subscription.ownerRunId && existing.ownerRunId !== subscription.ownerRunId) {
-    throw new Error('subscriber is owned by another run');
+  if (existing && existing.ownerRunId !== (subscription.ownerRunId ?? null)) {
+    throw new Error('subscriber is owned by another run or controller');
   }
   const normalized = {
     version: 1,
@@ -89,8 +90,13 @@ export async function getSubscriber(subscriberId) {
   return JSON.parse(await readFile(join(SUBSCRIBERS_DIR, `${subscriberId}.json`), 'utf8'));
 }
 
-export async function unregisterSubscriber(subscriberId) {
+function assertSubscriberOwner(subscription, ownerRunId) {
+  if (subscription.ownerRunId !== (ownerRunId ?? null)) throw new Error('callback subscriber access denied');
+}
+
+export async function unregisterSubscriber(subscriberId, { ownerRunId } = {}) {
   assertId(subscriberId, 'subscriber id');
+  assertSubscriberOwner(await getSubscriber(subscriberId), ownerRunId);
   await Promise.all([
     rm(join(SUBSCRIBERS_DIR, `${subscriberId}.json`), { force: true }),
     rm(mailboxDirs(subscriberId).root, { recursive: true, force: true }),
@@ -158,7 +164,8 @@ export async function routeEvent(event) {
   return { eventId: id, duplicate: false, delivered };
 }
 
-export async function claimMailboxEvents({ subscriberId, limit = 20 } = {}) {
+export async function claimMailboxEvents({ subscriberId, limit = 20, ownerRunId } = {}) {
+  assertSubscriberOwner(await getSubscriber(subscriberId), ownerRunId);
   const dirs = mailboxDirs(subscriberId);
   await Promise.all([mkdir(dirs.pending, { recursive: true }), mkdir(dirs.inflight, { recursive: true })]);
   const files = (await readdir(dirs.pending)).filter((file) => file.endsWith('.json')).sort().slice(0, Math.min(Math.max(Number(limit) || 20, 1), 100));
@@ -175,7 +182,8 @@ export async function claimMailboxEvents({ subscriberId, limit = 20 } = {}) {
   return { subscriberId, events };
 }
 
-export async function acknowledgeMailboxEvent({ subscriberId, eventId: id } = {}) {
+export async function acknowledgeMailboxEvent({ subscriberId, eventId: id, ownerRunId } = {}) {
+  assertSubscriberOwner(await getSubscriber(subscriberId), ownerRunId);
   const dirs = mailboxDirs(subscriberId);
   assertId(id, 'event id');
   await mkdir(dirs.acked, { recursive: true });
@@ -188,13 +196,15 @@ export async function acknowledgeMailboxEvent({ subscriberId, eventId: id } = {}
   }
 }
 
-export async function getMailboxStatus(subscriberId) {
+export async function getMailboxStatus(subscriberId, { ownerRunId } = {}) {
+  assertSubscriberOwner(await getSubscriber(subscriberId), ownerRunId);
   const dirs = mailboxDirs(subscriberId);
   const count = async (dir) => { try { return (await readdir(dir)).filter((file) => file.endsWith('.json')).length; } catch { return 0; } };
   return { subscriberId, pending: await count(dirs.pending), inflight: await count(dirs.inflight), acknowledged: await count(dirs.acked) };
 }
 
-export async function requeueInflightEvents({ subscriberId, olderThanMs = 300000 } = {}) {
+export async function requeueInflightEvents({ subscriberId, olderThanMs = 300000, ownerRunId } = {}) {
+  assertSubscriberOwner(await getSubscriber(subscriberId), ownerRunId);
   const dirs = mailboxDirs(subscriberId);
   await Promise.all([mkdir(dirs.pending, { recursive: true }), mkdir(dirs.inflight, { recursive: true })]);
   const now = Date.now();
@@ -252,9 +262,9 @@ export async function pruneRouter({ acknowledgedOlderThanMs = 7 * 86400000, jour
       if (Array.isArray(subscriberIds) && !subscriberIds.includes(sub.subscriberId)) continue;
       const age = now - Date.parse(sub.createdAt || '');
       if (!Number.isFinite(age) || age < subscriberCutoff) continue;
-      const status = await getMailboxStatus(sub.subscriberId);
+      const status = await getMailboxStatus(sub.subscriberId, { ownerRunId: sub.ownerRunId });
       if (status.pending || status.inflight) continue;
-      await unregisterSubscriber(sub.subscriberId);
+      await unregisterSubscriber(sub.subscriberId, { ownerRunId: sub.ownerRunId });
       subscribersRemoved++;
     }
   } catch {}

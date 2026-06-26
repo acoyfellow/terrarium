@@ -1,0 +1,8 @@
+{
+  "iterationId": "ph-20260626124000",
+  "contentKind": "product-summary",
+  "evidenceClaim": true,
+  "evidenceRef": "terrarium-run:ter_20260626123317547_zsf0gn",
+  "title": "Callback mailbox ownership is enforced in router and MCP",
+  "summary": "A parallel attacker found that unowned controllers could inspect or mutate owned callback subscriber mailboxes. The integrated fix requires exact ownerRunId for registration and mailbox operations."
+}
