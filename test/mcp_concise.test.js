@@ -196,6 +196,9 @@ test("conciseListing returns count + per-run triage with task truncated", () => 
 test("conciseBatch preserves partial-launch, cleanup, and group correlation diagnostics", () => {
   const projected = conciseBatch({
     ok: false,
+    apiVersion: "terrarium-batch-test",
+    schemaVersion: "terrarium-batch-schema-test",
+    supportedOptions: ["cleanupTimeoutMs"],
     strategy: "allSettled",
     groupId: "grp_partial",
     runIds: ["ter_started"],
@@ -213,6 +216,9 @@ test("conciseBatch preserves partial-launch, cleanup, and group correlation diag
     },
   });
 
+  assert.equal(projected.apiVersion, "terrarium-batch-test");
+  assert.equal(projected.schemaVersion, "terrarium-batch-schema-test");
+  assert.deepEqual(projected.supportedOptions, ["cleanupTimeoutMs"]);
   assert.equal(projected.groupId, "grp_partial");
   assert.deepEqual(projected.runIds, ["ter_started"]);
   assert.equal(projected.launchError, "Pi wrapper rejected cancellation");

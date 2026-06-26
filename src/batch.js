@@ -1,5 +1,6 @@
 import { spawnTerrariumBackground, getRunStatus, cancelRun } from "./core.js";
 import { createRunGroup, getRunGroupStatus } from "./groups.js";
+import { BATCH_API_VERSION, BATCH_SUPPORTED_OPTIONS } from "./versions.js";
 
 export const BATCH_STRATEGIES = ["all", "allSettled", "race", "any", "quorum"];
 const TERMINAL = ["done", "failed", "inconclusive", "cancelled", "error", "orphaned", "missing"];
@@ -65,6 +66,9 @@ export async function spawnBatch(opts = {}) {
     const cleanupErrors = await cancelLosers(status, { collectErrors: true, maxWaitMs: Number(cleanupTimeoutMs) });
     return {
       ok: false,
+      apiVersion: BATCH_API_VERSION,
+      schemaVersion: BATCH_API_VERSION,
+      supportedOptions: BATCH_SUPPORTED_OPTIONS,
       strategy,
       groupId: group.groupId,
       runIds,
@@ -89,6 +93,9 @@ export async function spawnBatch(opts = {}) {
 
   return {
     ok: resolution.ok,
+    apiVersion: BATCH_API_VERSION,
+    schemaVersion: BATCH_API_VERSION,
+    supportedOptions: BATCH_SUPPORTED_OPTIONS,
     strategy,
     groupId: group.groupId,
     runIds,
