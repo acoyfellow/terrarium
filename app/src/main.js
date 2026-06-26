@@ -117,7 +117,7 @@ function bindViewer() {
 }
 
 function callbackContract() {
-  return `<section class="callback-contract"><div><span class="eyebrow">CURRENT MECHANISM</span><h2>Each run returns one correlated receipt.</h2><p>A parent starts one bounded run. Terrarium records its status and receipt, then delivers the terminal callback to the subscriber for that run ID.</p></div><ol><li><b>1</b><span>start one bounded child</span></li><li><b>2</b><span>record status and receipt</span></li><li><b>3</b><span>claim one terminal callback</span></li><li><b>4</b><span>notify the requesting session</span></li></ol><p class="callback-note">Callbacks contain correlation and status fields. They omit prompts, child output, local paths, and credentials.</p></section>`;
+  return `<section class="callback-contract"><div><span class="eyebrow">CURRENT MECHANISM</span><h2>Each run records one correlated result.</h2><p>A parent starts one bounded run. Terrarium records its status and result receipt. In Pi, the extension can claim the terminal callback for that run ID and notify the requesting session; other hosts use the pull API or status inspection.</p></div><ol><li><b>1</b><span>start one bounded child</span></li><li><b>2</b><span>record status and receipt</span></li><li><b>3</b><span>claim one terminal callback</span></li><li><b>4</b><span>notify or inspect from the host</span></li></ol><p class="callback-note">Callback events contain correlation and status fields. They omit prompts, child output, and local paths; credential handling still depends on the host environment.</p></section>`;
 }
 
 function campaignHeader() {
