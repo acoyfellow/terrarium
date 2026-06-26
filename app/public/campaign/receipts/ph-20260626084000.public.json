@@ -1,0 +1,8 @@
+{
+  "iterationId": "ph-20260626084000",
+  "contentKind": "product-summary",
+  "evidenceClaim": true,
+  "evidenceRef": "terrarium-run:ter_20260626082925166_fw5tok",
+  "title": "Doctor keeps working through malformed child claims",
+  "summary": "The reconciler integrated a verified doctor hardening change so malformed .children paths are skipped instead of crashing diagnostics."
+}
