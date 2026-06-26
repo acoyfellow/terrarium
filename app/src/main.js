@@ -6,7 +6,12 @@ let milestones = [];
 let active = 0;
 let campaignVersion = '';
 const app = document.querySelector('#app');
-const verdictLabel = (v) => v === 'verified-escape' ? 'verified escape' : v;
+const verdictLabel = (v) => v === 'verified-escape' ? 'verified finding' : v;
+const isProductCampaign = () => campaign?.kind === 'active-product-campaign';
+const turnStatusLabel = (t) => {
+  if (isProductCampaign()) return t.verdict === 'contained' ? 'CHANGE RECORDED' : verdictLabel(t.verdict).toUpperCase();
+  return t.verdict === 'contained' ? 'IT STAYED INSIDE' : verdictLabel(t.verdict).toUpperCase();
+};
 const runStamp = () => {
   const value = campaign?.updatedAt || campaign?.turns?.at(-1)?.finishedAt;
   return value ? `LAST RUN · ${new Date(value).toISOString().replace('.000Z', 'Z')}` : 'LAST RUN · NONE';
@@ -45,7 +50,7 @@ function buildMilestones() {
 }
 
 function runGraphic(t) {
-  return `<div class="run-evidence"><div class="run-orbit"><span></span><i></i></div><div class="run-facts"><span>WHAT WE RECORDED</span><b>${t.verdict === 'contained' ? 'IT STAYED INSIDE' : verdictLabel(t.verdict).toUpperCase()}</b><dl><div><dt>attempt fingerprint</dt><dd>${t.payloadHash ?? 'redacted'}</dd></div><div><dt>run id</dt><dd>${t.evidence?.executionId ?? 'recorded'}</dd></div><div><dt>version tested</dt><dd>${t.sourceRevision?.slice(0, 12) ?? 'recorded'}</dd></div><div><dt>re-checked fresh</dt><dd>${t.evidence?.independentReplay ? 'yes' : 'not needed'}</dd></div></dl></div></div>`;
+  return `<div class="run-evidence"><div class="run-orbit"><span></span><i></i></div><div class="run-facts"><span>WHAT WE RECORDED</span><b>${turnStatusLabel(t)}</b><dl><div><dt>attempt fingerprint</dt><dd>${t.payloadHash ?? 'redacted'}</dd></div><div><dt>run id</dt><dd>${t.evidence?.executionId ?? 'recorded'}</dd></div><div><dt>version tested</dt><dd>${t.sourceRevision?.slice(0, 12) ?? 'recorded'}</dd></div><div><dt>re-checked fresh</dt><dd>${t.evidence?.independentReplay ? 'yes' : 'not needed'}</dd></div></dl></div></div>`;
 }
 
 function evidenceGraphic(t) {
@@ -73,7 +78,7 @@ function detailPanel() {
   const t = turns[active];
   const proof = t.verdict === 'verified-escape' ? `<div class="proof"><b>Replay condition</b><p>${t.healing?.lesson ?? 'The finding counts only when the same probe produces the same boundary crossing in a fresh run.'}</p></div>` : '';
   const healing = t.verdict === 'verified-escape' && t.healing ? `<section class="healing"><div class="healing-head"><span>FOLLOW-UP</span><b>${t.healing.status}</b></div><h3>The finding became a regression test.</h3><ol><li><span>1</span><div><b>Detector fired</b><p>An external check recorded a boundary crossing.</p></div></li><li><span>2</span><div><b>Fresh replay matched</b><p>The same probe reproduced the result in another run.</p></div></li><li><span>3</span><div><b>Code changed</b><p>Revision ${t.healing.mergedRevision?.slice(0, 12) ?? 'recorded'} addressed the finding.</p></div></li><li><span>4</span><div><b>Regression ran</b><p>The receipt records the post-fix result.</p></div></li></ol><div class="code-links">${t.healing.issueUrl ? `<a href="${t.healing.issueUrl}" target="_blank" rel="noreferrer">inspect the finding</a>` : ''}${t.healing.mergedRevision ? `<a href="https://github.com/acoyfellow/terrarium/commit/${t.healing.mergedRevision}" target="_blank" rel="noreferrer">inspect the fix</a>` : ''}</div></section>` : '';
-  return `<figure class="visual ${t.verdict === 'verified-escape' ? 'evidence-visual' : ''}">${evidenceGraphic(t)}${t.imageUrl ? '<span class="editorial-label">ILLUSTRATION</span>' : ''}${t.verdict === 'verified-escape' ? '<span class="proven-badge">PROVEN TWICE · NOW FIXED</span>' : ''}<figcaption><span>ATTEMPT ${String(t.turn).padStart(3, '0')}</span><strong class="${t.verdict === 'verified-escape' ? 'danger' : ''}">${t.verdict === 'contained' ? 'stayed inside' : verdictLabel(t.verdict)}</strong></figcaption></figure>
+  return `<figure class="visual ${t.verdict === 'verified-escape' ? 'evidence-visual' : ''}">${evidenceGraphic(t)}${t.imageUrl ? '<span class="editorial-label">ILLUSTRATION</span>' : ''}${t.verdict === 'verified-escape' ? '<span class="proven-badge">REPRODUCED TWICE · NOW FIXED</span>' : ''}<figcaption><span>${isProductCampaign() ? 'TURN' : 'ATTEMPT'} ${String(t.turn).padStart(3, '0')}</span><strong class="${t.verdict === 'verified-escape' ? 'danger' : ''}">${isProductCampaign() && t.verdict === 'contained' ? 'change recorded' : t.verdict === 'contained' ? 'boundary held' : verdictLabel(t.verdict)}</strong></figcaption></figure>
     <article class="detail"><div class="eyebrow">${t.technique}</div><h2>${t.title}</h2><dl>
       <div><dt>Hypothesis</dt><dd>${t.hypothesis}</dd></div><div><dt>Method</dt><dd>${t.attempt}</dd></div><div><dt>Observed result</dt><dd>${t.result}</dd></div><div><dt>Next change</dt><dd>${t.adaptation}</dd></div>
     </dl>${replayProof(t)}${githubProof(t)}${proofPanel(t)}${proof}${healing}<div class="navbuttons"><button data-prev>Back</button><button data-jump-escape>Next reproduced finding</button><button data-next>Next turn</button></div></article>`;
@@ -82,7 +87,7 @@ function detailPanel() {
 function milestoneRail() {
   return milestones.map(({ t, i }) => `<button data-milestone="${i}" class="milestone${i === active ? ' active' : ''}${t.verdict === 'verified-escape' ? ' escape' : ''}">
     <span class="milestone-visual">${t.imageUrl ? `<img loading="lazy" src="${t.imageUrl}" alt="">` : t.verdict === 'verified-escape' ? `<span class="mini-evidence family-${t.family}"><i></i><i></i></span>` : `<span class="mini-run"><i></i><b>${String(t.turn).padStart(3, '0')}</b></span>`}</span>
-    <span class="milestone-copy"><small>${t.verdict === 'verified-escape' ? 'IT GOT OUT' : 'STAYED INSIDE'}</small><b>Attempt ${t.turn}</b><em>${t.technique}</em></span>
+    <span class="milestone-copy"><small>${isProductCampaign() ? 'CHANGE RECORDED' : t.verdict === 'verified-escape' ? 'BOUNDARY CROSSED' : 'BOUNDARY HELD'}</small><b>${isProductCampaign() ? 'Turn' : 'Attempt'} ${t.turn}</b><em>${t.technique}</em></span>
   </button>`).join('');
 }
 

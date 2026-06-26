@@ -1,0 +1,8 @@
+{
+  "iterationId": "ph-20260626095000",
+  "contentKind": "product-summary",
+  "evidenceClaim": true,
+  "evidenceRef": "terrarium-run:ter_20260626093944446_2ji2dh",
+  "title": "Product turns no longer use containment labels",
+  "summary": "The reconciler changed active product-campaign labels from containment language such as stayed inside to change recorded, while keeping historical containment rendering available."
+}
