@@ -1,0 +1,72 @@
+{
+  "schema": "terrarium.product-loop.receipt.v0.1",
+  "iterationId": "ph-20260626083200",
+  "intent": "classify Pi runner-busy failures as retryable runner failures",
+  "phases": [
+    "OBSERVE",
+    "SELECT",
+    "EXECUTE",
+    "VERIFY",
+    "RECORD",
+    "PUBLIC_SUMMARIZE",
+    "OPTIONAL_DEPLOY"
+  ],
+  "selectedWork": {
+    "kind": "runner-hardening",
+    "reason": "Repeated Pi-backed Terrarium children fail with runner-busy admission errors that should be surfaced as retryable runner failures instead of generic failures."
+  },
+  "childRuns": [
+    {
+      "runId": "ter_20260626082925166_q2rmoe",
+      "status": "done",
+      "selected": true,
+      "summary": "Implemented runner-busy classification with targeted coverage."
+    },
+    {
+      "runId": "ter_20260626082925166_fw5tok",
+      "status": "done",
+      "selected": false,
+      "summary": "Doctor malformed child-claim hardening candidate."
+    },
+    {
+      "runId": "ter_20260626082925166_ek7h96",
+      "status": "done",
+      "selected": false,
+      "summary": "Receipt summary validation candidate."
+    }
+  ],
+  "health": {
+    "repoCleanAtStart": true,
+    "buildOk": true,
+    "validationOk": true,
+    "targetedTestsOk": true
+  },
+  "commands": [
+    {
+      "command": "terrarium_spawn_batch x3 isolated copy children",
+      "ok": true
+    },
+    {
+      "command": "node --test --test-name-pattern='Pi runner-busy' test/basic.test.js",
+      "ok": true
+    },
+    {
+      "command": "npm run product-loop:validate",
+      "ok": true
+    },
+    {
+      "command": "npm run demo:build",
+      "ok": true
+    }
+  ],
+  "publicSummary": {
+    "iterationId": "ph-20260626083200",
+    "contentKind": "product-summary",
+    "evidenceClaim": true,
+    "evidenceRef": "terrarium-run:ter_20260626082925166_q2rmoe",
+    "title": "Pi runner-busy failures are retryable now",
+    "summary": "The reconciler selected the runner-busy child result and integrated a focused classifier so Pi admission failures are surfaced as retryable runner failures."
+  },
+  "canPublishStory": true,
+  "createdAt": "2026-06-26T08:31:31.907Z"
+}
