@@ -1,12 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { createSecureContainer, destroySecureContainer } from '../src/secure-container.js';
+import { createSecureContainer, destroySecureContainer, dockerAvailable } from '../src/secure-container.js';
 import { SecureWorkspace } from '../src/secure-workspace.js';
 
 const fixture = new URL('../fixtures/secure-agent-parser', import.meta.url).pathname;
 
-test('secure workspace edits a disposable copy, runs tests, and leaves host unchanged', { timeout: 60000 }, async () => {
+test('secure workspace edits a disposable copy, runs tests, and leaves host unchanged', { timeout: 60000 }, async (t) => {
+  if (!dockerAvailable()) return t.skip('Docker unavailable');
   const original = readFileSync(`${fixture}/parser.js`, 'utf8');
   const secure = createSecureContainer({ cwd: fixture });
   try {
@@ -24,4 +25,7 @@ test('secure workspace rejects traversal and protected writes before execution',
   const workspace = new SecureWorkspace('not-used');
   assert.throws(() => workspace.readFile({ path: '../secret' }), /invalid workspace path/);
   assert.throws(() => workspace.writeFile({ path: 'package-lock.json', content: '{}' }), /protected path/);
+  for (const path of ['.env', '.env.local', '.aws/credentials', 'nested/.ssh/id_rsa', '.docker/config.json', '.config/gcloud/credentials.db']) {
+    assert.throws(() => workspace.readFile({ path }), /credential path forbidden/);
+  }
 });

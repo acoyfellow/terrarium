@@ -1,4 +1,4 @@
-import { execFileSync } from "node:child_process";
+import { execFileSync, spawnSync } from "node:child_process";
 import { SECURE_PROFILE } from "./secure-profile.js";
 
 export function dockerAvailable() {
@@ -11,9 +11,17 @@ export function createSecureContainer({ cwd = process.cwd(), image = SECURE_PROF
   const args = ["run", "-d", "--name", container, "--network", "none", "--read-only", "--cap-drop", "ALL", "--security-opt", "no-new-privileges", "--pids-limit", String(SECURE_PROFILE.pids), "--memory", SECURE_PROFILE.memory, "--cpus", SECURE_PROFILE.cpus, "--user", SECURE_PROFILE.user, "--tmpfs", `/workspace:${SECURE_PROFILE.workspace},uid=65534,gid=65534`, "--tmpfs", `/tmp:${SECURE_PROFILE.tmp}`, "--workdir", "/workspace", image, "sh", "-lc", "sleep 3600"];
   execFileSync("docker", args, { stdio: "ignore" });
   try {
-    execFileSync("sh", ["-lc", `COPYFILE_DISABLE=1 tar --exclude=.git --exclude=node_modules --exclude=dist --exclude='._*' -C ${JSON.stringify(cwd)} -cf - . | docker exec -i --user 65534:65534 ${container} tar -xf - -C /workspace`], { stdio: "ignore", timeout: 60000 });
+    copyWorkspace(container, cwd);
   } catch (error) { try { execFileSync("docker", ["rm", "-f", container], { stdio: "ignore" }); } catch {} throw error; }
   return { container, cwd, sourceRevision: gitHead(cwd), startedAt: new Date().toISOString() };
+}
+
+function copyWorkspace(container, cwd) {
+  const excludes = [".git", "node_modules", "dist", ".env", ".env.*", ".npmrc", ".pypirc", ".netrc", ".aws", ".config/gcloud", ".docker/config.json", ".ssh", "._*"];
+  const archive = spawnSync("tar", [...excludes.flatMap((path) => ["--exclude", path]), "-C", cwd, "-cf", "-", "."], { encoding: null, maxBuffer: 256 * 1024 * 1024, timeout: 60000, env: { PATH: process.env.PATH ?? "", COPYFILE_DISABLE: "1" } });
+  if (archive.status !== 0 || !archive.stdout) throw new Error(String(archive.stderr || "workspace archive failed").trim());
+  const extract = spawnSync("docker", ["exec", "-i", "--user", "65534:65534", container, "tar", "-xf", "-", "-C", "/workspace", "--no-same-owner", "--no-same-permissions"], { input: archive.stdout, encoding: null, maxBuffer: 1024 * 1024, timeout: 60000 });
+  if (extract.status !== 0) throw new Error(String(extract.stderr || "workspace extraction failed").trim());
 }
 
 export function destroySecureContainer(container) {

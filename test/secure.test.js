@@ -14,7 +14,11 @@ test('secure-v1 is explicit, bounded, and never bind-mounts the host repo', () =
   assert.equal(SECURE_PROFILE.childBudget, 1);
   assert.ok(SECURE_PROFILE.timeoutMs > 0);
   assert.doesNotMatch(containerSource, /--mount|--volume|-v,/);
-  assert.match(containerSource, /docker exec -i.*tar -xf/);
+  assert.match(containerSource, /spawnSync\("tar"/);
+  assert.doesNotMatch(containerSource, /"sh", \["-lc"/);
+  assert.match(containerSource, /"\.env\.\*"/);
+  assert.match(containerSource, /"\.aws"/);
+  assert.match(containerSource, /"\.docker\/config\.json"/);
   assert.match(containerSource, /docker.*rm.*-f/s);
 });
 

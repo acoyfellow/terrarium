@@ -30,9 +30,15 @@ function auditPiOutput(output) {
   return { calls: unique, finalText: finalTexts.at(-1)?.slice(0, 1000) || "" };
 }
 
+const SAFE_PI_ENV = ["PATH", "HOME", "TMPDIR", "SHELL", "LANG", "LC_ALL", "TERM", "XDG_CONFIG_HOME", "XDG_CACHE_HOME", "XDG_DATA_HOME"];
+
+export function secureAgentEnv(source = process.env) {
+  return Object.fromEntries(SAFE_PI_ENV.filter((key) => typeof source[key] === "string").map((key) => [key, source[key]]));
+}
+
 function runPi(args, { timeoutMs }) {
   return new Promise((resolve, reject) => {
-    const child = spawn("pi", args, { stdio: ["ignore", "pipe", "pipe"], detached: true });
+    const child = spawn("pi", args, { stdio: ["ignore", "pipe", "pipe"], detached: true, env: secureAgentEnv() });
     let stdout = "", stderr = "", timedOut = false;
     const timer = setTimeout(() => { timedOut = true; killGroup(child, "SIGTERM"); }, timeoutMs);
     child.stdout.on("data", (d) => stdout += d);

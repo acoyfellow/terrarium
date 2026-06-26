@@ -249,20 +249,26 @@ test('doctor rejects Date.parse-only timestamps, malformed subscriber ids, and d
   }
 });
 
-test('doctor counts stale empty and missing child claims', async () => {
+test('doctor rejects malformed event ids and counts stale malformed child claims', async () => {
   const suffix = `${process.pid}_${Date.now()}_claims`;
   const claimsDir = `${LOG_DIR}/doctor-${suffix}.children`;
-  await mkdir(claimsDir, { recursive: true });
+  const malformedEventId = `evt.malformed.${suffix}`;
+  const journal = `${JOURNAL_DIR}/${malformedEventId}.json`;
+  const baseline = await diagnoseTerrarium();
+  await Promise.all([mkdir(claimsDir, { recursive: true }), mkdir(JOURNAL_DIR, { recursive: true })]);
   await Promise.all([
     writeFile(`${claimsDir}/empty`, ''),
     writeFile(`${claimsDir}/missing`, `ter_missing_${suffix}`),
+    writeFile(`${claimsDir}/malformed`, `../ter_${suffix}`),
+    writeFile(journal, JSON.stringify({ eventId: malformedEventId, type: 'Completed', runId: `ter_${suffix}`, at: '2020-01-01T00:00:00.000Z' })),
   ]);
   try {
     const result = await diagnoseTerrarium();
-    assert.ok(result.checks.staleChildClaims >= 2);
+    assert.equal(result.checks.malformedJournalEvents, baseline.checks.malformedJournalEvents + 1);
+    assert.ok(result.checks.staleChildClaims >= baseline.checks.staleChildClaims + 3);
     assert.ok(result.warnings.some((warning) => warning.includes('stale child-slot claim')));
   } finally {
-    await rm(claimsDir, { recursive: true, force: true });
+    await Promise.all([rm(claimsDir, { recursive: true, force: true }), rm(journal, { force: true })]);
   }
 });
 

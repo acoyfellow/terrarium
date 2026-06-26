@@ -300,6 +300,10 @@ async function workspaceExcludes() {
   return new Set([".git", "node_modules", ".next", "dist", "build", "target", "coverage", ".terrarium-workspace"]);
 }
 
+function workspaceMarker(run, isolation, extra = {}) {
+  return { runId: run.runId, isolation, ...extra };
+}
+
 export async function prepareWorkspace(run) {
   if (!run.isolation || run.isolation === "none") return null;
   await mkdir(WORKSPACE_DIR, { recursive: true });
@@ -313,7 +317,7 @@ export async function prepareWorkspace(run) {
       errorOnExist: false,
       filter: (src) => !excludes.has(basename(src)),
     });
-    await writeFile(join(workspacePath, ".terrarium-workspace"), JSON.stringify({ runId: run.runId, source: run.originalCwd, isolation: "copy" }, null, 2) + "\n");
+    await writeFile(join(workspacePath, ".terrarium-workspace"), JSON.stringify(workspaceMarker(run, "copy"), null, 2) + "\n");
     run.cwd = workspacePath;
     return { type: "copy", path: workspacePath, source: run.originalCwd, cleanup: !run.keepWorkspace };
   }
@@ -325,7 +329,7 @@ export async function prepareWorkspace(run) {
     await rm(workspacePath, { recursive: true, force: true });
     const r = await spawnCapture("git", ["worktree", "add", "-b", branch, workspacePath], { cwd: root });
     if (r.code !== 0) throw new Error(`git worktree add failed: ${r.stderr || r.stdout}`.trim());
-    await writeFile(join(workspacePath, ".terrarium-workspace"), JSON.stringify({ runId: run.runId, source: root, isolation: "worktree", branch }, null, 2) + "\n");
+    await writeFile(join(workspacePath, ".terrarium-workspace"), JSON.stringify(workspaceMarker(run, "worktree", { branch }), null, 2) + "\n");
     run.cwd = workspacePath;
     return { type: "worktree", path: workspacePath, source: root, branch, cleanup: !run.keepWorkspace };
   }
@@ -333,8 +337,8 @@ export async function prepareWorkspace(run) {
 }
 
 export async function capturePatch(workspacePath) {
-  await spawnCapture("git", ["add", "-A", "--", ":!.terrarium-workspace"], { cwd: workspacePath });
-  return await spawnCapture("git", ["diff", "--cached", "--binary"], { cwd: workspacePath });
+  await spawnCapture("git", ["add", "-A", "--", ":(exclude).terrarium-workspace", ":(exclude)**/.terrarium-workspace"], { cwd: workspacePath });
+  return await spawnCapture("git", ["diff", "--cached", "--binary", "--", ":(exclude).terrarium-workspace", ":(exclude)**/.terrarium-workspace"], { cwd: workspacePath });
 }
 
 export async function removeWorktree(workspace) {
@@ -475,15 +479,20 @@ async function emitCompletionEvent(result) {
     return routed;
 }
 
+const TASK_RESULT_MARKER = "TERRARIUM_RESULT=";
+const MAX_TASK_RESULT_LINE_BYTES = 16 * 1024;
+const TASK_RESULT_KEYS = new Set(["runId", "taskFingerprint", "nonce", "summary"]);
+
 export function validateTaskContractOutput(output, expected) {
   if (!expected) return { status: "not-required" };
-  const lines = String(output ?? "").split(/[\n\r\u2028\u2029]/).filter((value) => value.startsWith("TERRARIUM_RESULT="));
+  const lines = String(output ?? "").split(/[\n\r\u2028\u2029]/).filter((value) => value.startsWith(TASK_RESULT_MARKER));
   if (lines.length === 0) return { status: "missing" };
-  if (lines.length !== 1) return { status: "malformed" };
+  if (lines.length !== 1 || Buffer.byteLength(lines[0], "utf8") > MAX_TASK_RESULT_LINE_BYTES) return { status: "malformed" };
   let receipt;
-  try { receipt = JSON.parse(lines[0].slice("TERRARIUM_RESULT=".length)); }
+  try { receipt = JSON.parse(lines[0].slice(TASK_RESULT_MARKER.length)); }
   catch { return { status: "malformed" }; }
   if (!receipt || typeof receipt !== "object" || Array.isArray(receipt)) return { status: "malformed" };
+  if (Object.keys(receipt).some((key) => !TASK_RESULT_KEYS.has(key))) return { status: "malformed" };
   if (receipt.runId !== expected.runId || receipt.taskFingerprint !== expected.taskFingerprint || receipt.nonce !== expected.nonce) return { status: "mismatch" };
   if (typeof receipt.summary !== "string" || !receipt.summary.trim() || receipt.summary.length > 2000) return { status: "malformed" };
   return { status: "verified", summary: receipt.summary.trim() };
@@ -571,6 +580,7 @@ export async function reconcileRun(meta, { staleMs = 30000 } = {}) {
       note: `No live Terrarium child process found and log is stale${logAgeMs === null ? "" : ` (${Math.round(logAgeMs)}ms old)`}.`,
     };
     await writeMetadata(next);
+    try { await emitCompletionEvent(next); } catch {}
     return next;
   }
   const idleMs = now - Date.parse(meta.lastActivityAt || meta.startedAt || new Date(now).toISOString());
@@ -632,8 +642,21 @@ export async function cancelRun({ runId, requesterRunId, scope } = {}) {
   await writeFile(cancelMarkerPath(runId), `${new Date().toISOString()}\n`, { flag: "wx" }).catch((error) => { if (error.code !== "EEXIST") throw error; });
   const childPids = [...new Set([meta.childPid, meta.pid].filter(Boolean))];
   if (!isPidAlive(meta.supervisorPid) && !childPids.some(isPidAlive)) {
-    const settled = await reconcileRun(meta, { staleMs: 0 });
-    return { runId, status: settled.status, cancelled: settled.status === "cancelled", requestedAt: settled.finishedAt };
+    const settled = {
+      ...meta,
+      ok: false,
+      status: "cancelled",
+      exitCode: meta.exitCode ?? null,
+      signal: meta.signal ?? null,
+      taskContractStatus: meta.taskContractStatus === "pending" ? "not-applicable" : meta.taskContractStatus,
+      finishedAt: new Date().toISOString(),
+      note: "Cancellation recovered after the background supervisor exited before recording a child process.",
+    };
+    delete settled.taskContract;
+    await writeMetadata(settled);
+    await rm(cancelMarkerPath(runId), { force: true });
+    try { await emitCompletionEvent(settled); } catch {}
+    return { runId, status: settled.status, cancelled: true, requestedAt: settled.finishedAt };
   }
   // Never kill the supervisor directly: during the launch handoff it may be the
   // only process capable of observing the durable cancel marker and finalizing.

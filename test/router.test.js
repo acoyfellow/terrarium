@@ -279,6 +279,28 @@ test('prune skips mismatched ownership without aborting later controller mailbox
   }
 });
 
+test('route and concrete replay reject non-canonical callback timestamps', async () => {
+  const suffix = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+  const subscriberId = `sub_replay_bad_time_${suffix}`;
+  const eventId = `evt_replay_bad_time_${suffix}`;
+  const runId = `ter_replay_bad_time_${suffix}`;
+  const path = join(JOURNAL_DIR, `${eventId}.json`);
+  await mkdir(JOURNAL_DIR, { recursive: true });
+  try {
+    for (const at of ['not-a-date', '2020-01-01T00:00:00Z', '2020-01-01T01:00:00.000+01:00']) {
+      await assert.rejects(routeEvent({ eventId, type: 'Completed', runId, at }), /invalid callback event timestamp/);
+      assert.equal(existsSync(path), false);
+    }
+    await writeFile(path, JSON.stringify({ eventId, type: 'Completed', runId, at: '2020-01-01T00:00:00Z' }));
+    const subscription = await registerSubscriber({ subscriberId, runIds: [runId] });
+    assert.equal(subscription.replayed, 0);
+    assert.equal((await getMailboxStatus(subscriberId)).pending, 0);
+  } finally {
+    await unregisterSubscriber(subscriberId).catch(() => {});
+    await rm(path, { force: true });
+  }
+});
+
 test('malformed journal timestamps are retained rather than treated as stale', async () => {
   const suffix = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
   const eventId = `evt_bad_time_${suffix}`;

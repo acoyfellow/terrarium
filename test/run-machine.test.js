@@ -163,6 +163,36 @@ test('cancel recovers a dead launch supervisor with no child pid exactly once an
   }
 });
 
+test('orphan reconciliation emits its terminal callback exactly once', { timeout: 15000 }, async () => {
+  const suffix = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+  const runId = `ter_orphan_callback_${suffix}`;
+  const subscriberId = `sub_orphan_callback_${suffix}`;
+  const eventId = `evt_${runId}_Failed`;
+  const logPath = join(LOG_DIR, `${runId}.log`);
+  await mkdir(LOG_DIR, { recursive: true });
+  await writeFile(metadataPath(runId), JSON.stringify({
+    runId, parentRunId: process.env.TERRARIUM_RUN_ID || null, task: 'orphan callback reconciliation', taskFingerprint: 'deadbeef', status: 'running', ok: true,
+    background: true, pid: 2147483647, startedAt: new Date(0).toISOString(), lastActivityAt: new Date(0).toISOString(),
+    needsAttentionAfterMs: 60000, logPath, channel: 'test', workflowId: runId, taskContractStatus: 'pending',
+  }));
+  await registerSubscriber({ subscriberId, runIds: [runId], eventTypes: ['Failed'], channels: ['*'], workflowIds: ['*'] });
+  try {
+    const status = await getRunStatus({ runId, staleMs: 0 });
+    assert.equal(status.status, 'orphaned');
+    assert.equal(status.ok, false);
+    const claimed = await claimMailboxEvents({ subscriberId });
+    assert.deepEqual(claimed.events.map((event) => event.eventId), [eventId]);
+    assert.equal(claimed.events[0].status, 'orphaned');
+    await getRunStatus({ runId, staleMs: 0 });
+    assert.deepEqual((await claimMailboxEvents({ subscriberId })).events, []);
+  } finally {
+    await unregisterSubscriber(subscriberId).catch(() => {});
+    await rm(join(JOURNAL_DIR, `${eventId}.json`), { force: true });
+    await rm(metadataPath(runId), { force: true });
+    await rm(logPath, { force: true });
+  }
+});
+
 test('callback channel follows the parent caller rather than the child cwd', { timeout: 15000 }, async () => {
   const suffix = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
   const runId = `ter_parent_channel_${suffix}`;

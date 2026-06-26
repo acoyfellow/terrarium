@@ -179,7 +179,7 @@ async function replayJournalToSubscriber(subscription, { concreteRuns = false } 
   let replayed = 0;
   for (const file of (await readdir(JOURNAL_DIR)).filter((name) => name.endsWith('.json')).sort()) {
     let event; try { event = sanitizeCallbackEvent(JSON.parse(await readFile(join(JOURNAL_DIR, file), 'utf8'))); } catch { continue; }
-    if (!TERMINAL_EVENT_TYPES.includes(event.type) || !matches(subscription, event)) continue;
+    if (!isValidCallbackEvent(event, file.slice(0, -5), { state: 'pending' }) || !matches(subscription, event)) continue;
     if (await enqueueEvent(subscription.subscriberId, event)) replayed++;
   }
   return replayed;
@@ -188,6 +188,7 @@ async function replayJournalToSubscriber(subscription, { concreteRuns = false } 
 export async function routeEvent(event) {
   const id = eventId(event);
   const routed = sanitizeCallbackEvent({ ...event, eventId: id });
+  if (!validTimestamp(routed.at)) throw new Error('invalid callback event timestamp');
   await mkdir(JOURNAL_DIR, { recursive: true });
   try { await writeFile(join(JOURNAL_DIR, `${id}.json`), `${JSON.stringify(routed)}\n`, { flag: 'wx' }); }
   catch (error) { if (error.code === 'EEXIST') return { eventId: id, duplicate: true, delivered: 0 }; throw error; }

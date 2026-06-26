@@ -15,6 +15,10 @@ Succinct, product-facing changes to Terrarium. This is not a full commit log; it
 - Hardened doctor diagnostics: malformed subscriber/callback timestamps are reported, and malformed acknowledged callbacks are included in router repair candidates.
 - Added `terra batch --cleanup-timeout-ms` and test coverage for the corresponding MCP schema field.
 - Aligned router and doctor timestamp validation on canonical UTC timestamps and subscriber ID validation so malformed callback records fail closed consistently.
+- Made task receipts an exact four-field contract and capped `TERRARIUM_RESULT=` marker lines at 16 KiB.
+- Emitted terminal callbacks when stale running records reconcile to `orphaned`.
+- Removed source paths from workspace isolation markers and excluded nested `.terrarium-workspace` files from captured patches.
+- Hardened secure workspace boundaries: shell-free archive transfer, credential path filtering, and a non-provider secure-agent environment allowlist.
 
 ## 2026-06-26
 
