@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { conciseListing, conciseSpawn, conciseStatus } from "../src/mcp.js";
+import { conciseBatch, conciseListing, conciseSpawn, conciseStatus } from "../src/mcp.js";
 
 const MCP_PATH = fileURLToPath(new URL("../src/mcp.js", import.meta.url));
 
@@ -191,6 +191,36 @@ test("conciseListing returns count + per-run triage with task truncated", () => 
   assert.equal(projected.runs[2].orphanedAt, "t6");
   assert.equal(projected.version, undefined);
   assert.equal(projected.logDir, undefined);
+});
+
+test("conciseBatch preserves partial-launch, cleanup, and group correlation diagnostics", () => {
+  const projected = conciseBatch({
+    ok: false,
+    strategy: "allSettled",
+    groupId: "grp_partial",
+    runIds: ["ter_started"],
+    reason: "launch-failed",
+    launchError: "Pi wrapper rejected cancellation",
+    launchErrors: ["Pi wrapper rejected cancellation", "child budget exceeded"],
+    launchedCount: 1,
+    unlaunchedCount: 2,
+    cleanupErrors: ["ter_started: cancellation settlement failed"],
+    group: {
+      groupId: "grp_partial",
+      counts: { cancelled: 1 },
+      complete: true,
+      runs: [{ runId: "ter_started", status: "cancelled", ok: false }],
+    },
+  });
+
+  assert.equal(projected.groupId, "grp_partial");
+  assert.deepEqual(projected.runIds, ["ter_started"]);
+  assert.equal(projected.launchError, "Pi wrapper rejected cancellation");
+  assert.deepEqual(projected.launchErrors, ["Pi wrapper rejected cancellation", "child budget exceeded"]);
+  assert.equal(projected.launchedCount, 1);
+  assert.equal(projected.unlaunchedCount, 2);
+  assert.deepEqual(projected.cleanupErrors, ["ter_started: cancellation settlement failed"]);
+  assert.equal(projected.runs[0].runId, projected.runIds[0]);
 });
 
 function rpcCall(args, { extraInit = false } = {}) {

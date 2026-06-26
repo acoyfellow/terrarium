@@ -210,7 +210,7 @@ export async function claimMailboxEvents({ subscriberId, limit = 20, ownerRunId 
         await rename(target, join(dirs.pending, file)).catch(() => {});
         continue;
       }
-      if (!isValidCallbackEvent(parsed, file.slice(0, -5))) {
+      if (!isValidCallbackEvent(parsed, file.slice(0, -5), { state: 'pending' })) {
         await rename(target, join(dirs.pending, file)).catch(() => {});
         continue;
       }
@@ -229,6 +229,10 @@ export async function acknowledgeMailboxEvent({ subscriberId, eventId: id, owner
   await mkdir(dirs.acked, { recursive: true });
   const source = join(dirs.inflight, `${id}.json`);
   const target = join(dirs.acked, `${id}.json`);
+  if (existsSync(source)) {
+    let event; try { event = JSON.parse(await readFile(source, 'utf8')); } catch { throw new Error(`event is not inflight: ${id}`); }
+    if (!isValidCallbackEvent(event, id, { state: 'claimed' })) throw new Error(`event is not inflight: ${id}`);
+  }
   try { await rename(source, target); return { subscriberId, eventId: id, acknowledged: true }; }
   catch (error) {
     if (error.code === 'ENOENT' && existsSync(target)) return { subscriberId, eventId: id, acknowledged: true, duplicate: true };
@@ -239,16 +243,16 @@ export async function acknowledgeMailboxEvent({ subscriberId, eventId: id, owner
 export async function getMailboxStatus(subscriberId, { ownerRunId } = {}) {
   assertSubscriberOwner(await getSubscriber(subscriberId), ownerRunId);
   const dirs = mailboxDirs(subscriberId);
-  const countValidEvents = async (dir) => {
+  const countValidEvents = async (dir, state) => {
     let count = 0;
     let files = []; try { files = (await readdir(dir)).filter((file) => file.endsWith('.json')); } catch { return 0; }
     for (const file of files) {
       let event; try { event = JSON.parse(await readFile(join(dir, file), 'utf8')); } catch { continue; }
-      if (isValidCallbackEvent(event, file.slice(0, -5))) count++;
+      if (isValidCallbackEvent(event, file.slice(0, -5), { state })) count++;
     }
     return count;
   };
-  return { subscriberId, pending: await countValidEvents(dirs.pending), inflight: await countValidEvents(dirs.inflight), acknowledged: await countValidEvents(dirs.acked) };
+  return { subscriberId, pending: await countValidEvents(dirs.pending, 'pending'), inflight: await countValidEvents(dirs.inflight, 'claimed'), acknowledged: await countValidEvents(dirs.acked, 'claimed') };
 }
 
 export async function requeueInflightEvents({ subscriberId, olderThanMs = 300000, ownerRunId } = {}) {
@@ -262,7 +266,12 @@ export async function requeueInflightEvents({ subscriberId, olderThanMs = 300000
     if (!isValidCallbackEvent(event, file.slice(0, -5), { state: 'claimed' })) continue;
     const age = now - Date.parse(event.claimedAt);
     if (age < Math.max(0, Number(olderThanMs) || 0)) continue;
-    try { await rename(join(dirs.inflight, file), join(dirs.pending, file)); requeued++; } catch (error) { if (error.code !== 'ENOENT') throw error; }
+    const pendingEvent = sanitizeCallbackEvent(event);
+    try {
+      await atomicJson(join(dirs.inflight, file), pendingEvent);
+      await rename(join(dirs.inflight, file), join(dirs.pending, file));
+      requeued++;
+    } catch (error) { if (error.code !== 'ENOENT') throw error; }
   }
   return { subscriberId, requeued };
 }
@@ -308,6 +317,7 @@ export async function pruneRouter({ acknowledgedOlderThanMs = 7 * 86400000, jour
     for (const file of (await readdir(JOURNAL_DIR)).filter((name) => name.endsWith('.json'))) {
       if (Array.isArray(eventIds) && !eventIds.includes(file.slice(0, -5))) continue;
       let event; try { event = JSON.parse(await readFile(join(JOURNAL_DIR, file), 'utf8')); } catch { continue; }
+      if (!isValidCallbackEvent(event, file.slice(0, -5), { state: 'pending' })) continue;
       const age = now - Date.parse(event.at || '');
       if (Number.isFinite(age) && age >= Math.max(0, Number(journalOlderThanMs) || 0)) { await rm(join(JOURNAL_DIR, file), { force: true }); journalRemoved++; }
     }
