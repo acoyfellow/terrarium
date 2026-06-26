@@ -78,6 +78,25 @@ test('allSettled timeout bounds synchronous cancellation settlement for client t
   }
 });
 
+test('race: small cleanup timeout returns a durable result instead of throwing during loser cleanup', { timeout: 45000 }, async () => {
+  const started = Date.now();
+  const r = await spawnBatch({
+    jobs: [job(ok()), job(slow(35000))],
+    strategy: 'race',
+    pollMs: 10,
+    cleanupTimeoutMs: 0,
+  });
+
+  assert.ok(Date.now() - started < 2000, 'race must not block on loser settlement');
+  assert.equal(r.ok, true);
+  assert.equal(r.reason, 'race-winner');
+  assert.match(r.groupId, /^grp_/);
+  assert.equal(r.runIds.length, 2);
+  assert.ok(Array.isArray(r.cleanupErrors));
+  assert.ok(r.cleanupErrors.length <= 1);
+  if (r.cleanupErrors.length) assert.match(r.cleanupErrors[0], /run did not become terminal after cancellation/);
+});
+
 test('any: first success wins and losers are cancelled', { timeout: 45000 }, async () => {
   const r = await spawnBatch({ jobs: [job(slow(8000)), job(ok()), job(slow(8000))], strategy: 'any', pollMs: 100 });
   assert.equal(r.ok, true);
@@ -104,6 +123,26 @@ test('quorum: resolves when k successes reached, cancels the rest', { timeout: 4
   const status = await getRunGroupStatus({ groupId: r.groupId });
   assert.equal(status.counts.running, 0);
   assert.ok(Array.isArray(r.cleanupErrors));
+});
+
+test('quorum: small cleanup timeout returns a durable result instead of throwing during loser cleanup', { timeout: 45000 }, async () => {
+  const started = Date.now();
+  const r = await spawnBatch({
+    jobs: [job(ok()), job(slow(35000))],
+    strategy: 'quorum',
+    quorum: 1,
+    pollMs: 10,
+    cleanupTimeoutMs: 0,
+  });
+
+  assert.ok(Date.now() - started < 2000, 'quorum must not block on loser settlement');
+  assert.equal(r.ok, true);
+  assert.equal(r.reason, 'quorum-reached');
+  assert.match(r.groupId, /^grp_/);
+  assert.equal(r.runIds.length, 2);
+  assert.ok(Array.isArray(r.cleanupErrors));
+  assert.ok(r.cleanupErrors.length <= 1);
+  if (r.cleanupErrors.length) assert.match(r.cleanupErrors[0], /run did not become terminal after cancellation/);
 });
 
 test('concurrency holds a slot until the active run is terminal', { timeout: 45000 }, async () => {

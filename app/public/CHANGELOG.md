@@ -12,6 +12,7 @@ Succinct, product-facing changes to Terrarium. This is not a full commit log; it
 - Normalized missing callback subscribers to the same concise denial as inaccessible subscribers.
 - Bounded synchronous batch cancellation settlement with `cleanupTimeoutMs` (default 5 seconds), preserving durable IDs and `cleanupErrors` before MCP client request deadlines.
 - Made product-loop public summaries an exact schema: unknown fields, malformed IDs/kinds, non-boolean evidence claims, multiline/padded prose, and evidence references on non-claims are rejected.
+- Hardened doctor diagnostics: malformed subscriber/callback timestamps are reported, and malformed acknowledged callbacks are included in router repair candidates.
 
 ## 2026-06-26
 

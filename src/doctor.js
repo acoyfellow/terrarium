@@ -26,8 +26,9 @@ const SUBSCRIBER_KEYS = new Set(["version", "subscriberId", "channels", "workflo
 const CALLBACK_KEYS = new Set(["type", "eventId", "runId", "parentRunId", "taskFingerprint", "workflowId", "sessionId", "channel", "at", "status", "ok", "exitCode", "signal", "dryRun", "claimedAt"]);
 const TERMINAL_TYPES = new Set(["Completed", "Failed", "TimedOut", "Cancelled"]);
 const hasOnlyKeys = (value, keys) => value && typeof value === "object" && !Array.isArray(value) && Object.keys(value).every((key) => keys.has(key));
-const validSubscriber = (value, file) => hasOnlyKeys(value, SUBSCRIBER_KEYS) && value.subscriberId === file.slice(0, -5) && Object.hasOwn(value, "ownerRunId") && validOwner(value.ownerRunId);
-const validEvent = (value, file) => hasOnlyKeys(value, CALLBACK_KEYS) && value.eventId === file.slice(0, -5) && TERMINAL_TYPES.has(value.type) && typeof value.runId === "string";
+const validTimestamp = (value) => typeof value === "string" && Number.isFinite(Date.parse(value));
+const validSubscriber = (value, file) => hasOnlyKeys(value, SUBSCRIBER_KEYS) && value.subscriberId === file.slice(0, -5) && Object.hasOwn(value, "ownerRunId") && validOwner(value.ownerRunId) && validTimestamp(value.createdAt) && validTimestamp(value.updatedAt);
+const validEvent = (value, file) => hasOnlyKeys(value, CALLBACK_KEYS) && value.eventId === file.slice(0, -5) && TERMINAL_TYPES.has(value.type) && typeof value.runId === "string" && validTimestamp(value.at);
 const validPendingEvent = (value, file) => validEvent(value, file) && !Object.hasOwn(value, "claimedAt");
 const validClaimedEvent = (value, file) => validEvent(value, file) && Object.hasOwn(value, "claimedAt") && Number.isFinite(Date.parse(value.claimedAt));
 async function mailboxHealth(path, validate) {
@@ -89,7 +90,7 @@ export async function diagnoseTerrarium() {
       checks.malformedInflightCallbacks += inflight.malformed;
       checks.acknowledgedCallbacks += acknowledged.valid;
       checks.malformedAcknowledgedCallbacks += acknowledged.malformed;
-      checks.routerRepairCandidates += pending.malformed + inflight.malformed;
+      checks.routerRepairCandidates += pending.malformed + inflight.malformed + acknowledged.malformed;
       try {
         for (const file of (await readdir(`${MAILBOXES_DIR}/${subscriber}/inflight`)).filter((name) => name.endsWith('.json'))) {
           let event; try { event = JSON.parse(await readFile(`${MAILBOXES_DIR}/${subscriber}/inflight/${file}`, 'utf8')); } catch { continue; }
