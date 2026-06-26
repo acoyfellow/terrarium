@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { existsSync } from 'node:fs';
-import { JOURNAL_DIR, MAILBOXES_DIR, SUBSCRIBERS_DIR, acknowledgeMailboxEvent, claimMailboxEvents, getMailboxStatus, pruneRouter, registerSubscriber, requeueInflightEvents, routeEvent, unregisterSubscriber } from '../src/router.js';
+import { JOURNAL_DIR, MAILBOXES_DIR, SUBSCRIBERS_DIR, acknowledgeMailboxEvent, claimMailboxEvents, getMailboxStatus, getSubscriber, pruneRouter, registerSubscriber, requeueInflightEvents, routeEvent, unregisterSubscriber } from '../src/router.js';
 
 test('callbacks route, deduplicate, claim, and acknowledge exactly once', async () => {
   const suffix = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
@@ -332,6 +332,38 @@ test('claim rejects structurally valid mailbox payloads containing non-allowlist
     assert.equal(existsSync(pending), true);
   } finally {
     await unregisterSubscriber(subscriberId).catch(() => {});
+  }
+});
+
+test('claimed callback validation accepts only claimedAt beyond the routed allowlist', async () => {
+  const suffix = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+  const subscriberId = `sub_claimed_allowlist_${suffix}`;
+  const eventId = `evt_claimed_allowlist_${suffix}`;
+  const inflight = join(MAILBOXES_DIR, subscriberId, 'inflight', `${eventId}.json`);
+  try {
+    await registerSubscriber({ subscriberId, runIds: ['*'] });
+    await writeFile(inflight, JSON.stringify({ eventId, type: 'Completed', runId: `ter_${suffix}`, at: '2020-01-01T00:00:00.000Z', claimedAt: '2020-01-01T00:00:00.000Z', privateMetadata: 'secret' }));
+    assert.equal((await requeueInflightEvents({ subscriberId, olderThanMs: 0 })).requeued, 0);
+    assert.equal((await pruneRouter({ callbackOlderThanMs: 0, subscriberIds: [subscriberId], eventIds: [eventId] })).inflightRemoved, 0);
+    assert.equal(existsSync(inflight), true);
+    await writeFile(inflight, JSON.stringify({ eventId, type: 'Completed', runId: `ter_${suffix}`, at: '2020-01-01T00:00:00.000Z', claimedAt: '2020-01-01T00:00:00.000Z' }));
+    assert.equal((await requeueInflightEvents({ subscriberId, olderThanMs: 0 })).requeued, 1);
+  } finally {
+    await unregisterSubscriber(subscriberId).catch(() => {});
+  }
+});
+
+test('subscriber records with private fields fail closed before owner checks', async () => {
+  const suffix = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+  const subscriberId = `sub_private_record_${suffix}`;
+  await mkdir(SUBSCRIBERS_DIR, { recursive: true });
+  try {
+    await writeFile(join(SUBSCRIBERS_DIR, `${subscriberId}.json`), JSON.stringify({ subscriberId, ownerRunId: `ter_owner_${suffix}`, runIds: ['*'], privateMetadata: 'secret' }));
+    await assert.rejects(getSubscriber(subscriberId), /invalid callback subscriber record/);
+    await assert.rejects(claimMailboxEvents({ subscriberId, ownerRunId: `ter_owner_${suffix}` }), /invalid callback subscriber record/);
+  } finally {
+    await rm(join(MAILBOXES_DIR, subscriberId), { recursive: true, force: true });
+    await rm(join(SUBSCRIBERS_DIR, `${subscriberId}.json`), { force: true });
   }
 });
 

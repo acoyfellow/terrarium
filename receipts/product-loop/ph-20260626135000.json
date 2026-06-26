@@ -1,0 +1,86 @@
+{
+  "schema": "terrarium.product-loop.receipt.v0.1",
+  "iterationId": "ph-20260626135000",
+  "intent": "parallel attacker run 8 against batch reliability, cancellation handoff, secure workspace artifacts, receipt/evidence references, callback privacy, and MCP group lineage",
+  "phases": [
+    "OBSERVE",
+    "BATCH_ATTACK",
+    "SELECT",
+    "EXECUTE",
+    "VERIFY",
+    "RECORD",
+    "LOCAL_TABLE_UPDATE"
+  ],
+  "selectedWork": {
+    "kind": "callback-receipt-group-hardening",
+    "reason": "Three verified non-conflicting fixes passed targeted parent tests."
+  },
+  "childRuns": [
+    {
+      "runId": "ter_20260626131958601_k7dghz",
+      "status": "done",
+      "selected": false,
+      "summary": "Child found partial-launch and concise cleanupErrors candidates. Not integrated this pass."
+    },
+    {
+      "runId": "ter_20260626131958601_o9bkgx",
+      "status": "done",
+      "selected": false,
+      "summary": "Child produced another cancel-handoff patch. Not integrated this pass."
+    },
+    {
+      "runId": "ter_20260626131958601_6stw39",
+      "status": "done",
+      "selected": false,
+      "summary": "Child produced secure workspace artifact-boundary patch. Not integrated this pass."
+    },
+    {
+      "runId": "ter_20260626132213458_jyna9b",
+      "status": "done",
+      "selected": true,
+      "summary": "Integrated stricter public evidenceRef validation and receipt edge-case tests."
+    },
+    {
+      "runId": "ter_20260626132213458_j6am6k",
+      "status": "done",
+      "selected": true,
+      "summary": "Integrated state-specific callback validation, strict subscriber records, and narrowed MCP callback arguments."
+    },
+    {
+      "runId": "ter_20260626132213458_sza98x",
+      "status": "done",
+      "selected": true,
+      "summary": "Integrated immediate fail-closed handling for inaccessible group members while preserving genuine missing records."
+    }
+  ],
+  "health": {
+    "routerTestsOk": true,
+    "basicTestsOk": true,
+    "productLoopValidateOk": true,
+    "mcpScopeTestsOk": true,
+    "groupsTestsOk": true,
+    "buildOk": true,
+    "localSmokeOk": true
+  },
+  "commands": [
+    {
+      "command": "terrarium_spawn_batch allSettled concurrency 3 plus continuation for six attacker jobs",
+      "ok": false,
+      "note": "first batch still hit cancellation wait; continuation timed out at tool layer but durable runs completed"
+    },
+    {
+      "command": "node --test test/router.test.js test/basic.test.js test/product-loop.test.js test/mcp_scope.test.js test/groups.test.js",
+      "ok": true
+    }
+  ],
+  "publicSummary": {
+    "iterationId": "ph-20260626135000",
+    "contentKind": "product-summary",
+    "evidenceClaim": true,
+    "evidenceRef": "terrarium-run:ter_20260626132213458_j6am6k",
+    "title": "Callback records are state-specific; public evidence refs are narrower",
+    "summary": "Run 8 integrated callback state-specific validation, stricter subscriber records and MCP callback argument narrowing, immediate group access denial, and public evidenceRef traversal/URL rejection."
+  },
+  "canPublishStory": true,
+  "createdAt": "2026-06-26T13:24:34.834Z"
+}

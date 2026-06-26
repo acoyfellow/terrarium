@@ -390,7 +390,10 @@ async function handle(msg) {
         }
         const subscription = await getSubscriber(args.subscriberId);
         if (subscription.ownerRunId !== policy.requesterRunId) throw new Error("callback subscriber access denied");
-        const ownedArgs = { ...args, ownerRunId: policy.requesterRunId };
+        const ownedArgs = { subscriberId: args.subscriberId, ownerRunId: policy.requesterRunId };
+        if (args.action === "claim" && args.limit !== undefined) ownedArgs.limit = args.limit;
+        if (args.action === "ack" && args.eventId !== undefined) ownedArgs.eventId = args.eventId;
+        if (args.action === "requeue" && args.olderThanMs !== undefined) ownedArgs.olderThanMs = args.olderThanMs;
         if (args.action === "claim") return send(msg.id, content(await claimMailboxEvents(ownedArgs)));
         if (args.action === "ack") return send(msg.id, content(await acknowledgeMailboxEvent(ownedArgs)));
         if (args.action === "status") return send(msg.id, content(await getMailboxStatus(args.subscriberId, ownedArgs)));

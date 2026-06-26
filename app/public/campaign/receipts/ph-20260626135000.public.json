@@ -1,0 +1,8 @@
+{
+  "iterationId": "ph-20260626135000",
+  "contentKind": "product-summary",
+  "evidenceClaim": true,
+  "evidenceRef": "terrarium-run:ter_20260626132213458_j6am6k",
+  "title": "Callback records are state-specific; public evidence refs are narrower",
+  "summary": "Run 8 integrated callback state-specific validation, stricter subscriber records and MCP callback argument narrowing, immediate group access denial, and public evidenceRef traversal/URL rejection."
+}

@@ -112,6 +112,29 @@ test('child MCP group status does not leak aggregate completion or ok through in
   }
 });
 
+test('group status/read/cancel deny mixed missing and inaccessible membership without leaking partial output', async () => {
+  const owner = await runTerrarium({ task: 'mixed group owner', dryRun: true, stream: false });
+  const sibling = await runTerrarium({ task: 'mixed group sibling', dryRun: true, stream: false });
+  const missingRunId = `ter_${'e'.repeat(20)}`;
+  const groupId = `grp_mixed_scope_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+  const groupsDir = join(process.env.TERRARIUM_HOME || join(process.env.HOME, '.terrarium'), 'groups');
+  const groupPath = join(groupsDir, `${groupId}.json`);
+  writeFileSync(groupPath, JSON.stringify({ version: 1, groupId, label: 'mixed', runIds: [owner.runId, missingRunId, sibling.runId], createdAt: new Date().toISOString() }));
+  try {
+    const env = { TERRARIUM_RUN_ID: owner.runId, TERRARIUM_ALLOW_SPAWN: 'false', TERRARIUM_STATUS_SCOPE: 'self', TERRARIUM_READ_SCOPE: 'self' };
+    const { responses } = await rpc(['status', 'read', 'cancel'].map((action, index) => ({
+      jsonrpc: '2.0', id: index + 1, method: 'tools/call', params: { name: 'terrarium_group', arguments: { action, groupId } },
+    })), env);
+    for (const response of responses) {
+      const text = toolText(response);
+      assert.match(text, /group access denied/);
+      assert.doesNotMatch(text, new RegExp(`${owner.runId}|${sibling.runId}|${missingRunId}|"counts"|"cancelled"`));
+    }
+  } finally {
+    rmSync(groupPath, { force: true });
+  }
+});
+
 test('MCP group status is concise by default and verbose only on request', async () => {
   const a = await runTerrarium({ task: 'concise group member', dryRun: true, stream: false });
   const groupId = `grp_concise_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;

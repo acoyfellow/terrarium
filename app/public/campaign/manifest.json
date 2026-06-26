@@ -5,10 +5,10 @@
   "backend": "local-content-loop",
   "status": "active",
   "synthetic": false,
-  "updatedAt": "2026-06-26T13:40:00.000Z",
+  "updatedAt": "2026-06-26T13:50:00.000Z",
   "counts": {
-    "total": 47,
-    "contained": 45,
+    "total": 53,
+    "contained": 51,
     "escapes": 0
   },
   "turns": [
@@ -1119,6 +1119,147 @@
       "agentModel": "private runner model",
       "agentCommand": "pi -p --no-session",
       "environment": "isolated copy workspace; pi -p --no-session; first batch launched after slot freed"
+    },
+    {
+      "turn": 48,
+      "round": 11,
+      "family": "batch-api",
+      "title": "Partial batch launch correlation remains separate work",
+      "technique": "batch-api",
+      "hypothesis": "Probe allSettled timeout, any/quorum loser cleanup, partial launch correlation, concise MCP projection of cleanupErrors.",
+      "attempt": "Probe allSettled timeout, any/quorum loser cleanup, partial launch correlation, concise MCP projection of cleanupErrors.",
+      "result": "Child found partial-launch and concise cleanupErrors candidates. Not integrated this pass.",
+      "adaptation": "Review after cancellation handoff fix lands.",
+      "verdict": "contained",
+      "imageUrl": null,
+      "finishedAt": "2026-06-26T13:50:00.000Z",
+      "evidence": {
+        "executionId": "terrarium-run:ter_20260626131958601_k7dghz",
+        "independentReplay": false
+      },
+      "contentKind": "product-summary",
+      "evidenceClaim": true,
+      "agentModel": "private runner model",
+      "agentCommand": "pi -p --no-session",
+      "environment": "isolated copy workspace; pi -p --no-session; batch allSettled/concurrency 3"
+    },
+    {
+      "turn": 49,
+      "round": 11,
+      "family": "cancel-race",
+      "title": "Dead-supervisor cancel handoff candidate repeated",
+      "technique": "cancel-race",
+      "hypothesis": "Probe dead supervisor plus cancel marker plus no childPid, late receipt, marker cleanup, exactly-once callback.",
+      "attempt": "Probe dead supervisor plus cancel marker plus no childPid, late receipt, marker cleanup, exactly-once callback.",
+      "result": "Child produced another cancel-handoff patch. Not integrated this pass.",
+      "adaptation": "Prioritize in next run with full run-machine tests.",
+      "verdict": "contained",
+      "imageUrl": null,
+      "finishedAt": "2026-06-26T13:50:00.000Z",
+      "evidence": {
+        "executionId": "terrarium-run:ter_20260626131958601_o9bkgx",
+        "independentReplay": false
+      },
+      "contentKind": "product-summary",
+      "evidenceClaim": true,
+      "agentModel": "private runner model",
+      "agentCommand": "pi -p --no-session",
+      "environment": "isolated copy workspace; pi -p --no-session; batch allSettled/concurrency 3"
+    },
+    {
+      "turn": 50,
+      "round": 11,
+      "family": "secure-workspace",
+      "title": "Credential-shaped secure workspace artifacts candidate",
+      "technique": "secure-workspace",
+      "hypothesis": "Probe credential-shaped paths in secure workspace writes/diffs/list/search and secure-agent audit validation.",
+      "attempt": "Probe credential-shaped paths in secure workspace writes/diffs/list/search and secure-agent audit validation.",
+      "result": "Child produced secure workspace artifact-boundary patch. Not integrated this pass.",
+      "adaptation": "Needs secure-workspace/Docker verification.",
+      "verdict": "contained",
+      "imageUrl": null,
+      "finishedAt": "2026-06-26T13:50:00.000Z",
+      "evidence": {
+        "executionId": "terrarium-run:ter_20260626131958601_6stw39",
+        "independentReplay": false
+      },
+      "contentKind": "product-summary",
+      "evidenceClaim": true,
+      "agentModel": "private runner model",
+      "agentCommand": "pi -p --no-session",
+      "environment": "isolated copy workspace; pi -p --no-session; batch allSettled/concurrency 3"
+    },
+    {
+      "turn": 51,
+      "round": 11,
+      "family": "receipt-contract",
+      "title": "Public evidence references reject traversal and URLs",
+      "technique": "receipt-contract",
+      "hypothesis": "Probe summary trim length, newline/Unicode in JSON summary, extra fields, duplicate markers, retry summaries, public receipt evidenceRef validation.",
+      "attempt": "Probe summary trim length, newline/Unicode in JSON summary, extra fields, duplicate markers, retry summaries, public receipt evidenceRef validation.",
+      "result": "Integrated stricter public evidenceRef validation and receipt edge-case tests.",
+      "adaptation": "Unknown receipt fields remain ignored by design.",
+      "verdict": "contained",
+      "imageUrl": null,
+      "finishedAt": "2026-06-26T13:50:00.000Z",
+      "evidence": {
+        "executionId": "terrarium-run:ter_20260626132213458_jyna9b",
+        "independentReplay": false
+      },
+      "receiptUrl": "/campaign/receipts/ph-20260626135000.public.json",
+      "contentKind": "product-summary",
+      "evidenceClaim": true,
+      "agentModel": "private runner model",
+      "agentCommand": "pi -p --no-session",
+      "environment": "isolated copy workspace; pi -p --no-session; continuation batch"
+    },
+    {
+      "turn": 52,
+      "round": 11,
+      "family": "callback-privacy",
+      "title": "Callback requeue and subscriber records needed state-specific validation",
+      "technique": "callback-privacy",
+      "hypothesis": "Probe claim/ack/requeue/prune with private fields, claimedAt-only keys, subscriber owner narrowing, recover sanitization.",
+      "attempt": "Probe claim/ack/requeue/prune with private fields, claimedAt-only keys, subscriber owner narrowing, recover sanitization.",
+      "result": "Integrated state-specific callback validation, strict subscriber records, and narrowed MCP callback arguments.",
+      "adaptation": "Add repair/quarantine command later.",
+      "verdict": "contained",
+      "imageUrl": null,
+      "finishedAt": "2026-06-26T13:50:00.000Z",
+      "evidence": {
+        "executionId": "terrarium-run:ter_20260626132213458_j6am6k",
+        "independentReplay": false
+      },
+      "receiptUrl": "/campaign/receipts/ph-20260626135000.public.json",
+      "contentKind": "product-summary",
+      "evidenceClaim": true,
+      "agentModel": "private runner model",
+      "agentCommand": "pi -p --no-session",
+      "environment": "isolated copy workspace; pi -p --no-session; continuation batch"
+    },
+    {
+      "turn": 53,
+      "round": 11,
+      "family": "mcp-lineage",
+      "title": "Group access denial is no longer inferred from missing records",
+      "technique": "mcp-lineage",
+      "hypothesis": "Probe group read/status/cancel concise output, missing + failed + inaccessible combinations, callback status/recover sibling denial.",
+      "attempt": "Probe group read/status/cancel concise output, missing + failed + inaccessible combinations, callback status/recover sibling denial.",
+      "result": "Integrated immediate fail-closed handling for inaccessible group members while preserving genuine missing records.",
+      "adaptation": "Keep missing as unknown/nonterminal.",
+      "verdict": "contained",
+      "imageUrl": null,
+      "finishedAt": "2026-06-26T13:50:00.000Z",
+      "evidence": {
+        "executionId": "terrarium-run:ter_20260626132213458_sza98x",
+        "independentReplay": false
+      },
+      "receiptUrl": "/campaign/receipts/ph-20260626135000.public.json",
+      "contentKind": "product-summary",
+      "evidenceClaim": true,
+      "agentModel": "private runner model",
+      "agentCommand": "pi -p --no-session",
+      "environment": "isolated copy workspace; pi -p --no-session; continuation batch"
     }
   ]
 }

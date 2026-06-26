@@ -25,8 +25,8 @@ function run(command, args, options = {}) {
 const EVIDENCE_REF_PATTERNS = Object.freeze([
   /^commit:[a-f0-9]{7,40}$/i,
   /^terrarium-run:ter_\d{17}_[a-z0-9]+$/i,
-  /^test:[A-Za-z0-9][A-Za-z0-9._:/-]*$/,
-  /^replay:[A-Za-z0-9][A-Za-z0-9._:/-]*$/,
+  /^test:(?!.*(?:^|\/)\.\.(?:\/|$))[A-Za-z0-9][A-Za-z0-9._/-]*$/,
+  /^replay:[A-Za-z0-9][A-Za-z0-9._-]*$/,
 ]);
 
 export function assertPublicSummary(summary) {

@@ -41,10 +41,11 @@ export async function getRunGroupStatus({ groupId, verbose = false, requesterRun
   const group = await getRunGroup(groupId);
   const runs = await Promise.all(group.runIds.map(async (runId) => {
     try { return await getRunStatus({ runId, requesterRunId, scope }); }
-    catch (error) { return { runId, status: "missing", ok: false, error: error.message }; }
+    catch (error) {
+      if (/access denied/i.test(error.message)) throw new Error("Terrarium group access denied");
+      return { runId, status: "missing", ok: false, error: error.message };
+    }
   }));
-  const inaccessible = runs.some((run) => run.status === "missing" && /access denied/i.test(run.error ?? ""));
-  if (inaccessible) throw new Error("Terrarium group access denied");
   const counts = Object.fromEntries(["running", "done", "failed", "inconclusive", "cancelled", "error", "orphaned", "missing"].map((status) => [status, runs.filter((run) => run.status === status).length]));
   const terminalStatuses = new Set(["done", "failed", "inconclusive", "cancelled", "error", "orphaned"]);
   // Unknown/missing records are not evidence that every member reached a terminal state.
