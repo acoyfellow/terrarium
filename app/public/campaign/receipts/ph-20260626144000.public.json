@@ -1,0 +1,8 @@
+{
+  "iterationId": "ph-20260626144000",
+  "contentKind": "product-summary",
+  "evidenceClaim": true,
+  "evidenceRef": "test:README.md",
+  "title": "Documentation hardening added to loop",
+  "summary": "Run 13 added CHANGELOG.md, exposed it as a public changelog page, linked the run ledger to it, and updated README to require docs/changelog updates when behavior or public surfaces change."
+}
