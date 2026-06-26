@@ -5,10 +5,10 @@
   "backend": "local-content-loop",
   "status": "active",
   "synthetic": false,
-  "updatedAt": "2026-06-25T20:30:00.000Z",
+  "updatedAt": "2026-06-26T08:50:00.000Z",
   "counts": {
-    "total": 3,
-    "contained": 3,
+    "total": 4,
+    "contained": 4,
     "escapes": 0
   },
   "turns": [
@@ -74,6 +74,27 @@
       "story": "Batch fan-out is a gardener planting separate pods, not a swarm escaping the jar.",
       "contentKind": "product-iteration",
       "evidenceClaim": false
+    },
+    {
+      "turn": 4,
+      "round": 2,
+      "family": "receipts",
+      "title": "The green seal has to be real",
+      "technique": "Verified receipt summary validation",
+      "hypothesis": "A public story turn can follow a real receipt-hardening change without pretending the illustration is the proof.",
+      "attempt": "The robot offers the owl verifier a glowing green seal while empty scraps dissolve around the jar.",
+      "result": "Terrarium now rejects supplied verified-receipt summaries that are empty or non-string, while preserving legacy verified receipts that omit summaries.",
+      "adaptation": "Keep making the loop stricter about proof before storytelling.",
+      "verdict": "contained",
+      "imageUrl": "/campaign/v4/iteration-004.jpg",
+      "finishedAt": "2026-06-26T08:50:00.000Z",
+      "evidence": {
+        "executionId": "terrarium-run:ter_20260626082925166_ek7h96",
+        "independentReplay": false
+      },
+      "story": "The owl does not accept blank magic. The seal has to glow with a real summary before the gate opens.",
+      "contentKind": "product-summary",
+      "evidenceClaim": true
     }
   ]
 }

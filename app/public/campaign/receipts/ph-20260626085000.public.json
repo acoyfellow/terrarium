@@ -1,0 +1,8 @@
+{
+  "iterationId": "ph-20260626085000",
+  "contentKind": "product-summary",
+  "evidenceClaim": true,
+  "evidenceRef": "terrarium-run:ter_20260626082925166_ek7h96",
+  "title": "Verified receipts must say something real",
+  "summary": "The reconciler integrated receipt validation so a verified receipt cannot carry an empty or non-string summary when it supplies one."
+}
