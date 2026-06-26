@@ -67,8 +67,8 @@ test('allSettled timeout preserves the durable batch result when cancellation se
   assert.equal(r.runIds.length, 1);
   assert.equal(r.group.groupId, r.groupId);
   assert.equal(r.group.runs[0].runId, r.runIds[0]);
-  if (r.cleanupErrors !== undefined) {
-    assert.ok(Array.isArray(r.cleanupErrors));
+  assert.ok(Array.isArray(r.cleanupErrors));
+  if (r.cleanupErrors.length) {
     assert.match(r.cleanupErrors[0], new RegExp(`^${r.runIds[0]}: run did not become terminal after cancellation`));
   }
 });
@@ -82,6 +82,7 @@ test('any: first success wins and losers are cancelled', { timeout: 45000 }, asy
   assert.ok(status.counts.cancelled >= 1, 'slow losers should be cancelled');
   assert.equal(status.complete, true, 'cancelled runs are terminal');
   assert.equal(status.ok, false, 'a group with cancelled children is not wholly successful');
+  assert.ok(Array.isArray(r.cleanupErrors));
 });
 
 test('any: fails when all jobs fail', { timeout: 45000 }, async () => {
@@ -97,6 +98,7 @@ test('quorum: resolves when k successes reached, cancels the rest', { timeout: 4
   assert.equal(r.winners.length, 2);
   const status = await getRunGroupStatus({ groupId: r.groupId });
   assert.equal(status.counts.running, 0);
+  assert.ok(Array.isArray(r.cleanupErrors));
 });
 
 test('concurrency holds a slot until the active run is terminal', { timeout: 45000 }, async () => {

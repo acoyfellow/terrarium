@@ -28,13 +28,15 @@ const TERMINAL_TYPES = new Set(["Completed", "Failed", "TimedOut", "Cancelled"])
 const hasOnlyKeys = (value, keys) => value && typeof value === "object" && !Array.isArray(value) && Object.keys(value).every((key) => keys.has(key));
 const validSubscriber = (value, file) => hasOnlyKeys(value, SUBSCRIBER_KEYS) && value.subscriberId === file.slice(0, -5) && Object.hasOwn(value, "ownerRunId") && validOwner(value.ownerRunId);
 const validEvent = (value, file) => hasOnlyKeys(value, CALLBACK_KEYS) && value.eventId === file.slice(0, -5) && TERMINAL_TYPES.has(value.type) && typeof value.runId === "string";
-async function mailboxHealth(path) {
+const validPendingEvent = (value, file) => validEvent(value, file) && !Object.hasOwn(value, "claimedAt");
+const validInflightEvent = (value, file) => validEvent(value, file) && Object.hasOwn(value, "claimedAt") && Number.isFinite(Date.parse(value.claimedAt));
+async function mailboxHealth(path, validate) {
   let valid = 0, malformed = 0;
   try {
     for (const file of (await readdir(path)).filter((name) => name.endsWith(".json"))) {
       try {
         const value = JSON.parse(await readFile(`${path}/${file}`, "utf8"));
-        if (!validEvent(value, file)) throw new Error("invalid callback");
+        if (!validate(value, file)) throw new Error("invalid callback");
         valid++;
       } catch { malformed++; }
     }
@@ -74,8 +76,8 @@ export async function diagnoseTerrarium() {
   }
   try {
     for (const subscriber of await readdir(MAILBOXES_DIR)) {
-      const pending = await mailboxHealth(`${MAILBOXES_DIR}/${subscriber}/pending`);
-      const inflight = await mailboxHealth(`${MAILBOXES_DIR}/${subscriber}/inflight`);
+      const pending = await mailboxHealth(`${MAILBOXES_DIR}/${subscriber}/pending`, validPendingEvent);
+      const inflight = await mailboxHealth(`${MAILBOXES_DIR}/${subscriber}/inflight`, validInflightEvent);
       checks.pendingCallbacks += pending.valid;
       checks.malformedPendingCallbacks += pending.malformed;
       checks.inflightCallbacks += inflight.valid;
