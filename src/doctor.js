@@ -29,7 +29,7 @@ const hasOnlyKeys = (value, keys) => value && typeof value === "object" && !Arra
 const validSubscriber = (value, file) => hasOnlyKeys(value, SUBSCRIBER_KEYS) && value.subscriberId === file.slice(0, -5) && Object.hasOwn(value, "ownerRunId") && validOwner(value.ownerRunId);
 const validEvent = (value, file) => hasOnlyKeys(value, CALLBACK_KEYS) && value.eventId === file.slice(0, -5) && TERMINAL_TYPES.has(value.type) && typeof value.runId === "string";
 const validPendingEvent = (value, file) => validEvent(value, file) && !Object.hasOwn(value, "claimedAt");
-const validInflightEvent = (value, file) => validEvent(value, file) && Object.hasOwn(value, "claimedAt") && Number.isFinite(Date.parse(value.claimedAt));
+const validClaimedEvent = (value, file) => validEvent(value, file) && Object.hasOwn(value, "claimedAt") && Number.isFinite(Date.parse(value.claimedAt));
 async function mailboxHealth(path, validate) {
   let valid = 0, malformed = 0;
   try {
@@ -66,6 +66,10 @@ export async function diagnoseTerrarium() {
     malformedPendingCallbacks: 0,
     inflightCallbacks: 0,
     malformedInflightCallbacks: 0,
+    acknowledgedCallbacks: 0,
+    malformedAcknowledgedCallbacks: 0,
+    staleInflightCallbacks: 0,
+    routerRepairCandidates: subscriberHealth.malformed + journalHealth.malformed,
     missingTerminalCallbacks: 0,
     staleChildClaims: 0,
   };
@@ -77,11 +81,21 @@ export async function diagnoseTerrarium() {
   try {
     for (const subscriber of await readdir(MAILBOXES_DIR)) {
       const pending = await mailboxHealth(`${MAILBOXES_DIR}/${subscriber}/pending`, validPendingEvent);
-      const inflight = await mailboxHealth(`${MAILBOXES_DIR}/${subscriber}/inflight`, validInflightEvent);
+      const inflight = await mailboxHealth(`${MAILBOXES_DIR}/${subscriber}/inflight`, validClaimedEvent);
+      const acknowledged = await mailboxHealth(`${MAILBOXES_DIR}/${subscriber}/acked`, validClaimedEvent);
       checks.pendingCallbacks += pending.valid;
       checks.malformedPendingCallbacks += pending.malformed;
       checks.inflightCallbacks += inflight.valid;
       checks.malformedInflightCallbacks += inflight.malformed;
+      checks.acknowledgedCallbacks += acknowledged.valid;
+      checks.malformedAcknowledgedCallbacks += acknowledged.malformed;
+      checks.routerRepairCandidates += pending.malformed + inflight.malformed + acknowledged.malformed;
+      try {
+        for (const file of (await readdir(`${MAILBOXES_DIR}/${subscriber}/inflight`)).filter((name) => name.endsWith('.json'))) {
+          let event; try { event = JSON.parse(await readFile(`${MAILBOXES_DIR}/${subscriber}/inflight/${file}`, 'utf8')); } catch { continue; }
+          if (validClaimedEvent(event, file) && Date.now() - Date.parse(event.claimedAt) >= 300000) checks.staleInflightCallbacks++;
+        }
+      } catch {}
     }
   } catch {}
   try {
@@ -104,6 +118,8 @@ export async function diagnoseTerrarium() {
   if (checks.malformedPendingCallbacks) warnings.push(`${checks.malformedPendingCallbacks} malformed pending callback(s) need quarantine or repair`);
   if (checks.inflightCallbacks) warnings.push(`${checks.inflightCallbacks} callback(s) are claimed but unacknowledged`);
   if (checks.malformedInflightCallbacks) warnings.push(`${checks.malformedInflightCallbacks} malformed inflight callback(s) need quarantine or repair`);
+  if (checks.malformedAcknowledgedCallbacks) warnings.push(`${checks.malformedAcknowledgedCallbacks} malformed acknowledged callback(s) need quarantine or repair`);
+  if (checks.staleInflightCallbacks) warnings.push(`${checks.staleInflightCallbacks} stale inflight callback(s) are repair candidates for requeue`);
   if (checks.missingTerminalCallbacks) warnings.push(`${checks.missingTerminalCallbacks} terminal run(s) are missing durable callback events; recover those run IDs`);
   if (checks.staleChildClaims) warnings.push(`${checks.staleChildClaims} stale child-slot claim(s) exist from older runs`);
   return { ok: warnings.length === 0, checks, warnings, paths: { home: HOME, logs: LOG_DIR, workspaces: WORKSPACE_DIR, events: EVENT_DIR, router: ROUTER_DIR } };

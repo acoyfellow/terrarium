@@ -1,0 +1,88 @@
+{
+  "schema": "terrarium.product-loop.receipt.v0.1",
+  "iterationId": "ph-20260626142000",
+  "intent": "parallel attacker run 11 against live batch wrapper, public ledger contract, secure workspace artifacts, receipt/public summary schema, doctor/router malformed state, and MCP callback/group lineage",
+  "phases": [
+    "OBSERVE",
+    "BATCH_ATTACK",
+    "SELECT",
+    "EXECUTE",
+    "VERIFY",
+    "RECORD",
+    "LOCAL_TABLE_UPDATE"
+  ],
+  "selectedWork": {
+    "kind": "batch-doctor-mcp-hardening",
+    "reason": "Three verified non-conflicting fixes passed targeted parent tests."
+  },
+  "childRuns": [
+    {
+      "runId": "ter_20260626133720009_68b1bb",
+      "status": "done",
+      "selected": true,
+      "summary": "Integrated stopped launch gate so a worker failure prevents sibling workers from consuming queued jobs after partial-launch failure."
+    },
+    {
+      "runId": "ter_20260626133720009_ipwqfc",
+      "status": "done",
+      "selected": false,
+      "summary": "Child proposed generated ledger placeholder hardening. Not integrated; static table already uses explicit rows."
+    },
+    {
+      "runId": "ter_20260626133720009_m19vu7",
+      "status": "done",
+      "selected": false,
+      "summary": "Child produced secure workspace credential artifact patch. Not integrated this pass."
+    },
+    {
+      "runId": "ter_20260626133748005_3oojgu",
+      "status": "done",
+      "selected": false,
+      "summary": "Child proposed removal of agent fields from manifest; not integrated because current spreadsheet intentionally has an Agent/model column."
+    },
+    {
+      "runId": "ter_20260626134114350_cuqmrn",
+      "status": "done",
+      "selected": true,
+      "summary": "Integrated acknowledged callback counters, stale inflight counters, and aggregate router repair candidate diagnostics."
+    },
+    {
+      "runId": "ter_20260626134114350_61300f",
+      "status": "done",
+      "selected": true,
+      "summary": "Integrated explicit callback ack eventId validation and missing groupId concise regression tests."
+    }
+  ],
+  "health": {
+    "batchTestsOk": true,
+    "mcpConciseTestsOk": true,
+    "doctorTestsOk": true,
+    "mcpScopeTestsOk": true,
+    "routerTestsOk": true,
+    "groupsTestsOk": true,
+    "productLoopValidateOk": true,
+    "buildOk": true,
+    "localSmokeOk": true
+  },
+  "commands": [
+    {
+      "command": "terrarium_spawn_batch allSettled concurrency 3 plus continuation for six attacker jobs",
+      "ok": false,
+      "note": "first batch still hit cancellation wait before integration; continuation completed"
+    },
+    {
+      "command": "TERRARIUM_CHILD_BUDGET=20 node --test test/batch.test.js test/mcp_concise.test.js test/doctor.test.js test/mcp_scope.test.js test/router.test.js test/groups.test.js",
+      "ok": true
+    }
+  ],
+  "publicSummary": {
+    "iterationId": "ph-20260626142000",
+    "contentKind": "product-summary",
+    "evidenceClaim": true,
+    "evidenceRef": "terrarium-run:ter_20260626133720009_68b1bb",
+    "title": "Partial launch gate closes; doctor repair counters added",
+    "summary": "Run 11 integrated the remaining partial-launch gate fix, acknowledged/stale callback repair diagnostics in doctor, and explicit MCP ack eventId validation. Targeted tests and local smoke passed."
+  },
+  "canPublishStory": true,
+  "createdAt": "2026-06-26T13:43:09.217Z"
+}
