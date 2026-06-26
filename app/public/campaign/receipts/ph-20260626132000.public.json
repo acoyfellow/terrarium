@@ -1,0 +1,8 @@
+{
+  "iterationId": "ph-20260626132000",
+  "contentKind": "product-summary",
+  "evidenceClaim": true,
+  "evidenceRef": "terrarium-run:ter_20260626130618392_j9mxee",
+  "title": "Group reads and mailbox counts fail closed",
+  "summary": "Run 5 integrated two verified hardenings: group read now fails closed instead of returning inaccessible run IDs, and malformed mailbox records are retained and excluded from live callback counts/prune."
+}

@@ -88,8 +88,8 @@ test('child MCP denies sibling cancel, callbacks, and group access', async () =>
   ], env);
   for (const id of [1, 2]) assert.match(toolText(responses.find((r) => r.id === id)), /access denied/);
   assert.match(toolText(responses.find((r) => r.id === 3)), /group access denied/);
-  const read = JSON.parse(toolText(responses.find((r) => r.id === 4)));
-  assert.match(read.results[0].error, /access denied/);
+  assert.match(toolText(responses.find((r) => r.id === 4)), /group access denied/);
+  assert.doesNotMatch(toolText(responses.find((r) => r.id === 4)), new RegExp(b.runId));
   assert.match(toolText(responses.find((r) => r.id === 5)), /group access denied/);
   assert.match(toolText(responses.find((r) => r.id === 6)), /access denied/);
   rmSync(join(process.env.TERRARIUM_HOME || join(process.env.HOME, '.terrarium'), 'groups', `${groupId}.json`), { force: true });
@@ -107,6 +107,26 @@ test('child MCP group status does not leak aggregate completion or ok through in
     const text = toolText(responses[0]);
     assert.match(text, /group access denied/);
     assert.doesNotMatch(text, /"complete"|"ok"|"counts"|scope aggregate sibling/);
+  } finally {
+    rmSync(join(process.env.TERRARIUM_HOME || join(process.env.HOME, '.terrarium'), 'groups', `${groupId}.json`), { force: true });
+  }
+});
+
+test('MCP group status is concise by default and verbose only on request', async () => {
+  const a = await runTerrarium({ task: 'concise group member', dryRun: true, stream: false });
+  const groupId = `grp_concise_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+  try {
+    await rpc([{ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'terrarium_group', arguments: { action: 'create', groupId, label: 'concise', runIds: [a.runId] } } }]);
+    const { responses } = await rpc([
+      { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'terrarium_group', arguments: { action: 'status', groupId } } },
+      { jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'terrarium_group', arguments: { action: 'status', groupId, verbose: true } } },
+    ]);
+    const concise = JSON.parse(toolText(responses.find((r) => r.id === 1)));
+    const verbose = JSON.parse(toolText(responses.find((r) => r.id === 2)));
+    assert.equal(concise.createdAt, undefined);
+    assert.equal(concise.runs[0].startedAt, undefined);
+    assert.equal(typeof verbose.createdAt, 'string');
+    assert.equal(typeof verbose.runs[0].startedAt, 'string');
   } finally {
     rmSync(join(process.env.TERRARIUM_HOME || join(process.env.HOME, '.terrarium'), 'groups', `${groupId}.json`), { force: true });
   }

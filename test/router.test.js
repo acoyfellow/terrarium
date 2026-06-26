@@ -294,6 +294,47 @@ test('malformed journal timestamps are retained rather than treated as stale', a
   }
 });
 
+test('mailbox status excludes malformed pending and inflight records and prune retains them', async () => {
+  const suffix = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+  const subscriberId = `sub_malformed_mailbox_${suffix}`;
+  const pendingDir = join(MAILBOXES_DIR, subscriberId, 'pending');
+  const inflightDir = join(MAILBOXES_DIR, subscriberId, 'inflight');
+  const badPending = join(pendingDir, `evt_bad_pending_${suffix}.json`);
+  const badInflight = join(inflightDir, `evt_bad_inflight_${suffix}.json`);
+  try {
+    await registerSubscriber({ subscriberId, runIds: ['*'] });
+    await writeFile(badPending, '{bad');
+    await writeFile(badInflight, JSON.stringify({ eventId: 'wrong', type: 'Completed', runId: `ter_${suffix}`, at: '2020-01-01T00:00:00.000Z' }));
+    assert.deepEqual(await getMailboxStatus(subscriberId), { subscriberId, pending: 0, inflight: 0, acknowledged: 0 });
+    const result = await pruneRouter({ callbackOlderThanMs: 0, subscriberIds: [subscriberId] });
+    assert.equal(result.pendingRemoved, 0);
+    assert.equal(result.inflightRemoved, 0);
+    assert.equal(existsSync(badPending), true);
+    assert.equal(existsSync(badInflight), true);
+  } finally {
+    await unregisterSubscriber(subscriberId).catch(() => {});
+  }
+});
+
+test('child-owned prune requires the exact owner and cannot cross subscriber ownership', async () => {
+  const suffix = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+  const subscriberId = `sub_owner_prune_${suffix}`;
+  const ownerRunId = `ter_owner_prune_${suffix}`;
+  const eventId = `evt_owner_prune_${suffix}`;
+  try {
+    await registerSubscriber({ subscriberId, ownerRunId, runIds: [ownerRunId] });
+    await routeEvent({ eventId, type: 'Completed', runId: ownerRunId, at: '2020-01-01T00:00:00.000Z' });
+    const mismatch = await pruneRouter({ ownerRunId: `ter_attacker_${suffix}`, callbackOlderThanMs: 0, subscriberIds: [subscriberId], eventIds: [eventId] });
+    assert.equal(mismatch.pendingRemoved, 0);
+    assert.equal((await getMailboxStatus(subscriberId, { ownerRunId })).pending, 1);
+    const owned = await pruneRouter({ ownerRunId, callbackOlderThanMs: 0, subscriberIds: [subscriberId], eventIds: [eventId] });
+    assert.equal(owned.pendingRemoved, 1);
+  } finally {
+    await unregisterSubscriber(subscriberId, { ownerRunId }).catch(() => {});
+    await rm(join(JOURNAL_DIR, `${eventId}.json`), { force: true });
+  }
+});
+
 test('callback filters do not deliver unrelated runs', async () => {
   const suffix = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
   const subscriberId = `sub_filter_${suffix}`;

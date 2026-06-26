@@ -57,5 +57,6 @@ export async function readRunGroupLogs({ groupId, kind = "terrarium", tailBytes 
     try { const value = await readRun({ runId, kind, tailBytes, requesterRunId, scope }); return { runId, text: value.text }; }
     catch (error) { return { runId, error: error.message }; }
   }));
+  if (results.some((result) => /access denied/i.test(result.error ?? ""))) throw new Error("Terrarium group access denied");
   return { groupId, kind, results };
 }

@@ -222,8 +222,16 @@ export async function acknowledgeMailboxEvent({ subscriberId, eventId: id, owner
 export async function getMailboxStatus(subscriberId, { ownerRunId } = {}) {
   assertSubscriberOwner(await getSubscriber(subscriberId), ownerRunId);
   const dirs = mailboxDirs(subscriberId);
-  const count = async (dir) => { try { return (await readdir(dir)).filter((file) => file.endsWith('.json')).length; } catch { return 0; } };
-  return { subscriberId, pending: await count(dirs.pending), inflight: await count(dirs.inflight), acknowledged: await count(dirs.acked) };
+  const countValidEvents = async (dir) => {
+    let count = 0;
+    let files = []; try { files = (await readdir(dir)).filter((file) => file.endsWith('.json')); } catch { return 0; }
+    for (const file of files) {
+      let event; try { event = JSON.parse(await readFile(join(dir, file), 'utf8')); } catch { continue; }
+      if (event && event.eventId === file.slice(0, -5) && typeof event.type === 'string' && typeof event.runId === 'string') count++;
+    }
+    return count;
+  };
+  return { subscriberId, pending: await countValidEvents(dirs.pending), inflight: await countValidEvents(dirs.inflight), acknowledged: await countValidEvents(dirs.acked) };
 }
 
 export async function requeueInflightEvents({ subscriberId, olderThanMs = 300000, ownerRunId } = {}) {
@@ -267,7 +275,8 @@ export async function pruneRouter({ acknowledgedOlderThanMs = 7 * 86400000, jour
         let files = []; try { files = (await readdir(dir)).filter((file) => file.endsWith('.json')); } catch {}
         for (const file of files) {
           if (Array.isArray(eventIds) && !eventIds.includes(file.slice(0, -5))) continue;
-          let event; try { event = JSON.parse(await readFile(join(dir, file), 'utf8')); } catch { event = {}; }
+          let event; try { event = JSON.parse(await readFile(join(dir, file), 'utf8')); } catch { continue; }
+          if (!event || event.eventId !== file.slice(0, -5) || typeof event.type !== 'string' || typeof event.runId !== 'string') continue;
           if (eventAge(now, event) < Math.max(0, Number(cutoff) || 0)) continue;
           await rm(join(dir, file), { force: true });
           if (kind === 'acked') acknowledgedRemoved++;

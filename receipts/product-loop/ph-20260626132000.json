@@ -1,0 +1,85 @@
+{
+  "schema": "terrarium.product-loop.receipt.v0.1",
+  "iterationId": "ph-20260626132000",
+  "intent": "parallel attacker run 5 against batch API, callback storage, receipt contract, cancellation, MCP group projection, and secure artifacts",
+  "phases": [
+    "OBSERVE",
+    "BATCH_ATTACK",
+    "SELECT",
+    "EXECUTE",
+    "VERIFY",
+    "RECORD",
+    "LOCAL_TABLE_UPDATE"
+  ],
+  "selectedWork": {
+    "kind": "mcp-and-callback-storage-hardening",
+    "reason": "Run 5 produced two clean non-conflicting fixes with passing router/MCP/group tests."
+  },
+  "childRuns": [
+    {
+      "runId": "ter_20260626130357880_ma0wmo",
+      "status": "done",
+      "selected": false,
+      "summary": "Child found root-cause candidates for repeated batch wrapper errors. Not integrated because partial group registration needs atomic design."
+    },
+    {
+      "runId": "ter_20260626130357880_8gtn2v",
+      "status": "done",
+      "selected": true,
+      "summary": "Integrated mailbox status/prune validation so malformed pending/inflight records are retained for diagnosis and not counted as live callbacks."
+    },
+    {
+      "runId": "ter_20260626130357880_6p7fx0",
+      "status": "done",
+      "selected": false,
+      "summary": "Child found receipt parser hardening candidates. Not integrated this pass."
+    },
+    {
+      "runId": "ter_20260626130618392_j19r15",
+      "status": "done",
+      "selected": false,
+      "summary": "Child found cancel recovery candidate. Not integrated this pass."
+    },
+    {
+      "runId": "ter_20260626130618392_j9mxee",
+      "status": "done",
+      "selected": true,
+      "summary": "Integrated fail-closed group reads and concise group status projection."
+    },
+    {
+      "runId": "ter_20260626130618392_wdzr5a",
+      "status": "done",
+      "selected": false,
+      "summary": "Child found secure artifact boundary candidates. Not integrated this pass."
+    }
+  ],
+  "health": {
+    "routerTestsOk": true,
+    "mcpScopeTestsOk": true,
+    "groupsTestsOk": true,
+    "productLoopValidateOk": true,
+    "buildOk": true,
+    "localSmokeOk": true
+  },
+  "commands": [
+    {
+      "command": "terrarium_spawn_batch allSettled concurrency 3 plus continuation for six attacker jobs",
+      "ok": false,
+      "note": "first batch wrapper errored on cancellation wait; continuation batch completed"
+    },
+    {
+      "command": "node --test test/router.test.js test/mcp_scope.test.js test/groups.test.js",
+      "ok": true
+    }
+  ],
+  "publicSummary": {
+    "iterationId": "ph-20260626132000",
+    "contentKind": "product-summary",
+    "evidenceClaim": true,
+    "evidenceRef": "terrarium-run:ter_20260626130618392_j9mxee",
+    "title": "Group reads and mailbox counts fail closed",
+    "summary": "Run 5 integrated two verified hardenings: group read now fails closed instead of returning inaccessible run IDs, and malformed mailbox records are retained and excluded from live callback counts/prune."
+  },
+  "canPublishStory": true,
+  "createdAt": "2026-06-26T13:08:51.067Z"
+}
