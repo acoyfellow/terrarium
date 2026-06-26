@@ -1,0 +1,103 @@
+{
+  "schema": "terrarium.product-loop.receipt.v0.1",
+  "iterationId": "ph-20260626153000",
+  "intent": "parallel attacker run 18 against batch compatibility, receipt contract, callback privacy, cancellation, group lineage, doctor state, workspace isolation, and secure workspace boundaries",
+  "phases": [
+    "OBSERVE",
+    "BATCH_ATTACK",
+    "SELECT",
+    "EXECUTE",
+    "VERIFY",
+    "RECORD",
+    "LOCAL_TABLE_UPDATE",
+    "DOCUMENT"
+  ],
+  "selectedWork": {
+    "kind": "receipt-callback-orphan-workspace-secure-hardening",
+    "reason": "Verified product/security fixes were focused, non-conflicting, and passed targeted tests."
+  },
+  "childRuns": [
+    {
+      "runId": "ter_20260626142351341_d00etv",
+      "status": "done",
+      "selected": false,
+      "summary": "Child verified repo CLI/Node behavior and durable group recovery. No code changes needed."
+    },
+    {
+      "runId": "ter_20260626142351341_7ogenu",
+      "status": "done",
+      "selected": true,
+      "summary": "Integrated exact four-field task receipt schema and 16 KiB marker-line cap."
+    },
+    {
+      "runId": "ter_20260626142351341_izrpo6",
+      "status": "done",
+      "selected": true,
+      "summary": "Integrated route-time timestamp validation and replay validation so malformed legacy journal records are not enqueued."
+    },
+    {
+      "runId": "ter_20260626142351341_sb7c0h",
+      "status": "done",
+      "selected": true,
+      "summary": "Integrated orphan terminal callback emission and regression coverage."
+    },
+    {
+      "runId": "ter_20260626142605224_s04kxo",
+      "status": "done",
+      "selected": false,
+      "summary": "Child verified complete/ok truthfulness and fail-closed group access. No code changes needed."
+    },
+    {
+      "runId": "ter_20260626142605224_vhfwpx",
+      "status": "done",
+      "selected": true,
+      "summary": "Integrated event ID validation and canonical run-ID validation for child claim contents."
+    },
+    {
+      "runId": "ter_20260626142605224_pqanq9",
+      "status": "done",
+      "selected": true,
+      "summary": "Integrated marker redaction and nested .terrarium-workspace exclusion from patch capture."
+    },
+    {
+      "runId": "ter_20260626142605224_cp6tq6",
+      "status": "done",
+      "selected": true,
+      "summary": "Integrated shell-free archive transfer, credential path filtering and non-provider secure-agent env allowlist. Docker integration skipped locally."
+    }
+  ],
+  "health": {
+    "targetedTestsOk": true,
+    "productLoopValidateOk": true,
+    "buildOk": true,
+    "localSmokeOk": true,
+    "changelogSynced": true,
+    "dockerSecureWorkspaceSkipped": true
+  },
+  "commands": [
+    {
+      "command": "terrarium_spawn_batch allSettled concurrency 4 plus continuation for eight attacker jobs",
+      "ok": false,
+      "note": "live host schema still stale and parent tool surfaced cancellation wait; durable child runs completed"
+    },
+    {
+      "command": "TERRARIUM_CHILD_BUDGET=20 node --test test/basic.test.js test/router.test.js test/doctor.test.js test/run-machine.test.js test/secure.test.js test/secure-agent.test.js test/secure-workspace.test.js test/product-loop.test.js test/mcp_scope.test.js",
+      "ok": true,
+      "note": "119 passed, 1 skipped because Docker unavailable"
+    },
+    {
+      "command": "npm run product-loop:validate && npm run demo:build && npm run demo:smoke && diff -q CHANGELOG.md app/public/CHANGELOG.md",
+      "ok": true
+    }
+  ],
+  "publicSummary": {
+    "iterationId": "ph-20260626153000",
+    "contentKind": "product-summary",
+    "evidenceClaim": true,
+    "evidenceRef": "terrarium-run:ter_20260626142351341_7ogenu",
+    "title": "Receipts, callbacks, orphan callbacks and workspace boundaries hardened",
+    "summary": "Run 18 bounded task-result receipts, rejected malformed callback timestamps before persistence, emitted orphan terminal callbacks, redacted workspace markers, and hardened secure workspace credential boundaries. Targeted tests, build, and local smoke passed."
+  },
+  "canPublishStory": true,
+  "createdAt": "2026-06-26T14:33:53.262Z"
+}

@@ -1,0 +1,8 @@
+{
+  "iterationId": "ph-20260626153000",
+  "contentKind": "product-summary",
+  "evidenceClaim": true,
+  "evidenceRef": "terrarium-run:ter_20260626142351341_7ogenu",
+  "title": "Receipts, callbacks, orphan callbacks and workspace boundaries hardened",
+  "summary": "Run 18 bounded task-result receipts, rejected malformed callback timestamps before persistence, emitted orphan terminal callbacks, redacted workspace markers, and hardened secure workspace credential boundaries. Targeted tests, build, and local smoke passed."
+}

@@ -27,9 +27,9 @@ const CALLBACK_KEYS = new Set(["type", "eventId", "runId", "parentRunId", "taskF
 const TERMINAL_TYPES = new Set(["Completed", "Failed", "TimedOut", "Cancelled"]);
 const hasOnlyKeys = (value, keys) => value && typeof value === "object" && !Array.isArray(value) && Object.keys(value).every((key) => keys.has(key));
 const validTimestamp = (value) => typeof value === "string" && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value) && new Date(value).toISOString() === value;
-const validSubscriberId = (value) => typeof value === "string" && /^[A-Za-z0-9_-]{1,120}$/.test(value);
-const validSubscriber = (value, file) => hasOnlyKeys(value, SUBSCRIBER_KEYS) && validSubscriberId(value.subscriberId) && value.subscriberId === file.slice(0, -5) && Object.hasOwn(value, "ownerRunId") && validOwner(value.ownerRunId) && validTimestamp(value.createdAt) && validTimestamp(value.updatedAt);
-const validEvent = (value, file) => hasOnlyKeys(value, CALLBACK_KEYS) && value.eventId === file.slice(0, -5) && TERMINAL_TYPES.has(value.type) && typeof value.runId === "string" && validTimestamp(value.at);
+const validId = (value) => typeof value === "string" && /^[A-Za-z0-9_-]{1,120}$/.test(value);
+const validSubscriber = (value, file) => hasOnlyKeys(value, SUBSCRIBER_KEYS) && validId(value.subscriberId) && value.subscriberId === file.slice(0, -5) && Object.hasOwn(value, "ownerRunId") && validOwner(value.ownerRunId) && validTimestamp(value.createdAt) && validTimestamp(value.updatedAt);
+const validEvent = (value, file) => hasOnlyKeys(value, CALLBACK_KEYS) && validId(value.eventId) && value.eventId === file.slice(0, -5) && TERMINAL_TYPES.has(value.type) && typeof value.runId === "string" && validTimestamp(value.at);
 const validPendingEvent = (value, file) => validEvent(value, file) && !Object.hasOwn(value, "claimedAt");
 const validClaimedEvent = (value, file) => validEvent(value, file) && Object.hasOwn(value, "claimedAt") && validTimestamp(value.claimedAt);
 async function mailboxHealth(path, validate) {
@@ -109,7 +109,7 @@ export async function diagnoseTerrarium() {
       let slots = []; try { slots = await readdir(dir); } catch { continue; }
       for (const slot of slots) {
         let childId = ""; try { childId = (await readFile(`${dir}/${slot}`, "utf8")).trim(); } catch {}
-        if (!childId || !existsSync(`${LOG_DIR}/${childId}.json`)) checks.staleChildClaims++;
+        if (!/^ter_[A-Za-z0-9_]+$/.test(childId) || !existsSync(`${LOG_DIR}/${childId}.json`)) checks.staleChildClaims++;
       }
     }
   } catch {}

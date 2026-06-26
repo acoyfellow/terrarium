@@ -5,12 +5,15 @@ import { SECURE_PROFILE } from "./secure.js";
 const MAX_FILE_BYTES = 256 * 1024;
 const MAX_WRITES = 20;
 const MAX_WRITE_BYTES = 1024 * 1024;
+const SECRET_PATH_PARTS = new Set([".env", ".npmrc", ".pypirc", ".netrc", ".aws", ".ssh", ".gnupg"]);
 
 function safePath(path) {
   if (typeof path !== "string" || !path || path.startsWith("/") || path.includes("\0")) throw new Error("workspace-relative path required");
   const parts = path.replaceAll("\\", "/").split("/");
   if (parts.some((part) => part === ".." || part === "." || part === "")) throw new Error("invalid workspace path");
-  return parts.join("/");
+  const normalized = parts.join("/");
+  if (parts.some((part) => SECRET_PATH_PARTS.has(part) || part.startsWith(".env.")) || normalized === ".docker/config.json" || normalized.startsWith(".config/gcloud/")) throw new Error("credential path forbidden");
+  return normalized;
 }
 
 function run(container, script, args = [], { input, timeout = 30000, maxBuffer = 1024 * 1024 } = {}) {
@@ -19,14 +22,14 @@ function run(container, script, args = [], { input, timeout = 30000, maxBuffer =
   return String(result.stdout || "");
 }
 
-const PRELUDE = `const fs=require('fs'),p=require('path');const root='/workspace';const rel=process.argv[1];const target=p.resolve(root,rel);if(target!==root&&!target.startsWith(root+'/'))throw Error('path escaped workspace');`;
+const PRELUDE = `const fs=require('fs'),p=require('path');const root='/workspace';const rel=process.argv[1];const target=p.resolve(root,rel);if(target!==root&&!target.startsWith(root+'/'))throw Error('path escaped workspace');const hidden=x=>{const r=p.relative(root,x).split(p.sep);return r.some(v=>['.env','.npmrc','.pypirc','.netrc','.aws','.ssh','.gnupg'].includes(v)||v.startsWith('.env.'))||r.join('/')==='.docker/config.json'||r.join('/').startsWith('.config/gcloud/')};if(hidden(target))throw Error('credential path forbidden');`;
 
 export class SecureWorkspace {
   constructor(container) { this.container = container; this.originals = new Map(); this.writes = 0; this.writeBytes = 0; }
 
   listFiles({ path = "", depth = 2 } = {}) {
     const rel = path ? safePath(path) : "";
-    const script = `${PRELUDE}const max=Math.min(Math.max(Number(process.argv[2])||2,0),5),out=[];function walk(dir,d){if(d>max)return;for(const e of fs.readdirSync(dir,{withFileTypes:true})){if(['.git','node_modules','dist'].includes(e.name))continue;const x=p.join(dir,e.name),r=p.relative(root,x);const st=fs.lstatSync(x);if(st.isSymbolicLink())continue;out.push({path:r,type:e.isDirectory()?'directory':'file',bytes:e.isFile()?st.size:undefined});if(e.isDirectory())walk(x,d+1);if(out.length>=500)return}}walk(target,0);console.log(JSON.stringify(out));`;
+    const script = `${PRELUDE}const max=Math.min(Math.max(Number(process.argv[2])||2,0),5),out=[];function walk(dir,d){if(d>max)return;for(const e of fs.readdirSync(dir,{withFileTypes:true})){const x=p.join(dir,e.name);if(['.git','node_modules','dist'].includes(e.name)||hidden(x))continue;const r=p.relative(root,x);const st=fs.lstatSync(x);if(st.isSymbolicLink())continue;out.push({path:r,type:e.isDirectory()?'directory':'file',bytes:e.isFile()?st.size:undefined});if(e.isDirectory())walk(x,d+1);if(out.length>=500)return}}walk(target,0);console.log(JSON.stringify(out));`;
     return JSON.parse(run(this.container, script, [rel, String(depth)]));
   }
 
@@ -39,7 +42,7 @@ export class SecureWorkspace {
   searchText({ query, path = "", limit = 50 } = {}) {
     if (typeof query !== "string" || !query || query.length > 200) throw new Error("bounded search query required");
     const rel = path ? safePath(path) : "";
-    const script = `${PRELUDE}const q=process.argv[2],limit=Math.min(Number(process.argv[3])||50,100),out=[];function walk(dir){for(const e of fs.readdirSync(dir,{withFileTypes:true})){if(['.git','node_modules','dist'].includes(e.name))continue;const x=p.join(dir,e.name);if(e.isDirectory())walk(x);else if(e.isFile()&&fs.statSync(x).size<262144){let s;try{s=fs.readFileSync(x,'utf8')}catch{continue}for(const [i,line] of s.split('\\n').entries())if(line.includes(q)){out.push({path:p.relative(root,x),line:i+1,text:line.slice(0,300)});if(out.length>=limit)return}}if(out.length>=limit)return}}walk(target);console.log(JSON.stringify(out));`;
+    const script = `${PRELUDE}const q=process.argv[2],limit=Math.min(Number(process.argv[3])||50,100),out=[];function walk(dir){for(const e of fs.readdirSync(dir,{withFileTypes:true})){const x=p.join(dir,e.name);if(['.git','node_modules','dist'].includes(e.name)||hidden(x))continue;if(e.isDirectory())walk(x);else if(e.isFile()&&fs.statSync(x).size<262144){let s;try{s=fs.readFileSync(x,'utf8')}catch{continue}for(const [i,line] of s.split('\\n').entries())if(line.includes(q)){out.push({path:p.relative(root,x),line:i+1,text:line.slice(0,300)});if(out.length>=limit)return}}if(out.length>=limit)return}}walk(target);console.log(JSON.stringify(out));`;
     return JSON.parse(run(this.container, script, [rel, query, String(limit)]));
   }
 

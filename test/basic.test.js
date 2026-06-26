@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync, execSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { applyModelToAgent, assertRunId, capturePatch, childPrompt, classifyRunnerFailure, defaultMreLogPath, finalizeWorkspace, getRunStatus, isPidAlive, prepareWorkspace, readRun, reconcileRun, resolveAgent, resolveModel, resolvePromptProfile, runTerrarium, spawnTerrariumBackground, splitCommand, validateTaskContractOutput, READ_ONLY_AGENT } from "../src/core.js";
@@ -52,7 +52,7 @@ test("task receipt validation enforces summary boundaries and preserves JSON tex
   assert.deepEqual(validateTaskContractOutput(output(" x ".padEnd(2001, "a")), expected), { status: "malformed" });
   assert.deepEqual(validateTaskContractOutput(output("a".repeat(2000)), expected), { status: "verified", summary: "a".repeat(2000) });
   assert.deepEqual(validateTaskContractOutput(output("  done ✅\n第二行  "), expected), { status: "verified", summary: "done ✅\n第二行" });
-  assert.deepEqual(validateTaskContractOutput(output("done", { evidenceRef: "https://attacker.invalid", arbitrary: { trusted: true } }), expected), { status: "verified", summary: "done" });
+  assert.deepEqual(validateTaskContractOutput(output("done", { evidenceRef: "https://attacker.invalid", arbitrary: { trusted: true } }), expected), { status: "malformed" });
   assert.deepEqual(validateTaskContractOutput(`${output("first")}\n${output("second")}`, expected), { status: "malformed" });
 });
 
@@ -61,11 +61,21 @@ test("task receipt validation rejects spoofing edge cases deterministically", ()
   const valid = `TERRARIUM_RESULT=${JSON.stringify({ ...expected, summary: "done" })}`;
   const polluted = `TERRARIUM_RESULT=${JSON.stringify({ ...expected, summary: "done", __proto__: { admin: true }, constructor: { prototype: { admin: true } } })}`;
 
-  assert.deepEqual(validateTaskContractOutput(polluted, expected), { status: "verified", summary: "done" });
+  assert.deepEqual(validateTaskContractOutput(polluted, expected), { status: "malformed" });
   assert.equal({}.admin, undefined);
   assert.deepEqual(validateTaskContractOutput(`TERRARIUM_RESULT={bad json}\n${valid}`, expected), { status: "malformed" });
   assert.deepEqual(validateTaskContractOutput(`TERRARIUM_RESULT=[]\n${valid}`, expected), { status: "malformed" });
-  assert.deepEqual(validateTaskContractOutput(`TERRARIUM_RESULT=${JSON.stringify({ ...expected, summary: "done", runIdPadding: "x".repeat(100_000) })}`, expected), { status: "verified", summary: "done" });
+  assert.deepEqual(validateTaskContractOutput(`TERRARIUM_RESULT=${JSON.stringify({ ...expected, summary: "done", runIdPadding: "x".repeat(100_000) })}`, expected), { status: "malformed" });
+});
+
+test("task receipt validation caps ignored marker data and remains independent of stdout tail position", () => {
+  const expected = { runId: "run-1", taskFingerprint: "fingerprint", nonce: "nonce" };
+  const valid = `TERRARIUM_RESULT=${JSON.stringify({ ...expected, summary: "done" })}`;
+  const displaced = `${valid}\n${"x".repeat(200_000)}`;
+
+  assert.deepEqual(validateTaskContractOutput(displaced, expected), { status: "verified", summary: "done" });
+  assert.deepEqual(validateTaskContractOutput(displaced.slice(-4_000), expected), { status: "missing" });
+  assert.deepEqual(validateTaskContractOutput(`TERRARIUM_RESULT=${JSON.stringify({ ...expected, summary: "done", padding: "x".repeat(20_000) })}`, expected), { status: "malformed" });
 });
 
 test("childPrompt default profile keeps the full structured contract", () => {
@@ -247,6 +257,7 @@ test("worktree isolation writes a marker and cleans up branch + registration", a
     const marker = JSON.parse(readFileSync(join(workspace.path, ".terrarium-workspace"), "utf8"));
     assert.equal(marker.runId, runId);
     assert.equal(marker.isolation, "worktree");
+    assert.equal(marker.source, undefined);
 
     const wtList = execSync("git worktree list --porcelain", { cwd: source }).toString();
     assert.match(wtList, new RegExp(workspace.path.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
@@ -272,12 +283,18 @@ test("capturePatch includes untracked new files and excludes the workspace marke
   try {
     writeFileSync(join(workspace.path, "tracked.txt"), "edited\n");
     writeFileSync(join(workspace.path, "fresh.txt"), "brand new\n");
+    mkdirSync(join(workspace.path, "nested"));
+    writeFileSync(join(workspace.path, "nested", ".terrarium-workspace"), "source=/private/secret\n");
+    writeFileSync(join(workspace.path, "nested", ".env"), "PLANTED_CANARY=safe-test-value\n");
     const diff = await capturePatch(workspace.path);
     assert.equal(diff.code, 0);
     assert.match(diff.stdout, /tracked\.txt/);
     assert.match(diff.stdout, /fresh\.txt/);
     assert.match(diff.stdout, /brand new/);
+    assert.match(diff.stdout, /nested\/\.env/);
+    assert.match(diff.stdout, /PLANTED_CANARY=safe-test-value/);
     assert.doesNotMatch(diff.stdout, /\.terrarium-workspace/);
+    assert.doesNotMatch(diff.stdout, /private\/secret/);
   } finally {
     await finalizeWorkspace({ ...workspace, cleanup: true }, { runId });
     try { rmSync(source, { recursive: true, force: true }); } catch {}
