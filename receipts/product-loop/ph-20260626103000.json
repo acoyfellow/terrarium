@@ -1,0 +1,77 @@
+{
+  "schema": "terrarium.product-loop.receipt.v0.1",
+  "iterationId": "ph-20260626103000",
+  "intent": "run agent discovery loop against Terrarium callback ownership",
+  "phases": [
+    "OBSERVE",
+    "SPAWN",
+    "SELECT",
+    "EXECUTE",
+    "VERIFY",
+    "RECORD",
+    "PUBLIC_SUMMARIZE",
+    "OPTIONAL_DEPLOY"
+  ],
+  "selectedWork": {
+    "kind": "callback-security-hardening",
+    "reason": "A child agent found that registerSubscriber allowed a different ownerRunId to reuse an existing subscriber ID and widen its filters."
+  },
+  "childRuns": [
+    {
+      "runId": "ter_20260626102302676_cecl76",
+      "status": "done",
+      "selected": false,
+      "summary": "Found receipt JSON whitespace parsing defect candidate."
+    },
+    {
+      "runId": "ter_20260626102302676_bx5thu",
+      "status": "done",
+      "selected": true,
+      "summary": "Found and fixed callback subscriber ownership hijacking."
+    },
+    {
+      "runId": "ter_20260626102302673_rq8ww9",
+      "status": "done",
+      "selected": false,
+      "summary": "Found group status ok aggregate candidate."
+    }
+  ],
+  "health": {
+    "productLoopValidateOk": true,
+    "routerTestOk": true,
+    "buildOk": true,
+    "localSmokeOk": true
+  },
+  "commands": [
+    {
+      "command": "spawn three isolated Terrarium child agents",
+      "ok": true
+    },
+    {
+      "command": "node --test test/router.test.js",
+      "ok": true
+    },
+    {
+      "command": "npm run product-loop:validate",
+      "ok": true
+    },
+    {
+      "command": "npm run demo:build",
+      "ok": true
+    },
+    {
+      "command": "npm run demo:smoke",
+      "ok": true
+    }
+  ],
+  "publicSummary": {
+    "iterationId": "ph-20260626103000",
+    "contentKind": "product-summary",
+    "evidenceClaim": true,
+    "evidenceRef": "terrarium-run:ter_20260626102302676_bx5thu",
+    "title": "A child agent found callback subscriber takeover",
+    "summary": "The discovery loop integrated a router guard so an existing subscriber owned by one run cannot be re-registered by another run to widen callback filters."
+  },
+  "canPublishStory": true,
+  "createdAt": "2026-06-26T10:26:03.820Z"
+}

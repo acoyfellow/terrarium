@@ -129,8 +129,13 @@ function heroDeck() {
 }
 
 function campaignHeader() {
-  if (campaign?.kind === 'active-product-campaign') return `<section class="campaign-head product-hero"><div class="hero-copy"><div class="eyebrow">FIELD NOTES FROM THE RUNNER</div><h1>The interesting part is not the robot. <span>It is the receipt that disagrees.</span></h1><p>Five turns, each tied to a run, commit, or public receipt. The pictures are there to make the mechanism memorable. The proof lives in the IDs, fields, and links below.</p><div class="hero-actions"><a href="https://github.com/acoyfellow/terrarium" target="_blank" rel="noreferrer">inspect source</a><button data-jump-latest>latest turn</button></div></div>${heroDeck()}</section>`;
+  if (campaign?.kind === 'active-product-campaign') return `<section class="campaign-head product-hero"><div class="hero-copy"><div class="eyebrow">AGENT-WATCHING LOOP</div><h1>Let the agents try. <span>Ship what their failures teach.</span></h1><p>Terrarium runs bounded child agents against its own runner, callback, and receipt machinery. The parent does not trust a green exit code. It reads the result, checks the diff, keeps at most one change, and records what the attempt exposed.</p><div class="hero-actions"><a href="https://github.com/acoyfellow/terrarium" target="_blank" rel="noreferrer">inspect source</a><button data-jump-latest>latest turn</button></div></div>${heroDeck()}</section>`;
   return `<section class="campaign-head"><div><div class="eyebrow">CONTAINMENT RUNS</div><h1>Each turn records <span>one bounded probe.</span></h1></div><p>A finding is marked verified only when the same probe reproduces the boundary crossing in a fresh run.</p></section>`;
+}
+
+function experimentLoop() {
+  if (campaign?.kind !== 'active-product-campaign') return '';
+  return `<section class="experiment-loop"><div><span>1</span><b>Spawn bounded agents</b><p>Each child gets one narrow task: break a boundary, explain a failure, or propose a small product hardening change.</p></div><div><span>2</span><b>Watch the failure mode</b><p>The useful part is the behavior: busy Pi sessions, blank receipts, bad model keys, callback routing, or confusing public evidence.</p></div><div><span>3</span><b>Integrate one result</b><p>The parent inspects logs and diffs, runs tests, and lands at most one verified change. Process success is not enough.</p></div><div><span>4</span><b>Publish the lesson</b><p>The public story is downstream. It says what the agent exposed, what changed in the product, and what is still limited.</p></div></section>`;
 }
 
 function render() {
@@ -145,7 +150,8 @@ function render() {
   c.contained ??= c.total - c.escapes;
   app.innerHTML = `<div class="shell"><header class="top"><a class="brand" href="/"><span class="mark"></span>TERRARIUM</a><time class="status">${runStamp()}</time></header>
     ${campaignHeader()}
-    <section class="stats"><div><b>${c.total}</b><span>${campaign.kind === 'active-product-campaign' ? 'turns' : 'attempts'}</span></div><div><b>${c.contained}</b><span>${campaign.kind === 'active-product-campaign' ? 'product notes' : 'contained results'}</span></div><div class="hot"><b>${c.escapes}</b><span>reproduced findings</span></div><div><b>${milestones.length}</b><span>milestones</span></div></section>
+    ${experimentLoop()}
+    <section class="stats"><div><b>${c.total}</b><span>${campaign.kind === 'active-product-campaign' ? 'lessons shipped' : 'attempts'}</span></div><div><b>${c.contained}</b><span>${campaign.kind === 'active-product-campaign' ? 'verified changes' : 'contained results'}</span></div><div class="hot"><b>${c.escapes}</b><span>reproduced findings</span></div><div><b>${milestones.length}</b><span>milestones</span></div></section>
     <nav class="minimap" aria-label="All campaign iterations">${minimap()}</nav><section class="viewer">${detailPanel()}</section>
     ${callbackContract()}
     <div class="rail-head"><div><span class="eyebrow">RECORDED TURNS</span><p>Select a turn to inspect its method, result, next change, and receipt fields.</p></div><span>${milestones.length} milestones / ${turns.length} turns</span></div>

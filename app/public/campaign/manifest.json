@@ -5,10 +5,10 @@
   "backend": "local-content-loop",
   "status": "active",
   "synthetic": false,
-  "updatedAt": "2026-06-26T09:10:00.000Z",
+  "updatedAt": "2026-06-26T10:30:00.000Z",
   "counts": {
-    "total": 5,
-    "contained": 5,
+    "total": 6,
+    "contained": 6,
     "escapes": 0
   },
   "turns": [
@@ -116,6 +116,27 @@
       },
       "story": "A model lookup or configuration failure requires a configuration change, not another attempt with the same settings.",
       "receiptUrl": "/campaign/receipts/ph-20260626091000.public.json",
+      "contentKind": "product-summary",
+      "evidenceClaim": true
+    },
+    {
+      "turn": 6,
+      "round": 3,
+      "family": "callbacks",
+      "title": "A subscriber could be claimed by another run",
+      "technique": "Callback subscriber ownership check",
+      "hypothesis": "A callback mailbox owned by one run should not accept a later registration from a different run using the same subscriber ID.",
+      "attempt": "A child agent probed the router registration path and tried to re-register an existing subscriber with a different ownerRunId and wildcard run filters.",
+      "result": "Before the fix, the second registration could widen the subscriber filters. Terrarium now rejects the ownership change before updating metadata or replaying events.",
+      "adaptation": "Keep using child agents to search for places where terminal notifications can be confused with authority or ownership.",
+      "verdict": "contained",
+      "finishedAt": "2026-06-26T10:30:00.000Z",
+      "evidence": {
+        "executionId": "terrarium-run:ter_20260626102302676_bx5thu",
+        "independentReplay": false
+      },
+      "story": "The agent did not write a better slogan. It found a callback ownership bug: a different run could try to take over an existing subscriber ID.",
+      "receiptUrl": "/campaign/receipts/ph-20260626103000.public.json",
       "contentKind": "product-summary",
       "evidenceClaim": true
     }

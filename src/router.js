@@ -53,6 +53,10 @@ export async function registerSubscriber(subscription) {
     if (previous.includes('*')) return narrowWildcard ? next : ['*'];
     return [...new Set([...previous, ...next])];
   };
+  const ownerRunId = subscription.ownerRunId ?? existing?.ownerRunId ?? null;
+  if (existing?.ownerRunId && subscription.ownerRunId && existing.ownerRunId !== subscription.ownerRunId) {
+    throw new Error('subscriber is owned by another run');
+  }
   const normalized = {
     version: 1,
     subscriberId,
@@ -60,7 +64,7 @@ export async function registerSubscriber(subscription) {
     workflowIds: mergeFilters(subscription.workflowIds, existing?.workflowIds, ['*']),
     eventTypes: mergeFilters(subscription.eventTypes, existing?.eventTypes, TERMINAL_EVENT_TYPES),
     runIds: mergeFilters(subscription.runIds, existing?.runIds, ['*'], { narrowWildcard: subscription.narrowWildcardRunIds === true }),
-    ownerRunId: subscription.ownerRunId ?? existing?.ownerRunId ?? null,
+    ownerRunId,
     createdAt: existing?.createdAt ?? subscription.createdAt ?? new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
