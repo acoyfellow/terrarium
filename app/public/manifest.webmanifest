@@ -1,7 +1,7 @@
 {
   "name": "Terrarium — contain, attack, verify, heal",
   "short_name": "Terrarium",
-  "description": "A self-hardening AI orchestration primitive that adversarially attacks its own boundaries, independently reproduces findings, and patches itself.",
+  "description": "Bounded agent runs with correlated receipts, inspectable status, and terminal callbacks.",
   "id": "/",
   "start_url": "/?source=pwa",
   "scope": "/",

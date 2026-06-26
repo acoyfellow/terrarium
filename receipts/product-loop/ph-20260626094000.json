@@ -1,0 +1,72 @@
+{
+  "schema": "terrarium.product-loop.receipt.v0.1",
+  "iterationId": "ph-20260626094000",
+  "intent": "de-cringe public app copy using the writing guide",
+  "phases": [
+    "OBSERVE",
+    "SELECT",
+    "EXECUTE",
+    "VERIFY",
+    "RECORD",
+    "PUBLIC_SUMMARIZE",
+    "OPTIONAL_DEPLOY"
+  ],
+  "selectedWork": {
+    "kind": "presentation-hardening",
+    "reason": "The public page had theatrical claims that obscured the product mechanism and made evidence boundaries harder to read."
+  },
+  "childRuns": [
+    {
+      "runId": "ter_20260626093417413_7wueaq",
+      "status": "done",
+      "selected": true,
+      "summary": "Rewrote public app copy around bounded runs and inspectable receipts."
+    },
+    {
+      "runId": "ter_20260626093554859_4dlvrh",
+      "status": "done",
+      "selected": false,
+      "summary": "Manifest copy rewrite candidate."
+    },
+    {
+      "runId": "ter_20260626093554860_2vp0o2",
+      "status": "done",
+      "selected": false,
+      "summary": "Public receipt panel candidate."
+    }
+  ],
+  "health": {
+    "repoCleanAtStart": true,
+    "productLoopValidateOk": true,
+    "buildOk": true,
+    "localSmokeOk": true
+  },
+  "commands": [
+    {
+      "command": "terrarium three isolated children for de-cringe/product presentation",
+      "ok": true
+    },
+    {
+      "command": "npm run product-loop:validate",
+      "ok": true
+    },
+    {
+      "command": "npm run demo:build",
+      "ok": true
+    },
+    {
+      "command": "npm run demo:smoke against local Vite",
+      "ok": true
+    }
+  ],
+  "publicSummary": {
+    "iterationId": "ph-20260626094000",
+    "contentKind": "product-summary",
+    "evidenceClaim": true,
+    "evidenceRef": "terrarium-run:ter_20260626093417413_7wueaq",
+    "title": "Public copy now starts from receipts, not theater",
+    "summary": "The reconciler integrated a public-app rewrite that names bounded runs, correlated receipts, and run-ID callbacks instead of unsupported escape/self-hardening language."
+  },
+  "canPublishStory": true,
+  "createdAt": "2026-06-26T09:38:08.660Z"
+}
