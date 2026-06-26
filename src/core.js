@@ -54,6 +54,15 @@ export function taskFingerprint(task) {
   return createHash("sha256").update(String(task)).digest("hex").slice(0, 24);
 }
 
+export function classifyRunnerFailure({ agent, stdoutTail, stderrTail, error } = {}) {
+  if (basename(splitCommand(agent || "")[0] || "") !== "pi") return null;
+  const output = [stderrTail, stdoutTail, error].filter(Boolean).join("\n");
+  if (/\b(?:runner|agent)\s+(?:is\s+)?busy\b|\bno\s+available\s+runners?\b|agent is already processing|specify streamingBehavior/i.test(output)) {
+    return { failureKind: "runner-busy", retryable: true };
+  }
+  return null;
+}
+
 export function resolveModel({ model } = {}, { env = process.env, config = {} } = {}) {
   return model || env.TERRARIUM_MODEL || config.defaultModel || null;
 }
@@ -477,6 +486,10 @@ export function validateTaskContractOutput(output, expected) {
 
 async function persistFinishedRun(base, patch) {
   let result = { ...base, ...patch, finishedAt: patch.finishedAt ?? new Date().toISOString() };
+  if (!result.ok) {
+    const classification = classifyRunnerFailure(result);
+    if (classification) result = { ...result, ...classification };
+  }
   if (patch.taskContractStatus != null) {
     // A run-machine adapter already made the contract/terminal decision.
   } else if (patch.dryRun === true && base.taskContractStatus === "pending") result.taskContractStatus = "not-applicable";

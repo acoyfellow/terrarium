@@ -1,0 +1,8 @@
+{
+  "iterationId": "ph-20260626083200",
+  "contentKind": "product-summary",
+  "evidenceClaim": true,
+  "evidenceRef": "terrarium-run:ter_20260626082925166_q2rmoe",
+  "title": "Pi runner-busy failures are retryable now",
+  "summary": "The reconciler selected the runner-busy child result and integrated a focused classifier so Pi admission failures are surfaced as retryable runner failures."
+}

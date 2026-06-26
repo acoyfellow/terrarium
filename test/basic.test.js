@@ -4,7 +4,7 @@ import { execFileSync, execSync } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { applyModelToAgent, assertRunId, capturePatch, childPrompt, defaultMreLogPath, finalizeWorkspace, getRunStatus, isPidAlive, prepareWorkspace, readRun, reconcileRun, resolveAgent, resolveModel, resolvePromptProfile, runTerrarium, spawnTerrariumBackground, splitCommand, READ_ONLY_AGENT } from "../src/core.js";
+import { applyModelToAgent, assertRunId, capturePatch, childPrompt, classifyRunnerFailure, defaultMreLogPath, finalizeWorkspace, getRunStatus, isPidAlive, prepareWorkspace, readRun, reconcileRun, resolveAgent, resolveModel, resolvePromptProfile, runTerrarium, spawnTerrariumBackground, splitCommand, READ_ONLY_AGENT } from "../src/core.js";
 
 test("builds a constrained child prompt", () => {
   assert.match(childPrompt("ship it", { depth: 1, maxDepth: 3 }), /Do not fan out/);
@@ -81,6 +81,14 @@ test("runTerrarium dry-run: explicit --agent overrides readOnly preset", async (
   assert.equal(result.agent, "pi run --no-session");
   assert.equal(result.readOnly, false);
   assert.match(result.invocation, /^pi run --no-session /);
+});
+
+test("Pi runner-busy failures are retryable without misclassifying other agents", () => {
+  assert.deepEqual(classifyRunnerFailure({ agent: "pi -p", stderrTail: "Error: runner is busy; try again" }), { failureKind: "runner-busy", retryable: true });
+  assert.deepEqual(classifyRunnerFailure({ agent: "/usr/local/bin/pi", error: "No available runners" }), { failureKind: "runner-busy", retryable: true });
+  assert.deepEqual(classifyRunnerFailure({ agent: "pi -p", stderrTail: "Agent is already processing. Specify streamingBehavior ('steer' or 'followUp') to queue the message." }), { failureKind: "runner-busy", retryable: true });
+  assert.equal(classifyRunnerFailure({ agent: "opencode run", stderrTail: "runner is busy" }), null);
+  assert.equal(classifyRunnerFailure({ agent: "pi -p", stderrTail: "authentication failed" }), null);
 });
 
 test("Pi children default ephemeral but explicit session behavior is preserved", async () => {
