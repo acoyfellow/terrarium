@@ -24,7 +24,11 @@ export async function createRunGroup({ label = "Terrarium group", runIds, groupI
 
 export async function getRunGroup(groupId) {
   assertGroupId(groupId);
-  return JSON.parse(await readFile(join(GROUP_DIR, `${groupId}.json`), "utf8"));
+  try { return JSON.parse(await readFile(join(GROUP_DIR, `${groupId}.json`), "utf8")); }
+  catch (error) {
+    if (error?.code === "ENOENT") throw new Error("Terrarium group access denied");
+    throw error;
+  }
 }
 
 export async function listRunGroups({ limit = 20 } = {}) {

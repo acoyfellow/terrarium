@@ -1,0 +1,88 @@
+{
+  "schema": "terrarium.product-loop.receipt.v0.1",
+  "iterationId": "ph-20260626143000",
+  "intent": "parallel attacker run 12 against live batch wrapper, secure workspace credentials, public ledger field policy, receipt/public schema, doctor repair consistency, and MCP group boundaries",
+  "phases": [
+    "OBSERVE",
+    "BATCH_ATTACK",
+    "SELECT",
+    "EXECUTE",
+    "VERIFY",
+    "RECORD",
+    "LOCAL_TABLE_UPDATE"
+  ],
+  "selectedWork": {
+    "kind": "public-redaction-doctor-group-hardening",
+    "reason": "Three verified non-conflicting fixes passed targeted parent tests."
+  },
+  "childRuns": [
+    {
+      "runId": "ter_20260626134346202_4wh4e3",
+      "status": "done",
+      "selected": false,
+      "summary": "Child verified focused allSettled partial-launch diagnostics and no production patch was needed. Parent first batch still threw before this verification completed."
+    },
+    {
+      "runId": "ter_20260626134346202_97ddyo",
+      "status": "done",
+      "selected": false,
+      "summary": "Child produced secure workspace credential-boundary patch. Not integrated this pass."
+    },
+    {
+      "runId": "ter_20260626134346202_u8kej3",
+      "status": "done",
+      "selected": true,
+      "summary": "Integrated manifest-wide agentModel value change from private runner model to not published while preserving the spreadsheet column."
+    },
+    {
+      "runId": "ter_20260626134416656_7t0mnl",
+      "status": "done",
+      "selected": false,
+      "summary": "Child proposed strict public-summary schema. Not integrated this pass to avoid broad schema changes."
+    },
+    {
+      "runId": "ter_20260626134612808_acd4q2",
+      "status": "done",
+      "selected": true,
+      "summary": "Integrated repair-candidate semantics: stale inflight counts as repairable; malformed acknowledged history does not."
+    },
+    {
+      "runId": "ter_20260626134612808_xi97ks",
+      "status": "done",
+      "selected": true,
+      "summary": "Integrated nonexistent group lookup normalization to Terrarium group access denied and added indistinguishable error tests."
+    }
+  ],
+  "health": {
+    "doctorTestsOk": true,
+    "routerTestsOk": true,
+    "mcpScopeTestsOk": true,
+    "groupsTestsOk": true,
+    "productLoopValidateOk": true,
+    "batchTestsOk": true,
+    "mcpConciseTestsOk": true,
+    "buildOk": true,
+    "localSmokeOk": true
+  },
+  "commands": [
+    {
+      "command": "terrarium_spawn_batch allSettled concurrency 3 plus continuation for six attacker jobs",
+      "ok": false,
+      "note": "first batch still hit cancellation wait; focused child validation showed no production patch needed"
+    },
+    {
+      "command": "TERRARIUM_CHILD_BUDGET=20 node --test test/doctor.test.js test/router.test.js test/mcp_scope.test.js test/groups.test.js test/product-loop.test.js test/batch.test.js test/mcp_concise.test.js",
+      "ok": true
+    }
+  ],
+  "publicSummary": {
+    "iterationId": "ph-20260626143000",
+    "contentKind": "product-summary",
+    "evidenceClaim": true,
+    "evidenceRef": "terrarium-run:ter_20260626134346202_u8kej3",
+    "title": "Agent model redacted; repair and group diagnostics tightened",
+    "summary": "Run 12 changed public agent/model cells to not published, corrected doctor repair-candidate semantics, and made missing groups indistinguishable from inaccessible groups. Targeted tests and local smoke passed."
+  },
+  "canPublishStory": true,
+  "createdAt": "2026-06-26T13:49:49.387Z"
+}
