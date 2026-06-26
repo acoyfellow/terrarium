@@ -7,9 +7,9 @@
   <meta name="color-scheme" content="dark" />
 
   <title>Terrarium — bounded agent runs with durable receipts</title>
-  <meta name="description" content="Terrarium starts bounded agent runs, records correlated receipts, and delivers terminal callbacks to the session that requested each run." />
+  <meta name="description" content="Terrarium runs bounded delegated tasks with inspectable status, correlated receipts, cancellation, and run-scoped terminal callbacks." />
   <link rel="canonical" href="https://terrarium.coey.dev/" />
-  <meta name="keywords" content="AI containment, AI sandbox, agent security, red team, self-healing, autonomous patching, LLM safety, Cloudflare, orchestration" />
+  <meta name="keywords" content="agent orchestration, delegated tasks, run receipts, terminal callbacks, agent tooling, CLI, MCP" />
   <meta name="author" content="Jordan Coeyman" />
   <meta name="robots" content="index, follow, max-image-preview:large" />
 
@@ -17,7 +17,7 @@
   <meta property="og:type" content="website" />
   <meta property="og:site_name" content="Terrarium" />
   <meta property="og:title" content="Terrarium — bounded agent runs with durable receipts" />
-  <meta property="og:description" content="One bounded run, one correlated receipt, and a terminal callback delivered by run ID." />
+  <meta property="og:description" content="Bounded delegated tasks with inspectable status, correlated receipts, cancellation, and run-scoped terminal callbacks." />
   <meta property="og:url" content="https://terrarium.coey.dev/" />
   <meta property="og:image" content="https://terrarium.coey.dev/og.jpg" />
   <meta property="og:image:width" content="1200" />
@@ -27,7 +27,7 @@
   <!-- Twitter / X -->
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="Terrarium — bounded agent runs with durable receipts" />
-  <meta name="twitter:description" content="One bounded run, one correlated receipt, and a terminal callback delivered by run ID." />
+  <meta name="twitter:description" content="Bounded delegated tasks with inspectable status, correlated receipts, cancellation, and run-scoped terminal callbacks." />
   <meta name="twitter:image" content="https://terrarium.coey.dev/og.jpg" />
 
   <!-- Icons + PWA -->
@@ -50,7 +50,7 @@
     "applicationCategory": "DeveloperApplication",
     "operatingSystem": "Any",
     "url": "https://terrarium.coey.dev/",
-    "description": "A durable execution and callback layer for bounded agent runs, correlated receipts, status inspection, logs, and cancellation.",
+    "description": "An execution and callback tool for bounded delegated tasks, with correlated receipts, inspectable status, logs, and cancellation.",
     "author": { "@type": "Person", "name": "Jordan Coeyman" },
     "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
     "sameAs": ["https://github.com/acoyfellow/terrarium"]
@@ -61,7 +61,7 @@
 </head>
 <body>
   <main id="app"></main>
-  <noscript>Terrarium starts bounded agent runs, records correlated receipts, and delivers terminal callbacks by run ID. Source: https://github.com/acoyfellow/terrarium</noscript>
+  <noscript>Terrarium runs bounded delegated tasks with inspectable status, correlated receipts, cancellation, and run-scoped terminal callbacks. Source: https://github.com/acoyfellow/terrarium</noscript>
   <script>
     if ("serviceWorker" in navigator) {
       window.addEventListener("load", () => navigator.serviceWorker.register("/sw.js").catch(() => {}));

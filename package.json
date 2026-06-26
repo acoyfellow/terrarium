@@ -1,7 +1,7 @@
 {
   "name": "terrarium",
   "version": "0.0.1",
-  "description": "A tiny one-level orchestration harness for composable subagents.",
+  "description": "Execution, status, receipts, cancellation, and callbacks for bounded delegated agent tasks.",
   "type": "module",
   "bin": {
     "terrarium": "./src/cli.js",
@@ -47,8 +47,10 @@
   ],
   "keywords": [
     "agent",
-    "orchestrator",
+    "orchestration",
     "subagent",
+    "callbacks",
+    "mcp",
     "cli",
     "pi-package"
   ],

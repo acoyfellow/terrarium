@@ -1,5 +1,5 @@
 {
-  "name": "Terrarium — contain, attack, verify, heal",
+  "name": "Terrarium — bounded agent runs with durable receipts",
   "short_name": "Terrarium",
   "description": "Bounded agent runs with correlated receipts, inspectable status, and terminal callbacks.",
   "id": "/",

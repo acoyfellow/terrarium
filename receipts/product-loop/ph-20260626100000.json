@@ -1,0 +1,90 @@
+{
+  "schema": "terrarium.product-loop.receipt.v0.1",
+  "iterationId": "ph-20260626100000",
+  "intent": "de-cringe public metadata and callback copy to match current product behavior",
+  "phases": [
+    "OBSERVE",
+    "SPAWN",
+    "SELECT",
+    "EXECUTE",
+    "VERIFY",
+    "RECORD",
+    "PUBLIC_SUMMARIZE",
+    "OPTIONAL_DEPLOY"
+  ],
+  "selectedWork": {
+    "kind": "presentation-hardening",
+    "reason": "Public metadata still advertised containment and self-healing terms while the current product is bounded delegated execution, receipts, cancellation, and callbacks."
+  },
+  "childRuns": [
+    {
+      "runId": "ter_20260626095647358_nl7blf",
+      "status": "done",
+      "selected": false,
+      "summary": "Receipt JSON primitive hardening candidate; not selected for this presentation-focused final run."
+    },
+    {
+      "runId": "ter_20260626095647358_fd19wl",
+      "status": "done",
+      "selected": true,
+      "summary": "Revised public metadata, package description, and callback copy."
+    },
+    {
+      "runId": "ter_20260626095647358_0tnu4b",
+      "status": "done",
+      "selected": false,
+      "summary": "Product-loop evidenceRef hardening was already present in main; no integration needed."
+    }
+  ],
+  "notes": [
+    "An earlier batch tool request timed out; the parent verified durable run files and integrated one selected result only."
+  ],
+  "health": {
+    "repoCleanAtStart": true,
+    "jsonValidationOk": true,
+    "nodeCheckOk": true,
+    "productLoopValidateOk": true,
+    "buildOk": true,
+    "localSmokeOk": true
+  },
+  "commands": [
+    {
+      "command": "npm run product-loop:dry-run",
+      "ok": true
+    },
+    {
+      "command": "npm run product-loop:validate",
+      "ok": true
+    },
+    {
+      "command": "npm run demo:build",
+      "ok": true
+    },
+    {
+      "command": "npm run product-loop:check -- fixtures/product-loop/three-child-plan.json",
+      "ok": true
+    },
+    {
+      "command": "node JSON parse checks",
+      "ok": true
+    },
+    {
+      "command": "node --check app/src/main.js",
+      "ok": true
+    },
+    {
+      "command": "npm run demo:smoke against local Vite",
+      "ok": true
+    }
+  ],
+  "publicSummary": {
+    "iterationId": "ph-20260626100000",
+    "contentKind": "product-summary",
+    "evidenceClaim": true,
+    "evidenceRef": "terrarium-run:ter_20260626095647358_fd19wl",
+    "title": "Public metadata now matches the runner product",
+    "summary": "The reconciler removed containment/self-healing SEO language and scoped callback delivery to Pi extension or pull API behavior."
+  },
+  "canPublishStory": true,
+  "createdAt": "2026-06-26T09:59:02.110Z"
+}
