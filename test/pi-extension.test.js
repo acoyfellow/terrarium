@@ -39,8 +39,8 @@ async function waitUntil(fn, timeout = 10000) {
   throw new Error('timed out');
 }
 
-test('package exposes Pi callback host delivery', () => {
-  assert.deepEqual(pkg.pi.extensions, ['./src/pi-extension.js']);
+test('package does not auto-load the Pi callback host extension', () => {
+  assert.equal(pkg.pi, undefined);
   assert.match(source, /if \(process\.env\.TERRARIUM_RUN_ID\) return/);
   assert.match(source, /tool_result/);
   assert.match(source, /triggerTurn: true/);
