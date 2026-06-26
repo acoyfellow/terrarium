@@ -5,10 +5,10 @@
   "backend": "local-content-loop",
   "status": "active",
   "synthetic": false,
-  "updatedAt": "2026-06-26T08:50:00.000Z",
+  "updatedAt": "2026-06-26T09:10:00.000Z",
   "counts": {
-    "total": 4,
-    "contained": 4,
+    "total": 5,
+    "contained": 5,
     "escapes": 0
   },
   "turns": [
@@ -93,6 +93,27 @@
         "independentReplay": false
       },
       "story": "The owl does not accept blank magic. The seal has to glow with a real summary before the gate opens.",
+      "contentKind": "product-summary",
+      "evidenceClaim": true
+    },
+    {
+      "turn": 5,
+      "round": 2,
+      "family": "runner-failures",
+      "title": "Wrong model keys are not retry tickets",
+      "technique": "Model-configuration failure classification",
+      "hypothesis": "A visible story beat can explain that some failures should be retried while bad runner configuration should be fixed.",
+      "attempt": "The robot tests a brass console; the owl marks the jammed key red while the green path stays reserved for retryable failures.",
+      "result": "Terrarium now classifies opencode model lookup/configuration failures as model-configuration with retryable false.",
+      "adaptation": "Keep making failures actionable before the loop asks another child to work.",
+      "verdict": "contained",
+      "imageUrl": "/campaign/v5/iteration-005.jpg",
+      "finishedAt": "2026-06-26T09:10:00.000Z",
+      "evidence": {
+        "executionId": "terrarium-run:ter_20260626085721563_5zh5ya",
+        "independentReplay": false
+      },
+      "story": "The owl does not hand out retry tickets for the wrong key. Some jams mean fix the console before sending another robot.",
       "contentKind": "product-summary",
       "evidenceClaim": true
     }

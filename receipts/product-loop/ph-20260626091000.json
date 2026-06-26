@@ -1,0 +1,57 @@
+{
+  "schema": "terrarium.product-loop.receipt.v0.1",
+  "iterationId": "ph-20260626091000",
+  "intent": "classify broken opencode model configuration as non-retryable runner failure",
+  "phases": [
+    "OBSERVE",
+    "SELECT",
+    "EXECUTE",
+    "VERIFY",
+    "RECORD",
+    "PUBLIC_SUMMARIZE",
+    "OPTIONAL_DEPLOY"
+  ],
+  "selectedWork": {
+    "kind": "runner-hardening",
+    "reason": "The A++++ loop observed opencode child batches fail from model lookup errors; that needs actionable classification."
+  },
+  "childRuns": [
+    {
+      "runId": "ter_20260626085721563_5zh5ya",
+      "status": "done",
+      "selected": true,
+      "summary": "Classified broken opencode model configuration as model-configuration/retryable false."
+    }
+  ],
+  "health": {
+    "repoCleanAtStart": true,
+    "targetedTestsOk": true,
+    "productLoopValidateOk": true,
+    "buildOk": true,
+    "demoSmokeOk": true
+  },
+  "commands": [
+    {
+      "command": "env -u TERRARIUM_REQUESTER_RUN_ID -u TERRARIUM_PARENT_RUN_ID -u TERRARIUM_MAX_CHILDREN node --test --test-name-pattern='runner failures classify' test/basic.test.js",
+      "ok": true
+    },
+    {
+      "command": "npm run product-loop:validate",
+      "ok": true
+    },
+    {
+      "command": "npm run demo:build",
+      "ok": true
+    }
+  ],
+  "publicSummary": {
+    "iterationId": "ph-20260626091000",
+    "contentKind": "product-summary",
+    "evidenceClaim": true,
+    "evidenceRef": "terrarium-run:ter_20260626085721563_5zh5ya",
+    "title": "Wrong model keys are not retry tickets",
+    "summary": "The reconciler integrated model-configuration classification so broken opencode model setup is surfaced as non-retryable instead of generic failure noise."
+  },
+  "canPublishStory": true,
+  "createdAt": "2026-06-26T09:08:24.515Z"
+}
