@@ -10,12 +10,12 @@ function assertGroupId(groupId) {
   return groupId;
 }
 
-export async function createRunGroup({ label = "Terrarium group", runIds, groupId = `grp_${randomUUID().replaceAll("-", "_")}` } = {}) {
+export async function createRunGroup({ label = "Terrarium group", runIds, groupId = `grp_${randomUUID().replaceAll("-", "_")}`, requesterRunId, scope } = {}) {
   assertGroupId(groupId);
   if (!Array.isArray(runIds) || runIds.length < 1 || runIds.length > 32) throw new Error("group requires 1-32 run IDs");
   const unique = [...new Set(runIds.map(assertRunId))];
   if (unique.length !== runIds.length) throw new Error("group run IDs must be unique");
-  for (const runId of unique) await getRunStatus({ runId });
+  for (const runId of unique) await getRunStatus({ runId, requesterRunId, scope });
   const group = { version: 1, groupId, label: String(label).slice(0, 120), runIds: unique, createdAt: new Date().toISOString() };
   await mkdir(GROUP_DIR, { recursive: true });
   await writeFile(join(GROUP_DIR, `${groupId}.json`), JSON.stringify(group, null, 2) + "\n", { flag: "wx" });
@@ -37,21 +37,22 @@ export async function listRunGroups({ limit = 20 } = {}) {
   return { count: bounded.length, groups: bounded };
 }
 
-export async function getRunGroupStatus({ groupId, verbose = false } = {}) {
+export async function getRunGroupStatus({ groupId, verbose = false, requesterRunId, scope } = {}) {
   const group = await getRunGroup(groupId);
   const runs = await Promise.all(group.runIds.map(async (runId) => {
-    try { return await getRunStatus({ runId }); }
+    try { return await getRunStatus({ runId, requesterRunId, scope }); }
     catch (error) { return { runId, status: "missing", ok: false, error: error.message }; }
   }));
   const counts = Object.fromEntries(["running", "done", "failed", "inconclusive", "cancelled", "error", "orphaned", "missing"].map((status) => [status, runs.filter((run) => run.status === status).length]));
-  const complete = runs.every((run) => !["running"].includes(run.status));
-  return { ...group, complete, counts, runs: verbose ? runs : runs.map(({ runId, status, ok, exitCode, taskContractStatus, progressText, needsAttention, idleMs, startedAt, finishedAt, error, note }) => ({ runId, status, ok, exitCode, taskContractStatus, progressText, needsAttention, idleMs, startedAt, finishedAt, error, note })) };
+  const complete = runs.every((run) => run.status !== "running");
+  const ok = complete && runs.every((run) => run.status === "done" && run.ok !== false);
+  return { ...group, complete, ok, counts, runs: verbose ? runs : runs.map(({ runId, status, ok, exitCode, taskContractStatus, progressText, needsAttention, idleMs, startedAt, finishedAt, error, note }) => ({ runId, status, ok, exitCode, taskContractStatus, progressText, needsAttention, idleMs, startedAt, finishedAt, error, note })) };
 }
 
-export async function readRunGroupLogs({ groupId, kind = "terrarium", tailBytes = 2000 } = {}) {
+export async function readRunGroupLogs({ groupId, kind = "terrarium", tailBytes = 2000, requesterRunId, scope } = {}) {
   const group = await getRunGroup(groupId);
   const results = await Promise.all(group.runIds.map(async (runId) => {
-    try { const value = await readRun({ runId, kind, tailBytes }); return { runId, text: value.text }; }
+    try { const value = await readRun({ runId, kind, tailBytes, requesterRunId, scope }); return { runId, text: value.text }; }
     catch (error) { return { runId, error: error.message }; }
   }));
   return { groupId, kind, results };
