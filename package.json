@@ -29,9 +29,6 @@
     "product-loop:validate": "node --test test/product-loop.test.js",
     "deploy": "vite build && wrangler deploy"
   },
-  "pi": {
-    "extensions": ["./src/pi-extension.js"]
-  },
   "files": [
     "src",
     "docs/SECURE_V1.md",
