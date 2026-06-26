@@ -1,0 +1,8 @@
+{
+  "iterationId": "ph-20260626094500",
+  "contentKind": "product-summary",
+  "evidenceClaim": true,
+  "evidenceRef": "terrarium-run:ter_20260626093944446_t74slb",
+  "title": "Campaign turns now describe mechanisms, not props",
+  "summary": "The reconciler rewrote the campaign manifest so each turn names the product mechanism, evidence boundary, and limit without leaning on firefly/owl/magic language."
+}
