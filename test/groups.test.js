@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdir, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { cancelRun, getRunStatus, isPidAlive, readRun, runTerrarium, spawnTerrariumBackground } from '../src/core.js';
@@ -20,6 +21,25 @@ test('run groups preserve ordered independent runs and summarize status/logs', a
   const logs = await readRunGroupLogs({ groupId: group.groupId, tailBytes: 200 });
   assert.equal(logs.results.length, 2);
   assert.ok(logs.results.every((result) => typeof result.text === 'string'));
+});
+
+test('group truthfulness rejects traversal IDs and does not call missing records complete', async () => {
+  for (const groupId of ['../grp_escape', 'grp_ok/../../escape', 'grp_%2e%2e', 'not_a_group']) {
+    await assert.rejects(createRunGroup({ groupId, runIds: ['ter_' + 'a'.repeat(20)] }), /invalid Terrarium group id/);
+    await assert.rejects(getRunGroupStatus({ groupId }), /invalid Terrarium group id/);
+    await assert.rejects(readRunGroupLogs({ groupId }), /invalid Terrarium group id/);
+  }
+
+  const groupId = `grp_missing_${Date.now()}`;
+  await mkdir(join(process.env.TERRARIUM_HOME || join(process.env.HOME, '.terrarium'), 'groups'), { recursive: true });
+  const path = join(process.env.TERRARIUM_HOME || join(process.env.HOME, '.terrarium'), 'groups', `${groupId}.json`);
+  await writeFile(path, JSON.stringify({ version: 1, groupId, label: 'missing member', runIds: [`ter_${'f'.repeat(20)}`], createdAt: new Date().toISOString() }));
+  try {
+    const status = await getRunGroupStatus({ groupId });
+    assert.equal(status.counts.missing, 1);
+    assert.equal(status.complete, false, 'missing state is unknown, not terminal');
+    assert.equal(status.ok, false);
+  } finally { rmSync(path, { force: true }); }
 });
 
 test('cancel terminates the child process group and records cancelled status', { timeout: 15000 }, async () => {

@@ -31,6 +31,11 @@ function sanitizeCallbackEvent(event) {
   const allowed = ['type', 'eventId', 'runId', 'parentRunId', 'taskFingerprint', 'workflowId', 'sessionId', 'channel', 'at', 'status', 'ok', 'exitCode', 'signal', 'dryRun'];
   return Object.fromEntries(allowed.filter((key) => event[key] !== undefined).map((key) => [key, event[key]]));
 }
+function isValidCallbackEvent(event, expectedEventId) {
+  if (!event || typeof event !== 'object' || Array.isArray(event)) return false;
+  if (event.eventId !== expectedEventId || !TERMINAL_EVENT_TYPES.includes(event.type) || typeof event.runId !== 'string') return false;
+  return Object.keys(event).every((key) => CALLBACK_EVENT_KEYS.has(key));
+}
 
 async function atomicJson(path, value) {
   const temp = `${path}.${process.pid}.${Math.random().toString(36).slice(2, 8)}.tmp`;
@@ -39,6 +44,7 @@ async function atomicJson(path, value) {
 }
 
 const TERMINAL_EVENT_TYPES = ['Completed', 'Failed', 'TimedOut', 'Cancelled'];
+const CALLBACK_EVENT_KEYS = new Set(['type', 'eventId', 'runId', 'parentRunId', 'taskFingerprint', 'workflowId', 'sessionId', 'channel', 'at', 'status', 'ok', 'exitCode', 'signal', 'dryRun', 'claimedAt']);
 
 export async function registerSubscriber(subscription) {
   const subscriberId = assertId(subscription.subscriberId, 'subscriber id');
@@ -197,7 +203,11 @@ export async function claimMailboxEvents({ subscriberId, limit = 20, ownerRunId 
         await rename(target, join(dirs.pending, file)).catch(() => {});
         continue;
       }
-      const event = { ...parsed, claimedAt: new Date().toISOString() };
+      if (!isValidCallbackEvent(parsed, file.slice(0, -5))) {
+        await rename(target, join(dirs.pending, file)).catch(() => {});
+        continue;
+      }
+      const event = { ...sanitizeCallbackEvent(parsed), claimedAt: new Date().toISOString() };
       await atomicJson(target, event);
       events.push(event);
     } catch (error) { if (error.code !== 'ENOENT') throw error; }
@@ -227,7 +237,7 @@ export async function getMailboxStatus(subscriberId, { ownerRunId } = {}) {
     let files = []; try { files = (await readdir(dir)).filter((file) => file.endsWith('.json')); } catch { return 0; }
     for (const file of files) {
       let event; try { event = JSON.parse(await readFile(join(dir, file), 'utf8')); } catch { continue; }
-      if (event && event.eventId === file.slice(0, -5) && typeof event.type === 'string' && typeof event.runId === 'string') count++;
+      if (isValidCallbackEvent(event, file.slice(0, -5))) count++;
     }
     return count;
   };
@@ -276,7 +286,7 @@ export async function pruneRouter({ acknowledgedOlderThanMs = 7 * 86400000, jour
         for (const file of files) {
           if (Array.isArray(eventIds) && !eventIds.includes(file.slice(0, -5))) continue;
           let event; try { event = JSON.parse(await readFile(join(dir, file), 'utf8')); } catch { continue; }
-          if (!event || event.eventId !== file.slice(0, -5) || typeof event.type !== 'string' || typeof event.runId !== 'string') continue;
+          if (!isValidCallbackEvent(event, file.slice(0, -5))) continue;
           if (eventAge(now, event) < Math.max(0, Number(cutoff) || 0)) continue;
           await rm(join(dir, file), { force: true });
           if (kind === 'acked') acknowledgedRemoved++;

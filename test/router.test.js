@@ -316,6 +316,32 @@ test('mailbox status excludes malformed pending and inflight records and prune r
   }
 });
 
+test('claim rejects structurally valid mailbox payloads containing non-allowlisted private fields', async () => {
+  const suffix = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+  const subscriberId = `sub_private_payload_${suffix}`;
+  const eventId = `evt_private_payload_${suffix}`;
+  const pending = join(MAILBOXES_DIR, subscriberId, 'pending', `${eventId}.json`);
+  try {
+    await registerSubscriber({ subscriberId, runIds: ['*'] });
+    await writeFile(pending, JSON.stringify({ eventId, type: 'Completed', runId: `ter_${suffix}`, at: new Date().toISOString(), task: 'secret prompt', logPath: '/private/log' }));
+    assert.deepEqual((await claimMailboxEvents({ subscriberId })).events, []);
+    assert.equal(existsSync(pending), true, 'malformed payload remains available for diagnosis');
+    assert.equal((await getMailboxStatus(subscriberId)).pending, 0);
+    const result = await pruneRouter({ callbackOlderThanMs: 0, subscriberIds: [subscriberId], eventIds: [eventId] });
+    assert.equal(result.pendingRemoved, 0);
+    assert.equal(existsSync(pending), true);
+  } finally {
+    await unregisterSubscriber(subscriberId).catch(() => {});
+  }
+});
+
+test('subscriber IDs cannot traverse router storage paths', async () => {
+  for (const subscriberId of ['../victim', '..', 'sub/name', 'sub\\name', 'sub%2fescape']) {
+    await assert.rejects(registerSubscriber({ subscriberId, runIds: ['*'] }), /invalid subscriber id/);
+    await assert.rejects(getMailboxStatus(subscriberId), /invalid subscriber id/);
+  }
+});
+
 test('child-owned prune requires the exact owner and cannot cross subscriber ownership', async () => {
   const suffix = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
   const subscriberId = `sub_owner_prune_${suffix}`;
