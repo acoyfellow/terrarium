@@ -294,6 +294,36 @@ test('malformed journal timestamps are retained rather than treated as stale', a
   }
 });
 
+test('router operations reject malformed callback and subscriber timestamps consistently with doctor', async () => {
+  const suffix = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+  const subscriberId = `sub_bad_timestamp_${suffix}`;
+  const pendingId = `evt_bad_pending_time_${suffix}`;
+  const inflightId = `evt_bad_inflight_time_${suffix}`;
+  const pending = join(MAILBOXES_DIR, subscriberId, 'pending', `${pendingId}.json`);
+  const inflight = join(MAILBOXES_DIR, subscriberId, 'inflight', `${inflightId}.json`);
+  try {
+    await registerSubscriber({ subscriberId, runIds: ['*'] });
+    await writeFile(pending, JSON.stringify({ eventId: pendingId, type: 'Completed', runId: `ter_${suffix}`, at: 'not-a-date' }));
+    await writeFile(inflight, JSON.stringify({ eventId: inflightId, type: 'Completed', runId: `ter_${suffix}`, at: 'not-a-date', claimedAt: '2020-01-01T00:00:00.000Z' }));
+    assert.deepEqual((await claimMailboxEvents({ subscriberId })).events, []);
+    await assert.rejects(acknowledgeMailboxEvent({ subscriberId, eventId: inflightId }), /event is not inflight/);
+    assert.equal((await requeueInflightEvents({ subscriberId, olderThanMs: 0 })).requeued, 0);
+    assert.deepEqual(await getMailboxStatus(subscriberId), { subscriberId, pending: 0, inflight: 0, acknowledged: 0 });
+    const pruned = await pruneRouter({ callbackOlderThanMs: 0, subscriberIds: [subscriberId], eventIds: [pendingId, inflightId] });
+    assert.equal(pruned.pendingRemoved, 0);
+    assert.equal(pruned.inflightRemoved, 0);
+
+    const record = JSON.parse(await readFile(join(SUBSCRIBERS_DIR, `${subscriberId}.json`), 'utf8'));
+    record.updatedAt = 'not-a-date';
+    await writeFile(join(SUBSCRIBERS_DIR, `${subscriberId}.json`), JSON.stringify(record));
+    await assert.rejects(getSubscriber(subscriberId), /invalid callback subscriber record/);
+    await assert.rejects(claimMailboxEvents({ subscriberId }), /invalid callback subscriber record/);
+  } finally {
+    await rm(join(MAILBOXES_DIR, subscriberId), { recursive: true, force: true });
+    await rm(join(SUBSCRIBERS_DIR, `${subscriberId}.json`), { force: true });
+  }
+});
+
 test('mailbox status excludes malformed pending and inflight records and prune retains them', async () => {
   const suffix = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
   const subscriberId = `sub_malformed_mailbox_${suffix}`;

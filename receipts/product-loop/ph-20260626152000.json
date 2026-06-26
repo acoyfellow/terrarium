@@ -1,0 +1,101 @@
+{
+  "schema": "terrarium.product-loop.receipt.v0.1",
+  "iterationId": "ph-20260626152000",
+  "intent": "parallel attacker run 17 across batch schema compatibility, receipts, callbacks, cancellation, groups, doctor state, secure workspace boundaries, and public ledger truthfulness",
+  "phases": [
+    "OBSERVE",
+    "BATCH_ATTACK",
+    "SELECT",
+    "EXECUTE",
+    "VERIFY",
+    "RECORD",
+    "LOCAL_TABLE_UPDATE",
+    "DOCUMENT"
+  ],
+  "selectedWork": {
+    "kind": "cli-batch-router-doctor-receipt-cancel-public-tests",
+    "reason": "Multiple verified tests and hardening changes were non-conflicting and passed the targeted suite."
+  },
+  "childRuns": [
+    {
+      "runId": "ter_20260626141542538_89vumn",
+      "status": "done",
+      "selected": true,
+      "summary": "Integrated CLI --cleanup-timeout-ms parsing/forwarding and MCP schema assertion. Live parent tool schema remains stale until reload."
+    },
+    {
+      "runId": "ter_20260626141542538_pjlscz",
+      "status": "done",
+      "selected": true,
+      "summary": "Integrated deterministic receipt spoofing regression tests. No production bypass found."
+    },
+    {
+      "runId": "ter_20260626141542538_jwdje0",
+      "status": "done",
+      "selected": true,
+      "summary": "Integrated canonical timestamp validation for router callbacks and subscriber records plus regression coverage."
+    },
+    {
+      "runId": "ter_20260626141542538_j25gdg",
+      "status": "done",
+      "selected": true,
+      "summary": "Integrated run-machine assertions that late verified receipts cannot replace cancelled terminal callbacks."
+    },
+    {
+      "runId": "ter_20260626141753792_zrzoxw",
+      "status": "done",
+      "selected": false,
+      "summary": "Child verified complete/ok semantics and fail-closed group access. No code changes needed."
+    },
+    {
+      "runId": "ter_20260626141753791_wti5xf",
+      "status": "done",
+      "selected": true,
+      "summary": "Integrated canonical UTC timestamp validation and router-compatible subscriber ID validation in doctor."
+    },
+    {
+      "runId": "ter_20260626141753791_dbuo8z",
+      "status": "done",
+      "selected": false,
+      "summary": "Child produced secure-workspace changes but Docker/dependency-capable verification and provider credential policy review are still needed."
+    },
+    {
+      "runId": "ter_20260626141753791_m2x1dx",
+      "status": "done",
+      "selected": true,
+      "summary": "Integrated tests for receipt link schema, changelog mirroring, ignored legacy media/story fields and not-published identity cells."
+    }
+  ],
+  "health": {
+    "targetedTestsOk": true,
+    "productLoopValidateOk": true,
+    "buildOk": true,
+    "localSmokeOk": true,
+    "changelogSynced": true
+  },
+  "commands": [
+    {
+      "command": "terrarium_spawn_batch allSettled concurrency 4 plus continuation for eight attacker jobs",
+      "ok": false,
+      "note": "parent tool still surfaced stale-schema/cancellation timeout; durable child runs completed"
+    },
+    {
+      "command": "TERRARIUM_CHILD_BUDGET=20 node --test test/basic.test.js test/router.test.js test/doctor.test.js test/run-machine.test.js test/product-loop.test.js test/mcp_scope.test.js",
+      "ok": true
+    },
+    {
+      "command": "npm run product-loop:validate && npm run demo:build && npm run demo:smoke && diff -q CHANGELOG.md app/public/CHANGELOG.md",
+      "ok": true
+    }
+  ],
+  "publicSummary": {
+    "iterationId": "ph-20260626152000",
+    "contentKind": "product-summary",
+    "evidenceClaim": true,
+    "evidenceRef": "terrarium-run:ter_20260626141542538_jwdje0",
+    "title": "CLI batch timeout and router timestamp validation hardened",
+    "summary": "Run 17 added CLI cleanupTimeoutMs forwarding, canonical router and doctor timestamp validation, receipt and cancellation regression tests, and public ledger truthfulness tests. Targeted tests, build, and local smoke passed."
+  },
+  "canPublishStory": true,
+  "createdAt": "2026-06-26T14:23:06.200Z"
+}

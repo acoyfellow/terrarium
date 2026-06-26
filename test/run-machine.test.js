@@ -40,6 +40,16 @@ test('CancelRequested -> ChildExited -> ReceiptObserved: cancellation wins once'
   assertSingleTerminal(r);
 });
 
+test('late verified receipt after cancellation is ignored and cannot replace the cancelled callback', () => {
+  const r = replay([cancel, exited, receipt, receipt]);
+  assert.equal(r.state.terminal.status, 'cancelled');
+  assert.equal(r.state.terminal.taskContractStatus, 'not-applicable');
+  assert.equal(count(r, 'Finalize'), 1);
+  assert.equal(count(r, 'QueueCallback'), 1);
+  assert.equal(r.decisions.filter((d) => d.type === 'IgnoreLateInput' && d.inputType === 'ReceiptObserved').length, 2);
+  assertSingleTerminal(r);
+});
+
 test('ChildExited -> ReceiptObserved -> CancelRequested: completion wins once', () => {
   const r = replay([exited, receipt, cancel]);
   assert.equal(r.state.terminal.status, 'done');
@@ -141,6 +151,8 @@ test('cancel recovers a dead launch supervisor with no child pid exactly once an
     assert.equal(status.taskContractStatus, 'not-applicable');
     const claimed = await claimMailboxEvents({ subscriberId });
     assert.deepEqual(claimed.events.map((event) => event.eventId), [eventId]);
+    assert.equal(claimed.events[0].status, 'cancelled');
+    assert.equal(claimed.events[0].ok, false);
     await getRunStatus({ runId, staleMs: 0 });
     assert.deepEqual((await claimMailboxEvents({ subscriberId })).events, []);
   } finally {

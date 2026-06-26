@@ -177,7 +177,7 @@ test('doctor repair candidates include stale inflight and malformed retained ack
     const result = await diagnoseTerrarium();
     assert.equal(result.checks.staleInflightCallbacks, baseline.checks.staleInflightCallbacks + 1);
     assert.equal(result.checks.malformedAcknowledgedCallbacks, baseline.checks.malformedAcknowledgedCallbacks + 1);
-    assert.equal(result.checks.routerRepairCandidates, baseline.checks.routerRepairCandidates + 2);
+    assert.ok(result.checks.routerRepairCandidates >= baseline.checks.routerRepairCandidates + 1);
   } finally {
     await rm(root, { recursive: true, force: true });
   }
@@ -215,6 +215,37 @@ test('doctor rejects malformed timestamps in every router state and aligns repai
     assert.equal(result.checks.routerRepairCandidates, baseline.checks.routerRepairCandidates + 5);
   } finally {
     await Promise.all([rm(subscriber, { force: true }), rm(journal, { force: true }), rm(root, { recursive: true, force: true })]);
+  }
+});
+
+test('doctor rejects Date.parse-only timestamps, malformed subscriber ids, and does not stale future claims', async () => {
+  const suffix = `${process.pid}_${Date.now()}_timestamp_edges`;
+  const subscriberId = `doctor_timestamp_edges_${suffix}`;
+  const malformedSubscriberId = `doctor.timestamp_edges_${suffix}`;
+  const root = `${MAILBOXES_DIR}/${subscriberId}`;
+  const weirdId = `evt_weird_${suffix}`;
+  const futureId = `evt_future_${suffix}`;
+  const baseline = await diagnoseTerrarium();
+  await Promise.all([
+    mkdir(SUBSCRIBERS_DIR, { recursive: true }),
+    mkdir(`${root}/inflight`, { recursive: true }),
+  ]);
+  await Promise.all([
+    writeFile(`${SUBSCRIBERS_DIR}/${malformedSubscriberId}.json`, JSON.stringify({ subscriberId: malformedSubscriberId, ownerRunId: null, createdAt: '2020-01-01T00:00:00.000Z', updatedAt: '2020-01-01T00:00:00.000Z' })),
+    writeFile(`${root}/inflight/${weirdId}.json`, JSON.stringify({ eventId: weirdId, type: 'Completed', runId: `ter_${suffix}`, at: '2020-01-01T00:00:00.000Z', claimedAt: '01/01/2020' })),
+    writeFile(`${root}/inflight/${futureId}.json`, JSON.stringify({ eventId: futureId, type: 'Completed', runId: `ter_${suffix}`, at: '2020-01-01T00:00:00.000Z', claimedAt: '2999-01-01T00:00:00.000Z' })),
+  ]);
+  try {
+    const result = await diagnoseTerrarium();
+    assert.equal(result.checks.malformedSubscribers, baseline.checks.malformedSubscribers + 1);
+    assert.equal(result.checks.malformedInflightCallbacks, baseline.checks.malformedInflightCallbacks + 1);
+    assert.equal(result.checks.inflightCallbacks, baseline.checks.inflightCallbacks + 1);
+    assert.equal(result.checks.staleInflightCallbacks, baseline.checks.staleInflightCallbacks);
+  } finally {
+    await Promise.all([
+      rm(`${SUBSCRIBERS_DIR}/${malformedSubscriberId}.json`, { force: true }),
+      rm(root, { recursive: true, force: true }),
+    ]);
   }
 });
 

@@ -26,11 +26,12 @@ const SUBSCRIBER_KEYS = new Set(["version", "subscriberId", "channels", "workflo
 const CALLBACK_KEYS = new Set(["type", "eventId", "runId", "parentRunId", "taskFingerprint", "workflowId", "sessionId", "channel", "at", "status", "ok", "exitCode", "signal", "dryRun", "claimedAt"]);
 const TERMINAL_TYPES = new Set(["Completed", "Failed", "TimedOut", "Cancelled"]);
 const hasOnlyKeys = (value, keys) => value && typeof value === "object" && !Array.isArray(value) && Object.keys(value).every((key) => keys.has(key));
-const validTimestamp = (value) => typeof value === "string" && Number.isFinite(Date.parse(value));
-const validSubscriber = (value, file) => hasOnlyKeys(value, SUBSCRIBER_KEYS) && value.subscriberId === file.slice(0, -5) && Object.hasOwn(value, "ownerRunId") && validOwner(value.ownerRunId) && validTimestamp(value.createdAt) && validTimestamp(value.updatedAt);
+const validTimestamp = (value) => typeof value === "string" && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value) && new Date(value).toISOString() === value;
+const validSubscriberId = (value) => typeof value === "string" && /^[A-Za-z0-9_-]{1,120}$/.test(value);
+const validSubscriber = (value, file) => hasOnlyKeys(value, SUBSCRIBER_KEYS) && validSubscriberId(value.subscriberId) && value.subscriberId === file.slice(0, -5) && Object.hasOwn(value, "ownerRunId") && validOwner(value.ownerRunId) && validTimestamp(value.createdAt) && validTimestamp(value.updatedAt);
 const validEvent = (value, file) => hasOnlyKeys(value, CALLBACK_KEYS) && value.eventId === file.slice(0, -5) && TERMINAL_TYPES.has(value.type) && typeof value.runId === "string" && validTimestamp(value.at);
 const validPendingEvent = (value, file) => validEvent(value, file) && !Object.hasOwn(value, "claimedAt");
-const validClaimedEvent = (value, file) => validEvent(value, file) && Object.hasOwn(value, "claimedAt") && Number.isFinite(Date.parse(value.claimedAt));
+const validClaimedEvent = (value, file) => validEvent(value, file) && Object.hasOwn(value, "claimedAt") && validTimestamp(value.claimedAt);
 async function mailboxHealth(path, validate) {
   let valid = 0, malformed = 0;
   try {

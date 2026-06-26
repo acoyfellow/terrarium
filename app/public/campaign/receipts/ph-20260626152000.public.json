@@ -1,0 +1,8 @@
+{
+  "iterationId": "ph-20260626152000",
+  "contentKind": "product-summary",
+  "evidenceClaim": true,
+  "evidenceRef": "terrarium-run:ter_20260626141542538_jwdje0",
+  "title": "CLI batch timeout and router timestamp validation hardened",
+  "summary": "Run 17 added CLI cleanupTimeoutMs forwarding, canonical router and doctor timestamp validation, receipt and cancellation regression tests, and public ledger truthfulness tests. Targeted tests, build, and local smoke passed."
+}

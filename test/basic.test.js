@@ -56,6 +56,18 @@ test("task receipt validation enforces summary boundaries and preserves JSON tex
   assert.deepEqual(validateTaskContractOutput(`${output("first")}\n${output("second")}`, expected), { status: "malformed" });
 });
 
+test("task receipt validation rejects spoofing edge cases deterministically", () => {
+  const expected = { runId: "run-1", taskFingerprint: "fingerprint", nonce: "nonce" };
+  const valid = `TERRARIUM_RESULT=${JSON.stringify({ ...expected, summary: "done" })}`;
+  const polluted = `TERRARIUM_RESULT=${JSON.stringify({ ...expected, summary: "done", __proto__: { admin: true }, constructor: { prototype: { admin: true } } })}`;
+
+  assert.deepEqual(validateTaskContractOutput(polluted, expected), { status: "verified", summary: "done" });
+  assert.equal({}.admin, undefined);
+  assert.deepEqual(validateTaskContractOutput(`TERRARIUM_RESULT={bad json}\n${valid}`, expected), { status: "malformed" });
+  assert.deepEqual(validateTaskContractOutput(`TERRARIUM_RESULT=[]\n${valid}`, expected), { status: "malformed" });
+  assert.deepEqual(validateTaskContractOutput(`TERRARIUM_RESULT=${JSON.stringify({ ...expected, summary: "done", runIdPadding: "x".repeat(100_000) })}`, expected), { status: "verified", summary: "done" });
+});
+
 test("childPrompt default profile keeps the full structured contract", () => {
   const out = childPrompt("ship it", { depth: 1, maxDepth: 3, runId: "r1", parentRunId: null });
   assert.match(out, /You are a Terrarium child agent\./);
