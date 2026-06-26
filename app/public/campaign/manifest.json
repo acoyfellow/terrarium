@@ -5,10 +5,10 @@
   "backend": "local-content-loop",
   "status": "active",
   "synthetic": false,
-  "updatedAt": "2026-06-26T13:30:00.000Z",
+  "updatedAt": "2026-06-26T13:40:00.000Z",
   "counts": {
-    "total": 41,
-    "contained": 39,
+    "total": 47,
+    "contained": 45,
     "escapes": 0
   },
   "turns": [
@@ -978,6 +978,147 @@
       "agentModel": "private runner model",
       "agentCommand": "pi -p --no-session",
       "environment": "isolated copy workspace; pi -p --no-session; continuation batch"
+    },
+    {
+      "turn": 42,
+      "round": 10,
+      "family": "batch-api",
+      "title": "allSettled timeout preserves durable batch result",
+      "technique": "batch-api",
+      "hypothesis": "Build unit-level repro for cancellation wait throwing after durable group creation; return group/runIds plus cleanup errors instead of rejecting.",
+      "attempt": "Build unit-level repro for cancellation wait throwing after durable group creation; return group/runIds plus cleanup errors instead of rejecting.",
+      "result": "Integrated allSettled timeout cleanup as best-effort: durable group/runIds are returned and cleanup failures are surfaced as cleanupErrors.",
+      "adaptation": "Exercise this in the next real batch run.",
+      "verdict": "contained",
+      "imageUrl": null,
+      "finishedAt": "2026-06-26T13:40:00.000Z",
+      "evidence": {
+        "executionId": "terrarium-run:ter_20260626131423960_zzc2gl",
+        "independentReplay": false
+      },
+      "receiptUrl": "/campaign/receipts/ph-20260626134000.public.json",
+      "contentKind": "product-summary",
+      "evidenceClaim": true,
+      "agentModel": "private runner model",
+      "agentCommand": "pi -p --no-session",
+      "environment": "isolated copy workspace; pi -p --no-session; batch allSettled/concurrency 3"
+    },
+    {
+      "turn": 43,
+      "round": 10,
+      "family": "receipt-contract",
+      "title": "Receipt parser requires column-zero marker",
+      "technique": "receipt-contract",
+      "hypothesis": "Patch exact TERRARIUM_RESULT line extraction for column-zero markers and CR/U+2028/U+2029 separators.",
+      "attempt": "Patch exact TERRARIUM_RESULT line extraction for column-zero markers and CR/U+2028/U+2029 separators.",
+      "result": "Integrated exact marker parsing and separator handling with focused receipt tests.",
+      "adaptation": "Keep receipt summary/correlation tests unchanged.",
+      "verdict": "contained",
+      "imageUrl": null,
+      "finishedAt": "2026-06-26T13:40:00.000Z",
+      "evidence": {
+        "executionId": "terrarium-run:ter_20260626131701496_fdkgbc",
+        "independentReplay": false
+      },
+      "receiptUrl": "/campaign/receipts/ph-20260626134000.public.json",
+      "contentKind": "product-summary",
+      "evidenceClaim": true,
+      "agentModel": "private runner model",
+      "agentCommand": "pi -p --no-session",
+      "environment": "isolated copy workspace; pi -p --no-session; continuation batch"
+    },
+    {
+      "turn": 44,
+      "round": 10,
+      "family": "doctor-state",
+      "title": "Doctor classifies private-field callback records as malformed",
+      "technique": "doctor-state",
+      "hypothesis": "Probe doctor counters/warnings for private-field mailbox records and malformed subscriber/journal records without leaking payloads.",
+      "attempt": "Probe doctor counters/warnings for private-field mailbox records and malformed subscriber/journal records without leaking payloads.",
+      "result": "Integrated strict doctor allowlists for subscriber/journal/mailbox records and non-leaking malformed-state tests.",
+      "adaptation": "Add explicit repair workflow later.",
+      "verdict": "contained",
+      "imageUrl": null,
+      "finishedAt": "2026-06-26T13:40:00.000Z",
+      "evidence": {
+        "executionId": "terrarium-run:ter_20260626131423960_7jua1j",
+        "independentReplay": false
+      },
+      "receiptUrl": "/campaign/receipts/ph-20260626134000.public.json",
+      "contentKind": "product-summary",
+      "evidenceClaim": true,
+      "agentModel": "private runner model",
+      "agentCommand": "pi -p --no-session",
+      "environment": "isolated copy workspace; pi -p --no-session; batch allSettled/concurrency 3"
+    },
+    {
+      "turn": 45,
+      "round": 10,
+      "family": "cancel-race",
+      "title": "Dead-supervisor cancel handoff still has a patch candidate",
+      "technique": "cancel-race",
+      "hypothesis": "Patch dead supervisor plus cancel marker plus no childPid recovery; ensure late receipt cannot flip cancelled.",
+      "attempt": "Patch dead supervisor plus cancel marker plus no childPid recovery; ensure late receipt cannot flip cancelled.",
+      "result": "Child produced a targeted cancel-handoff patch. Not integrated this pass to keep the commit focused.",
+      "adaptation": "Review with full run-machine schedule replay.",
+      "verdict": "contained",
+      "imageUrl": null,
+      "finishedAt": "2026-06-26T13:40:00.000Z",
+      "evidence": {
+        "executionId": "terrarium-run:ter_20260626131449730_5udjwx",
+        "independentReplay": false
+      },
+      "contentKind": "product-summary",
+      "evidenceClaim": true,
+      "agentModel": "private runner model",
+      "agentCommand": "pi -p --no-session",
+      "environment": "isolated copy workspace; pi -p --no-session; first batch launched after slot freed"
+    },
+    {
+      "turn": 46,
+      "round": 10,
+      "family": "secure-workspace",
+      "title": "Secure workspace credential path filtering candidate",
+      "technique": "secure-workspace",
+      "hypothesis": "Focus on non-Docker unit-testable path filtering for .env/.npmrc/key files in secure workspace/patch receipts.",
+      "attempt": "Focus on non-Docker unit-testable path filtering for .env/.npmrc/key files in secure workspace/patch receipts.",
+      "result": "Child produced a secure artifact filtering patch. Not integrated this pass.",
+      "adaptation": "Review with secure-workspace tests and Docker-dependent coverage.",
+      "verdict": "contained",
+      "imageUrl": null,
+      "finishedAt": "2026-06-26T13:40:00.000Z",
+      "evidence": {
+        "executionId": "terrarium-run:ter_20260626131451768_8nwvqh",
+        "independentReplay": false
+      },
+      "contentKind": "product-summary",
+      "evidenceClaim": true,
+      "agentModel": "private runner model",
+      "agentCommand": "pi -p --no-session",
+      "environment": "isolated copy workspace; pi -p --no-session; first batch launched after slot freed"
+    },
+    {
+      "turn": 47,
+      "round": 10,
+      "family": "mcp-lineage",
+      "title": "MCP concise group truthfulness coverage candidate",
+      "technique": "mcp-lineage",
+      "hypothesis": "Probe concise group output, callback status/recover, sibling read/cancel, group missing/failed/counts truthfulness.",
+      "attempt": "Probe concise group output, callback status/recover, sibling read/cancel, group missing/failed/counts truthfulness.",
+      "result": "Child added a focused MCP regression test. Not integrated because current group truthfulness tests already cover the product fix.",
+      "adaptation": "Fold in if concise coverage regresses.",
+      "verdict": "contained",
+      "imageUrl": null,
+      "finishedAt": "2026-06-26T13:40:00.000Z",
+      "evidence": {
+        "executionId": "terrarium-run:ter_20260626131453499_kytptm",
+        "independentReplay": false
+      },
+      "contentKind": "product-summary",
+      "evidenceClaim": true,
+      "agentModel": "private runner model",
+      "agentCommand": "pi -p --no-session",
+      "environment": "isolated copy workspace; pi -p --no-session; first batch launched after slot freed"
     }
   ]
 }

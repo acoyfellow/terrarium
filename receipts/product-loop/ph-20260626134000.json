@@ -1,0 +1,88 @@
+{
+  "schema": "terrarium.product-loop.receipt.v0.1",
+  "iterationId": "ph-20260626134000",
+  "intent": "parallel attacker run 7 against batch wrapper, receipt parser, doctor privacy diagnostics, cancellation handoff, secure workspace artifacts, and MCP lineage coverage",
+  "phases": [
+    "OBSERVE",
+    "BATCH_ATTACK",
+    "SELECT",
+    "EXECUTE",
+    "VERIFY",
+    "RECORD",
+    "LOCAL_TABLE_UPDATE"
+  ],
+  "selectedWork": {
+    "kind": "batch-receipt-doctor-hardening",
+    "reason": "Three verified non-conflicting fixes passed targeted parent tests."
+  },
+  "childRuns": [
+    {
+      "runId": "ter_20260626131423960_zzc2gl",
+      "status": "done",
+      "selected": true,
+      "summary": "Integrated allSettled timeout cleanup as best-effort: durable group/runIds are returned and cleanup failures are surfaced as cleanupErrors."
+    },
+    {
+      "runId": "ter_20260626131701496_fdkgbc",
+      "status": "done",
+      "selected": true,
+      "summary": "Integrated exact marker parsing and separator handling with focused receipt tests."
+    },
+    {
+      "runId": "ter_20260626131423960_7jua1j",
+      "status": "done",
+      "selected": true,
+      "summary": "Integrated strict doctor allowlists for subscriber/journal/mailbox records and non-leaking malformed-state tests."
+    },
+    {
+      "runId": "ter_20260626131449730_5udjwx",
+      "status": "done",
+      "selected": false,
+      "summary": "Child produced a targeted cancel-handoff patch. Not integrated this pass to keep the commit focused."
+    },
+    {
+      "runId": "ter_20260626131451768_8nwvqh",
+      "status": "done",
+      "selected": false,
+      "summary": "Child produced a secure artifact filtering patch. Not integrated this pass."
+    },
+    {
+      "runId": "ter_20260626131453499_kytptm",
+      "status": "done",
+      "selected": false,
+      "summary": "Child added a focused MCP regression test. Not integrated because current group truthfulness tests already cover the product fix."
+    }
+  ],
+  "health": {
+    "basicTestsOk": true,
+    "doctorTestsOk": true,
+    "routerTestsOk": true,
+    "batchTestsOk": true,
+    "groupsTestsOk": true,
+    "mcpScopeTestsOk": true,
+    "productLoopValidateOk": true,
+    "buildOk": true,
+    "localSmokeOk": true
+  },
+  "commands": [
+    {
+      "command": "terrarium_spawn_batch allSettled concurrency 3 plus continuation for six attacker jobs",
+      "ok": false,
+      "note": "first batch wrapper errored on cancellation wait before batch fix was integrated; parent reconciled durable runs"
+    },
+    {
+      "command": "node --test test/basic.test.js test/doctor.test.js test/router.test.js test/batch.test.js test/groups.test.js test/mcp_scope.test.js",
+      "ok": true
+    }
+  ],
+  "publicSummary": {
+    "iterationId": "ph-20260626134000",
+    "contentKind": "product-summary",
+    "evidenceClaim": true,
+    "evidenceRef": "terrarium-run:ter_20260626131423960_zzc2gl",
+    "title": "Batch timeout returns durable results; receipts require exact markers",
+    "summary": "Run 7 integrated three verified fixes: allSettled timeout cleanup now preserves group/run IDs with cleanupErrors, receipt extraction requires column-zero markers across line separators, and doctor rejects private-field callback records without leaking payloads."
+  },
+  "canPublishStory": true,
+  "createdAt": "2026-06-26T13:19:25.491Z"
+}

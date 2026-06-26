@@ -22,8 +22,12 @@ async function jsonHealth(path, validate = () => true) {
   return { valid, malformed };
 }
 const validOwner = (value) => value === null || (typeof value === "string" && /^ter_[A-Za-z0-9_]+$/.test(value));
-const validSubscriber = (value, file) => value && value.subscriberId === file.slice(0, -5) && Object.hasOwn(value, "ownerRunId") && validOwner(value.ownerRunId);
-const validEvent = (value, file) => value && value.eventId === file.slice(0, -5) && typeof value.type === "string" && typeof value.runId === "string";
+const SUBSCRIBER_KEYS = new Set(["version", "subscriberId", "channels", "workflowIds", "eventTypes", "runIds", "ownerRunId", "createdAt", "updatedAt"]);
+const CALLBACK_KEYS = new Set(["type", "eventId", "runId", "parentRunId", "taskFingerprint", "workflowId", "sessionId", "channel", "at", "status", "ok", "exitCode", "signal", "dryRun", "claimedAt"]);
+const TERMINAL_TYPES = new Set(["Completed", "Failed", "TimedOut", "Cancelled"]);
+const hasOnlyKeys = (value, keys) => value && typeof value === "object" && !Array.isArray(value) && Object.keys(value).every((key) => keys.has(key));
+const validSubscriber = (value, file) => hasOnlyKeys(value, SUBSCRIBER_KEYS) && value.subscriberId === file.slice(0, -5) && Object.hasOwn(value, "ownerRunId") && validOwner(value.ownerRunId);
+const validEvent = (value, file) => hasOnlyKeys(value, CALLBACK_KEYS) && value.eventId === file.slice(0, -5) && TERMINAL_TYPES.has(value.type) && typeof value.runId === "string";
 async function mailboxHealth(path) {
   let valid = 0, malformed = 0;
   try {

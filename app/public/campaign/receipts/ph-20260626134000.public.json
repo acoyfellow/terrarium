@@ -1,0 +1,8 @@
+{
+  "iterationId": "ph-20260626134000",
+  "contentKind": "product-summary",
+  "evidenceClaim": true,
+  "evidenceRef": "terrarium-run:ter_20260626131423960_zzc2gl",
+  "title": "Batch timeout returns durable results; receipts require exact markers",
+  "summary": "Run 7 integrated three verified fixes: allSettled timeout cleanup now preserves group/run IDs with cleanupErrors, receipt extraction requires column-zero markers across line separators, and doctor rejects private-field callback records without leaking payloads."
+}

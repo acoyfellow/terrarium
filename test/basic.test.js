@@ -18,6 +18,33 @@ test("task receipt validation classifies non-object JSON as malformed", () => {
   }
 });
 
+test("task receipt validation only accepts column-zero result markers", () => {
+  const expected = { runId: "run-1", taskFingerprint: "fingerprint", nonce: "nonce" };
+  const receipt = JSON.stringify({ ...expected, summary: "done" });
+  for (const prefix of [" ", "\t", "log: ", "x"]) {
+    assert.deepEqual(validateTaskContractOutput(`${prefix}TERRARIUM_RESULT=${receipt}`, expected), { status: "missing" });
+  }
+  assert.deepEqual(
+    validateTaskContractOutput(`quoted marker: TERRARIUM_RESULT={not-json}\nTERRARIUM_RESULT=${receipt}`, expected),
+    { status: "verified", summary: "done" },
+  );
+});
+
+test("task receipt validation recognizes CR and Unicode line separators", () => {
+  const expected = { runId: "run-1", taskFingerprint: "fingerprint", nonce: "nonce" };
+  const receipt = JSON.stringify({ ...expected, summary: "done" });
+  for (const separator of ["\r", "\u2028", "\u2029"]) {
+    assert.deepEqual(
+      validateTaskContractOutput(`progress${separator}TERRARIUM_RESULT=${receipt}${separator}finished`, expected),
+      { status: "verified", summary: "done" },
+    );
+  }
+  assert.deepEqual(
+    validateTaskContractOutput(`TERRARIUM_RESULT=${receipt}\rTERRARIUM_RESULT=${receipt}`, expected),
+    { status: "malformed" },
+  );
+});
+
 test("childPrompt default profile keeps the full structured contract", () => {
   const out = childPrompt("ship it", { depth: 1, maxDepth: 3, runId: "r1", parentRunId: null });
   assert.match(out, /You are a Terrarium child agent\./);

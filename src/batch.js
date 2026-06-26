@@ -112,8 +112,14 @@ async function awaitStrategy({ groupId, strategy, quorumTarget, pollMs, timeoutM
       return { ...decision, group: await getRunGroupStatus({ groupId }) };
     }
     if (deadline && Date.now() >= deadline) {
-      await cancelLosers(status, { all: true });
-      return { ok: false, reason: "timeout", timedOut: true, group: await getRunGroupStatus({ groupId }) };
+      const cleanupErrors = await cancelLosers(status, { all: true, collectErrors: true });
+      return {
+        ok: false,
+        reason: "timeout",
+        timedOut: true,
+        ...(cleanupErrors.length ? { cleanupErrors } : {}),
+        group: await getRunGroupStatus({ groupId }),
+      };
     }
     await sleep(pollMs);
   }
@@ -158,7 +164,7 @@ function decide(status, strategy, quorumTarget) {
   }
 }
 
-async function cancelLosers(status, { all = false } = {}) {
+async function cancelLosers(status, { all = false, collectErrors = false } = {}) {
   const targets = status.runs.filter((run) => run.status === "running");
   if (!all) {
     // keep none running; winners are already terminal
@@ -172,7 +178,8 @@ async function cancelLosers(status, { all = false } = {}) {
       failures.push(`${run.runId}: ${error.message}`);
     }
   }));
-  if (failures.length) throw new AggregateError(failures.map((message) => new Error(message)), `failed to settle ${failures.length} cancelled run(s)`);
+  if (failures.length && !collectErrors) throw new AggregateError(failures.map((message) => new Error(message)), `failed to settle ${failures.length} cancelled run(s)`);
+  return failures;
 }
 
 function sleep(ms) { return new Promise((resolve) => setTimeout(resolve, ms)); }
