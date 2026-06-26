@@ -35,6 +35,8 @@ test("conciseSpawn drops envelope and keeps failure-triage fields", () => {
     error: "child died",
     note: "supervisor saw EIO",
     taskContractStatus: "mismatch",
+    failureKind: "runner-busy",
+    retryable: true,
     stdoutTail: "out",
     stderrTail: "err",
   };
@@ -47,6 +49,8 @@ test("conciseSpawn drops envelope and keeps failure-triage fields", () => {
   assert.equal(projected.error, "child died");
   assert.equal(projected.note, "supervisor saw EIO");
   assert.equal(projected.taskContractStatus, "mismatch");
+  assert.equal(projected.failureKind, "runner-busy");
+  assert.equal(projected.retryable, true);
   assert.equal(projected.startedAt, "2026-05-19T19:00:00.000Z");
   assert.equal(projected.finishedAt, "2026-05-19T19:00:01.000Z");
   assert.equal(projected.tail, "out");
@@ -127,6 +131,18 @@ test("conciseStatus keeps alive/exitCode/signal/note for triage and drops noise"
   assert.equal(projected.stderrTail, undefined);
 });
 
+test("conciseStatus surfaces runner failure classification", () => {
+  const projected = conciseStatus({
+    runId: "ter_test_busy",
+    status: "failed",
+    ok: false,
+    failureKind: "runner-busy",
+    retryable: true,
+  });
+  assert.equal(projected.failureKind, "runner-busy");
+  assert.equal(projected.retryable, true);
+});
+
 test("conciseStatus surfaces orphaned diagnostics", () => {
   const full = {
     runId: "ter_test_orphan",
@@ -152,7 +168,7 @@ test("conciseListing returns count + per-run triage with task truncated", () => 
     activeRunIds: ["d"],
     runs: [
       { runId: "a", status: "done", model: "test-model", ok: true, exitCode: 0, task: "short", startedAt: "t1", finishedAt: "t2" },
-      { runId: "b", status: "failed", ok: false, exitCode: 1, error: "boom", task: longTask, startedAt: "t3", finishedAt: "t4" },
+      { runId: "b", status: "failed", ok: false, exitCode: 1, error: "boom", failureKind: "runner-busy", retryable: true, task: longTask, startedAt: "t3", finishedAt: "t4" },
       { runId: "c", status: "orphaned", background: true, alive: false, logAgeMs: 1234, orphanedAt: "t6", task: "ongoing", startedAt: "t5" },
     ],
   };
@@ -167,6 +183,8 @@ test("conciseListing returns count + per-run triage with task truncated", () => 
   assert.ok(projected.runs[1].task.length <= 80);
   assert.equal(projected.runs[1].error, "boom");
   assert.equal(projected.runs[1].exitCode, 1);
+  assert.equal(projected.runs[1].failureKind, "runner-busy");
+  assert.equal(projected.runs[1].retryable, true);
   assert.equal(projected.runs[2].alive, false);
   assert.equal(projected.runs[2].background, true);
   assert.equal(projected.runs[2].logAgeMs, 1234);

@@ -1,0 +1,56 @@
+{
+  "schema": "terrarium.product-loop.receipt.v0.1",
+  "iterationId": "ph-20260626090500",
+  "intent": "surface runner failure classification in concise MCP status outputs",
+  "phases": [
+    "OBSERVE",
+    "SELECT",
+    "EXECUTE",
+    "VERIFY",
+    "RECORD",
+    "PUBLIC_SUMMARIZE",
+    "OPTIONAL_DEPLOY"
+  ],
+  "selectedWork": {
+    "kind": "observability-hardening",
+    "reason": "Runner-busy classification is only useful if callers can see failureKind and retryable in normal concise MCP/status responses."
+  },
+  "childRuns": [
+    {
+      "runId": "ter_20260626085721564_ceov5r",
+      "status": "done",
+      "selected": true,
+      "summary": "Exposed failureKind/retryable in concise spawn/status/list output."
+    }
+  ],
+  "health": {
+    "repoCleanAtStart": true,
+    "mcpProjectionTestsOk": true,
+    "productLoopValidateOk": true,
+    "buildOk": true
+  },
+  "commands": [
+    {
+      "command": "env -u TERRARIUM_RUN_ID ... node --test --test-name-pattern='conciseSpawn drops|conciseStatus surfaces runner|conciseListing returns' test/mcp_concise.test.js",
+      "ok": true
+    },
+    {
+      "command": "npm run product-loop:validate",
+      "ok": true
+    },
+    {
+      "command": "npm run demo:build",
+      "ok": true
+    }
+  ],
+  "publicSummary": {
+    "iterationId": "ph-20260626090500",
+    "contentKind": "product-summary",
+    "evidenceClaim": true,
+    "evidenceRef": "terrarium-run:ter_20260626085721564_ceov5r",
+    "title": "Runner failures show their retry ticket",
+    "summary": "The reconciler integrated concise MCP/status projection fields so runner failures surface failureKind and retryable instead of hiding actionable classification."
+  },
+  "canPublishStory": true,
+  "createdAt": "2026-06-26T09:02:29.945Z"
+}
