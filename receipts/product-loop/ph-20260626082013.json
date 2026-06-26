@@ -1,0 +1,61 @@
+{
+  "schema": "terrarium.product-loop.receipt.v0.1",
+  "iterationId": "ph-20260626082013",
+  "intent": "product hardening loop bootstrap",
+  "phases": [
+    "OBSERVE",
+    "SELECT",
+    "EXECUTE",
+    "VERIFY",
+    "RECORD",
+    "PUBLIC_SUMMARIZE",
+    "OPTIONAL_DEPLOY"
+  ],
+  "selectedWork": {
+    "kind": "loop-infrastructure",
+    "reason": "Storytelling must become a byproduct of verified product-hardening work."
+  },
+  "health": {
+    "repoCleanAtStart": false,
+    "buildOk": true,
+    "validationOk": true
+  },
+  "commands": [
+    {
+      "command": "git status --short",
+      "startedAt": "2026-06-26T08:20:13.462Z",
+      "finishedAt": "2026-06-26T08:20:13.531Z",
+      "ok": true,
+      "status": 0,
+      "stdout": " M package.json\n?? docs/PRODUCT_HARDENING_LOOP.md\n?? scripts/product-loop.mjs\n?? test/product-loop.test.js\n",
+      "stderr": ""
+    },
+    {
+      "command": "npm run demo:build",
+      "startedAt": "2026-06-26T08:20:13.531Z",
+      "finishedAt": "2026-06-26T08:20:13.937Z",
+      "ok": true,
+      "status": 0,
+      "stdout": "\n> terrarium@0.0.1 demo:build\n> vite build\n\nvite v7.3.5 building client environment for production...\ntransforming...\n✓ 4 modules transformed.\nrendering chunks...\ncomputing gzip size...\ndist/index.html                  4.03 kB │ gzip: 1.52 kB\ndist/assets/index-BK78Y9wR.css  19.36 kB │ gzip: 5.06 kB\ndist/assets/index-CJeDx7R2.js   13.39 kB │ gzip: 4.91 kB\n✓ built in 98ms\n",
+      "stderr": ""
+    },
+    {
+      "command": "node --test test/product-loop.test.js",
+      "startedAt": "2026-06-26T08:20:13.937Z",
+      "finishedAt": "2026-06-26T08:20:14.054Z",
+      "ok": true,
+      "status": 0,
+      "stdout": "✔ product loop receipt schema separates public summary from private details (0.579ms)\n✔ public campaign turns cannot claim evidence without checkable evidence metadata (1.592541ms)\nℹ tests 2\nℹ suites 0\nℹ pass 2\nℹ fail 0\nℹ cancelled 0\nℹ skipped 0\nℹ todo 0\nℹ duration_ms 37.765375\n",
+      "stderr": ""
+    }
+  ],
+  "publicSummary": {
+    "iterationId": "ph-20260626082013",
+    "contentKind": "product-summary",
+    "evidenceClaim": false,
+    "title": "Product hardening loop bootstrap",
+    "summary": "This iteration records loop health and validation before allowing public storytelling."
+  },
+  "canPublishStory": false,
+  "createdAt": "2026-06-26T08:20:14.054Z"
+}

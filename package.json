@@ -23,6 +23,8 @@
     "demo:dev": "vite --host 127.0.0.1 --port 5178",
     "demo:build": "vite build",
     "demo:smoke": "node scripts/smoke-demo.mjs",
+    "product-loop:once": "node scripts/product-loop.mjs",
+    "product-loop:validate": "node --test test/product-loop.test.js",
     "deploy": "vite build && wrangler deploy"
   },
   "pi": {
