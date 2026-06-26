@@ -1,0 +1,83 @@
+{
+  "schema": "terrarium.product-loop.receipt.v0.1",
+  "iterationId": "ph-20260626130000",
+  "intent": "parallel attacker run 3 against receipt, callback, batch, cancellation, doctor, and secure-workspace surfaces",
+  "phases": [
+    "OBSERVE",
+    "BATCH_ATTACK",
+    "SELECT",
+    "EXECUTE",
+    "VERIFY",
+    "RECORD",
+    "LOCAL_TABLE_UPDATE"
+  ],
+  "selectedWork": {
+    "kind": "doctor-storage-hardening",
+    "reason": "The doctor/local-state attacker found a clean malformed-storage hardening change with focused tests."
+  },
+  "childRuns": [
+    {
+      "runId": "ter_20260626125144647_8q9kjk",
+      "status": "done",
+      "selected": false,
+      "summary": "Child found exact ownership/prune hardening candidates. Parent integrated the malformed JSON and pending-callback handling from the doctor/local-state attacker instead this pass."
+    },
+    {
+      "runId": "ter_20260626125144647_51inkg",
+      "status": "done",
+      "selected": false,
+      "summary": "Child found indented marker and summary normalization issues. Not integrated this pass."
+    },
+    {
+      "runId": "ter_20260626125144647_r903fo",
+      "status": "done",
+      "selected": false,
+      "summary": "Child found concise output and Pi marker candidates for groupOk. Not integrated because Pi extension auto-load is disabled."
+    },
+    {
+      "runId": "ter_20260626125402549_xhy69l",
+      "status": "done",
+      "selected": false,
+      "summary": "Child found a cancel-marker orphan reconciliation candidate. Not integrated this pass."
+    },
+    {
+      "runId": "ter_20260626125402549_66te2b",
+      "status": "done",
+      "selected": true,
+      "summary": "Integrated stable malformed-subscriber errors, pending callback malformed JSON requeue, and doctor counters for malformed subscriber/journal records."
+    },
+    {
+      "runId": "ter_20260626125402549_yzvgn0",
+      "status": "done",
+      "selected": false,
+      "summary": "Child found documentation/test candidates around patch artifact leakage and secure MCP allowlists. Not integrated this pass."
+    }
+  ],
+  "health": {
+    "doctorTestsOk": true,
+    "routerTestsOk": true,
+    "productLoopValidateOk": true,
+    "buildOk": true,
+    "localSmokeOk": true
+  },
+  "commands": [
+    {
+      "command": "terrarium_spawn_batch allSettled concurrency 3 twice for six attacker jobs",
+      "ok": true
+    },
+    {
+      "command": "node --test test/doctor.test.js test/router.test.js",
+      "ok": true
+    }
+  ],
+  "publicSummary": {
+    "iterationId": "ph-20260626130000",
+    "contentKind": "product-summary",
+    "evidenceClaim": true,
+    "evidenceRef": "terrarium-run:ter_20260626125402549_66te2b",
+    "title": "Doctor now reports malformed router JSON",
+    "summary": "A parallel attacker found malformed subscriber and callback journal JSON could be hidden from doctor, and malformed pending callbacks could strand claims. The fix normalizes subscriber errors, keeps malformed pending files pending, and adds doctor JSON-health counters."
+  },
+  "canPublishStory": true,
+  "createdAt": "2026-06-26T12:55:57.159Z"
+}

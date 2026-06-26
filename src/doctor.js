@@ -8,9 +8,20 @@ async function writable(path) {
   try { await mkdir(path, { recursive: true }); await access(path, constants.R_OK | constants.W_OK); return true; } catch { return false; }
 }
 async function count(path, filter = () => true) { try { return (await readdir(path)).filter(filter).length; } catch { return 0; } }
+async function jsonHealth(path) {
+  let valid = 0, malformed = 0;
+  try {
+    for (const file of (await readdir(path)).filter((name) => name.endsWith(".json"))) {
+      try { JSON.parse(await readFile(`${path}/${file}`, "utf8")); valid++; } catch { malformed++; }
+    }
+  } catch {}
+  return { valid, malformed };
+}
 
 export async function diagnoseTerrarium() {
   const runs = await listRuns({ limit: 100 });
+  const subscriberHealth = await jsonHealth(SUBSCRIBERS_DIR);
+  const journalHealth = await jsonHealth(JOURNAL_DIR);
   const checks = {
     homeWritable: await writable(HOME),
     logsWritable: await writable(LOG_DIR),
@@ -21,7 +32,10 @@ export async function diagnoseTerrarium() {
     orphanedRuns: runs.runs.filter((run) => run.status === "orphaned").length,
     needsAttentionRuns: runs.runs.filter((run) => run.needsAttention === true).length,
     groups: await count(GROUP_DIR, (file) => file.endsWith(".json")),
-    subscribers: await count(SUBSCRIBERS_DIR, (file) => file.endsWith(".json")),
+    subscribers: subscriberHealth.valid,
+    malformedSubscribers: subscriberHealth.malformed,
+    journalEvents: journalHealth.valid,
+    malformedJournalEvents: journalHealth.malformed,
     pendingCallbacks: 0,
     inflightCallbacks: 0,
     missingTerminalCallbacks: 0,
@@ -52,6 +66,8 @@ export async function diagnoseTerrarium() {
   if (!checks.homeWritable || !checks.logsWritable || !checks.workspaceWritable || !checks.routerWritable) warnings.push("Terrarium storage is not readable/writable");
   if (checks.orphanedRuns) warnings.push(`${checks.orphanedRuns} orphaned run(s) need inspection`);
   if (checks.needsAttentionRuns) warnings.push(`${checks.needsAttentionRuns} active run(s) need attention`);
+  if (checks.malformedSubscribers) warnings.push(`${checks.malformedSubscribers} malformed subscriber record(s) need quarantine or repair`);
+  if (checks.malformedJournalEvents) warnings.push(`${checks.malformedJournalEvents} malformed callback journal event(s) need quarantine or repair`);
   if (checks.pendingCallbacks) warnings.push(`${checks.pendingCallbacks} callback(s) are pending delivery`);
   if (checks.inflightCallbacks) warnings.push(`${checks.inflightCallbacks} callback(s) are claimed but unacknowledged`);
   if (checks.missingTerminalCallbacks) warnings.push(`${checks.missingTerminalCallbacks} terminal run(s) are missing durable callback events; recover those run IDs`);
