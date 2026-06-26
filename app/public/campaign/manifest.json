@@ -93,6 +93,7 @@
         "independentReplay": false
       },
       "story": "When a verified receipt supplies a summary, the summary must be a non-empty string.",
+      "receiptUrl": "/campaign/receipts/ph-20260626085000.public.json",
       "contentKind": "product-summary",
       "evidenceClaim": true
     },
@@ -114,6 +115,7 @@
         "independentReplay": false
       },
       "story": "A model lookup or configuration failure requires a configuration change, not another attempt with the same settings.",
+      "receiptUrl": "/campaign/receipts/ph-20260626091000.public.json",
       "contentKind": "product-summary",
       "evidenceClaim": true
     }

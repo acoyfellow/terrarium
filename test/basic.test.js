@@ -4,11 +4,18 @@ import { execFileSync, execSync } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { applyModelToAgent, assertRunId, capturePatch, childPrompt, classifyRunnerFailure, defaultMreLogPath, finalizeWorkspace, getRunStatus, isPidAlive, prepareWorkspace, readRun, reconcileRun, resolveAgent, resolveModel, resolvePromptProfile, runTerrarium, spawnTerrariumBackground, splitCommand, READ_ONLY_AGENT } from "../src/core.js";
+import { applyModelToAgent, assertRunId, capturePatch, childPrompt, classifyRunnerFailure, defaultMreLogPath, finalizeWorkspace, getRunStatus, isPidAlive, prepareWorkspace, readRun, reconcileRun, resolveAgent, resolveModel, resolvePromptProfile, runTerrarium, spawnTerrariumBackground, splitCommand, validateTaskContractOutput, READ_ONLY_AGENT } from "../src/core.js";
 
 test("builds a constrained child prompt", () => {
   assert.match(childPrompt("ship it", { depth: 1, maxDepth: 3 }), /Do not fan out/);
   assert.deepEqual(splitCommand('node -e "console.log(1)"'), ["node", "-e", "console.log(1)"]);
+});
+
+test("task receipt validation classifies non-object JSON as malformed", () => {
+  const expected = { runId: "run-1", taskFingerprint: "fingerprint", nonce: "nonce" };
+  for (const value of ["null", "[]", '"receipt"', "42"]) {
+    assert.deepEqual(validateTaskContractOutput(`TERRARIUM_RESULT=${value}`, expected), { status: "malformed" });
+  }
 });
 
 test("childPrompt default profile keeps the full structured contract", () => {

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
-import { createIterationReceipt, reconcileOuterLoop } from '../scripts/product-loop.mjs';
+import { assertPublicSummary, createIterationReceipt, reconcileOuterLoop } from '../scripts/product-loop.mjs';
 
 function validateReceipt(receipt) {
   assert.equal(receipt.schema, 'terrarium.product-loop.receipt.v0.1');
@@ -64,6 +64,23 @@ test('product loop receipt schema separates public summary from private details'
       summary: 'A verified product change happened.',
     },
   });
+});
+
+test('public evidence claims require a typed, checkable evidence reference', () => {
+  for (const evidenceRef of [
+    'commit:abc1234',
+    'terrarium-run:ter_20260626085721563_5zh5ya',
+    'test:test/product-loop.test.js',
+    'replay:fixture-environment-leak',
+  ]) {
+    assert.doesNotThrow(() => assertPublicSummary({ iterationId: 'ph-20260625203000', evidenceClaim: true, evidenceRef }));
+  }
+  for (const evidenceRef of [undefined, '', 'trust me', 'commit:xyz', 'terrarium-run:not-a-run']) {
+    assert.throws(
+      () => assertPublicSummary({ iterationId: 'ph-20260625203000', evidenceClaim: true, evidenceRef }),
+      /checkable evidenceRef/,
+    );
+  }
 });
 
 test('dry run evaluates health without writing receipts', async () => {
