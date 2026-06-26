@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
+import { MCP_SCHEMA_VERSION } from '../src/versions.js';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -36,9 +37,11 @@ test('top-level MCP keeps the stable three-tool surface', async () => {
   assert.ok(names.indexOf('terrarium_status') < names.indexOf('terrarium_read'));
   assert.ok(names.includes('terrarium_spawn_batch'));
   const spawnSchema = responses[0].result.tools.find((tool) => tool.name === 'terrarium_spawn').inputSchema;
-  const batchSchema = responses[0].result.tools.find((tool) => tool.name === 'terrarium_spawn_batch').inputSchema;
+  const batchTool = responses[0].result.tools.find((tool) => tool.name === 'terrarium_spawn_batch');
+  const batchSchema = batchTool.inputSchema;
   assert.deepEqual(spawnSchema.properties.isolation.enum, ['none', 'copy', 'worktree']);
   assert.deepEqual(batchSchema.properties.jobs.items.properties.isolation.enum, ['none', 'copy', 'worktree']);
+  assert.equal(batchTool.schemaVersion, MCP_SCHEMA_VERSION);
   assert.deepEqual(batchSchema.properties.cleanupTimeoutMs, {
     type: 'number',
     minimum: 0,

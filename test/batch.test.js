@@ -5,6 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnBatch, BATCH_STRATEGIES } from '../src/batch.js';
 import { getRunGroupStatus } from '../src/groups.js';
+import { BATCH_API_VERSION } from '../src/versions.js';
 
 let dir;
 function agent(name, body) {
@@ -35,6 +36,9 @@ test('validates inputs', async () => {
 test('all: resolves ok only when every job succeeds', { timeout: 45000 }, async () => {
   const good = await spawnBatch({ jobs: [job(ok()), job(ok())], strategy: 'all', pollMs: 100 });
   assert.equal(good.ok, true);
+  assert.equal(good.apiVersion, BATCH_API_VERSION);
+  assert.equal(good.schemaVersion, BATCH_API_VERSION);
+  assert.ok(good.supportedOptions.includes('cleanupTimeoutMs'));
   assert.equal(good.group.counts.done, 2);
 
   const mixed = await spawnBatch({ jobs: [job(ok()), job(fail())], strategy: 'all', pollMs: 100 });
