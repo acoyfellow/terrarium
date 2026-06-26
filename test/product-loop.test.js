@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
+import { createIterationReceipt } from '../scripts/product-loop.mjs';
 
 function validateReceipt(receipt) {
   assert.equal(receipt.schema, 'terrarium.product-loop.receipt.v0.1');
@@ -40,6 +41,13 @@ test('product loop receipt schema separates public summary from private details'
       summary: 'A verified product change happened.',
     },
   });
+});
+
+test('dry run evaluates health without writing receipts', async () => {
+  const result = await createIterationReceipt({ dryRun: true });
+  assert.equal(result.dryRun, true);
+  assert.equal(result.receipt.health.validationOk, true);
+  assert.equal(result.receipt.commands.length, 3);
 });
 
 test('public campaign turns cannot claim evidence without checkable evidence metadata', async () => {

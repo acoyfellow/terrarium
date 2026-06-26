@@ -1,0 +1,77 @@
+{
+  "schema": "terrarium.product-loop.receipt.v0.1",
+  "iterationId": "ph-20260626090000",
+  "intent": "make the product-hardening loop safer and more first-class with a non-writing dry run",
+  "phases": [
+    "OBSERVE",
+    "SELECT",
+    "EXECUTE",
+    "VERIFY",
+    "RECORD",
+    "PUBLIC_SUMMARIZE",
+    "OPTIONAL_DEPLOY"
+  ],
+  "selectedWork": {
+    "kind": "loop-infrastructure",
+    "reason": "The reconciler should be able to check health before mutating receipt/public data."
+  },
+  "childRuns": [
+    {
+      "runId": "ter_20260626085721564_f6fiks",
+      "status": "done",
+      "selected": true,
+      "summary": "Added and tested product-loop dry-run."
+    },
+    {
+      "runId": "ter_20260626085721563_5zh5ya",
+      "status": "done",
+      "selected": false,
+      "summary": "Model configuration classification candidate."
+    },
+    {
+      "runId": "ter_20260626085721564_ceov5r",
+      "status": "done",
+      "selected": false,
+      "summary": "MCP concise failure classification candidate."
+    }
+  ],
+  "health": {
+    "repoCleanAtStart": true,
+    "productLoopValidateOk": true,
+    "dryRunOk": true,
+    "dryRunWroteNoReceipts": true,
+    "buildOk": true
+  },
+  "commands": [
+    {
+      "command": "terrarium_spawn_batch x3 isolated copy children",
+      "ok": true
+    },
+    {
+      "command": "npm run product-loop:validate",
+      "ok": true
+    },
+    {
+      "command": "npm run product-loop:dry-run",
+      "ok": true
+    },
+    {
+      "command": "test ! -e receipts/product-loop/<dry-run-id>.json",
+      "ok": true
+    },
+    {
+      "command": "npm run demo:build",
+      "ok": true
+    }
+  ],
+  "publicSummary": {
+    "iterationId": "ph-20260626090000",
+    "contentKind": "product-summary",
+    "evidenceClaim": true,
+    "evidenceRef": "terrarium-run:ter_20260626085721564_f6fiks",
+    "title": "The loop can rehearse before it writes",
+    "summary": "The reconciler integrated a product-loop dry-run command so the health gate can be previewed without creating receipts or public summaries."
+  },
+  "canPublishStory": true,
+  "createdAt": "2026-06-26T08:59:08.656Z"
+}

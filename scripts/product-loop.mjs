@@ -31,9 +31,11 @@ function assertPublicSummary(summary) {
   }
 }
 
-export async function createIterationReceipt({ intent = 'product hardening loop bootstrap', selectedWork = null, publicSummary = null } = {}) {
-  await mkdir(receiptDir, { recursive: true });
-  await mkdir(publicDir, { recursive: true });
+export async function createIterationReceipt({ intent = 'product hardening loop bootstrap', selectedWork = null, publicSummary = null, dryRun = false } = {}) {
+  if (!dryRun) {
+    await mkdir(receiptDir, { recursive: true });
+    await mkdir(publicDir, { recursive: true });
+  }
   const files = await readFile(new URL('../package.json', import.meta.url), 'utf8').then(() => []).catch(() => []);
   const iterationId = `ph-${new Date().toISOString().replace(/[-:.TZ]/g, '').slice(0, 14)}`;
   const commands = [
@@ -71,12 +73,15 @@ export async function createIterationReceipt({ intent = 'product hardening loop 
   assertPublicSummary(receipt.publicSummary);
   const privatePath = join(receiptDir, `${iterationId}.json`);
   const publicPath = join(publicDir, `${iterationId}.public.json`);
-  await writeFile(privatePath, `${JSON.stringify(receipt, null, 2)}\n`);
-  await writeFile(publicPath, `${JSON.stringify(receipt.publicSummary, null, 2)}\n`);
-  return { receipt, privatePath, publicPath };
+  if (!dryRun) {
+    await writeFile(privatePath, `${JSON.stringify(receipt, null, 2)}\n`);
+    await writeFile(publicPath, `${JSON.stringify(receipt.publicSummary, null, 2)}\n`);
+  }
+  return { receipt, privatePath, publicPath, dryRun };
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-  const result = await createIterationReceipt();
-  console.log(JSON.stringify({ ok: true, iterationId: result.receipt.iterationId, canPublishStory: result.receipt.canPublishStory, privatePath: result.privatePath, publicPath: result.publicPath }, null, 2));
+  const dryRun = process.argv.slice(2).includes('--dry-run');
+  const result = await createIterationReceipt({ dryRun });
+  console.log(JSON.stringify({ ok: true, dryRun, iterationId: result.receipt.iterationId, canPublishStory: result.receipt.canPublishStory, privatePath: result.privatePath, publicPath: result.publicPath }, null, 2));
 }

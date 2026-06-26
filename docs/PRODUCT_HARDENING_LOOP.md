@@ -19,6 +19,14 @@ OBSERVE -> SELECT -> EXECUTE -> VERIFY -> RECORD -> PUBLIC_SUMMARIZE -> OPTIONAL
 
 ## Run one iteration
 
+Preview the full health gate without creating either receipt:
+
+```sh
+npm run product-loop:dry-run
+```
+
+When the preview is healthy, record an iteration:
+
 ```sh
 npm run product-loop:once
 ```
