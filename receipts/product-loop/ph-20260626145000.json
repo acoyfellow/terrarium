@@ -1,0 +1,91 @@
+{
+  "schema": "terrarium.product-loop.receipt.v0.1",
+  "iterationId": "ph-20260626145000",
+  "intent": "parallel attacker run 14 against MCP timeout behavior, secure workspace credentials, documentation accuracy, public schema, doctor/router repair, and MCP callback/group lineage",
+  "phases": [
+    "OBSERVE",
+    "BATCH_ATTACK",
+    "SELECT",
+    "EXECUTE",
+    "VERIFY",
+    "RECORD",
+    "LOCAL_TABLE_UPDATE",
+    "DOCUMENT"
+  ],
+  "selectedWork": {
+    "kind": "docs-public-redaction-mcp-lineage",
+    "reason": "Three verified non-conflicting fixes passed targeted parent tests and documentation/changelog were updated."
+  },
+  "childRuns": [
+    {
+      "runId": "ter_20260626135556970_nszu57",
+      "status": "done",
+      "selected": false,
+      "summary": "Child traced the error to batch cancellation wait outliving the parent MCP/tool timeout. No code patch integrated."
+    },
+    {
+      "runId": "ter_20260626135556970_geijs1",
+      "status": "done",
+      "selected": false,
+      "summary": "Child produced a focused secure workspace patch. Not integrated because full dependency/Docker verification is still needed."
+    },
+    {
+      "runId": "ter_20260626135556970_uoavz5",
+      "status": "done",
+      "selected": true,
+      "summary": "Integrated README and changelog wording: Terrarium does not auto-load the Pi extension; hosts may explicitly install it."
+    },
+    {
+      "runId": "ter_20260626135623618_jbz6zc",
+      "status": "done",
+      "selected": true,
+      "summary": "Integrated manifest-wide agentCommand redaction to not published and test coverage for unpublished runner command identity."
+    },
+    {
+      "runId": "ter_20260626135817038_hzipk7",
+      "status": "done",
+      "selected": false,
+      "summary": "Child verified current doctor/router repair behavior with 34 passing tests. No code changes integrated."
+    },
+    {
+      "runId": "ter_20260626135817039_z2u44k",
+      "status": "done",
+      "selected": true,
+      "summary": "Integrated missing subscriber normalization to callback subscriber access denied and lineage regression coverage."
+    }
+  ],
+  "health": {
+    "mcpScopeTestsOk": true,
+    "groupsTestsOk": true,
+    "mcpConciseTestsOk": true,
+    "productLoopValidateOk": true,
+    "buildOk": true,
+    "localSmokeOk": true,
+    "changelogSynced": true
+  },
+  "commands": [
+    {
+      "command": "terrarium_spawn_batch allSettled concurrency 3 plus continuation for six attacker jobs",
+      "ok": false,
+      "note": "first batch still hit cancellation wait; continuation timed out but durable runs completed"
+    },
+    {
+      "command": "TERRARIUM_CHILD_BUDGET=20 node --test test/mcp_scope.test.js test/groups.test.js test/mcp_concise.test.js test/product-loop.test.js",
+      "ok": true
+    },
+    {
+      "command": "npm run product-loop:validate && npm run demo:build && npm run demo:smoke && diff -q CHANGELOG.md app/public/CHANGELOG.md",
+      "ok": true
+    }
+  ],
+  "publicSummary": {
+    "iterationId": "ph-20260626145000",
+    "contentKind": "product-summary",
+    "evidenceClaim": true,
+    "evidenceRef": "terrarium-run:ter_20260626135817039_z2u44k",
+    "title": "Docs corrected; public runner command redacted; callback subscriber denial normalized",
+    "summary": "Run 14 corrected Pi extension docs/changelog wording, redacted public runner command cells to not published, and made missing callback subscribers indistinguishable from inaccessible subscribers. Targeted tests and local smoke passed."
+  },
+  "canPublishStory": true,
+  "createdAt": "2026-06-26T14:01:42.630Z"
+}

@@ -398,7 +398,12 @@ async function handle(msg) {
         }
         if (!args.subscriberId) throw new Error(`callback ${args.action} requires subscriberId`);
         if (args.action === "ack" && !args.eventId) throw new Error("callback ack requires eventId");
-        const subscription = await getSubscriber(args.subscriberId);
+        let subscription;
+        try { subscription = await getSubscriber(args.subscriberId); }
+        catch (error) {
+          if (error?.code === "ENOENT") throw new Error("callback subscriber access denied");
+          throw error;
+        }
         if (subscription.ownerRunId !== policy.requesterRunId) throw new Error("callback subscriber access denied");
         const ownedArgs = { subscriberId: args.subscriberId, ownerRunId: policy.requesterRunId };
         if (args.action === "claim" && args.limit !== undefined) ownedArgs.limit = args.limit;

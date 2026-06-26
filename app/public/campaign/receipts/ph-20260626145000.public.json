@@ -1,0 +1,8 @@
+{
+  "iterationId": "ph-20260626145000",
+  "contentKind": "product-summary",
+  "evidenceClaim": true,
+  "evidenceRef": "terrarium-run:ter_20260626135817039_z2u44k",
+  "title": "Docs corrected; public runner command redacted; callback subscriber denial normalized",
+  "summary": "Run 14 corrected Pi extension docs/changelog wording, redacted public runner command cells to not published, and made missing callback subscribers indistinguishable from inaccessible subscribers. Targeted tests and local smoke passed."
+}

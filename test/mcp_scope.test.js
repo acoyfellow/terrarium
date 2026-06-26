@@ -169,7 +169,7 @@ test('child callback recover and subscriber status enforce lineage ownership', a
     ], env);
     assert.equal(JSON.parse(toolText(responses.find((r) => r.id === 2))).runId, a.runId);
     assert.match(toolText(responses.find((r) => r.id === 3)), /access denied/);
-    assert.match(toolText(responses.find((r) => r.id === 4)), /ENOENT|subscriberId/);
+    assert.equal(toolText(responses.find((r) => r.id === 4)), 'callback subscriber access denied');
   } finally {
     rmSync(join(MAILBOXES_DIR, subscriberId), { recursive: true, force: true });
     rmSync(join(SUBSCRIBERS_DIR, `${subscriberId}.json`), { force: true });
@@ -200,6 +200,36 @@ test('callback status/claim narrow arguments and reject missing identifiers with
   } finally {
     rmSync(join(MAILBOXES_DIR, subscriberId), { recursive: true, force: true });
     rmSync(join(SUBSCRIBERS_DIR, `${subscriberId}.json`), { force: true });
+  }
+});
+
+test('callback subscriber mutations make missing and sibling-owned identifiers indistinguishable', async () => {
+  const owner = await runTerrarium({ task: 'callback boundary owner', dryRun: true, stream: false });
+  const sibling = await runTerrarium({ task: 'callback boundary sibling', dryRun: true, stream: false });
+  const siblingSubscriberId = `sub_callback_boundary_${sibling.runId}`;
+  const missingSubscriberId = `${siblingSubscriberId}_missing`;
+  const siblingEnv = { TERRARIUM_RUN_ID: sibling.runId, TERRARIUM_ALLOW_SPAWN: 'false', TERRARIUM_STATUS_SCOPE: 'self', TERRARIUM_READ_SCOPE: 'self' };
+  const ownerEnv = { TERRARIUM_RUN_ID: owner.runId, TERRARIUM_ALLOW_SPAWN: 'false', TERRARIUM_STATUS_SCOPE: 'self', TERRARIUM_READ_SCOPE: 'self' };
+  try {
+    await rpc([{ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'terrarium_callbacks', arguments: { action: 'subscribe', subscriberId: siblingSubscriberId, runIds: [sibling.runId] } } }], siblingEnv);
+    const messages = [];
+    let id = 0;
+    for (const subscriberId of [siblingSubscriberId, missingSubscriberId]) {
+      for (const action of ['status', 'claim', 'ack', 'requeue', 'unsubscribe']) {
+        messages.push({ jsonrpc: '2.0', id: ++id, method: 'tools/call', params: { name: 'terrarium_callbacks', arguments: { action, subscriberId, ...(action === 'ack' ? { eventId: 'evt_boundary' } : {}) } } });
+      }
+    }
+    const { responses } = await rpc(messages, ownerEnv);
+    const inaccessible = responses.slice(0, 5).map(toolText);
+    const missing = responses.slice(5).map(toolText);
+    for (const text of [...inaccessible, ...missing]) {
+      assert.equal(text, 'callback subscriber access denied');
+      assert.ok(text.length < 100);
+    }
+    assert.deepEqual(inaccessible, missing);
+  } finally {
+    rmSync(join(MAILBOXES_DIR, siblingSubscriberId), { recursive: true, force: true });
+    rmSync(join(SUBSCRIBERS_DIR, `${siblingSubscriberId}.json`), { force: true });
   }
 });
 
