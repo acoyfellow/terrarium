@@ -12,14 +12,14 @@
     "LOCAL_TABLE_UPDATE"
   ],
   "selectedWork": {
-    "kind": "mcp-lineage-hardening",
-    "reason": "The MCP lineage attacker found a clean authorization bypass in group tools."
+    "kind": "multi-surface-security-hardening",
+    "reason": "Run 2 produced three non-conflicting verified fixes: MCP group lineage, callback prune ownership, and batch/group settlement truthfulness."
   },
   "childRuns": [
     {
       "runId": "ter_20260626124409775_0f068s",
       "status": "done",
-      "selected": false,
+      "selected": true,
       "summary": "Child found prune could delete child-owned mailbox records and malformed subscriber owner values were ambiguous. Not integrated this pass."
     },
     {
@@ -31,7 +31,7 @@
     {
       "runId": "ter_20260626124409775_stw2md",
       "status": "done",
-      "selected": false,
+      "selected": true,
       "summary": "Child found allSettled ok conflated settlement with success and cancellation errors could be swallowed. Not integrated this pass."
     },
     {
@@ -54,8 +54,10 @@
     }
   ],
   "health": {
-    "mcpScopeTestsOk": true,
+    "routerTestsOk": true,
+    "batchTestsOk": true,
     "groupsTestsOk": true,
+    "mcpScopeTestsOk": true,
     "productLoopValidateOk": true,
     "buildOk": true,
     "localSmokeOk": true
@@ -69,6 +71,10 @@
     {
       "command": "node --test test/mcp_scope.test.js test/groups.test.js",
       "ok": true
+    },
+    {
+      "command": "node --test test/router.test.js test/batch.test.js test/groups.test.js",
+      "ok": true
     }
   ],
   "publicSummary": {
@@ -76,8 +82,8 @@
     "contentKind": "product-summary",
     "evidenceClaim": true,
     "evidenceRef": "terrarium-run:ter_20260626124639782_lb1v89",
-    "title": "Group tools now honor child lineage scope",
-    "summary": "A parallel attacker found that terrarium_group status/read/create/cancel paths bypassed child lineage scope. The fix propagates requester run identity and scope through group APIs and MCP dispatch."
+    "title": "Run 2 integrated lineage, mailbox, and settlement hardening",
+    "summary": "Parallel attackers found three clean hardening changes: group tools bypassed child lineage, controller prune crossed child mailbox ownership, and batch allSettled conflated terminal settlement with success."
   },
   "canPublishStory": true,
   "createdAt": "2026-06-26T12:50:33.834Z"

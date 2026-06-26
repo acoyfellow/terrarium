@@ -132,9 +132,10 @@ function decide(status, strategy, quorumTarget) {
       return { settled: true, ok: successes.length === runs.length, reason: "all-complete" };
 
     case "allSettled":
-      // Never short-circuit; always ok=true, collect outcomes.
+      // Never short-circuit. Settlement describes completion; ok still describes
+      // whether every child succeeded, as it does for every other strategy.
       if (!allTerminal) return { settled: false };
-      return { settled: true, ok: true, reason: "all-settled", successCount: successes.length, failureCount: runs.length - successes.length };
+      return { settled: true, ok: successes.length === runs.length, reason: "all-settled", successCount: successes.length, failureCount: runs.length - successes.length };
 
     case "race":
       // First terminal wins, whatever its outcome; cancel the rest.
@@ -162,10 +163,16 @@ async function cancelLosers(status, { all = false } = {}) {
   if (!all) {
     // keep none running; winners are already terminal
   }
+  const failures = [];
   await Promise.all(targets.map(async (run) => {
-    await cancelRun({ runId: run.runId }).catch(() => {});
-    await waitUntilTerminal(run.runId).catch(() => {});
+    try {
+      await cancelRun({ runId: run.runId });
+      await waitUntilTerminal(run.runId);
+    } catch (error) {
+      failures.push(`${run.runId}: ${error.message}`);
+    }
   }));
+  if (failures.length) throw new AggregateError(failures.map((message) => new Error(message)), `failed to settle ${failures.length} cancelled run(s)`);
 }
 
 function sleep(ms) { return new Promise((resolve) => setTimeout(resolve, ms)); }

@@ -42,9 +42,12 @@ test('all: resolves ok only when every job succeeds', { timeout: 45000 }, async 
   assert.equal(mixed.group.counts.failed, 1);
 });
 
-test('allSettled: always ok, collects successes and failures', { timeout: 45000 }, async () => {
+test('allSettled: completes every job without disguising child failures', { timeout: 45000 }, async () => {
   const r = await spawnBatch({ jobs: [job(ok()), job(fail())], strategy: 'allSettled', pollMs: 100 });
-  assert.equal(r.ok, true);
+  assert.equal(r.settled, true);
+  assert.equal(r.ok, false);
+  assert.equal(r.group.complete, true);
+  assert.equal(r.group.ok, false);
   assert.equal(r.successCount, 1);
   assert.equal(r.failureCount, 1);
 });
@@ -56,6 +59,8 @@ test('any: first success wins and losers are cancelled', { timeout: 45000 }, asy
   const status = await getRunGroupStatus({ groupId: r.groupId });
   assert.equal(status.counts.running, 0, 'no runs should remain running after any');
   assert.ok(status.counts.cancelled >= 1, 'slow losers should be cancelled');
+  assert.equal(status.complete, true, 'cancelled runs are terminal');
+  assert.equal(status.ok, false, 'a group with cancelled children is not wholly successful');
 });
 
 test('any: fails when all jobs fail', { timeout: 45000 }, async () => {
