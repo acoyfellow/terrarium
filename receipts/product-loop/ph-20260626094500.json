@@ -1,0 +1,72 @@
+{
+  "schema": "terrarium.product-loop.receipt.v0.1",
+  "iterationId": "ph-20260626094500",
+  "intent": "rewrite campaign manifest copy into evidence-bounded field-note language",
+  "phases": [
+    "OBSERVE",
+    "SELECT",
+    "EXECUTE",
+    "VERIFY",
+    "RECORD",
+    "PUBLIC_SUMMARIZE",
+    "OPTIONAL_DEPLOY"
+  ],
+  "selectedWork": {
+    "kind": "presentation-hardening",
+    "reason": "The campaign manifest still carried metaphor-heavy text that made product evidence harder to distinguish from illustration."
+  },
+  "childRuns": [
+    {
+      "runId": "ter_20260626093944446_t74slb",
+      "status": "done",
+      "selected": true,
+      "summary": "Rewrote five campaign turns with concrete, evidence-bounded wording."
+    },
+    {
+      "runId": "ter_20260626093944446_2ji2dh",
+      "status": "done",
+      "selected": false,
+      "summary": "Active product label cleanup candidate."
+    },
+    {
+      "runId": "ter_20260626093944446_5dnuof",
+      "status": "done",
+      "selected": false,
+      "summary": "Public receipt inspector candidate."
+    }
+  ],
+  "health": {
+    "repoCleanAtStart": true,
+    "productLoopValidateOk": true,
+    "buildOk": true,
+    "localSmokeOk": true
+  },
+  "commands": [
+    {
+      "command": "terrarium_spawn_batch x3 isolated children",
+      "ok": true
+    },
+    {
+      "command": "npm run product-loop:validate",
+      "ok": true
+    },
+    {
+      "command": "npm run demo:build",
+      "ok": true
+    },
+    {
+      "command": "npm run demo:smoke against local Vite",
+      "ok": true
+    }
+  ],
+  "publicSummary": {
+    "iterationId": "ph-20260626094500",
+    "contentKind": "product-summary",
+    "evidenceClaim": true,
+    "evidenceRef": "terrarium-run:ter_20260626093944446_t74slb",
+    "title": "Campaign turns now describe mechanisms, not props",
+    "summary": "The reconciler rewrote the campaign manifest so each turn names the product mechanism, evidence boundary, and limit without leaning on firefly/owl/magic language."
+  },
+  "canPublishStory": true,
+  "createdAt": "2026-06-26T09:41:26.072Z"
+}
