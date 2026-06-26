@@ -24,6 +24,7 @@ function isSuccess(run) { return SUCCESS.includes(run.status) && run.ok !== fals
  * @param {string} [opts.label]           group label
  * @param {number} [opts.pollMs]          status poll interval (default 500)
  * @param {number} [opts.timeoutMs]       overall batch wait budget (default none)
+ * @param {number} [opts.cleanupTimeoutMs] max synchronous cancellation settlement wait (default 5000)
  */
 export async function spawnBatch(opts = {}) {
   const {
@@ -34,6 +35,7 @@ export async function spawnBatch(opts = {}) {
     label = "Terrarium batch",
     pollMs = 500,
     timeoutMs,
+    cleanupTimeoutMs = 5000,
   } = opts;
 
   if (!Array.isArray(jobs) || jobs.length < 1 || jobs.length > 32) {
@@ -51,6 +53,7 @@ export async function spawnBatch(opts = {}) {
   }
   const limit = concurrency == null ? jobs.length : Number(concurrency);
   if (!Number.isInteger(limit) || limit < 1) throw new Error("concurrency must be a positive integer");
+  if (!Number.isFinite(Number(cleanupTimeoutMs)) || Number(cleanupTimeoutMs) < 0) throw new Error("cleanupTimeoutMs must be a non-negative number");
 
   const { started, launchError, launchErrors } = await launchBounded(jobs, limit);
   const runIds = started.filter(Boolean).map((run) => run.runId);
@@ -59,7 +62,7 @@ export async function spawnBatch(opts = {}) {
   const group = await createRunGroup({ label, runIds });
   if (launchError) {
     const status = await getRunGroupStatus({ groupId: group.groupId });
-    const cleanupErrors = await cancelLosers(status, { collectErrors: true });
+    const cleanupErrors = await cancelLosers(status, { collectErrors: true, maxWaitMs: Number(cleanupTimeoutMs) });
     return {
       ok: false,
       strategy,
@@ -81,6 +84,7 @@ export async function spawnBatch(opts = {}) {
     quorumTarget,
     pollMs,
     timeoutMs,
+    cleanupTimeoutMs: Number(cleanupTimeoutMs),
   });
 
   return {
@@ -133,14 +137,14 @@ async function waitUntilTerminal(runId, maxWaitMs = 30000) {
   }
 }
 
-async function awaitStrategy({ groupId, strategy, quorumTarget, pollMs, timeoutMs }) {
+async function awaitStrategy({ groupId, strategy, quorumTarget, pollMs, timeoutMs, cleanupTimeoutMs }) {
   const deadline = timeoutMs > 0 ? Date.now() + timeoutMs : null;
   while (true) {
     const status = await getRunGroupStatus({ groupId });
     const decision = decide(status, strategy, quorumTarget);
     if (decision.settled) {
       const cleanupErrors = decision.cancelLosers
-        ? await cancelLosers(status, { collectErrors: true })
+        ? await cancelLosers(status, { collectErrors: true, maxWaitMs: cleanupTimeoutMs })
         : [];
       return {
         ...decision,
@@ -149,7 +153,7 @@ async function awaitStrategy({ groupId, strategy, quorumTarget, pollMs, timeoutM
       };
     }
     if (deadline && Date.now() >= deadline) {
-      const cleanupErrors = await cancelLosers(status, { all: true, collectErrors: true });
+      const cleanupErrors = await cancelLosers(status, { all: true, collectErrors: true, maxWaitMs: cleanupTimeoutMs });
       return {
         ok: false,
         reason: "timeout",
@@ -201,7 +205,7 @@ function decide(status, strategy, quorumTarget) {
   }
 }
 
-async function cancelLosers(status, { all = false, collectErrors = false } = {}) {
+async function cancelLosers(status, { all = false, collectErrors = false, maxWaitMs = 5000 } = {}) {
   const targets = status.runs.filter((run) => run.status === "running");
   if (!all) {
     // keep none running; winners are already terminal
@@ -210,7 +214,7 @@ async function cancelLosers(status, { all = false, collectErrors = false } = {})
   await Promise.all(targets.map(async (run) => {
     try {
       await cancelRun({ runId: run.runId });
-      await waitUntilTerminal(run.runId);
+      await waitUntilTerminal(run.runId, maxWaitMs);
     } catch (error) {
       failures.push(`${run.runId}: ${error.message}`);
     }

@@ -1,0 +1,91 @@
+{
+  "schema": "terrarium.product-loop.receipt.v0.1",
+  "iterationId": "ph-20260626150000",
+  "intent": "parallel attacker run 15 against MCP batch timeout boundary, secure workspace credential readiness, public schema, callback privacy, doctor repair semantics, and MCP/group docs",
+  "phases": [
+    "OBSERVE",
+    "BATCH_ATTACK",
+    "SELECT",
+    "EXECUTE",
+    "VERIFY",
+    "RECORD",
+    "LOCAL_TABLE_UPDATE",
+    "DOCUMENT"
+  ],
+  "selectedWork": {
+    "kind": "batch-timeout-and-public-schema-hardening",
+    "reason": "Two verified fixes directly addressed recurring MCP timeout behavior and public receipt/schema safety."
+  },
+  "childRuns": [
+    {
+      "runId": "ter_20260626140220782_x4267h",
+      "status": "done",
+      "selected": true,
+      "summary": "Integrated cleanupTimeoutMs with 5 second default, MCP schema exposure, README and changelog notes, and regression coverage."
+    },
+    {
+      "runId": "ter_20260626140220782_o53y8s",
+      "status": "done",
+      "selected": false,
+      "summary": "Child produced secure workspace path filtering patch. Not integrated because Docker-backed integration is still pending."
+    },
+    {
+      "runId": "ter_20260626140220782_rl73os",
+      "status": "done",
+      "selected": true,
+      "summary": "Integrated exact public-summary schema for unknown fields, ID/kind, boolean evidence claims, single-line prose and evidenceRef consistency."
+    },
+    {
+      "runId": "ter_20260626140440481_a962np",
+      "status": "done",
+      "selected": false,
+      "summary": "Child verified router and MCP privacy tests. No code changes needed."
+    },
+    {
+      "runId": "ter_20260626140440481_apsfdu",
+      "status": "done",
+      "selected": false,
+      "summary": "Child verified doctor/router tests. No code changes needed."
+    },
+    {
+      "runId": "ter_20260626140440481_m8h06z",
+      "status": "done",
+      "selected": false,
+      "summary": "Child proposed MCP/CLI docs improvements. Not integrated in this commit because core timeout and schema changes were selected."
+    }
+  ],
+  "health": {
+    "batchTestsOk": true,
+    "productLoopValidateOk": true,
+    "mcpConciseTestsOk": true,
+    "mcpScopeTestsOk": true,
+    "buildOk": true,
+    "localSmokeOk": true,
+    "changelogSynced": true
+  },
+  "commands": [
+    {
+      "command": "terrarium_spawn_batch allSettled concurrency 3 plus continuation for six attacker jobs",
+      "ok": false,
+      "note": "first batch still hit cancellation wait before cleanupTimeoutMs integration; continuation timed out but durable runs completed"
+    },
+    {
+      "command": "TERRARIUM_CHILD_BUDGET=20 node --test test/batch.test.js test/product-loop.test.js test/mcp_concise.test.js test/mcp_scope.test.js",
+      "ok": true
+    },
+    {
+      "command": "npm run product-loop:validate && npm run demo:build && npm run demo:smoke && diff -q CHANGELOG.md app/public/CHANGELOG.md",
+      "ok": true
+    }
+  ],
+  "publicSummary": {
+    "iterationId": "ph-20260626150000",
+    "contentKind": "product-summary",
+    "evidenceClaim": true,
+    "evidenceRef": "terrarium-run:ter_20260626140220782_x4267h",
+    "title": "Batch cleanup timeout and public summary schema hardened",
+    "summary": "Run 15 added cleanupTimeoutMs for bounded batch cancellation settlement and made public summaries an exact schema. Targeted tests, changelog sync, build, and local smoke passed."
+  },
+  "canPublishStory": true,
+  "createdAt": "2026-06-26T14:09:56.335Z"
+}

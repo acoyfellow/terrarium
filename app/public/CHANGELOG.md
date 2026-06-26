@@ -10,6 +10,8 @@ Succinct, product-facing changes to Terrarium. This is not a full commit log; it
 - Clarified README/CHANGELOG wording for the opt-in Pi host extension: it is not auto-loaded, but hosts may install it explicitly.
 - Redacted public runner command cells to `not published` while keeping the spreadsheet column.
 - Normalized missing callback subscribers to the same concise denial as inaccessible subscribers.
+- Bounded synchronous batch cancellation settlement with `cleanupTimeoutMs` (default 5 seconds), preserving durable IDs and `cleanupErrors` before MCP client request deadlines.
+- Made product-loop public summaries an exact schema: unknown fields, malformed IDs/kinds, non-boolean evidence claims, multiline/padded prose, and evidence references on non-claims are rejected.
 
 ## 2026-06-26
 

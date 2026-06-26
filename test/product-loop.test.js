@@ -67,13 +67,14 @@ test('product loop receipt schema separates public summary from private details'
 });
 
 test('public evidence claims require a typed, checkable evidence reference', () => {
+  const base = { iterationId: 'ph-20260625203000', contentKind: 'product-summary', evidenceClaim: true, title: 'Verified change', summary: 'Targeted tests passed.' };
   for (const evidenceRef of [
     'commit:abc1234',
     'terrarium-run:ter_20260626085721563_5zh5ya',
     'test:test/product-loop.test.js',
     'replay:fixture-environment-leak',
   ]) {
-    assert.doesNotThrow(() => assertPublicSummary({ iterationId: 'ph-20260625203000', evidenceClaim: true, evidenceRef }));
+    assert.doesNotThrow(() => assertPublicSummary({ ...base, evidenceRef }));
   }
   for (const evidenceRef of [
     undefined,
@@ -87,10 +88,27 @@ test('public evidence claims require a typed, checkable evidence reference', () 
     'replay:https://attacker.invalid/proof',
   ]) {
     assert.throws(
-      () => assertPublicSummary({ iterationId: 'ph-20260625203000', evidenceClaim: true, evidenceRef }),
+      () => assertPublicSummary({ ...base, evidenceRef }),
       /checkable evidenceRef/,
     );
   }
+});
+
+test('public summaries use the exact published schema and single-line prose', () => {
+  const valid = {
+    iterationId: 'ph-20260625203000',
+    contentKind: 'product-summary',
+    evidenceClaim: false,
+    title: 'Boundary hardening',
+    summary: 'Targeted tests passed.',
+  };
+  assert.doesNotThrow(() => assertPublicSummary(valid));
+  assert.throws(() => assertPublicSummary({ ...valid, arbitrary: 'not public' }), /unknown fields: arbitrary/);
+  assert.throws(() => assertPublicSummary({ ...valid, contentKind: 'story' }), /invalid contentKind/);
+  assert.throws(() => assertPublicSummary({ ...valid, evidenceClaim: 'false' }), /must be boolean/);
+  assert.throws(() => assertPublicSummary({ ...valid, evidenceRef: 'test:test/product-loop.test.js' }), /must omit evidenceRef/);
+  assert.throws(() => assertPublicSummary({ ...valid, summary: 'line one\nline two' }), /invalid summary/);
+  assert.throws(() => assertPublicSummary({ ...valid, title: ' padded ' }), /invalid title/);
 });
 
 test('public campaign keeps agent/model column without publishing model identity', async () => {

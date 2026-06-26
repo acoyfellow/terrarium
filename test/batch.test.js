@@ -28,6 +28,7 @@ test('validates inputs', async () => {
   await assert.rejects(() => spawnBatch({ jobs: [job(ok())], strategy: 'bogus' }), /invalid batch strategy/);
   await assert.rejects(() => spawnBatch({ jobs: [job(ok())], strategy: 'quorum' }), /quorum strategy requires/);
   await assert.rejects(() => spawnBatch({ jobs: [job(ok())], concurrency: 0 }), /concurrency/);
+  await assert.rejects(() => spawnBatch({ jobs: [job(ok())], cleanupTimeoutMs: -1 }), /cleanupTimeoutMs/);
   assert.deepEqual(BATCH_STRATEGIES, ['all', 'allSettled', 'race', 'any', 'quorum']);
 });
 
@@ -52,13 +53,17 @@ test('allSettled: completes every job without disguising child failures', { time
   assert.equal(r.failureCount, 1);
 });
 
-test('allSettled timeout preserves the durable batch result when cancellation settlement fails', { timeout: 45000 }, async () => {
+test('allSettled timeout bounds synchronous cancellation settlement for client timeout safety', { timeout: 45000 }, async () => {
+  const started = Date.now();
   const r = await spawnBatch({
     jobs: [job(slow(35000))],
     strategy: 'allSettled',
     pollMs: 10,
     timeoutMs: 1,
+    cleanupTimeoutMs: 100,
   });
+
+  assert.ok(Date.now() - started < 2000, 'batch must return before a typical client timeout while cancellation settles durably');
 
   assert.equal(r.ok, false);
   assert.equal(r.reason, 'timeout');
