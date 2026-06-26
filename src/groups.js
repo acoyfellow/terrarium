@@ -43,6 +43,8 @@ export async function getRunGroupStatus({ groupId, verbose = false, requesterRun
     try { return await getRunStatus({ runId, requesterRunId, scope }); }
     catch (error) { return { runId, status: "missing", ok: false, error: error.message }; }
   }));
+  const inaccessible = runs.some((run) => run.status === "missing" && /access denied/i.test(run.error ?? ""));
+  if (inaccessible) throw new Error("Terrarium group access denied");
   const counts = Object.fromEntries(["running", "done", "failed", "inconclusive", "cancelled", "error", "orphaned", "missing"].map((status) => [status, runs.filter((run) => run.status === status).length]));
   const complete = runs.every((run) => run.status !== "running");
   const ok = complete && runs.every((run) => run.status === "done" && run.ok !== false);

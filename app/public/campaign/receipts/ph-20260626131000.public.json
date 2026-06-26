@@ -1,0 +1,8 @@
+{
+  "iterationId": "ph-20260626131000",
+  "contentKind": "product-summary",
+  "evidenceClaim": true,
+  "evidenceRef": "terrarium-run:ter_20260626125907366_m4ihzo",
+  "title": "Group status now fails closed on inaccessible members",
+  "summary": "Run 4 integrated two storage/lineage hardenings: group status no longer leaks complete/ok/counts through inaccessible members, and router/doctor handling now reports malformed pending/inflight callback records and avoids cross-owner prune aborts."
+}

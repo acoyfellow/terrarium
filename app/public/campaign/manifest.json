@@ -5,10 +5,10 @@
   "backend": "local-content-loop",
   "status": "active",
   "synthetic": false,
-  "updatedAt": "2026-06-26T13:00:00.000Z",
+  "updatedAt": "2026-06-26T13:10:00.000Z",
   "counts": {
-    "total": 23,
-    "contained": 21,
+    "total": 29,
+    "contained": 27,
     "escapes": 0
   },
   "turns": [
@@ -558,6 +558,146 @@
       "agentModel": "private runner model",
       "agentCommand": "pi -p --no-session",
       "environment": "isolated copy workspace; pi -p --no-session; continuation batch"
+    },
+    {
+      "turn": 24,
+      "round": 7,
+      "family": "receipt-contract",
+      "title": "Receipt parser still accepted indented markers",
+      "technique": "receipt-contract",
+      "hypothesis": "Probe column-zero marker, multiline/Unicode summaries, duplicate markers, summary trim length, dry-run not-applicable, retry attempt IDs.",
+      "attempt": "Probe column-zero marker, multiline/Unicode summaries, duplicate markers, summary trim length, dry-run not-applicable, retry attempt IDs.",
+      "result": "Child found receipt marker and summary hardening candidates. Not integrated this pass.",
+      "adaptation": "Review receipt parser fix separately.",
+      "verdict": "contained",
+      "imageUrl": null,
+      "finishedAt": "2026-06-26T13:10:00.000Z",
+      "evidence": {
+        "executionId": "terrarium-run:ter_20260626125646111_wxhv6v",
+        "independentReplay": false
+      },
+      "contentKind": "product-summary",
+      "evidenceClaim": true,
+      "agentModel": "private runner model",
+      "agentCommand": "pi -p --no-session",
+      "environment": "isolated copy workspace; pi -p --no-session; batch allSettled/concurrency 3"
+    },
+    {
+      "turn": 25,
+      "round": 7,
+      "family": "callback-storage",
+      "title": "Prune could abort before later controller mailboxes",
+      "technique": "callback-storage",
+      "hypothesis": "Probe malformed pending/inflight files, malformed journal/subscriber doctor counters, ownerRunId null/missing/invalid, prune ownership, callback recover.",
+      "attempt": "Probe malformed pending/inflight files, malformed journal/subscriber doctor counters, ownerRunId null/missing/invalid, prune ownership, callback recover.",
+      "result": "Integrated prune skip semantics, malformed timestamp retention, and doctor malformed pending/inflight callback counters.",
+      "adaptation": "Add explicit quarantine/repair commands for malformed callback records later.",
+      "verdict": "contained",
+      "imageUrl": null,
+      "finishedAt": "2026-06-26T13:10:00.000Z",
+      "evidence": {
+        "executionId": "terrarium-run:ter_20260626125646111_sth12w",
+        "independentReplay": false
+      },
+      "receiptUrl": "/campaign/receipts/ph-20260626131000.public.json",
+      "contentKind": "product-summary",
+      "evidenceClaim": true,
+      "agentModel": "private runner model",
+      "agentCommand": "pi -p --no-session",
+      "environment": "isolated copy workspace; pi -p --no-session; batch allSettled/concurrency 3"
+    },
+    {
+      "turn": 26,
+      "round": 7,
+      "family": "batch-api",
+      "title": "Batch launch failure can leave partial runs hard to reconcile",
+      "technique": "batch-api",
+      "hypothesis": "Probe terrarium_spawn_batch wrapper errors after cancellation/timeouts, long/stale children, launch continuation after failures.",
+      "attempt": "Probe terrarium_spawn_batch wrapper errors after cancellation/timeouts, long/stale children, launch continuation after failures.",
+      "result": "Child found incremental group/launch continuation candidates but noted race risks. Not integrated this pass.",
+      "adaptation": "Design an atomic group append before integrating.",
+      "verdict": "contained",
+      "imageUrl": null,
+      "finishedAt": "2026-06-26T13:10:00.000Z",
+      "evidence": {
+        "executionId": "terrarium-run:ter_20260626125646111_rja4yo",
+        "independentReplay": false
+      },
+      "contentKind": "product-summary",
+      "evidenceClaim": true,
+      "agentModel": "private runner model",
+      "agentCommand": "pi -p --no-session",
+      "environment": "isolated copy workspace; pi -p --no-session; batch allSettled/concurrency 3"
+    },
+    {
+      "turn": 27,
+      "round": 7,
+      "family": "cancel-race",
+      "title": "Dead supervisor plus cancel marker can look orphaned",
+      "technique": "cancel-race",
+      "hypothesis": "Probe cancel markers with dead supervisor, orphan reconciliation, ensureTerminalCallback after recovered cancel, late receipt after cancel.",
+      "attempt": "Probe cancel markers with dead supervisor, orphan reconciliation, ensureTerminalCallback after recovered cancel, late receipt after cancel.",
+      "result": "Child found cancel-marker orphan recovery candidate. Not integrated this pass.",
+      "adaptation": "Review with full parent-side run-machine tests.",
+      "verdict": "contained",
+      "imageUrl": null,
+      "finishedAt": "2026-06-26T13:10:00.000Z",
+      "evidence": {
+        "executionId": "terrarium-run:ter_20260626125907366_rxpikr",
+        "independentReplay": false
+      },
+      "contentKind": "product-summary",
+      "evidenceClaim": true,
+      "agentModel": "private runner model",
+      "agentCommand": "pi -p --no-session",
+      "environment": "isolated copy workspace; pi -p --no-session; continuation batch"
+    },
+    {
+      "turn": 28,
+      "round": 7,
+      "family": "mcp-lineage",
+      "title": "Group aggregates leaked through inaccessible members",
+      "technique": "mcp-lineage",
+      "hypothesis": "Probe concise MCP outputs for groupOk/complete/ok, group redaction vs access denied, callback recover/status under child scopes.",
+      "attempt": "Probe concise MCP outputs for groupOk/complete/ok, group redaction vs access denied, callback recover/status under child scopes.",
+      "result": "Integrated fail-closed group status when any member is inaccessible, plus lineage tests for aggregate redaction and callback recover/status.",
+      "adaptation": "Keep group read redaction separate from group status aggregation.",
+      "verdict": "contained",
+      "imageUrl": null,
+      "finishedAt": "2026-06-26T13:10:00.000Z",
+      "evidence": {
+        "executionId": "terrarium-run:ter_20260626125907366_m4ihzo",
+        "independentReplay": false
+      },
+      "receiptUrl": "/campaign/receipts/ph-20260626131000.public.json",
+      "contentKind": "product-summary",
+      "evidenceClaim": true,
+      "agentModel": "private runner model",
+      "agentCommand": "pi -p --no-session",
+      "environment": "isolated copy workspace; pi -p --no-session; continuation batch"
+    },
+    {
+      "turn": 29,
+      "round": 7,
+      "family": "secure-workspace",
+      "title": "Patch artifacts can include credential-shaped files",
+      "technique": "secure-workspace",
+      "hypothesis": "Probe patch artifact leakage, secure-agent allowlist, teardown claims, docs threat model consistency, copy/worktree source mutation.",
+      "attempt": "Probe patch artifact leakage, secure-agent allowlist, teardown claims, docs threat model consistency, copy/worktree source mutation.",
+      "result": "Child found secure workspace artifact-boundary candidates. Not integrated this pass.",
+      "adaptation": "Review because it touches core, secure-agent, docs, and workspace policy.",
+      "verdict": "contained",
+      "imageUrl": null,
+      "finishedAt": "2026-06-26T13:10:00.000Z",
+      "evidence": {
+        "executionId": "terrarium-run:ter_20260626130030262_ft2rz9",
+        "independentReplay": false
+      },
+      "contentKind": "product-summary",
+      "evidenceClaim": true,
+      "agentModel": "private runner model",
+      "agentCommand": "pi -p --no-session",
+      "environment": "isolated copy workspace; pi -p --no-session; final one-job batch"
     }
   ]
 }

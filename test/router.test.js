@@ -255,6 +255,45 @@ test('controller prune skips child-owned mailboxes', async () => {
   }
 });
 
+test('prune skips mismatched ownership without aborting later controller mailboxes', async () => {
+  const suffix = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+  const ownedId = `aaa_owned_${suffix}`;
+  const controllerId = `zzz_controller_${suffix}`;
+  const ownerRunId = `ter_owner_${suffix}`;
+  const ownedEvent = `evt_owned_${suffix}`;
+  const controllerEvent = `evt_controller_${suffix}`;
+  try {
+    await registerSubscriber({ subscriberId: ownedId, ownerRunId, runIds: [ownerRunId], createdAt: '2020-01-01T00:00:00.000Z' });
+    await registerSubscriber({ subscriberId: controllerId, runIds: ['*'], createdAt: '2020-01-01T00:00:00.000Z' });
+    await routeEvent({ eventId: ownedEvent, type: 'Completed', runId: ownerRunId, at: '2020-01-01T00:00:00.000Z' });
+    await routeEvent({ eventId: controllerEvent, type: 'Completed', runId: `ter_controller_${suffix}`, at: '2020-01-01T00:00:00.000Z' });
+    const result = await pruneRouter({ callbackOlderThanMs: 0, subscriberOlderThanMs: 0, subscriberIds: [ownedId, controllerId], eventIds: [ownedEvent, controllerEvent] });
+    assert.ok(result.pendingRemoved >= 1, 'the controller mailbox must still be pruned');
+    assert.equal(result.subscribersRemoved, 1);
+    assert.equal((await getMailboxStatus(ownedId, { ownerRunId })).pending, 1);
+  } finally {
+    await unregisterSubscriber(ownedId, { ownerRunId }).catch(() => {});
+    await unregisterSubscriber(controllerId).catch(() => {});
+    await rm(join(JOURNAL_DIR, `${ownedEvent}.json`), { force: true });
+    await rm(join(JOURNAL_DIR, `${controllerEvent}.json`), { force: true });
+  }
+});
+
+test('malformed journal timestamps are retained rather than treated as stale', async () => {
+  const suffix = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+  const eventId = `evt_bad_time_${suffix}`;
+  const path = join(JOURNAL_DIR, `${eventId}.json`);
+  await mkdir(JOURNAL_DIR, { recursive: true });
+  await writeFile(path, JSON.stringify({ eventId, type: 'Completed', runId: `ter_${suffix}`, at: 'not-a-date' }));
+  try {
+    const result = await pruneRouter({ journalOlderThanMs: 0, eventIds: [eventId] });
+    assert.equal(result.journalRemoved, 0);
+    assert.equal(existsSync(path), true);
+  } finally {
+    await rm(path, { force: true });
+  }
+});
+
 test('callback filters do not deliver unrelated runs', async () => {
   const suffix = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
   const subscriberId = `sub_filter_${suffix}`;

@@ -1,0 +1,86 @@
+{
+  "schema": "terrarium.product-loop.receipt.v0.1",
+  "iterationId": "ph-20260626131000",
+  "intent": "parallel attacker run 4 against receipt, callback storage, batch API, cancellation, MCP lineage, and secure workspace surfaces",
+  "phases": [
+    "OBSERVE",
+    "BATCH_ATTACK",
+    "SELECT",
+    "EXECUTE",
+    "VERIFY",
+    "RECORD",
+    "LOCAL_TABLE_UPDATE"
+  ],
+  "selectedWork": {
+    "kind": "storage-and-lineage-hardening",
+    "reason": "Run 4 produced two non-conflicting verified fixes: fail-closed group aggregate access and malformed callback storage diagnostics/prune behavior."
+  },
+  "childRuns": [
+    {
+      "runId": "ter_20260626125646111_wxhv6v",
+      "status": "done",
+      "selected": false,
+      "summary": "Child found receipt marker and summary hardening candidates. Not integrated this pass."
+    },
+    {
+      "runId": "ter_20260626125646111_sth12w",
+      "status": "done",
+      "selected": true,
+      "summary": "Integrated prune skip semantics, malformed timestamp retention, and doctor malformed pending/inflight callback counters."
+    },
+    {
+      "runId": "ter_20260626125646111_rja4yo",
+      "status": "done",
+      "selected": false,
+      "summary": "Child found incremental group/launch continuation candidates but noted race risks. Not integrated this pass."
+    },
+    {
+      "runId": "ter_20260626125907366_rxpikr",
+      "status": "done",
+      "selected": false,
+      "summary": "Child found cancel-marker orphan recovery candidate. Not integrated this pass."
+    },
+    {
+      "runId": "ter_20260626125907366_m4ihzo",
+      "status": "done",
+      "selected": true,
+      "summary": "Integrated fail-closed group status when any member is inaccessible, plus lineage tests for aggregate redaction and callback recover/status."
+    },
+    {
+      "runId": "ter_20260626130030262_ft2rz9",
+      "status": "done",
+      "selected": false,
+      "summary": "Child found secure workspace artifact-boundary candidates. Not integrated this pass."
+    }
+  ],
+  "health": {
+    "routerTestsOk": true,
+    "doctorTestsOk": true,
+    "mcpScopeTestsOk": true,
+    "groupsTestsOk": true,
+    "productLoopValidateOk": true,
+    "buildOk": true,
+    "localSmokeOk": true
+  },
+  "commands": [
+    {
+      "command": "terrarium_spawn_batch allSettled concurrency 3 plus continuation batches for six attacker jobs",
+      "ok": false,
+      "note": "first batch wrapper errored on cancellation wait; parent reconciled durable runs"
+    },
+    {
+      "command": "node --test test/router.test.js test/doctor.test.js test/mcp_scope.test.js test/groups.test.js",
+      "ok": true
+    }
+  ],
+  "publicSummary": {
+    "iterationId": "ph-20260626131000",
+    "contentKind": "product-summary",
+    "evidenceClaim": true,
+    "evidenceRef": "terrarium-run:ter_20260626125907366_m4ihzo",
+    "title": "Group status now fails closed on inaccessible members",
+    "summary": "Run 4 integrated two storage/lineage hardenings: group status no longer leaks complete/ok/counts through inaccessible members, and router/doctor handling now reports malformed pending/inflight callback records and avoids cross-owner prune aborts."
+  },
+  "canPublishStory": true,
+  "createdAt": "2026-06-26T13:03:22.205Z"
+}
