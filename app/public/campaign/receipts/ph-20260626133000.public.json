@@ -1,0 +1,8 @@
+{
+  "iterationId": "ph-20260626133000",
+  "contentKind": "product-summary",
+  "evidenceClaim": true,
+  "evidenceRef": "terrarium-run:ter_20260626130922047_6j0to4",
+  "title": "Callback claims reject private fields; missing group members are not complete",
+  "summary": "Run 6 integrated strict callback mailbox event validation and group truthfulness fixes. Corrupted callback records with private fields stay pending for diagnosis and group completion now requires explicit terminal member statuses."
+}

@@ -46,8 +46,10 @@ export async function getRunGroupStatus({ groupId, verbose = false, requesterRun
   const inaccessible = runs.some((run) => run.status === "missing" && /access denied/i.test(run.error ?? ""));
   if (inaccessible) throw new Error("Terrarium group access denied");
   const counts = Object.fromEntries(["running", "done", "failed", "inconclusive", "cancelled", "error", "orphaned", "missing"].map((status) => [status, runs.filter((run) => run.status === status).length]));
-  const complete = runs.every((run) => run.status !== "running");
-  const ok = complete && runs.every((run) => run.status === "done" && run.ok !== false);
+  const terminalStatuses = new Set(["done", "failed", "inconclusive", "cancelled", "error", "orphaned"]);
+  // Unknown/missing records are not evidence that every member reached a terminal state.
+  const complete = runs.every((run) => terminalStatuses.has(run.status));
+  const ok = complete && runs.every((run) => run.status === "done" && run.ok === true);
   return { ...group, complete, ok, counts, runs: verbose ? runs : runs.map(({ runId, status, ok, exitCode, taskContractStatus, progressText, needsAttention, idleMs, startedAt, finishedAt, error, note }) => ({ runId, status, ok, exitCode, taskContractStatus, progressText, needsAttention, idleMs, startedAt, finishedAt, error, note })) };
 }
 

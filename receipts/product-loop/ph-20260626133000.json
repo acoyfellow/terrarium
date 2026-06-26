@@ -1,0 +1,85 @@
+{
+  "schema": "terrarium.product-loop.receipt.v0.1",
+  "iterationId": "ph-20260626133000",
+  "intent": "parallel attacker run 6 against batch wrapper, receipt contract, callback privacy, group truthfulness, cancellation handoff, and secure workspace artifacts",
+  "phases": [
+    "OBSERVE",
+    "BATCH_ATTACK",
+    "SELECT",
+    "EXECUTE",
+    "VERIFY",
+    "RECORD",
+    "LOCAL_TABLE_UPDATE"
+  ],
+  "selectedWork": {
+    "kind": "callback-privacy-and-group-truthfulness",
+    "reason": "Two verified non-conflicting fixes with passing router/group/MCP tests."
+  },
+  "childRuns": [
+    {
+      "runId": "ter_20260626130922047_izgjug",
+      "status": "done",
+      "selected": false,
+      "summary": "Child found best-effort cleanup candidate for recurring batch wrapper errors. Not integrated because batch tests need dependency-backed verification."
+    },
+    {
+      "runId": "ter_20260626130922047_27m06k",
+      "status": "done",
+      "selected": false,
+      "summary": "Child found receipt extraction hardening candidates. Not integrated this pass."
+    },
+    {
+      "runId": "ter_20260626130922047_6j0to4",
+      "status": "done",
+      "selected": true,
+      "summary": "Integrated strict callback mailbox event validation; claim/status/prune only accept allowlisted terminal records and retain malformed private payloads."
+    },
+    {
+      "runId": "ter_20260626130947644_oqwi1k",
+      "status": "done",
+      "selected": true,
+      "summary": "Integrated terminal-status-only group completion and stricter ok semantics; added missing-member and group-ID traversal tests."
+    },
+    {
+      "runId": "ter_20260626131133532_fy2cuw",
+      "status": "done",
+      "selected": false,
+      "summary": "Child found cancellation recovery candidate. Not integrated this pass."
+    },
+    {
+      "runId": "ter_20260626131133532_744ux2",
+      "status": "done",
+      "selected": false,
+      "summary": "Child found secure workspace credential artifact candidates. Not integrated this pass because Docker-dependent verification remains."
+    }
+  ],
+  "health": {
+    "routerTestsOk": true,
+    "groupsTestsOk": true,
+    "mcpScopeTestsOk": true,
+    "productLoopValidateOk": true,
+    "buildOk": true,
+    "localSmokeOk": true
+  },
+  "commands": [
+    {
+      "command": "terrarium_spawn_batch allSettled concurrency 3 plus continuation for six attacker jobs",
+      "ok": false,
+      "note": "first batch wrapper errored on cancellation wait; parent reconciled durable runs"
+    },
+    {
+      "command": "node --test test/router.test.js test/groups.test.js test/mcp_scope.test.js",
+      "ok": true
+    }
+  ],
+  "publicSummary": {
+    "iterationId": "ph-20260626133000",
+    "contentKind": "product-summary",
+    "evidenceClaim": true,
+    "evidenceRef": "terrarium-run:ter_20260626130922047_6j0to4",
+    "title": "Callback claims reject private fields; missing group members are not complete",
+    "summary": "Run 6 integrated strict callback mailbox event validation and group truthfulness fixes. Corrupted callback records with private fields stay pending for diagnosis and group completion now requires explicit terminal member statuses."
+  },
+  "canPublishStory": true,
+  "createdAt": "2026-06-26T13:13:24.308Z"
+}
