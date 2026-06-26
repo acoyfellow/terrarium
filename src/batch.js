@@ -95,15 +95,24 @@ export async function spawnBatch(opts = {}) {
 async function launchBounded(jobs, limit) {
   const results = new Array(jobs.length);
   let next = 0;
+  let stopped = false;
   async function worker() {
-    while (true) {
+    while (!stopped) {
       const index = next++;
       if (index >= jobs.length) return;
-      // A slot remains occupied until its run is terminal. Merely awaiting the
-      // detached spawn would only bound launcher calls, not active children.
-      const run = await spawnTerrariumBackground({ ...jobs[index], stream: false });
-      results[index] = run;
-      if (limit < jobs.length) await waitUntilTerminal(run.runId);
+      try {
+        // A slot remains occupied until its run is terminal. Merely awaiting the
+        // detached spawn would only bound launcher calls, not active children.
+        const run = await spawnTerrariumBackground({ ...jobs[index], stream: false });
+        results[index] = run;
+        if (limit < jobs.length) await waitUntilTerminal(run.runId);
+      } catch (error) {
+        // A failed worker must close the shared launch gate. Without this handoff,
+        // other workers continue consuming queued jobs after the batch is already
+        // known to have a partial-launch failure.
+        stopped = true;
+        throw error;
+      }
     }
   }
   const workers = Array.from({ length: Math.min(limit, jobs.length) }, () => worker());

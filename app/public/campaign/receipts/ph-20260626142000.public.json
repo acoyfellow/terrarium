@@ -1,0 +1,8 @@
+{
+  "iterationId": "ph-20260626142000",
+  "contentKind": "product-summary",
+  "evidenceClaim": true,
+  "evidenceRef": "terrarium-run:ter_20260626133720009_68b1bb",
+  "title": "Partial launch gate closes; doctor repair counters added",
+  "summary": "Run 11 integrated the remaining partial-launch gate fix, acknowledged/stale callback repair diagnostics in doctor, and explicit MCP ack eventId validation. Targeted tests and local smoke passed."
+}

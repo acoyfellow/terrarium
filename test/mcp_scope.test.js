@@ -203,6 +203,37 @@ test('callback status/claim narrow arguments and reject missing identifiers with
   }
 });
 
+test('callback ack/requeue/prune validate required arguments and top-level ownership', async () => {
+  const owner = await runTerrarium({ task: 'callback mutation owner', dryRun: true, stream: false });
+  const subscriberId = `sub_callback_mutation_${owner.runId}`;
+  const env = { TERRARIUM_RUN_ID: owner.runId, TERRARIUM_ALLOW_SPAWN: 'false', TERRARIUM_STATUS_SCOPE: 'self', TERRARIUM_READ_SCOPE: 'self' };
+  try {
+    await rpc([{ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'terrarium_callbacks', arguments: { action: 'subscribe', subscriberId, runIds: [owner.runId] } } }], env);
+    const { responses } = await rpc([
+      { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'terrarium_callbacks', arguments: { action: 'ack', subscriberId } } },
+      { jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'terrarium_callbacks', arguments: { action: 'requeue' } } },
+      { jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'terrarium_callbacks', arguments: { action: 'prune', olderThanMs: 0 } } },
+    ], env);
+    assert.match(toolText(responses.find((r) => r.id === 1)), /ack requires eventId/);
+    assert.match(toolText(responses.find((r) => r.id === 2)), /requeue requires subscriberId/);
+    assert.match(toolText(responses.find((r) => r.id === 3)), /top-level controller/);
+  } finally {
+    rmSync(join(MAILBOXES_DIR, subscriberId), { recursive: true, force: true });
+    rmSync(join(SUBSCRIBERS_DIR, `${subscriberId}.json`), { force: true });
+  }
+});
+
+test('group status/read/cancel reject missing group IDs concisely', async () => {
+  const { responses } = await rpc(['status', 'read', 'cancel'].map((action, index) => ({
+    jsonrpc: '2.0', id: index + 1, method: 'tools/call', params: { name: 'terrarium_group', arguments: { action } },
+  })));
+  for (const response of responses) {
+    const text = toolText(response);
+    assert.match(text, /groupId|group id/i);
+    assert.ok(text.length < 300, `missing-group error should stay concise: ${text.length} bytes`);
+  }
+});
+
 test('MCP concrete callback subscribe recovers completion that raced ahead', async () => {
   const suffix = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
   const runId = `ter_mcp_callback_${suffix}`;

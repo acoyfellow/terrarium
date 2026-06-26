@@ -8,7 +8,7 @@ import { JOURNAL_DIR, MAILBOXES_DIR, SUBSCRIBERS_DIR } from '../src/router.js';
 test('doctor reports bounded operational diagnostics without process environments', async () => {
   const result = await diagnoseTerrarium();
   for (const field of ['homeWritable', 'logsWritable', 'workspaceWritable', 'routerWritable']) assert.equal(typeof result.checks[field], 'boolean');
-  for (const field of ['activeRuns', 'orphanedRuns', 'needsAttentionRuns', 'groups', 'subscribers', 'malformedSubscribers', 'journalEvents', 'malformedJournalEvents', 'pendingCallbacks', 'malformedPendingCallbacks', 'inflightCallbacks', 'malformedInflightCallbacks', 'missingTerminalCallbacks', 'staleChildClaims']) assert.equal(typeof result.checks[field], 'number');
+  for (const field of ['activeRuns', 'orphanedRuns', 'needsAttentionRuns', 'groups', 'subscribers', 'malformedSubscribers', 'journalEvents', 'malformedJournalEvents', 'pendingCallbacks', 'malformedPendingCallbacks', 'inflightCallbacks', 'malformedInflightCallbacks', 'acknowledgedCallbacks', 'malformedAcknowledgedCallbacks', 'staleInflightCallbacks', 'routerRepairCandidates', 'missingTerminalCallbacks', 'staleChildClaims']) assert.equal(typeof result.checks[field], 'number');
   assert.equal(JSON.stringify(result).includes('process.env'), false);
   assert.ok(Array.isArray(result.warnings));
 });
@@ -129,6 +129,34 @@ test('doctor counts valid state-specific callbacks', async () => {
     assert.ok(result.checks.inflightCallbacks >= 1);
   } finally {
     await rm(`${MAILBOXES_DIR}/${subscriberId}`, { recursive: true, force: true });
+  }
+});
+
+test('doctor mirrors router validation for acknowledged, stale inflight, and repair candidates', async () => {
+  const suffix = `${process.pid}_${Date.now()}_repair`;
+  const subscriberId = `doctor_repair_${suffix}`;
+  const root = `${MAILBOXES_DIR}/${subscriberId}`;
+  const staleId = `evt_stale_${suffix}`;
+  const ackedId = `evt_acked_${suffix}`;
+  const privateId = `evt_private_acked_${suffix}`;
+  const base = { type: 'Completed', runId: `ter_${suffix}`, at: '2020-01-01T00:00:00.000Z', claimedAt: '2020-01-01T00:00:00.000Z' };
+  await Promise.all([mkdir(`${root}/inflight`, { recursive: true }), mkdir(`${root}/acked`, { recursive: true })]);
+  await Promise.all([
+    writeFile(`${root}/inflight/${staleId}.json`, JSON.stringify({ ...base, eventId: staleId })),
+    writeFile(`${root}/acked/${ackedId}.json`, JSON.stringify({ ...base, eventId: ackedId })),
+    writeFile(`${root}/acked/${privateId}.json`, JSON.stringify({ ...base, eventId: privateId, privateMetadata: 'secret' })),
+  ]);
+  try {
+    const result = await diagnoseTerrarium();
+    assert.ok(result.checks.acknowledgedCallbacks >= 1);
+    assert.ok(result.checks.malformedAcknowledgedCallbacks >= 1);
+    assert.ok(result.checks.staleInflightCallbacks >= 1);
+    assert.ok(result.checks.routerRepairCandidates >= result.checks.malformedAcknowledgedCallbacks);
+    assert.ok(result.warnings.some((warning) => warning.includes('malformed acknowledged callback')));
+    assert.ok(result.warnings.some((warning) => warning.includes('repair candidates for requeue')));
+    assert.equal(JSON.stringify(result).includes('privateMetadata'), false);
+  } finally {
+    await rm(root, { recursive: true, force: true });
   }
 });
 
