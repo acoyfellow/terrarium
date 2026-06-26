@@ -1,0 +1,8 @@
+{
+  "iterationId": "ph-20260626091000",
+  "contentKind": "product-summary",
+  "evidenceClaim": true,
+  "evidenceRef": "terrarium-run:ter_20260626085721563_5zh5ya",
+  "title": "Wrong model keys are not retry tickets",
+  "summary": "The reconciler integrated model-configuration classification so broken opencode model setup is surfaced as non-retryable instead of generic failure noise."
+}

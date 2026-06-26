@@ -55,10 +55,14 @@ export function taskFingerprint(task) {
 }
 
 export function classifyRunnerFailure({ agent, stdoutTail, stderrTail, error } = {}) {
-  if (basename(splitCommand(agent || "")[0] || "") !== "pi") return null;
+  const parts = splitCommand(agent || "");
+  const executable = basename(parts[0] || "");
   const output = [stderrTail, stdoutTail, error].filter(Boolean).join("\n");
-  if (/\b(?:runner|agent)\s+(?:is\s+)?busy\b|\bno\s+available\s+runners?\b|agent is already processing|specify streamingBehavior/i.test(output)) {
+  if (executable === "pi" && /\b(?:runner|agent)\s+(?:is\s+)?busy\b|\bno\s+available\s+runners?\b|agent is already processing|specify streamingBehavior/i.test(output)) {
     return { failureKind: "runner-busy", retryable: true };
+  }
+  if (executable === "opencode" && parts[1] === "run" && /model(?:\s+\S+)?\s+(?:not found|does not exist|is not available|is invalid)|unknown model|invalid model|provider\/model|model.*(?:configuration|config).*(?:invalid|missing)/i.test(output)) {
+    return { failureKind: "model-configuration", retryable: false };
   }
   return null;
 }

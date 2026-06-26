@@ -83,11 +83,15 @@ test("runTerrarium dry-run: explicit --agent overrides readOnly preset", async (
   assert.match(result.invocation, /^pi run --no-session /);
 });
 
-test("Pi runner-busy failures are retryable without misclassifying other agents", () => {
+test("runner failures classify actionable Pi contention and opencode model configuration", () => {
   assert.deepEqual(classifyRunnerFailure({ agent: "pi -p", stderrTail: "Error: runner is busy; try again" }), { failureKind: "runner-busy", retryable: true });
   assert.deepEqual(classifyRunnerFailure({ agent: "/usr/local/bin/pi", error: "No available runners" }), { failureKind: "runner-busy", retryable: true });
   assert.deepEqual(classifyRunnerFailure({ agent: "pi -p", stderrTail: "Agent is already processing. Specify streamingBehavior ('steer' or 'followUp') to queue the message." }), { failureKind: "runner-busy", retryable: true });
+  assert.deepEqual(classifyRunnerFailure({ agent: "opencode run", stderrTail: "Error: model anthropic/missing not found" }), { failureKind: "model-configuration", retryable: false });
+  assert.deepEqual(classifyRunnerFailure({ agent: "/usr/local/bin/opencode run", error: "Unknown model: bad/model" }), { failureKind: "model-configuration", retryable: false });
   assert.equal(classifyRunnerFailure({ agent: "opencode run", stderrTail: "runner is busy" }), null);
+  assert.equal(classifyRunnerFailure({ agent: "pi -p", stderrTail: "unknown model: bad/model" }), null);
+  assert.equal(classifyRunnerFailure({ agent: "opencode serve", stderrTail: "unknown model: bad/model" }), null);
   assert.equal(classifyRunnerFailure({ agent: "pi -p", stderrTail: "authentication failed" }), null);
 });
 
