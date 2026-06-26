@@ -255,7 +255,9 @@ export async function pruneRouter({ acknowledgedOlderThanMs = 7 * 86400000, jour
     for (const subscriber of await readdir(MAILBOXES_DIR)) {
       if (Array.isArray(subscriberIds) && !subscriberIds.includes(subscriber)) continue;
       let subscription; try { subscription = await getSubscriber(subscriber); } catch { continue; }
-      assertSubscriberOwner(subscription, ownerRunId);
+      // A top-level prune may maintain only controller-owned mailboxes. Child
+      // ownership must never make pruning abort early or reach another child.
+      if (subscription.ownerRunId !== (ownerRunId ?? null)) continue;
       const dirs = mailboxDirs(subscriber);
       for (const [kind, dir, cutoff] of [
         ['acked', dirs.acked, acknowledgedOlderThanMs],
@@ -279,13 +281,14 @@ export async function pruneRouter({ acknowledgedOlderThanMs = 7 * 86400000, jour
     for (const file of (await readdir(JOURNAL_DIR)).filter((name) => name.endsWith('.json'))) {
       if (Array.isArray(eventIds) && !eventIds.includes(file.slice(0, -5))) continue;
       let event; try { event = JSON.parse(await readFile(join(JOURNAL_DIR, file), 'utf8')); } catch { continue; }
-      if (now - Date.parse(event.at || new Date(now).toISOString()) >= journalOlderThanMs) { await rm(join(JOURNAL_DIR, file), { force: true }); journalRemoved++; }
+      const age = now - Date.parse(event.at || '');
+      if (Number.isFinite(age) && age >= Math.max(0, Number(journalOlderThanMs) || 0)) { await rm(join(JOURNAL_DIR, file), { force: true }); journalRemoved++; }
     }
   } catch {}
   try {
     for (const sub of await listSubscribers()) {
       if (Array.isArray(subscriberIds) && !subscriberIds.includes(sub.subscriberId)) continue;
-      assertSubscriberOwner(sub, ownerRunId);
+      if (sub.ownerRunId !== (ownerRunId ?? null)) continue;
       const age = now - Date.parse(sub.createdAt || '');
       if (!Number.isFinite(age) || age < subscriberCutoff) continue;
       const status = await getMailboxStatus(sub.subscriberId, { ownerRunId: sub.ownerRunId });

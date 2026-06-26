@@ -87,14 +87,50 @@ test('child MCP denies sibling cancel, callbacks, and group access', async () =>
     { jsonrpc: '2.0', id: 6, method: 'tools/call', params: { name: 'terrarium_group', arguments: { action: 'create', groupId: `${groupId}_new`, runIds: [b.runId] } } },
   ], env);
   for (const id of [1, 2]) assert.match(toolText(responses.find((r) => r.id === id)), /access denied/);
-  const status = JSON.parse(toolText(responses.find((r) => r.id === 3)));
-  assert.equal(status.runs[0].status, 'missing');
-  assert.match(status.runs[0].error, /access denied/);
+  assert.match(toolText(responses.find((r) => r.id === 3)), /group access denied/);
   const read = JSON.parse(toolText(responses.find((r) => r.id === 4)));
   assert.match(read.results[0].error, /access denied/);
-  assert.deepEqual(JSON.parse(toolText(responses.find((r) => r.id === 5))).cancelled, []);
+  assert.match(toolText(responses.find((r) => r.id === 5)), /group access denied/);
   assert.match(toolText(responses.find((r) => r.id === 6)), /access denied/);
   rmSync(join(process.env.TERRARIUM_HOME || join(process.env.HOME, '.terrarium'), 'groups', `${groupId}.json`), { force: true });
+});
+
+test('child MCP group status does not leak aggregate completion or ok through inaccessible members', async () => {
+  const a = await runTerrarium({ task: 'scope aggregate owner', dryRun: true, stream: false });
+  const b = await runTerrarium({ task: 'scope aggregate sibling', dryRun: true, stream: false });
+  const groupId = `grp_scope_aggregate_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+  const top = await rpc([{ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'terrarium_group', arguments: { action: 'create', groupId, runIds: [a.runId, b.runId] } } }]);
+  assert.equal(JSON.parse(toolText(top.responses[0])).groupId, groupId);
+  try {
+    const env = { TERRARIUM_RUN_ID: a.runId, TERRARIUM_ALLOW_SPAWN: 'false', TERRARIUM_STATUS_SCOPE: 'self', TERRARIUM_READ_SCOPE: 'self' };
+    const { responses } = await rpc([{ jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'terrarium_group', arguments: { action: 'status', groupId } } }], env);
+    const text = toolText(responses[0]);
+    assert.match(text, /group access denied/);
+    assert.doesNotMatch(text, /"complete"|"ok"|"counts"|scope aggregate sibling/);
+  } finally {
+    rmSync(join(process.env.TERRARIUM_HOME || join(process.env.HOME, '.terrarium'), 'groups', `${groupId}.json`), { force: true });
+  }
+});
+
+test('child callback recover and subscriber status enforce lineage ownership', async () => {
+  const a = await runTerrarium({ task: 'callback scope owner', dryRun: true, stream: false });
+  const b = await runTerrarium({ task: 'callback scope sibling', dryRun: true, stream: false });
+  const subscriberId = `sub_callback_scope_${a.runId}`;
+  const env = { TERRARIUM_RUN_ID: a.runId, TERRARIUM_ALLOW_SPAWN: 'false', TERRARIUM_STATUS_SCOPE: 'self', TERRARIUM_READ_SCOPE: 'self' };
+  try {
+    const { responses } = await rpc([
+      { jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'terrarium_callbacks', arguments: { action: 'subscribe', subscriberId, runIds: [a.runId] } } },
+      { jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'terrarium_callbacks', arguments: { action: 'recover', runId: a.runId } } },
+      { jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'terrarium_callbacks', arguments: { action: 'recover', runId: b.runId } } },
+      { jsonrpc: '2.0', id: 4, method: 'tools/call', params: { name: 'terrarium_callbacks', arguments: { action: 'status', subscriberId } } },
+    ], env);
+    assert.equal(JSON.parse(toolText(responses.find((r) => r.id === 2))).runId, a.runId);
+    assert.match(toolText(responses.find((r) => r.id === 3)), /access denied/);
+    assert.match(toolText(responses.find((r) => r.id === 4)), /ENOENT|subscriberId/);
+  } finally {
+    rmSync(join(MAILBOXES_DIR, subscriberId), { recursive: true, force: true });
+    rmSync(join(SUBSCRIBERS_DIR, `${subscriberId}.json`), { force: true });
+  }
 });
 
 test('MCP concrete callback subscribe recovers completion that raced ahead', async () => {

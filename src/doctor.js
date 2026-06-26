@@ -8,11 +8,31 @@ async function writable(path) {
   try { await mkdir(path, { recursive: true }); await access(path, constants.R_OK | constants.W_OK); return true; } catch { return false; }
 }
 async function count(path, filter = () => true) { try { return (await readdir(path)).filter(filter).length; } catch { return 0; } }
-async function jsonHealth(path) {
+async function jsonHealth(path, validate = () => true) {
   let valid = 0, malformed = 0;
   try {
     for (const file of (await readdir(path)).filter((name) => name.endsWith(".json"))) {
-      try { JSON.parse(await readFile(`${path}/${file}`, "utf8")); valid++; } catch { malformed++; }
+      try {
+        const value = JSON.parse(await readFile(`${path}/${file}`, "utf8"));
+        if (!validate(value, file)) throw new Error("invalid record");
+        valid++;
+      } catch { malformed++; }
+    }
+  } catch {}
+  return { valid, malformed };
+}
+const validOwner = (value) => value === null || (typeof value === "string" && /^ter_[A-Za-z0-9_]+$/.test(value));
+const validSubscriber = (value, file) => value && value.subscriberId === file.slice(0, -5) && Object.hasOwn(value, "ownerRunId") && validOwner(value.ownerRunId);
+const validEvent = (value, file) => value && value.eventId === file.slice(0, -5) && typeof value.type === "string" && typeof value.runId === "string";
+async function mailboxHealth(path) {
+  let valid = 0, malformed = 0;
+  try {
+    for (const file of (await readdir(path)).filter((name) => name.endsWith(".json"))) {
+      try {
+        const value = JSON.parse(await readFile(`${path}/${file}`, "utf8"));
+        if (!validEvent(value, file)) throw new Error("invalid callback");
+        valid++;
+      } catch { malformed++; }
     }
   } catch {}
   return { valid, malformed };
@@ -20,8 +40,8 @@ async function jsonHealth(path) {
 
 export async function diagnoseTerrarium() {
   const runs = await listRuns({ limit: 100 });
-  const subscriberHealth = await jsonHealth(SUBSCRIBERS_DIR);
-  const journalHealth = await jsonHealth(JOURNAL_DIR);
+  const subscriberHealth = await jsonHealth(SUBSCRIBERS_DIR, validSubscriber);
+  const journalHealth = await jsonHealth(JOURNAL_DIR, validEvent);
   const checks = {
     homeWritable: await writable(HOME),
     logsWritable: await writable(LOG_DIR),
@@ -37,7 +57,9 @@ export async function diagnoseTerrarium() {
     journalEvents: journalHealth.valid,
     malformedJournalEvents: journalHealth.malformed,
     pendingCallbacks: 0,
+    malformedPendingCallbacks: 0,
     inflightCallbacks: 0,
+    malformedInflightCallbacks: 0,
     missingTerminalCallbacks: 0,
     staleChildClaims: 0,
   };
@@ -48,8 +70,12 @@ export async function diagnoseTerrarium() {
   }
   try {
     for (const subscriber of await readdir(MAILBOXES_DIR)) {
-      checks.pendingCallbacks += await count(`${MAILBOXES_DIR}/${subscriber}/pending`, (file) => file.endsWith(".json"));
-      checks.inflightCallbacks += await count(`${MAILBOXES_DIR}/${subscriber}/inflight`, (file) => file.endsWith(".json"));
+      const pending = await mailboxHealth(`${MAILBOXES_DIR}/${subscriber}/pending`);
+      const inflight = await mailboxHealth(`${MAILBOXES_DIR}/${subscriber}/inflight`);
+      checks.pendingCallbacks += pending.valid;
+      checks.malformedPendingCallbacks += pending.malformed;
+      checks.inflightCallbacks += inflight.valid;
+      checks.malformedInflightCallbacks += inflight.malformed;
     }
   } catch {}
   try {
@@ -69,7 +95,9 @@ export async function diagnoseTerrarium() {
   if (checks.malformedSubscribers) warnings.push(`${checks.malformedSubscribers} malformed subscriber record(s) need quarantine or repair`);
   if (checks.malformedJournalEvents) warnings.push(`${checks.malformedJournalEvents} malformed callback journal event(s) need quarantine or repair`);
   if (checks.pendingCallbacks) warnings.push(`${checks.pendingCallbacks} callback(s) are pending delivery`);
+  if (checks.malformedPendingCallbacks) warnings.push(`${checks.malformedPendingCallbacks} malformed pending callback(s) need quarantine or repair`);
   if (checks.inflightCallbacks) warnings.push(`${checks.inflightCallbacks} callback(s) are claimed but unacknowledged`);
+  if (checks.malformedInflightCallbacks) warnings.push(`${checks.malformedInflightCallbacks} malformed inflight callback(s) need quarantine or repair`);
   if (checks.missingTerminalCallbacks) warnings.push(`${checks.missingTerminalCallbacks} terminal run(s) are missing durable callback events; recover those run IDs`);
   if (checks.staleChildClaims) warnings.push(`${checks.staleChildClaims} stale child-slot claim(s) exist from older runs`);
   return { ok: warnings.length === 0, checks, warnings, paths: { home: HOME, logs: LOG_DIR, workspaces: WORKSPACE_DIR, events: EVENT_DIR, router: ROUTER_DIR } };
