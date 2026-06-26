@@ -671,6 +671,12 @@ export async function superviseTerrariumBackground({ run, parts, prompt, base, w
           const { type: _type, reason: _reason, ...terminal } = decision;
           finalResult = await persistFinishedRun(base, { background: true, pid: child.pid, childPid: child.pid, supervisorPid: process.pid, stdoutTail: tail(stdout), stderrTail: tail(stderr), ...terminal, ...ws });
           if (specPath) await rm(specPath, { force: true });
+          // Journal the durable terminal event at Finalize, not gated behind a later
+          // QueueCallback. Finalize always runs; QueueCallback may be skipped if the
+          // supervisor is detached/killed first — which left terminal runs missing
+          // durable callback events (doctor: missingTerminalCallbacks). routeEvent is
+          // idempotent (wx flag), so a later QueueCallback emit is a harmless no-op.
+          try { await emitCompletionEvent(finalResult); } catch {}
         }
         if (decision.type === "QueueCallback" && finalResult) {
           await emitCompletionEvent(finalResult);
