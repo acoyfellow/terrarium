@@ -75,7 +75,17 @@ test('public evidence claims require a typed, checkable evidence reference', () 
   ]) {
     assert.doesNotThrow(() => assertPublicSummary({ iterationId: 'ph-20260625203000', evidenceClaim: true, evidenceRef }));
   }
-  for (const evidenceRef of [undefined, '', 'trust me', 'commit:xyz', 'terrarium-run:not-a-run']) {
+  for (const evidenceRef of [
+    undefined,
+    '',
+    'trust me',
+    'commit:xyz',
+    'commit:abc1234\nreplay:forged',
+    'terrarium-run:not-a-run',
+    'terrarium-run:ter_20260626085721563_5zh5ya/../../private',
+    'test:../private',
+    'replay:https://attacker.invalid/proof',
+  ]) {
     assert.throws(
       () => assertPublicSummary({ iterationId: 'ph-20260625203000', evidenceClaim: true, evidenceRef }),
       /checkable evidenceRef/,

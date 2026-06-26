@@ -45,6 +45,17 @@ test("task receipt validation recognizes CR and Unicode line separators", () => 
   );
 });
 
+test("task receipt validation enforces summary boundaries and preserves JSON text", () => {
+  const expected = { runId: "run-1", taskFingerprint: "fingerprint", nonce: "nonce" };
+  const output = (summary, extra = {}) => `TERRARIUM_RESULT=${JSON.stringify({ ...expected, summary, ...extra })}`;
+
+  assert.deepEqual(validateTaskContractOutput(output(" x ".padEnd(2001, "a")), expected), { status: "malformed" });
+  assert.deepEqual(validateTaskContractOutput(output("a".repeat(2000)), expected), { status: "verified", summary: "a".repeat(2000) });
+  assert.deepEqual(validateTaskContractOutput(output("  done ✅\n第二行  "), expected), { status: "verified", summary: "done ✅\n第二行" });
+  assert.deepEqual(validateTaskContractOutput(output("done", { evidenceRef: "https://attacker.invalid", arbitrary: { trusted: true } }), expected), { status: "verified", summary: "done" });
+  assert.deepEqual(validateTaskContractOutput(`${output("first")}\n${output("second")}`, expected), { status: "malformed" });
+});
+
 test("childPrompt default profile keeps the full structured contract", () => {
   const out = childPrompt("ship it", { depth: 1, maxDepth: 3, runId: "r1", parentRunId: null });
   assert.match(out, /You are a Terrarium child agent\./);

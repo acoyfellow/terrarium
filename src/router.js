@@ -31,10 +31,14 @@ function sanitizeCallbackEvent(event) {
   const allowed = ['type', 'eventId', 'runId', 'parentRunId', 'taskFingerprint', 'workflowId', 'sessionId', 'channel', 'at', 'status', 'ok', 'exitCode', 'signal', 'dryRun'];
   return Object.fromEntries(allowed.filter((key) => event[key] !== undefined).map((key) => [key, event[key]]));
 }
-function isValidCallbackEvent(event, expectedEventId) {
+function isValidCallbackEvent(event, expectedEventId, { state = 'any' } = {}) {
   if (!event || typeof event !== 'object' || Array.isArray(event)) return false;
   if (event.eventId !== expectedEventId || !TERMINAL_EVENT_TYPES.includes(event.type) || typeof event.runId !== 'string') return false;
-  return Object.keys(event).every((key) => CALLBACK_EVENT_KEYS.has(key));
+  const claimed = Object.hasOwn(event, 'claimedAt');
+  if (state === 'pending' && claimed) return false;
+  if (state === 'claimed' && !claimed) return false;
+  const allowed = claimed ? CLAIMED_CALLBACK_EVENT_KEYS : CALLBACK_EVENT_KEYS;
+  return Object.keys(event).every((key) => allowed.has(key)) && (!claimed || Number.isFinite(Date.parse(event.claimedAt)));
 }
 
 async function atomicJson(path, value) {
@@ -44,7 +48,8 @@ async function atomicJson(path, value) {
 }
 
 const TERMINAL_EVENT_TYPES = ['Completed', 'Failed', 'TimedOut', 'Cancelled'];
-const CALLBACK_EVENT_KEYS = new Set(['type', 'eventId', 'runId', 'parentRunId', 'taskFingerprint', 'workflowId', 'sessionId', 'channel', 'at', 'status', 'ok', 'exitCode', 'signal', 'dryRun', 'claimedAt']);
+const CALLBACK_EVENT_KEYS = new Set(['type', 'eventId', 'runId', 'parentRunId', 'taskFingerprint', 'workflowId', 'sessionId', 'channel', 'at', 'status', 'ok', 'exitCode', 'signal', 'dryRun']);
+const CLAIMED_CALLBACK_EVENT_KEYS = new Set([...CALLBACK_EVENT_KEYS, 'claimedAt']);
 
 export async function registerSubscriber(subscription) {
   const subscriberId = assertId(subscription.subscriberId, 'subscriber id');
@@ -99,7 +104,9 @@ export async function getSubscriber(subscriberId) {
     if (error.code === 'ENOENT') throw error;
     throw new Error('invalid callback subscriber record');
   }
+  const allowed = new Set(['version', 'subscriberId', 'channels', 'workflowIds', 'eventTypes', 'runIds', 'ownerRunId', 'createdAt', 'updatedAt']);
   if (!subscription || subscription.subscriberId !== subscriberId ||
+      !Object.keys(subscription).every((key) => allowed.has(key)) ||
       !Object.hasOwn(subscription, 'ownerRunId') ||
       (subscription.ownerRunId !== null && !/^ter_[A-Za-z0-9_]+$/.test(subscription.ownerRunId))) {
     throw new Error('invalid callback subscriber record');
@@ -252,7 +259,8 @@ export async function requeueInflightEvents({ subscriberId, olderThanMs = 300000
   let requeued = 0;
   for (const file of (await readdir(dirs.inflight)).filter((name) => name.endsWith('.json'))) {
     let event; try { event = JSON.parse(await readFile(join(dirs.inflight, file), 'utf8')); } catch { continue; }
-    const age = now - Date.parse(event.claimedAt || event.at || new Date(now).toISOString());
+    if (!isValidCallbackEvent(event, file.slice(0, -5), { state: 'claimed' })) continue;
+    const age = now - Date.parse(event.claimedAt);
     if (age < Math.max(0, Number(olderThanMs) || 0)) continue;
     try { await rename(join(dirs.inflight, file), join(dirs.pending, file)); requeued++; } catch (error) { if (error.code !== 'ENOENT') throw error; }
   }
@@ -286,7 +294,7 @@ export async function pruneRouter({ acknowledgedOlderThanMs = 7 * 86400000, jour
         for (const file of files) {
           if (Array.isArray(eventIds) && !eventIds.includes(file.slice(0, -5))) continue;
           let event; try { event = JSON.parse(await readFile(join(dir, file), 'utf8')); } catch { continue; }
-          if (!isValidCallbackEvent(event, file.slice(0, -5))) continue;
+          if (!isValidCallbackEvent(event, file.slice(0, -5), { state: kind === 'pending' ? 'pending' : 'claimed' })) continue;
           if (eventAge(now, event) < Math.max(0, Number(cutoff) || 0)) continue;
           await rm(join(dir, file), { force: true });
           if (kind === 'acked') acknowledgedRemoved++;
