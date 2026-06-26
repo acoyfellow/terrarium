@@ -35,6 +35,8 @@ const normalizeTurn = (turn, index) => ({
   evidence: turn.evidence ?? null,
   trace: turn.trace ?? null,
   story: turn.story ?? null,
+  receiptUrl: turn.receiptUrl ?? null,
+  evidenceClaim: turn.evidenceClaim ?? false,
   family: turn.family ?? turn.scenarioId ?? 'finding',
   healing: turn.healing ?? null,
 });
@@ -83,12 +85,13 @@ function proofPanel(t) {
 
 function detailPanel() {
   const t = turns[active];
+  const fieldNote = t.story ? `<aside class="field-note"><span>FIELD NOTE</span><p>${t.story}</p></aside>` : '';
   const proof = t.verdict === 'verified-escape' ? `<div class="proof"><b>Replay condition</b><p>${t.healing?.lesson ?? 'The finding counts only when the same probe produces the same boundary crossing in a fresh run.'}</p></div>` : '';
   const healing = t.verdict === 'verified-escape' && t.healing ? `<section class="healing"><div class="healing-head"><span>FOLLOW-UP</span><b>${t.healing.status}</b></div><h3>The finding became a regression test.</h3><ol><li><span>1</span><div><b>Detector fired</b><p>An external check recorded a boundary crossing.</p></div></li><li><span>2</span><div><b>Fresh replay matched</b><p>The same probe reproduced the result in another run.</p></div></li><li><span>3</span><div><b>Code changed</b><p>Revision ${t.healing.mergedRevision?.slice(0, 12) ?? 'recorded'} addressed the finding.</p></div></li><li><span>4</span><div><b>Regression ran</b><p>The receipt records the post-fix result.</p></div></li></ol><div class="code-links">${t.healing.issueUrl ? `<a href="${t.healing.issueUrl}" target="_blank" rel="noreferrer">inspect the finding</a>` : ''}${t.healing.mergedRevision ? `<a href="https://github.com/acoyfellow/terrarium/commit/${t.healing.mergedRevision}" target="_blank" rel="noreferrer">inspect the fix</a>` : ''}</div></section>` : '';
   return `<figure class="visual ${t.verdict === 'verified-escape' ? 'evidence-visual' : ''}">${evidenceGraphic(t)}${t.imageUrl ? '<span class="editorial-label">ILLUSTRATION</span>' : ''}${t.verdict === 'verified-escape' ? '<span class="proven-badge">REPRODUCED TWICE · NOW FIXED</span>' : ''}<figcaption><span>${isProductCampaign() ? 'TURN' : 'ATTEMPT'} ${String(t.turn).padStart(3, '0')}</span><strong class="${t.verdict === 'verified-escape' ? 'danger' : ''}">${isProductCampaign() && t.verdict === 'contained' ? 'change recorded' : t.verdict === 'contained' ? 'boundary held' : verdictLabel(t.verdict)}</strong></figcaption></figure>
-    <article class="detail"><div class="eyebrow">${t.technique}</div><h2>${t.title}</h2><dl>
+    <article class="detail"><div class="eyebrow">${t.technique}</div><h2>${t.title}</h2>${fieldNote}<dl>
       <div><dt>Hypothesis</dt><dd>${t.hypothesis}</dd></div><div><dt>Method</dt><dd>${t.attempt}</dd></div><div><dt>Observed result</dt><dd>${t.result}</dd></div><div><dt>Next change</dt><dd>${t.adaptation}</dd></div>
-    </dl>${replayProof(t)}${githubProof(t)}${proofPanel(t)}${proof}${healing}<div class="navbuttons"><button data-prev>Back</button><button data-jump-escape>Next reproduced finding</button><button data-next>Next turn</button></div></article>`;
+    </dl>${replayProof(t)}${githubProof(t)}${proofPanel(t)}${proof}${healing}<div class="navbuttons"><button data-prev>Back</button><button data-jump-escape>Next evidence-backed turn</button><button data-next>Next turn</button></div></article>`;
 }
 
 function milestoneRail() {
@@ -108,7 +111,7 @@ function select(i, center = true) {
 }
 
 function nextEscape() {
-  for (let k = 1; k <= turns.length; k++) { const i = (active + k) % turns.length; if (turns[i].verdict === 'verified-escape') return select(i); }
+  for (let k = 1; k <= turns.length; k++) { const i = (active + k) % turns.length; if (turns[i].verdict === 'verified-escape' || turns[i].evidenceClaim === true) return select(i); }
 }
 function bindViewer() {
   document.querySelector('[data-prev]')?.addEventListener('click', () => select(active - 1));
@@ -120,8 +123,13 @@ function callbackContract() {
   return `<section class="callback-contract"><div><span class="eyebrow">CURRENT MECHANISM</span><h2>Each run records one correlated result.</h2><p>A parent starts one bounded run. Terrarium records its status and result receipt. In Pi, the extension can claim the terminal callback for that run ID and notify the requesting session; other hosts use the pull API or status inspection.</p></div><ol><li><b>1</b><span>start one bounded child</span></li><li><b>2</b><span>record status and receipt</span></li><li><b>3</b><span>claim one terminal callback</span></li><li><b>4</b><span>notify or inspect from the host</span></li></ol><p class="callback-note">Callback events contain correlation and status fields. They omit prompts, child output, and local paths; credential handling still depends on the host environment. A callback reports completion—it does not by itself verify that the task succeeded.</p></section>`;
 }
 
+function heroDeck() {
+  const illustrated = turns.filter(t => t.imageUrl).slice(0, 3);
+  return `<div class="hero-deck" aria-label="Campaign illustrations">${illustrated.map((t, i) => `<button data-hero-turn="${turns.indexOf(t)}" class="hero-card hero-card-${i}"><img src="${t.imageUrl}" alt="Illustration for turn ${t.turn}: ${t.title}"><span>turn ${String(t.turn).padStart(2, '0')}</span><b>${t.family}</b></button>`).join('')}<div class="terminal-card"><span>$ terra status</span><b>${turns.length} recorded turns</b><small>callbacks notify; receipts decide</small></div></div>`;
+}
+
 function campaignHeader() {
-  if (campaign?.kind === 'active-product-campaign') return `<section class="campaign-head"><div><div class="eyebrow">PRODUCT RECEIPTS</div><h1>Each turn records <span>one bounded change.</span></h1></div><p>The turn text comes from a product-loop receipt. Illustrations are labeled and are not evidence; run IDs and receipt fields are.</p></section>`;
+  if (campaign?.kind === 'active-product-campaign') return `<section class="campaign-head product-hero"><div class="hero-copy"><div class="eyebrow">FIELD NOTES FROM THE RUNNER</div><h1>The interesting part is not the robot. <span>It is the receipt that disagrees.</span></h1><p>Five turns, each tied to a run, commit, or public receipt. The pictures are there to make the mechanism memorable. The proof lives in the IDs, fields, and links below.</p><div class="hero-actions"><a href="https://github.com/acoyfellow/terrarium" target="_blank" rel="noreferrer">inspect source</a><button data-jump-latest>latest turn</button></div></div>${heroDeck()}</section>`;
   return `<section class="campaign-head"><div><div class="eyebrow">CONTAINMENT RUNS</div><h1>Each turn records <span>one bounded probe.</span></h1></div><p>A finding is marked verified only when the same probe reproduces the boundary crossing in a fresh run.</p></section>`;
 }
 
@@ -145,6 +153,8 @@ function render() {
     <footer class="footer"><span>${turns.length} recorded turns · ${c.escapes} reproduced findings</span><span><a href="https://github.com/acoyfellow/terrarium">inspect the source</a> · claims link back to receipts and run IDs</span></footer></div>`;
   document.querySelectorAll('.tick').forEach(el => el.addEventListener('click', () => select(Number(el.dataset.turn))));
   document.querySelectorAll('.milestone').forEach(el => el.addEventListener('click', () => select(Number(el.dataset.milestone), false)));
+  document.querySelectorAll('[data-hero-turn]').forEach(el => el.addEventListener('click', () => select(Number(el.dataset.heroTurn))));
+  document.querySelector('[data-jump-latest]')?.addEventListener('click', () => select(turns.length - 1));
   bindViewer();
 }
 
