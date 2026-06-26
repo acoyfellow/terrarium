@@ -2,7 +2,7 @@
 // HTML is network-first so a new deploy is picked up immediately (no stale shell
 // pointing at a deleted bundle). Hashed assets and imagery are cache-first.
 // The /api ledger is always-fresh with an offline fallback.
-const CACHE = "terrarium-shell-v2";
+const CACHE = "terrarium-shell-v3";
 const SHELL_ASSETS = ["/", "/manifest.webmanifest", "/icon-192.png", "/icon-512.png"];
 
 self.addEventListener("install", (event) => {
@@ -23,8 +23,8 @@ self.addEventListener("fetch", (event) => {
   const url = new URL(request.url);
   if (url.origin !== self.location.origin) return;
 
-  // Always-fresh JSON ledger; fall back to cache only when offline.
-  if (url.pathname.startsWith("/api/")) {
+  // Always-fresh public ledgers and campaign imagery; fall back to cache only when offline.
+  if (url.pathname.startsWith("/api/") || url.pathname.startsWith("/campaign/")) {
     event.respondWith(fetch(request).then((r) => { const c = r.clone(); caches.open(CACHE).then((cache) => cache.put(request, c)); return r; }).catch(() => caches.match(request)));
     return;
   }
