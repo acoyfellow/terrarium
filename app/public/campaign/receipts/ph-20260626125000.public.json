@@ -1,0 +1,8 @@
+{
+  "iterationId": "ph-20260626125000",
+  "contentKind": "product-summary",
+  "evidenceClaim": true,
+  "evidenceRef": "terrarium-run:ter_20260626124639782_lb1v89",
+  "title": "Group tools now honor child lineage scope",
+  "summary": "A parallel attacker found that terrarium_group status/read/create/cancel paths bypassed child lineage scope. The fix propagates requester run identity and scope through group APIs and MCP dispatch."
+}

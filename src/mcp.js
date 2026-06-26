@@ -338,11 +338,12 @@ async function handle(msg) {
       if (name === "terrarium_read") return send(msg.id, content(await readRun({ ...args, requesterRunId: policy.requesterRunId, scope: policy.readScope })));
       if (name === "terrarium_cancel") return send(msg.id, content(await cancelRun({ ...args, requesterRunId: policy.requesterRunId, scope: policy.statusScope })));
       if (name === "terrarium_group") {
-        if (args.action === "create") return send(msg.id, content(await createRunGroup(args)));
-        if (args.action === "status") return send(msg.id, content(await getRunGroupStatus(args)));
-        if (args.action === "read") return send(msg.id, content(await readRunGroupLogs(args)));
+        const groupAccess = { requesterRunId: policy.requesterRunId, scope: policy.statusScope };
+        if (args.action === "create") return send(msg.id, content(await createRunGroup({ ...args, ...groupAccess })));
+        if (args.action === "status") return send(msg.id, content(await getRunGroupStatus({ ...args, ...groupAccess })));
+        if (args.action === "read") return send(msg.id, content(await readRunGroupLogs({ ...args, requesterRunId: policy.requesterRunId, scope: policy.readScope })));
         if (args.action === "cancel") {
-          const group = await getRunGroupStatus({ groupId: args.groupId });
+          const group = await getRunGroupStatus({ groupId: args.groupId, ...groupAccess });
           const results = [];
           for (const run of group.runs) if (run.status === "running") results.push(await cancelRun({ runId: run.runId, requesterRunId: policy.requesterRunId, scope: policy.statusScope }));
           return send(msg.id, content({ groupId: args.groupId, cancelled: results }));

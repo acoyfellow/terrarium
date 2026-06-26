@@ -5,10 +5,10 @@
   "backend": "local-content-loop",
   "status": "active",
   "synthetic": false,
-  "updatedAt": "2026-06-26T12:40:00.000Z",
+  "updatedAt": "2026-06-26T12:50:00.000Z",
   "counts": {
-    "total": 11,
-    "contained": 10,
+    "total": 17,
+    "contained": 15,
     "escapes": 0
   },
   "turns": [
@@ -278,6 +278,145 @@
       "agentModel": "private runner model",
       "agentCommand": "pi -p --no-session",
       "environment": "isolated copy workspace; pi -p --no-session; launched after a concurrency slot opened"
+    },
+    {
+      "turn": 12,
+      "round": 5,
+      "family": "callback-router",
+      "title": "Prune could cross child mailbox ownership",
+      "technique": "callback-router",
+      "hypothesis": "Probe remaining ways to claim/status/requeue/ack/unsubscribe owned mailboxes, malformed subscriber records, prune ownership, top-level vs child requester.",
+      "attempt": "Probe remaining ways to claim/status/requeue/ack/unsubscribe owned mailboxes, malformed subscriber records, prune ownership, top-level vs child requester.",
+      "result": "Child found prune could delete child-owned mailbox records and malformed subscriber owner values were ambiguous. Not integrated this pass.",
+      "adaptation": "Review after group lineage fix.",
+      "verdict": "contained",
+      "imageUrl": null,
+      "finishedAt": "2026-06-26T12:50:00.000Z",
+      "evidence": {
+        "executionId": "terrarium-run:ter_20260626124409775_0f068s",
+        "independentReplay": false
+      },
+      "contentKind": "product-summary",
+      "evidenceClaim": true,
+      "agentModel": "private runner model",
+      "agentCommand": "pi -p --no-session",
+      "environment": "isolated copy workspace; pi -p --no-session; batch allSettled/concurrency 3"
+    },
+    {
+      "turn": 13,
+      "round": 5,
+      "family": "receipt-contract",
+      "title": "Receipt marker and summary normalization can be spoofed",
+      "technique": "receipt-contract",
+      "hypothesis": "Probe summary newline/unicode spoofing, whitespace, duplicate markers, length after trim, non-object JSON, mismatch retry semantics.",
+      "attempt": "Probe summary newline/unicode spoofing, whitespace, duplicate markers, length after trim, non-object JSON, mismatch retry semantics.",
+      "result": "Child found indented markers accepted and summary length checked before trim. Not integrated this pass.",
+      "adaptation": "Review focused parser fix next.",
+      "verdict": "contained",
+      "imageUrl": null,
+      "finishedAt": "2026-06-26T12:50:00.000Z",
+      "evidence": {
+        "executionId": "terrarium-run:ter_20260626124409775_x1b9vq",
+        "independentReplay": false
+      },
+      "contentKind": "product-summary",
+      "evidenceClaim": true,
+      "agentModel": "private runner model",
+      "agentCommand": "pi -p --no-session",
+      "environment": "isolated copy workspace; pi -p --no-session; batch allSettled/concurrency 3"
+    },
+    {
+      "turn": 14,
+      "round": 5,
+      "family": "batch-settlement",
+      "title": "allSettled success and terminal state were conflated",
+      "technique": "batch-settlement",
+      "hypothesis": "Probe allSettled wrapper errors, cancellation wait errors, complete-vs-ok, stale running children, cancelled run table semantics.",
+      "attempt": "Probe allSettled wrapper errors, cancellation wait errors, complete-vs-ok, stale running children, cancelled run table semantics.",
+      "result": "Child found allSettled ok conflated settlement with success and cancellation errors could be swallowed. Not integrated this pass.",
+      "adaptation": "Review with the observed batch wrapper cancellation error.",
+      "verdict": "contained",
+      "imageUrl": null,
+      "finishedAt": "2026-06-26T12:50:00.000Z",
+      "evidence": {
+        "executionId": "terrarium-run:ter_20260626124409775_stw2md",
+        "independentReplay": false
+      },
+      "contentKind": "product-summary",
+      "evidenceClaim": true,
+      "agentModel": "private runner model",
+      "agentCommand": "pi -p --no-session",
+      "environment": "isolated copy workspace; pi -p --no-session; batch allSettled/concurrency 3"
+    },
+    {
+      "turn": 15,
+      "round": 5,
+      "family": "cancel-race",
+      "title": "Cancel handoff can miss a newly published child process",
+      "technique": "cancel-race",
+      "hypothesis": "Probe immediate cancel before childPid, cancel marker cleanup/audit, late verified receipt after cancel, process group descendants.",
+      "attempt": "Probe immediate cancel before childPid, cancel marker cleanup/audit, late verified receipt after cancel, process group descendants.",
+      "result": "Child found immediate cancel could arrive before childPid publication. Not integrated this pass.",
+      "adaptation": "Review alongside prior cancellation handoff candidates.",
+      "verdict": "contained",
+      "imageUrl": null,
+      "finishedAt": "2026-06-26T12:50:00.000Z",
+      "evidence": {
+        "executionId": "terrarium-run:ter_20260626124639782_jicx33",
+        "independentReplay": false
+      },
+      "contentKind": "product-summary",
+      "evidenceClaim": true,
+      "agentModel": "private runner model",
+      "agentCommand": "pi -p --no-session",
+      "environment": "isolated copy workspace; pi -p --no-session; continuation batch"
+    },
+    {
+      "turn": 16,
+      "round": 5,
+      "family": "mcp-lineage",
+      "title": "Group tools bypassed child lineage checks",
+      "technique": "mcp-lineage",
+      "hypothesis": "Probe sibling status/read/cancel/callback access, group read/cancel leakage, copy/worktree source mutation and patch receipt leakage.",
+      "attempt": "Probe sibling status/read/cancel/callback access, group read/cancel leakage, copy/worktree source mutation and patch receipt leakage.",
+      "result": "Integrated group API and MCP dispatch changes so group create/status/read/cancel propagate requester run identity and scope.",
+      "adaptation": "Consider whether inaccessible group members should fail the whole request or stay redacted as missing.",
+      "verdict": "contained",
+      "imageUrl": null,
+      "finishedAt": "2026-06-26T12:50:00.000Z",
+      "evidence": {
+        "executionId": "terrarium-run:ter_20260626124639782_lb1v89",
+        "independentReplay": false
+      },
+      "receiptUrl": "/campaign/receipts/ph-20260626125000.public.json",
+      "contentKind": "product-summary",
+      "evidenceClaim": true,
+      "agentModel": "private runner model",
+      "agentCommand": "pi -p --no-session",
+      "environment": "isolated copy workspace; pi -p --no-session; continuation batch"
+    },
+    {
+      "turn": 17,
+      "round": 5,
+      "family": "doctor-state",
+      "title": "Doctor malformed-state attacker was cancelled",
+      "technique": "doctor-state",
+      "hypothesis": "Probe malformed run metadata, subscribers, callbacks, child claims, stale empty mailboxes.",
+      "attempt": "Probe malformed run metadata, subscribers, callbacks, child claims, stale empty mailboxes.",
+      "result": "Run became stale and was cancelled by parent. No product change integrated from this attacker.",
+      "adaptation": "Retry doctor malformed-state attacks in a later batch.",
+      "verdict": "cancelled",
+      "imageUrl": null,
+      "finishedAt": "2026-06-26T12:50:00.000Z",
+      "evidence": {
+        "executionId": "terrarium-run:ter_20260626124639782_2x2ynv",
+        "independentReplay": false
+      },
+      "contentKind": "product-summary",
+      "evidenceClaim": true,
+      "agentModel": "private runner model",
+      "agentCommand": "pi -p --no-session",
+      "environment": "isolated copy workspace; pi -p --no-session; continuation batch"
     }
   ]
 }

@@ -1,0 +1,84 @@
+{
+  "schema": "terrarium.product-loop.receipt.v0.1",
+  "iterationId": "ph-20260626125000",
+  "intent": "parallel attacker run 2 against callback, receipt, batch, cancellation, doctor, and MCP lineage surfaces",
+  "phases": [
+    "OBSERVE",
+    "BATCH_ATTACK",
+    "SELECT",
+    "EXECUTE",
+    "VERIFY",
+    "RECORD",
+    "LOCAL_TABLE_UPDATE"
+  ],
+  "selectedWork": {
+    "kind": "mcp-lineage-hardening",
+    "reason": "The MCP lineage attacker found a clean authorization bypass in group tools."
+  },
+  "childRuns": [
+    {
+      "runId": "ter_20260626124409775_0f068s",
+      "status": "done",
+      "selected": false,
+      "summary": "Child found prune could delete child-owned mailbox records and malformed subscriber owner values were ambiguous. Not integrated this pass."
+    },
+    {
+      "runId": "ter_20260626124409775_x1b9vq",
+      "status": "done",
+      "selected": false,
+      "summary": "Child found indented markers accepted and summary length checked before trim. Not integrated this pass."
+    },
+    {
+      "runId": "ter_20260626124409775_stw2md",
+      "status": "done",
+      "selected": false,
+      "summary": "Child found allSettled ok conflated settlement with success and cancellation errors could be swallowed. Not integrated this pass."
+    },
+    {
+      "runId": "ter_20260626124639782_jicx33",
+      "status": "done",
+      "selected": false,
+      "summary": "Child found immediate cancel could arrive before childPid publication. Not integrated this pass."
+    },
+    {
+      "runId": "ter_20260626124639782_lb1v89",
+      "status": "done",
+      "selected": true,
+      "summary": "Integrated group API and MCP dispatch changes so group create/status/read/cancel propagate requester run identity and scope."
+    },
+    {
+      "runId": "ter_20260626124639782_2x2ynv",
+      "status": "cancelled",
+      "selected": false,
+      "summary": "Run became stale and was cancelled by parent. No product change integrated from this attacker."
+    }
+  ],
+  "health": {
+    "mcpScopeTestsOk": true,
+    "groupsTestsOk": true,
+    "productLoopValidateOk": true,
+    "buildOk": true,
+    "localSmokeOk": true
+  },
+  "commands": [
+    {
+      "command": "terrarium_spawn_batch allSettled concurrency 3 with six attacker jobs split across two batch calls",
+      "ok": false,
+      "note": "batch wrapper timed out/errored, parent reconciled durable runs"
+    },
+    {
+      "command": "node --test test/mcp_scope.test.js test/groups.test.js",
+      "ok": true
+    }
+  ],
+  "publicSummary": {
+    "iterationId": "ph-20260626125000",
+    "contentKind": "product-summary",
+    "evidenceClaim": true,
+    "evidenceRef": "terrarium-run:ter_20260626124639782_lb1v89",
+    "title": "Group tools now honor child lineage scope",
+    "summary": "A parallel attacker found that terrarium_group status/read/create/cancel paths bypassed child lineage scope. The fix propagates requester run identity and scope through group APIs and MCP dispatch."
+  },
+  "canPublishStory": true,
+  "createdAt": "2026-06-26T12:50:33.834Z"
+}
