@@ -39,6 +39,11 @@ test('top-level MCP keeps the stable three-tool surface', async () => {
   const batchSchema = responses[0].result.tools.find((tool) => tool.name === 'terrarium_spawn_batch').inputSchema;
   assert.deepEqual(spawnSchema.properties.isolation.enum, ['none', 'copy', 'worktree']);
   assert.deepEqual(batchSchema.properties.jobs.items.properties.isolation.enum, ['none', 'copy', 'worktree']);
+  assert.deepEqual(batchSchema.properties.cleanupTimeoutMs, {
+    type: 'number',
+    minimum: 0,
+    description: 'Maximum synchronous wait for cancellation settlement in ms. Default: 5000; unfinished cleanup is returned in cleanupErrors.'
+  });
   assert.ok(names.includes('terrarium_cancel'));
   assert.ok(names.includes('terrarium_group'));
   assert.ok(names.includes('terrarium_callbacks'));

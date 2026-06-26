@@ -13,6 +13,8 @@ Succinct, product-facing changes to Terrarium. This is not a full commit log; it
 - Bounded synchronous batch cancellation settlement with `cleanupTimeoutMs` (default 5 seconds), preserving durable IDs and `cleanupErrors` before MCP client request deadlines.
 - Made product-loop public summaries an exact schema: unknown fields, malformed IDs/kinds, non-boolean evidence claims, multiline/padded prose, and evidence references on non-claims are rejected.
 - Hardened doctor diagnostics: malformed subscriber/callback timestamps are reported, and malformed acknowledged callbacks are included in router repair candidates.
+- Added `terra batch --cleanup-timeout-ms` and test coverage for the corresponding MCP schema field.
+- Aligned router and doctor timestamp validation on canonical UTC timestamps and subscriber ID validation so malformed callback records fail closed consistently.
 
 ## 2026-06-26
 

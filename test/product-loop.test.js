@@ -119,6 +119,26 @@ test('public campaign keeps agent/model column without publishing model identity
   }
 });
 
+test('public campaign receipt links resolve to exact-schema summaries and legacy story media is not consumed', async () => {
+  const manifest = JSON.parse(await readFile(new URL('../app/public/campaign/manifest.json', import.meta.url), 'utf8'));
+  const source = await readFile(new URL('../app/src/main.js', import.meta.url), 'utf8');
+  assert.doesNotMatch(source, /turn\.(?:imageUrl|story)\b/);
+  for (const turn of manifest.turns) {
+    if (!turn.receiptUrl) continue;
+    assert.match(turn.receiptUrl, /^\/campaign\/receipts\/ph-\d{14}\.public\.json$/);
+    const receipt = JSON.parse(await readFile(new URL(`../app/public${turn.receiptUrl}`, import.meta.url), 'utf8'));
+    assert.doesNotThrow(() => assertPublicSummary(receipt));
+  }
+});
+
+test('published changelog is an exact mirror of the repository changelog', async () => {
+  const [source, published] = await Promise.all([
+    readFile(new URL('../CHANGELOG.md', import.meta.url), 'utf8'),
+    readFile(new URL('../app/public/CHANGELOG.md', import.meta.url), 'utf8'),
+  ]);
+  assert.equal(published, source);
+});
+
 test('dry run evaluates health without writing receipts', async () => {
   const result = await createIterationReceipt({ dryRun: true });
   assert.equal(result.dryRun, true);

@@ -234,7 +234,7 @@ The original delegation contract remains foundational:
 - Node API: bounded single-run primitives from `src/core.js`
 - MCP: `terrarium_spawn`, `terrarium_status`, `terrarium_read`
 
-Batch calls wait for the selected join strategy. `timeoutMs` bounds that join; when cancellation is needed, `cleanupTimeoutMs` (default 5000 ms) separately bounds synchronous settlement so an MCP client can receive durable `groupId`/`runIds` before its own request deadline. Any runs still settling are reported in `cleanupErrors` and remain inspectable through `terrarium_group`/`terrarium_status`.
+Batch calls wait for the selected join strategy. `timeoutMs` bounds that join; when cancellation is needed, `cleanupTimeoutMs` (default 5000 ms; CLI `--cleanup-timeout-ms`) separately bounds synchronous settlement so an MCP client can receive durable `groupId`/`runIds` before its own request deadline. Any runs still settling are reported in `cleanupErrors` and remain inspectable through `terrarium_group`/`terrarium_status`.
 
 Compatibility promises:
 

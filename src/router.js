@@ -31,6 +31,9 @@ function sanitizeCallbackEvent(event) {
   const allowed = ['type', 'eventId', 'runId', 'parentRunId', 'taskFingerprint', 'workflowId', 'sessionId', 'channel', 'at', 'status', 'ok', 'exitCode', 'signal', 'dryRun'];
   return Object.fromEntries(allowed.filter((key) => event[key] !== undefined).map((key) => [key, event[key]]));
 }
+function validTimestamp(value) {
+  return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value) && new Date(value).toISOString() === value;
+}
 function isValidCallbackEvent(event, expectedEventId, { state = 'any' } = {}) {
   if (!event || typeof event !== 'object' || Array.isArray(event)) return false;
   if (event.eventId !== expectedEventId || !TERMINAL_EVENT_TYPES.includes(event.type) || typeof event.runId !== 'string') return false;
@@ -38,7 +41,7 @@ function isValidCallbackEvent(event, expectedEventId, { state = 'any' } = {}) {
   if (state === 'pending' && claimed) return false;
   if (state === 'claimed' && !claimed) return false;
   const allowed = claimed ? CLAIMED_CALLBACK_EVENT_KEYS : CALLBACK_EVENT_KEYS;
-  return Object.keys(event).every((key) => allowed.has(key)) && (!claimed || Number.isFinite(Date.parse(event.claimedAt)));
+  return Object.keys(event).every((key) => allowed.has(key)) && validTimestamp(event.at) && (!claimed || validTimestamp(event.claimedAt));
 }
 
 async function atomicJson(path, value) {
@@ -108,7 +111,9 @@ export async function getSubscriber(subscriberId) {
   if (!subscription || subscription.subscriberId !== subscriberId ||
       !Object.keys(subscription).every((key) => allowed.has(key)) ||
       !Object.hasOwn(subscription, 'ownerRunId') ||
-      (subscription.ownerRunId !== null && !/^ter_[A-Za-z0-9_]+$/.test(subscription.ownerRunId))) {
+      (subscription.ownerRunId !== null && !/^ter_[A-Za-z0-9_]+$/.test(subscription.ownerRunId)) ||
+      !validTimestamp(subscription.createdAt) ||
+      !validTimestamp(subscription.updatedAt)) {
     throw new Error('invalid callback subscriber record');
   }
   return subscription;
