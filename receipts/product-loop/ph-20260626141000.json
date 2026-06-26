@@ -1,0 +1,88 @@
+{
+  "schema": "terrarium.product-loop.receipt.v0.1",
+  "iterationId": "ph-20260626141000",
+  "intent": "parallel attacker run 10 against batch regression, cancellation handoff, secure workspace artifacts, public ledger contract, callback state privacy, and group/MCP lineage",
+  "phases": [
+    "OBSERVE",
+    "BATCH_ATTACK",
+    "SELECT",
+    "EXECUTE",
+    "VERIFY",
+    "RECORD",
+    "LOCAL_TABLE_UPDATE"
+  ],
+  "selectedWork": {
+    "kind": "cancel-callback-batch-diagnostics",
+    "reason": "Three verified non-conflicting fixes passed targeted parent tests."
+  },
+  "childRuns": [
+    {
+      "runId": "ter_20260626133131266_9qtq7n",
+      "status": "done",
+      "selected": true,
+      "summary": "Integrated partial-launch diagnostics and concise batch projection of launch/cleanup errors. Real first batch still reproduced before this commit."
+    },
+    {
+      "runId": "ter_20260626133131266_kuysf8",
+      "status": "done",
+      "selected": true,
+      "summary": "Integrated launch-handoff cancellation recovery, pre-launch marker check, marker cleanup, and exactly-once callback regression."
+    },
+    {
+      "runId": "ter_20260626133131266_4leurz",
+      "status": "done",
+      "selected": false,
+      "summary": "Child produced secure workspace artifact patch. Not integrated this pass."
+    },
+    {
+      "runId": "ter_20260626133346259_ltgj30",
+      "status": "done",
+      "selected": false,
+      "summary": "Child found public rows expose the placeholder private runner model. Not integrated because user requested the agent/model column in the spreadsheet."
+    },
+    {
+      "runId": "ter_20260626133346259_jjy7nh",
+      "status": "done",
+      "selected": true,
+      "summary": "Integrated state-specific claim/ack/status/prune validation, requeue removes claimedAt, and journal prune retains private/claimed malformed records."
+    },
+    {
+      "runId": "ter_20260626133346259_uap11o",
+      "status": "done",
+      "selected": false,
+      "summary": "Child verified existing group/MCP hardening and added no code changes."
+    }
+  ],
+  "health": {
+    "runMachineTestsOk": true,
+    "routerTestsOk": true,
+    "batchTestsOk": true,
+    "mcpConciseTestsOk": true,
+    "mcpScopeTestsOk": true,
+    "groupsTestsOk": true,
+    "productLoopValidateOk": true,
+    "buildOk": true,
+    "localSmokeOk": true
+  },
+  "commands": [
+    {
+      "command": "terrarium_spawn_batch allSettled concurrency 3 plus continuation for six attacker jobs",
+      "ok": false,
+      "note": "first batch still hit cancellation wait before integration; continuation completed"
+    },
+    {
+      "command": "TERRARIUM_CHILD_BUDGET=20 node --test test/run-machine.test.js test/router.test.js test/batch.test.js test/mcp_concise.test.js test/mcp_scope.test.js test/groups.test.js",
+      "ok": true
+    }
+  ],
+  "publicSummary": {
+    "iterationId": "ph-20260626141000",
+    "contentKind": "product-summary",
+    "evidenceClaim": true,
+    "evidenceRef": "terrarium-run:ter_20260626133131266_kuysf8",
+    "title": "Cancellation handoff and callback state validation hardened",
+    "summary": "Run 10 integrated dead-supervisor cancellation handoff recovery, stricter callback state validation across claim/ack/requeue/prune, and clearer batch partial-launch diagnostics. Targeted tests and local smoke passed."
+  },
+  "canPublishStory": true,
+  "createdAt": "2026-06-26T13:36:41.035Z"
+}

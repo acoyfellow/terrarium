@@ -1,0 +1,8 @@
+{
+  "iterationId": "ph-20260626141000",
+  "contentKind": "product-summary",
+  "evidenceClaim": true,
+  "evidenceRef": "terrarium-run:ter_20260626133131266_kuysf8",
+  "title": "Cancellation handoff and callback state validation hardened",
+  "summary": "Run 10 integrated dead-supervisor cancellation handoff recovery, stricter callback state validation across claim/ack/requeue/prune, and clearer batch partial-launch diagnostics. Targeted tests and local smoke passed."
+}

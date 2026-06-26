@@ -52,7 +52,7 @@ export async function spawnBatch(opts = {}) {
   const limit = concurrency == null ? jobs.length : Number(concurrency);
   if (!Number.isInteger(limit) || limit < 1) throw new Error("concurrency must be a positive integer");
 
-  const { started, launchError } = await launchBounded(jobs, limit);
+  const { started, launchError, launchErrors } = await launchBounded(jobs, limit);
   const runIds = started.filter(Boolean).map((run) => run.runId);
   if (runIds.length === 0) throw launchError;
 
@@ -67,6 +67,9 @@ export async function spawnBatch(opts = {}) {
       runIds,
       reason: "launch-failed",
       launchError: launchError.message,
+      launchErrors,
+      launchedCount: runIds.length,
+      unlaunchedCount: jobs.length - runIds.length,
       cleanupErrors,
       group: await getRunGroupStatus({ groupId: group.groupId }),
     };
@@ -105,8 +108,10 @@ async function launchBounded(jobs, limit) {
   }
   const workers = Array.from({ length: Math.min(limit, jobs.length) }, () => worker());
   const settled = await Promise.allSettled(workers);
-  const launchError = settled.find((result) => result.status === "rejected")?.reason;
-  return { started: results, launchError };
+  const rejected = settled.filter((result) => result.status === "rejected");
+  const launchError = rejected[0]?.reason;
+  const launchErrors = rejected.map((result) => String(result.reason?.message ?? result.reason));
+  return { started: results, launchError, launchErrors };
 }
 
 async function waitUntilTerminal(runId, maxWaitMs = 30000) {

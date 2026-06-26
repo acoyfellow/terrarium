@@ -532,8 +532,30 @@ export async function readMetadata(runId) {
 export async function reconcileRun(meta, { staleMs = 30000 } = {}) {
   if (!meta || meta.status !== "running") return meta;
   const now = Date.now();
-  const pids = [meta.pid, meta.childPid, meta.runnerPid, meta.supervisorPid].filter(Boolean);
-  const alive = pids.some(isPidAlive);
+  const cancelled = existsSync(cancelMarkerPath(meta.runId));
+  const childPids = [meta.pid, meta.childPid, meta.runnerPid].filter(Boolean);
+  const supervisorAlive = isPidAlive(meta.supervisorPid);
+  const alive = [...childPids, meta.supervisorPid].filter(Boolean).some(isPidAlive);
+  // A detached supervisor can die during the launch handoff, before it records a
+  // child PID. A durable cancellation marker is sufficient to settle that run:
+  // there is then no process left that could observe the marker or finish it.
+  if (cancelled && !supervisorAlive && !childPids.some(isPidAlive)) {
+    const next = {
+      ...meta,
+      ok: false,
+      status: "cancelled",
+      exitCode: meta.exitCode ?? null,
+      signal: meta.signal ?? null,
+      taskContractStatus: meta.taskContractStatus === "pending" ? "not-applicable" : meta.taskContractStatus,
+      finishedAt: new Date().toISOString(),
+      note: "Cancellation recovered after the background supervisor exited before recording a child process.",
+    };
+    delete next.taskContract;
+    await writeMetadata(next);
+    await rm(cancelMarkerPath(meta.runId), { force: true });
+    try { await emitCompletionEvent(next); } catch {}
+    return next;
+  }
   let logAgeMs = null;
   try {
     const st = await stat(meta.logPath);
@@ -609,6 +631,10 @@ export async function cancelRun({ runId, requesterRunId, scope } = {}) {
   if (meta.status !== "running") return { runId, status: meta.status, cancelled: false, note: "run is not active" };
   await writeFile(cancelMarkerPath(runId), `${new Date().toISOString()}\n`, { flag: "wx" }).catch((error) => { if (error.code !== "EEXIST") throw error; });
   const childPids = [...new Set([meta.childPid, meta.pid].filter(Boolean))];
+  if (!isPidAlive(meta.supervisorPid) && !childPids.some(isPidAlive)) {
+    const settled = await reconcileRun(meta, { staleMs: 0 });
+    return { runId, status: settled.status, cancelled: settled.status === "cancelled", requestedAt: settled.finishedAt };
+  }
   // Never kill the supervisor directly: during the launch handoff it may be the
   // only process capable of observing the durable cancel marker and finalizing.
   for (const pid of childPids) signalProcessGroup(pid, "SIGTERM");
@@ -634,6 +660,17 @@ function childEnvironment(run) {
 
 export async function superviseTerrariumBackground({ run, parts, prompt, base, workspace, specPath } = {}) {
   const env = childEnvironment(run);
+  if (existsSync(cancelMarkerPath(run.runId))) {
+    const step = transition(initialRunState({ requireReceipt: run.requireTaskContract }), { type: "CancelRequested" });
+    const terminal = step.decisions.find((decision) => decision.type === "Finalize");
+    const ws = await finalizeWorkspace(workspace, base);
+    const { type: _type, reason: _reason, ...result } = terminal;
+    const finalResult = await persistFinishedRun(base, { background: true, supervisorPid: process.pid, ...result, ...ws });
+    if (specPath) await rm(specPath, { force: true });
+    await rm(cancelMarkerPath(run.runId), { force: true });
+    try { await emitCompletionEvent(finalResult); } catch {}
+    return finalResult;
+  }
   const child = spawn(parts[0], [...parts.slice(1), prompt], { stdio: ["ignore", "pipe", "pipe"], env, cwd: run.cwd, detached: true });
   const started = { ok: true, ...base, status: "running", background: true, pid: child.pid, childPid: child.pid, supervisorPid: process.pid, lastSeenAt: new Date().toISOString() };
   await writeMetadata(started);

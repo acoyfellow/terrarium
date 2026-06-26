@@ -1,10 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { initialRunState, transition } from '../src/run-machine.js';
-import { spawnTerrariumBackground, cancelRun, getRunStatus } from '../src/core.js';
+import { LOG_DIR, spawnTerrariumBackground, cancelRun, getRunStatus, metadataPath } from '../src/core.js';
 import { JOURNAL_DIR, registerSubscriber, claimMailboxEvents, unregisterSubscriber } from '../src/router.js';
 import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
-import { readFile, rm } from 'node:fs/promises';
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { replayScheduleFile, replayScheduleFixture } from '../src/schedule-replay.js';
@@ -114,6 +114,40 @@ test('real background cancel emits exactly one terminal callback', { timeout: 15
   } finally {
     await unregisterSubscriber(subscriberId).catch(() => {});
     rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('cancel recovers a dead launch supervisor with no child pid exactly once and cleans marker', { timeout: 15000 }, async () => {
+  const suffix = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+  const runId = `ter_dead_handoff_${suffix}`;
+  const subscriberId = `sub_dead_handoff_${suffix}`;
+  const eventId = `evt_${runId}_Cancelled`;
+  const marker = join(LOG_DIR, `${runId}.cancel`);
+  await mkdir(LOG_DIR, { recursive: true });
+  await writeFile(metadataPath(runId), JSON.stringify({
+    runId, parentRunId: process.env.TERRARIUM_RUN_ID || null, task: 'dead supervisor handoff', taskFingerprint: 'deadbeef', status: 'running', ok: true,
+    background: true, supervisorPid: 2147483647, startedAt: new Date().toISOString(),
+    lastActivityAt: new Date().toISOString(), needsAttentionAfterMs: 60000,
+    logPath: join(LOG_DIR, `${runId}.log`), channel: 'test', workflowId: runId,
+    taskContractStatus: 'pending',
+  }));
+  await registerSubscriber({ subscriberId, runIds: [runId], eventTypes: ['Cancelled'], channels: ['*'], workflowIds: ['*'] });
+  try {
+    const cancelled = await cancelRun({ runId });
+    assert.equal(cancelled.status, 'cancelled');
+    assert.equal(existsSync(marker), false);
+    const status = await getRunStatus({ runId, staleMs: 0 });
+    assert.equal(status.status, 'cancelled');
+    assert.equal(status.taskContractStatus, 'not-applicable');
+    const claimed = await claimMailboxEvents({ subscriberId });
+    assert.deepEqual(claimed.events.map((event) => event.eventId), [eventId]);
+    await getRunStatus({ runId, staleMs: 0 });
+    assert.deepEqual((await claimMailboxEvents({ subscriberId })).events, []);
+  } finally {
+    await unregisterSubscriber(subscriberId).catch(() => {});
+    await rm(join(JOURNAL_DIR, `${eventId}.json`), { force: true });
+    await rm(metadataPath(runId), { force: true });
+    await rm(marker, { force: true });
   }
 });
 

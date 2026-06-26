@@ -353,6 +353,50 @@ test('claimed callback validation accepts only claimedAt beyond the routed allow
   }
 });
 
+test('state-specific validation prevents claim, ack, status, and prune from accepting misplaced records', async () => {
+  const suffix = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+  const subscriberId = `sub_state_probe_${suffix}`;
+  const pendingId = `evt_pending_claimed_${suffix}`;
+  const inflightId = `evt_inflight_unclaimed_${suffix}`;
+  const pending = join(MAILBOXES_DIR, subscriberId, 'pending', `${pendingId}.json`);
+  const inflight = join(MAILBOXES_DIR, subscriberId, 'inflight', `${inflightId}.json`);
+  try {
+    await registerSubscriber({ subscriberId, runIds: ['*'] });
+    await writeFile(pending, JSON.stringify({ eventId: pendingId, type: 'Completed', runId: `ter_${suffix}`, at: '2020-01-01T00:00:00.000Z', claimedAt: '2020-01-01T00:00:00.000Z' }));
+    await writeFile(inflight, JSON.stringify({ eventId: inflightId, type: 'Completed', runId: `ter_${suffix}`, at: '2020-01-01T00:00:00.000Z' }));
+    assert.deepEqual((await claimMailboxEvents({ subscriberId })).events, []);
+    await assert.rejects(acknowledgeMailboxEvent({ subscriberId, eventId: inflightId }), /event is not inflight/);
+    assert.deepEqual(await getMailboxStatus(subscriberId), { subscriberId, pending: 0, inflight: 0, acknowledged: 0 });
+    const pruned = await pruneRouter({ callbackOlderThanMs: 0, subscriberIds: [subscriberId], eventIds: [pendingId, inflightId] });
+    assert.equal(pruned.pendingRemoved, 0);
+    assert.equal(pruned.inflightRemoved, 0);
+    assert.equal(existsSync(pending), true);
+    assert.equal(existsSync(inflight), true);
+  } finally {
+    await unregisterSubscriber(subscriberId).catch(() => {});
+  }
+});
+
+test('journal prune retains valid-looking records with private fields or claimed state', async () => {
+  const suffix = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+  const privateId = `evt_journal_private_${suffix}`;
+  const claimedId = `evt_journal_claimed_${suffix}`;
+  const privatePath = join(JOURNAL_DIR, `${privateId}.json`);
+  const claimedPath = join(JOURNAL_DIR, `${claimedId}.json`);
+  await mkdir(JOURNAL_DIR, { recursive: true });
+  try {
+    await writeFile(privatePath, JSON.stringify({ eventId: privateId, type: 'Completed', runId: `ter_${suffix}`, at: '2020-01-01T00:00:00.000Z', task: 'secret' }));
+    await writeFile(claimedPath, JSON.stringify({ eventId: claimedId, type: 'Completed', runId: `ter_${suffix}`, at: '2020-01-01T00:00:00.000Z', claimedAt: '2020-01-01T00:00:00.000Z' }));
+    const result = await pruneRouter({ journalOlderThanMs: 0, eventIds: [privateId, claimedId] });
+    assert.equal(result.journalRemoved, 0);
+    assert.equal(existsSync(privatePath), true);
+    assert.equal(existsSync(claimedPath), true);
+  } finally {
+    await rm(privatePath, { force: true });
+    await rm(claimedPath, { force: true });
+  }
+});
+
 test('subscriber records with private fields fail closed before owner checks', async () => {
   const suffix = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
   const subscriberId = `sub_private_record_${suffix}`;
