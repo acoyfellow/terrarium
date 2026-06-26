@@ -295,6 +295,19 @@ export function conciseBatch(full) {
   });
 }
 
+export function conciseGroup(full) {
+  if (!full || typeof full !== "object") return full;
+  return defined({
+    groupId: full.groupId,
+    label: full.label,
+    complete: full.complete,
+    ok: full.ok,
+    counts: full.counts,
+    runIds: full.runIds,
+    runs: Array.isArray(full.runs) ? full.runs.map((r) => defined({ runId: r.runId, status: r.status, ok: r.ok, exitCode: r.exitCode, taskContractStatus: r.taskContractStatus, error: r.error, note: r.note })) : undefined,
+  });
+}
+
 function send(id, result) { process.stdout.write(JSON.stringify({ jsonrpc: "2.0", id, result }) + "\n"); }
 function error(id, code, message) { process.stdout.write(JSON.stringify({ jsonrpc: "2.0", id, error: { code, message } }) + "\n"); }
 function content(obj, isError = false) { return { content: [{ type: "text", text: typeof obj === "string" ? obj : JSON.stringify(obj, null, 2) }], isError }; }
@@ -340,7 +353,10 @@ async function handle(msg) {
       if (name === "terrarium_group") {
         const groupAccess = { requesterRunId: policy.requesterRunId, scope: policy.statusScope };
         if (args.action === "create") return send(msg.id, content(await createRunGroup({ ...args, ...groupAccess })));
-        if (args.action === "status") return send(msg.id, content(await getRunGroupStatus({ ...args, ...groupAccess })));
+        if (args.action === "status") {
+          const result = await getRunGroupStatus({ ...args, ...groupAccess });
+          return send(msg.id, content(verbose ? result : conciseGroup(result)));
+        }
         if (args.action === "read") return send(msg.id, content(await readRunGroupLogs({ ...args, requesterRunId: policy.requesterRunId, scope: policy.readScope })));
         if (args.action === "cancel") {
           const group = await getRunGroupStatus({ groupId: args.groupId, ...groupAccess });
