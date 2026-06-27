@@ -21,7 +21,7 @@ Succinct, product-facing changes to Terrarium. This is not a full commit log; it
 ### Callbacks: malformed events do not enter the queue
 
 - Added an experimental Cloudflare Pulse callback backend with Durable Object storage and capability-token-gated HTTP routes for route/subscribe/claim/ack/status, sharing validation and matching semantics with the filesystem router.
-- Pulse now has direct Durable Object unit coverage for dedup, replay, owner isolation, requeue, malformed events, wildcard Pi delivery guards, and tampered subscriber records, in addition to the Miniflare HTTP e2e.
+- Pulse now has direct Durable Object unit coverage for dedup, replay, owner isolation, requeue, malformed events, wildcard Pi delivery guards, and tampered subscriber records, in addition to Miniflare HTTP e2e and production asset-topology coverage that proves `/pulse`, `/claim`, `/ack`, and `/status` reach the worker instead of the SPA fallback.
 - Callback events now require canonical UTC millisecond timestamps before journal persistence.
 - Concrete replay validates legacy journal records before mailbox enqueue. Malformed historical records stay retained for diagnosis, but are not delivered as callbacks.
 - MCP callback descriptions now say delivery is at-least-once with dedup: acknowledged events are not redelivered, but requeue can replay an inflight event that was claimed and never acknowledged.
