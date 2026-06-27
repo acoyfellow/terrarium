@@ -52,6 +52,7 @@
     "pi-package"
   ],
   "devDependencies": {
+    "miniflare": "^4.20260625.0",
     "vite": "^7.3.3",
     "wrangler": "^4.98.0"
   },

@@ -3,6 +3,18 @@ import { mkdir, readFile, readdir, rename, rm, writeFile } from 'node:fs/promise
 import { existsSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { homedir } from 'node:os';
+import {
+  TERMINAL_EVENT_TYPES,
+  CALLBACK_EVENT_KEYS,
+  CLAIMED_CALLBACK_EVENT_KEYS,
+  assertId,
+  boundedList,
+  sanitizeCallbackEvent,
+  validTimestamp,
+  isValidCallbackEvent,
+  matches as matchesShared,
+  mergeFilters,
+} from './pulse/shared.js';
 const HOME = process.env.TERRARIUM_HOME ? resolve(process.env.TERRARIUM_HOME) : join(homedir(), '.terrarium');
 
 export const ROUTER_DIR = join(HOME, 'router');
@@ -10,15 +22,6 @@ export const JOURNAL_DIR = join(ROUTER_DIR, 'journal');
 export const SUBSCRIBERS_DIR = join(ROUTER_DIR, 'subscribers');
 export const MAILBOXES_DIR = join(ROUTER_DIR, 'mailboxes');
 
-function assertId(value, label) {
-  if (typeof value !== 'string' || !/^[A-Za-z0-9_-]{1,120}$/.test(value)) throw new Error(`invalid ${label}`);
-  return value;
-}
-function boundedList(value, fallback = ['*']) {
-  const list = value ?? fallback;
-  if (!Array.isArray(list) || list.length < 1 || list.length > 100 || list.some((item) => typeof item !== 'string' || item.length > 200)) throw new Error('invalid subscription filter');
-  return [...new Set(list)];
-}
 function mailboxDirs(subscriberId) {
   const root = join(MAILBOXES_DIR, assertId(subscriberId, 'subscriber id'));
   return { root, pending: join(root, 'pending'), inflight: join(root, 'inflight'), acked: join(root, 'acked') };
@@ -27,32 +30,11 @@ function eventId(event) {
   if (event.eventId) return assertId(event.eventId, 'event id');
   return `evt_${createHash('sha256').update(JSON.stringify([event.runId, event.type, event.at, event.status, event.exitCode])).digest('hex').slice(0, 32)}`;
 }
-function sanitizeCallbackEvent(event) {
-  const allowed = ['type', 'eventId', 'runId', 'parentRunId', 'taskFingerprint', 'workflowId', 'sessionId', 'channel', 'at', 'status', 'ok', 'exitCode', 'signal', 'dryRun'];
-  return Object.fromEntries(allowed.filter((key) => event[key] !== undefined).map((key) => [key, event[key]]));
-}
-function validTimestamp(value) {
-  return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value) && new Date(value).toISOString() === value;
-}
-function isValidCallbackEvent(event, expectedEventId, { state = 'any' } = {}) {
-  if (!event || typeof event !== 'object' || Array.isArray(event)) return false;
-  if (event.eventId !== expectedEventId || !TERMINAL_EVENT_TYPES.includes(event.type) || typeof event.runId !== 'string') return false;
-  const claimed = Object.hasOwn(event, 'claimedAt');
-  if (state === 'pending' && claimed) return false;
-  if (state === 'claimed' && !claimed) return false;
-  const allowed = claimed ? CLAIMED_CALLBACK_EVENT_KEYS : CALLBACK_EVENT_KEYS;
-  return Object.keys(event).every((key) => allowed.has(key)) && validTimestamp(event.at) && (!claimed || validTimestamp(event.claimedAt));
-}
-
 async function atomicJson(path, value) {
   const temp = `${path}.${process.pid}.${Math.random().toString(36).slice(2, 8)}.tmp`;
   await writeFile(temp, `${JSON.stringify(value, null, 2)}\n`, { flag: 'wx' });
   await rename(temp, path);
 }
-
-const TERMINAL_EVENT_TYPES = ['Completed', 'Failed', 'TimedOut', 'Cancelled'];
-const CALLBACK_EVENT_KEYS = new Set(['type', 'eventId', 'runId', 'parentRunId', 'taskFingerprint', 'workflowId', 'sessionId', 'channel', 'at', 'status', 'ok', 'exitCode', 'signal', 'dryRun']);
-const CLAIMED_CALLBACK_EVENT_KEYS = new Set([...CALLBACK_EVENT_KEYS, 'claimedAt']);
 
 export async function registerSubscriber(subscription) {
   const subscriberId = assertId(subscription.subscriberId, 'subscriber id');
@@ -60,14 +42,6 @@ export async function registerSubscriber(subscription) {
   let existing = null;
   try { existing = await getSubscriber(subscriberId); }
   catch (error) { if (error.code !== 'ENOENT') throw error; }
-  const mergeFilters = (requested, prior, fallback, { narrowWildcard = false } = {}) => {
-    const next = boundedList(requested, fallback);
-    if (!prior) return next;
-    const previous = boundedList(prior, fallback);
-    if (next.includes('*')) return ['*'];
-    if (previous.includes('*')) return narrowWildcard ? next : ['*'];
-    return [...new Set([...previous, ...next])];
-  };
   const ownerRunId = subscription.ownerRunId ?? existing?.ownerRunId ?? null;
   if (existing && existing.ownerRunId !== (subscription.ownerRunId ?? null)) {
     throw new Error('subscriber is owned by another run or controller');
@@ -146,21 +120,10 @@ export async function listSubscribers() {
   return values;
 }
 
-export function matches(subscription, event) {
-  const channels = subscription.channels ?? ['*'];
-  const workflows = subscription.workflowIds ?? ['*'];
-  const types = subscription.eventTypes ?? ['*'];
-  const runs = subscription.runIds ?? ['*'];
-  // Pi host delivery is session-bound. Old/global Pi extensions once wrote
-  // wildcard run subscriptions, which caused callbacks to wake sibling Pi
-  // sessions sharing a cwd/channel. Keep wildcard support for explicit pull
-  // consumers, but never let pi-* / pi_* subscribers match every run.
-  if (/^pi[-_]/.test(subscription.subscriberId || '') && runs.includes('*')) return false;
-  return (channels.includes('*') || channels.includes(event.channel)) &&
-    (workflows.includes('*') || workflows.includes(event.workflowId)) &&
-    (types.includes('*') || types.includes(event.type)) &&
-    (runs.includes('*') || runs.includes(event.runId));
-}
+// Re-export the shared matcher under the historical name. Pi host delivery is
+// session-bound; the pi-*/pi_* wildcard guard lives in ./pulse/shared.js so the
+// fs router and the cloudflare backend share one implementation.
+export const matches = matchesShared;
 
 async function enqueueEvent(subscriberId, event) {
   const dirs = mailboxDirs(subscriberId);

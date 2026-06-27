@@ -6,6 +6,9 @@ import { sanitizeTurnFeedback } from "./adaptive.js";
 import { appendPublicTurn, EMPTY_PUBLIC_CAMPAIGN, publicTurnFromReceipt } from "./public-ledger.js";
 import { publicSummary } from "./public-summary.js";
 import { publicTraceEvent } from "./trace-events.js";
+import pulseWorker, { PulseRouter } from "./pulse/worker.js";
+
+export { PulseRouter };
 
 const DEFAULT_POLICY = {
   paused: false,
@@ -176,6 +179,11 @@ export class TerrariumCampaignWorkflow extends WorkflowEntrypoint {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+    // Pulse transport (edge wake): delegate to the pulse worker handler. These
+    // routes are capability-token gated inside pulseWorker (fail-closed 401).
+    if (["/pulse", "/claim", "/ack", "/status"].includes(url.pathname)) {
+      return pulseWorker.fetch(request, env);
+    }
     if (url.pathname === "/health") return Response.json({ ok: true, mode: env.TERRARIUM_MODE || "fixture" });
     if (url.pathname === "/api/demo") {
       const ledger = await loadLedger(env);

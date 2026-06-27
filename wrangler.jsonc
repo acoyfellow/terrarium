@@ -35,11 +35,13 @@
   "observability": { "enabled": true },
   "durable_objects": {
     "bindings": [
-      { "name": "CAMPAIGN_LOCK", "class_name": "CampaignLock" }
+      { "name": "CAMPAIGN_LOCK", "class_name": "CampaignLock" },
+      { "name": "PULSE_ROUTER", "class_name": "PulseRouter" }
     ]
   },
   "migrations": [
-    { "tag": "v1", "new_sqlite_classes": ["CampaignLock"] }
+    { "tag": "v1", "new_sqlite_classes": ["CampaignLock"] },
+    { "tag": "v2", "new_sqlite_classes": ["PulseRouter"] }
   ],
   "workflows": [
     {
