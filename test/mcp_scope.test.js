@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { MCP_SCHEMA_VERSION } from '../src/versions.js';
+import { BATCH_API_VERSION, BATCH_SUPPORTED_OPTIONS, MCP_SCHEMA_VERSION, TERRARIUM_API_VERSION } from '../src/versions.js';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -60,7 +60,10 @@ test('every advertised tool carries schemaVersion matching the initialize handsh
   ]);
   const init = responses.find((r) => r.id === 1).result;
   const listed = responses.find((r) => r.id === 2).result.tools;
+  assert.equal(init.serverInfo.apiVersion, TERRARIUM_API_VERSION);
   assert.equal(init.serverInfo.schemaVersion, MCP_SCHEMA_VERSION);
+  assert.equal(init.serverInfo.batchApiVersion, BATCH_API_VERSION);
+  assert.deepEqual(init.serverInfo.batchSupportedOptions, BATCH_SUPPORTED_OPTIONS);
   assert.ok(listed.length > 0);
   for (const tool of listed) {
     assert.equal(tool.schemaVersion, MCP_SCHEMA_VERSION, `tool ${tool.name} missing/mismatched schemaVersion`);

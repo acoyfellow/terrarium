@@ -5,7 +5,7 @@ import { createRunGroup, getRunGroupStatus, readRunGroupLogs } from "./groups.js
 import { spawnBatch, BATCH_STRATEGIES } from "./batch.js";
 import { acknowledgeMailboxEvent, claimMailboxEvents, getMailboxStatus, getSubscriber, pruneRouter, registerSubscriber, requeueInflightEvents, unregisterSubscriber } from "./router.js";
 import { diagnoseTerrarium } from "./doctor.js";
-import { MCP_SCHEMA_VERSION } from "./versions.js";
+import { BATCH_API_VERSION, BATCH_SUPPORTED_OPTIONS, MCP_SCHEMA_VERSION, TERRARIUM_API_VERSION } from "./versions.js";
 
 const tools = [
   {
@@ -330,7 +330,7 @@ function content(obj, isError = false) { return { content: [{ type: "text", text
 
 async function handle(msg) {
   const policy = capabilityPolicy();
-  if (msg.method === "initialize") return send(msg.id, { protocolVersion: "2024-11-05", capabilities: { tools: {} }, serverInfo: { name: "terrarium", version: VERSION, schemaVersion: MCP_SCHEMA_VERSION } });
+  if (msg.method === "initialize") return send(msg.id, { protocolVersion: "2024-11-05", capabilities: { tools: {} }, serverInfo: { name: "terrarium", version: VERSION, apiVersion: TERRARIUM_API_VERSION, schemaVersion: MCP_SCHEMA_VERSION, batchApiVersion: BATCH_API_VERSION, batchSupportedOptions: BATCH_SUPPORTED_OPTIONS } });
   if (msg.method === "tools/list") return send(msg.id, { tools: visibleTools(policy) });
   if (msg.method === "tools/call") {
     const { name, arguments: args = {} } = msg.params ?? {};
