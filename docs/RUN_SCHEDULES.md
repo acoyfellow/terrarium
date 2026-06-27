@@ -29,4 +29,6 @@ The initial fixtures freeze both sides of cancellation versus completion:
 - cancellation observed before terminal commit wins;
 - cancellation observed after terminal commit is ignored.
 
+A run terminated by cancellation or deadline produced no trusted completion, so its `taskContractStatus` is forced to `not-applicable` even when a `verified` receipt arrived before the kill. This matches the orphan terminal convention and prevents a cancelled/deadlined run from being reconstructed as a verified task success by group roll-ups, the Pi extension, or the mcp retry classifier. The same normalization is applied by the dead-supervisor cancel-recovery paths in `core.js` (`reconcileRun` and `cancelRun`).
+
 The feature began as a bounded spike and earned retention by finding a real launch-handoff cancellation defect: cancelling immediately after detached spawn could kill the supervisor before it had a child PID, leaving the run orphaned with no terminal callback. The supervisor now remains alive, observes the durable cancel marker, terminates the child, and emits exactly one terminal callback.
