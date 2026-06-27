@@ -114,9 +114,13 @@ async function launchBounded(jobs, limit) {
       try {
         // A slot remains occupied until its run is terminal. Merely awaiting the
         // detached spawn would only bound launcher calls, not active children.
+        // Do not impose a hidden 30s launch-stage timeout here: long but healthy
+        // children used to turn bounded batches into false launch failures while
+        // their durable run records kept progressing. Overall batch timeouts and
+        // explicit cancellation cleanup are handled by awaitStrategy/cancelLosers.
         const run = await spawnTerrariumBackground({ ...jobs[index], stream: false });
         results[index] = run;
-        if (limit < jobs.length) await waitUntilTerminal(run.runId);
+        if (limit < jobs.length) await waitUntilTerminal(run.runId, Infinity);
       } catch (error) {
         // A failed worker must close the shared launch gate. Without this handoff,
         // other workers continue consuming queued jobs after the batch is already
@@ -135,11 +139,11 @@ async function launchBounded(jobs, limit) {
 }
 
 async function waitUntilTerminal(runId, maxWaitMs = 30000) {
-  const deadline = Date.now() + maxWaitMs;
+  const deadline = Number.isFinite(maxWaitMs) ? Date.now() + maxWaitMs : null;
   while (true) {
     const run = await getRunStatus({ runId });
     if (isTerminal(run.status)) return run;
-    if (Date.now() >= deadline) throw new Error(`run did not become terminal after cancellation: ${runId}`);
+    if (deadline && Date.now() >= deadline) throw new Error(`run did not become terminal within ${maxWaitMs}ms: ${runId}`);
     await sleep(100);
   }
 }

@@ -28,6 +28,7 @@ Succinct, product-facing changes to Terrarium. This is not a full commit log; it
 
 ### Batch: durable IDs survive cleanup races
 
+- Bounded-concurrency launch no longer has a hidden 30s terminal-wait cap that could turn long but healthy child runs into false launch failures while their durable run records kept progressing.
 - `cleanupTimeoutMs` bounds synchronous loser-cancellation settlement for batch calls. The default remains 5 seconds.
 - Batch results preserve durable `groupId`, `runIds`, launch counts, launch errors, and `cleanupErrors` so callers can inspect follow-up state instead of losing correlation to a client timeout.
 - `terra batch --cleanup-timeout-ms` now forwards the same cleanup budget available through the Node/MCP batch API.

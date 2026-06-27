@@ -84,7 +84,7 @@ test('allSettled timeout bounds synchronous cancellation settlement for client t
   assert.equal(r.group.runs[0].runId, r.runIds[0]);
   assert.ok(Array.isArray(r.cleanupErrors));
   if (r.cleanupErrors.length) {
-    assert.match(r.cleanupErrors[0], new RegExp(`^${r.runIds[0]}: run did not become terminal after cancellation`));
+    assert.match(r.cleanupErrors[0], new RegExp(`^${r.runIds[0]}: run did not become terminal within`));
   }
 });
 
@@ -104,7 +104,7 @@ test('race: small cleanup timeout returns a durable result instead of throwing d
   assert.equal(r.runIds.length, 2);
   assert.ok(Array.isArray(r.cleanupErrors));
   assert.ok(r.cleanupErrors.length <= 1);
-  if (r.cleanupErrors.length) assert.match(r.cleanupErrors[0], /run did not become terminal after cancellation/);
+  if (r.cleanupErrors.length) assert.match(r.cleanupErrors[0], /run did not become terminal within/);
 });
 
 test('any: first success wins and losers are cancelled', { timeout: 45000 }, async () => {
@@ -152,7 +152,7 @@ test('quorum: small cleanup timeout returns a durable result instead of throwing
   assert.equal(r.runIds.length, 2);
   assert.ok(Array.isArray(r.cleanupErrors));
   assert.ok(r.cleanupErrors.length <= 1);
-  if (r.cleanupErrors.length) assert.match(r.cleanupErrors[0], /run did not become terminal after cancellation/);
+  if (r.cleanupErrors.length) assert.match(r.cleanupErrors[0], /run did not become terminal within/);
 });
 
 test('concurrency holds a slot until the active run is terminal', { timeout: 45000 }, async () => {
