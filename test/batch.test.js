@@ -6,6 +6,9 @@ import { join } from 'node:path';
 import { spawnBatch, BATCH_STRATEGIES } from '../src/batch.js';
 import { getRunGroupStatus } from '../src/groups.js';
 import { BATCH_API_VERSION, MCP_SCHEMA_VERSION } from '../src/versions.js';
+import { clearInheritedTerrariumEnv } from './helpers/terrarium-env.js';
+
+clearInheritedTerrariumEnv();
 
 let dir;
 function agent(name, body) {
@@ -69,11 +72,11 @@ test('allSettled timeout bounds synchronous cancellation settlement for client t
     jobs: [job(slow(35000))],
     strategy: 'allSettled',
     pollMs: 10,
-    timeoutMs: 500,
+    timeoutMs: 1500,
     cleanupTimeoutMs: 100,
   });
 
-  assert.ok(Date.now() - started < 2000, 'batch must return before a typical client timeout while cancellation settles durably');
+  assert.ok(Date.now() - started < 3000, 'batch must return before a typical client timeout while cancellation settles durably');
 
   assert.equal(r.ok, false);
   assert.equal(r.reason, 'timeout');

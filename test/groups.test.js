@@ -6,6 +6,9 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { cancelRun, getRunStatus, isPidAlive, readRun, runTerrarium, spawnTerrariumBackground } from '../src/core.js';
 import { createRunGroup, getRunGroupStatus, listRunGroups, readRunGroupLogs } from '../src/groups.js';
+import { clearInheritedTerrariumEnv } from './helpers/terrarium-env.js';
+
+clearInheritedTerrariumEnv();
 
 test('run groups preserve ordered independent runs and summarize status/logs', async () => {
   const a = await runTerrarium({ task: 'group alpha', dryRun: true, stream: false });

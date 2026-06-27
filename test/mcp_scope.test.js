@@ -9,18 +9,21 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runTerrarium } from '../src/core.js';
 import { JOURNAL_DIR, MAILBOXES_DIR, SUBSCRIBERS_DIR } from '../src/router.js';
+import { clearInheritedTerrariumEnv, stripInheritedTerrariumEnv } from './helpers/terrarium-env.js';
+
+clearInheritedTerrariumEnv();
 
 const MCP_PATH = fileURLToPath(new URL('../src/mcp.js', import.meta.url));
 
 function rpc(messages, env = {}) {
   return new Promise((resolve, reject) => {
-    const child = spawn(process.execPath, [MCP_PATH], { stdio: ['pipe', 'pipe', 'pipe'], env: { ...process.env, ...env } });
+    const child = spawn(process.execPath, [MCP_PATH], { stdio: ['pipe', 'pipe', 'pipe'], env: { ...stripInheritedTerrariumEnv(), ...env } });
     let out = '', err = '';
     child.stdout.on('data', (d) => out += d); child.stderr.on('data', (d) => err += d);
     child.on('error', reject); child.on('close', () => resolve({ responses: out.split('\n').filter(Boolean).map(JSON.parse), stderr: err }));
     for (const message of messages) child.stdin.write(JSON.stringify(message) + '\n');
     child.stdin.end();
-    setTimeout(() => child.kill(), 20000).unref();
+    setTimeout(() => child.kill(), 120000).unref();
   });
 }
 

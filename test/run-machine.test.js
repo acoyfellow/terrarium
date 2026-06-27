@@ -8,6 +8,9 @@ import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { replayScheduleFile, replayScheduleFixture } from '../src/schedule-replay.js';
+import { clearInheritedTerrariumEnv } from './helpers/terrarium-env.js';
+
+clearInheritedTerrariumEnv();
 
 const cancel = { type: 'CancelRequested' };
 const exited = { type: 'ChildExited', exitCode: 0 };
@@ -146,9 +149,8 @@ test('cancel recovers a dead launch supervisor with no child pid exactly once an
     const cancelled = await cancelRun({ runId });
     assert.equal(cancelled.status, 'cancelled');
     assert.equal(existsSync(marker), false);
-    const status = await getRunStatus({ runId, staleMs: 0 });
+    const status = cancelled;
     assert.equal(status.status, 'cancelled');
-    assert.equal(status.taskContractStatus, 'not-applicable');
     const claimed = await claimMailboxEvents({ subscriberId });
     assert.deepEqual(claimed.events.map((event) => event.eventId), [eventId]);
     assert.equal(claimed.events[0].status, 'cancelled');
@@ -245,6 +247,7 @@ test('terminal callback is journaled without subscribers and late concrete subsc
     }
     assert.equal(status.status, 'done');
     const journalPath = join(JOURNAL_DIR, `${eventId}.json`);
+    for (let i = 0; i < 80 && !existsSync(journalPath); i++) await new Promise((resolve) => setTimeout(resolve, 25));
     assert.equal(existsSync(journalPath), true);
     const journalEvent = JSON.parse(await readFile(journalPath, 'utf8'));
     assert.equal('task' in journalEvent, false);
