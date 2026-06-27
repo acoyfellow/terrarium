@@ -16,6 +16,11 @@ test('doctor reports bounded operational diagnostics without process environment
   for (const field of ['activeRuns', 'orphanedRuns', 'needsAttentionRuns', 'groups', 'subscribers', 'malformedSubscribers', 'journalEvents', 'malformedJournalEvents', 'pendingCallbacks', 'malformedPendingCallbacks', 'inflightCallbacks', 'malformedInflightCallbacks', 'acknowledgedCallbacks', 'malformedAcknowledgedCallbacks', 'staleInflightCallbacks', 'routerRepairCandidates', 'missingTerminalCallbacks', 'staleChildClaims']) assert.equal(typeof result.checks[field], 'number');
   assert.equal(JSON.stringify(result).includes('process.env'), false);
   assert.ok(Array.isArray(result.warnings));
+  assert.ok(Array.isArray(result.details.activeRunIds));
+  assert.ok(Array.isArray(result.details.orphanedRunIds));
+  assert.ok(Array.isArray(result.details.needsAttentionRunIds));
+  assert.ok(Array.isArray(result.details.missingTerminalCallbackRunIds));
+  assert.ok(Array.isArray(result.details.staleChildClaims));
 });
 
 test('doctor reports malformed router JSON without crashing', async () => {
@@ -271,6 +276,11 @@ test('doctor rejects malformed event ids and counts stale malformed child claims
     const result = await diagnoseTerrarium();
     assert.equal(result.checks.malformedJournalEvents, baseline.checks.malformedJournalEvents + 1);
     assert.ok(result.checks.staleChildClaims >= baseline.checks.staleChildClaims + 3);
+    const claimFiles = result.details.staleChildClaims.map((claim) => claim.claimFile);
+    assert.ok(claimFiles.includes(`${claimsDir}/empty`));
+    assert.ok(claimFiles.includes(`${claimsDir}/missing`));
+    assert.ok(claimFiles.includes(`${claimsDir}/malformed`));
+    assert.ok(result.details.staleChildClaims.some((claim) => claim.childRunId === `ter_missing_${suffix}`));
     assert.ok(result.warnings.some((warning) => warning.includes('stale child-slot claim')));
   } finally {
     await Promise.all([rm(claimsDir, { recursive: true, force: true }), rm(journal, { force: true })]);

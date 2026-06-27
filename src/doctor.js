@@ -49,6 +49,13 @@ async function mailboxHealth(path, validate) {
 
 export async function diagnoseTerrarium() {
   const runs = await listRuns({ limit: 100 });
+  const details = {
+    activeRunIds: runs.activeRunIds ?? [],
+    orphanedRunIds: runs.runs.filter((run) => run.status === "orphaned").map((run) => run.runId),
+    needsAttentionRunIds: runs.runs.filter((run) => run.needsAttention === true).map((run) => run.runId),
+    missingTerminalCallbackRunIds: [],
+    staleChildClaims: [],
+  };
   const subscriberHealth = await jsonHealth(SUBSCRIBERS_DIR, validSubscriber);
   const journalHealth = await jsonHealth(JOURNAL_DIR, validEvent);
   const checks = {
@@ -58,8 +65,8 @@ export async function diagnoseTerrarium() {
     routerWritable: await writable(ROUTER_DIR),
     configPresent: existsSync(CONFIG_PATH),
     activeRuns: runs.activeCount,
-    orphanedRuns: runs.runs.filter((run) => run.status === "orphaned").length,
-    needsAttentionRuns: runs.runs.filter((run) => run.needsAttention === true).length,
+    orphanedRuns: details.orphanedRunIds.length,
+    needsAttentionRuns: details.needsAttentionRunIds.length,
     groups: await count(GROUP_DIR, (file) => file.endsWith(".json")),
     subscribers: subscriberHealth.valid,
     malformedSubscribers: subscriberHealth.malformed,
@@ -79,7 +86,10 @@ export async function diagnoseTerrarium() {
   for (const run of runs.runs) {
     if (["running", "orphaned"].includes(run.status)) continue;
     const type = run.status === "cancelled" ? "Cancelled" : run.ok ? "Completed" : "Failed";
-    if (!existsSync(`${JOURNAL_DIR}/evt_${run.runId}_${type}.json`)) checks.missingTerminalCallbacks++;
+    if (!existsSync(`${JOURNAL_DIR}/evt_${run.runId}_${type}.json`)) {
+      checks.missingTerminalCallbacks++;
+      details.missingTerminalCallbackRunIds.push(run.runId);
+    }
   }
   try {
     for (const subscriber of await readdir(MAILBOXES_DIR)) {
@@ -110,7 +120,10 @@ export async function diagnoseTerrarium() {
       let slots = []; try { slots = await readdir(dir); } catch { continue; }
       for (const slot of slots) {
         let childId = ""; try { childId = (await readFile(`${dir}/${slot}`, "utf8")).trim(); } catch {}
-        if (!/^ter_[A-Za-z0-9_]+$/.test(childId) || !existsSync(`${LOG_DIR}/${childId}.json`)) checks.staleChildClaims++;
+        if (!/^ter_[A-Za-z0-9_]+$/.test(childId) || !existsSync(`${LOG_DIR}/${childId}.json`)) {
+          checks.staleChildClaims++;
+          details.staleChildClaims.push({ claimFile: `${dir}/${slot}`, childRunId: childId || null });
+        }
       }
     }
   } catch {}
@@ -128,5 +141,5 @@ export async function diagnoseTerrarium() {
   if (checks.staleInflightCallbacks) warnings.push(`${checks.staleInflightCallbacks} stale inflight callback(s) are repair candidates for requeue`);
   if (checks.missingTerminalCallbacks) warnings.push(`${checks.missingTerminalCallbacks} terminal run(s) are missing durable callback events; recover those run IDs`);
   if (checks.staleChildClaims) warnings.push(`${checks.staleChildClaims} stale child-slot claim(s) exist from older runs`);
-  return { ok: warnings.length === 0, version: VERSION, apiVersion: TERRARIUM_API_VERSION, schemaVersion: MCP_SCHEMA_VERSION, batchApiVersion: BATCH_API_VERSION, batchSupportedOptions: BATCH_SUPPORTED_OPTIONS, checks, warnings, paths: { home: HOME, logs: LOG_DIR, workspaces: WORKSPACE_DIR, events: EVENT_DIR, router: ROUTER_DIR } };
+  return { ok: warnings.length === 0, version: VERSION, apiVersion: TERRARIUM_API_VERSION, schemaVersion: MCP_SCHEMA_VERSION, batchApiVersion: BATCH_API_VERSION, batchSupportedOptions: BATCH_SUPPORTED_OPTIONS, checks, details, warnings, paths: { home: HOME, logs: LOG_DIR, workspaces: WORKSPACE_DIR, events: EVENT_DIR, router: ROUTER_DIR } };
 }
