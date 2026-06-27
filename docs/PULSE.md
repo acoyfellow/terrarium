@@ -4,7 +4,7 @@ Terrarium's local callback router (journal → claim → ack → replay, with pe
 
 **Promise:** a terminal run event emitted once is durably journaled at the edge and delivered at-least-once, with dedup, to every subscriber whose filters match, and only the owning run can claim, ack, or read its mailbox.
 
-Status: implemented and unit/e2e tested locally. Production end-to-end against the live Access URL is pending (see [Limits](#limits-and-non-goals)).
+Status: live in production at `terrarium.coey.dev` and proven end-to-end (emit → claim → ack, dedup, journal replay, per-owner isolation, fail-closed auth). v0 — no consumer reads from it yet (see [Limits](#limits-and-non-goals)).
 
 ## How it works
 
@@ -105,7 +105,7 @@ node --test test/pulse-do.test.js test/pulse-e2e.test.js \
 Stated plainly, because the [7-minute-repo rule](../README.md) requires it:
 
 - **Isolation is enforced at claim/ack/status/requeue/unsubscribe, not at delivery/match.** `matches()` has no `ownerRunId` dimension: a single event may legitimately fan out to subscribers owned by different runs, and what an owner must *not* do is read or settle *another* owner's mailbox. This is a conscious host-trust choice that mirrors the filesystem router — the journal and mailboxes live inside one trusted DO. Pushing ownership into matching would wrongly suppress legitimate multi-owner fan-out. See the long comment in `route()` in `src/pulse/do.js`.
-- **Production end-to-end is pending.** The live behavior behind the Access URL and DO durability across hibernation have not yet been exercised against prod; this is gated on a human setting `PULSE_TOKEN` and approving the deploy. Coverage today is DO unit tests plus Miniflare HTTP e2e plus an asset-topology test.
+- **DO durability under long hibernation is not separately stress-tested.** Production e2e (2026-06-27) verified the full path live — including journal replay across separate HTTP isolate invocations, which exercises DO SQLite persistence — but a dedicated long-eviction/hibernation durability test has not been written. Coverage: DO unit tests, Miniflare HTTP e2e, an asset-topology test, and a live prod e2e.
 - **Consumers are not yet rewired.** glance, mote, my-ax push, and the Pi extension still read from the local filesystem router; reading from the cloud router is downstream work, not part of this transport.
 - Pulse is a **transport**, not a memory or workflow system. It does not resume an agent conversation, store run results, or own continuity — it carries terminal wake events to whoever is listening.
 
