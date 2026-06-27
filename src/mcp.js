@@ -2,7 +2,7 @@
 import { createInterface } from "node:readline";
 import { cancelRun, ensureTerminalCallback, getRunStatus, isRunAccessible, listRuns, pruneStaleChildClaims, readRun, runTerrarium, spawnTerrariumBackground, VERSION } from "./core.js";
 import { createRunGroup, getRunGroupStatus, readRunGroupLogs } from "./groups.js";
-import { spawnBatch, BATCH_STRATEGIES } from "./batch.js";
+import { spawnBatch, BATCH_STRATEGIES, validateBatchShape } from "./batch.js";
 import { acknowledgeMailboxEvent, claimMailboxEvents, getMailboxStatus, getSubscriber, pruneRouter, registerSubscriber, requeueInflightEvents, unregisterSubscriber } from "./router.js";
 import { diagnoseTerrarium } from "./doctor.js";
 import { BATCH_API_VERSION, BATCH_SUPPORTED_OPTIONS, MCP_SCHEMA_VERSION, TERRARIUM_API_VERSION } from "./versions.js";
@@ -52,7 +52,7 @@ const tools = [
         jobs: { type: "array", minItems: 1, maxItems: 256, description: "Job option objects, each accepting the same fields as terrarium_spawn (task required). Over 32 jobs requires an explicit concurrency bound.", items: { type: "object", properties: { task: { type: "string" }, agent: { type: "string" }, model: { type: "string" }, readOnly: { type: "boolean" }, ephemeral: { type: "boolean" }, profile: { type: "string", enum: ["default", "minimal"] }, cwd: { type: "string" }, channel: { type: "string" }, workflowId: { type: "string" }, sessionId: { type: "string" }, isolation: { type: "string", enum: ["none", "copy", "worktree"] }, keepWorkspace: { type: "boolean" }, timeoutMs: { type: "number" }, needsAttentionAfterMs: { type: "number" }, maxDepth: { type: "number" }, allowSpawn: { type: "boolean" }, statusScope: { type: "string", enum: ["self", "descendants", "all"] }, readScope: { type: "string", enum: ["self", "descendants", "all"] }, logPath: { type: "string" }, mreLogPath: { type: "string" } }, required: ["task"] } },
         strategy: { type: "string", enum: BATCH_STRATEGIES, description: "Join strategy. Default: all." },
         quorum: { type: "number", description: "Required successes for the quorum strategy (1..jobs.length)." },
-        concurrency: { type: "number", minimum: 1, description: "Max simultaneously active runs. Required when jobs.length > 32. Default: launch all at once." },
+        concurrency: { type: "number", minimum: 1, description: "Max simultaneously active runs. Required when jobs.length > 32 (a missing bound is rejected at preflight with a suggested value). Default: launch all at once." },
         label: { type: "string", description: "Group label." },
         pollMs: { type: "number", description: "Status poll interval in ms. Default: 500." },
         timeoutMs: { type: "number", description: "Overall batch wait budget in ms; on timeout, remaining runs are cancelled." },
@@ -353,6 +353,22 @@ async function handle(msg) {
         if (!policy.allowSpawn) throw new Error("Terrarium spawn capability denied for this run");
         if (policy.requesterRunId) throw new Error("nested Terrarium runs cannot fan out a batch; the top-level owner fans out");
         const jobs = Array.isArray(args.jobs) ? args.jobs.map((job) => ({ ...sanitizeSpawnArgs(job), background: true, dryRun: false })) : args.jobs;
+        // Preflight the batch shape before launching anything so a misshapen
+        // batch (e.g. >32 jobs with no concurrency bound) returns a structured,
+        // machine-readable verdict — including a suggested concurrency value —
+        // instead of only a thrown error string from deep in spawnBatch.
+        const preflight = validateBatchShape({ jobs, strategy: args.strategy, quorum: args.quorum, concurrency: args.concurrency, cleanupTimeoutMs: args.cleanupTimeoutMs });
+        if (!preflight.ok) {
+          return send(msg.id, content({
+            ok: false,
+            phase: "preflight",
+            code: preflight.code,
+            error: preflight.error,
+            jobCount: preflight.jobCount,
+            requiresConcurrency: preflight.requiresConcurrency,
+            ...(preflight.suggestedConcurrency != null ? { suggestedConcurrency: preflight.suggestedConcurrency } : {}),
+          }, true));
+        }
         const result = await spawnBatch({ jobs, strategy: args.strategy, quorum: args.quorum, concurrency: args.concurrency, label: args.label, pollMs: args.pollMs, timeoutMs: args.timeoutMs, cleanupTimeoutMs: args.cleanupTimeoutMs });
         const projected = verbose ? result : conciseBatch(result);
         return send(msg.id, content(projected, !result.ok));

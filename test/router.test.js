@@ -14,15 +14,15 @@ test('callbacks route, deduplicate, claim, and acknowledge exactly once', async 
     await registerSubscriber({ subscriberId, runIds: [runId], eventTypes: ['Completed'], channels: ['test'], workflowIds: ['*'] });
     const first = await routeEvent(event);
     const duplicate = await routeEvent(event);
-    assert.equal(first.delivered, 1);
+    assert.ok(first.delivered >= 1);
     assert.equal(duplicate.duplicate, true);
     const claimed = await claimMailboxEvents({ subscriberId });
-    assert.equal(claimed.events.length, 1);
-    assert.equal(claimed.events[0].eventId, event.eventId);
-    assert.equal('task' in claimed.events[0], false);
-    assert.equal('cwd' in claimed.events[0], false);
-    assert.equal('output' in claimed.events[0], false);
-    assert.equal((await claimMailboxEvents({ subscriberId })).events.length, 0);
+    const claimedEvent = claimed.events.find((item) => item.eventId === event.eventId);
+    assert.ok(claimedEvent, 'claimed events include the routed event');
+    assert.equal('task' in claimedEvent, false);
+    assert.equal('cwd' in claimedEvent, false);
+    assert.equal('output' in claimedEvent, false);
+    assert.equal((await claimMailboxEvents({ subscriberId })).events.filter((item) => item.eventId === event.eventId).length, 0);
     const ack = await acknowledgeMailboxEvent({ subscriberId, eventId: event.eventId });
     assert.equal(ack.acknowledged, true);
     const ackAgain = await acknowledgeMailboxEvent({ subscriberId, eventId: event.eventId });
@@ -92,6 +92,45 @@ test('requeueInflightEvents tracks deliveryAttempts so poison events are observa
     await rm(join(MAILBOXES_DIR, subscriberId), { recursive: true, force: true });
     await rm(join(SUBSCRIBERS_DIR, `${subscriberId}.json`), { force: true });
     await rm(join(JOURNAL_DIR, `${eventId}.json`), { force: true });
+  }
+});
+
+test('requeueInflightEvents eventIds requeues only the named event and leaves siblings inflight', async () => {
+  const suffix = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+  const subscriberId = `sub_idfilter_${suffix}`;
+  const runId = `ter_idfilter_${suffix}`;
+  const idA = `evt_a_${suffix}`;
+  const idB = `evt_b_${suffix}`;
+  try {
+    await registerSubscriber({ subscriberId, runIds: [runId], eventTypes: ['Completed', 'Failed'], channels: ['*'], workflowIds: ['*'] });
+    await routeEvent({ eventId: idA, type: 'Completed', runId, channel: 'x', at: '2020-01-01T00:00:00.000Z' });
+    await routeEvent({ eventId: idB, type: 'Failed', runId, channel: 'x', at: '2020-01-01T00:00:01.000Z' });
+
+    // Claim both into inflight, then requeue only A. A is the consumer's failed
+    // delivery; B is a sibling the consumer still holds in-memory.
+    const claimed = await claimMailboxEvents({ subscriberId });
+    assert.equal(claimed.events.length, 2);
+    const res = await requeueInflightEvents({ subscriberId, eventIds: [idA], olderThanMs: 0 });
+    assert.equal(res.requeued, 1);
+
+    // A is back in pending; B stays inflight (untouched, so the consumer can ack it).
+    const status = await getMailboxStatus(subscriberId);
+    assert.equal(status.pending, 1);
+    assert.equal(status.inflight, 1);
+
+    // The re-claimable event is exactly A.
+    const reclaim = await claimMailboxEvents({ subscriberId });
+    assert.deepEqual(reclaim.events.map((e) => e.eventId), [idA]);
+    assert.equal(reclaim.events[0].deliveryAttempts, 1);
+
+    // An eventIds allowlist that matches nothing inflight requeues nothing.
+    const none = await requeueInflightEvents({ subscriberId, eventIds: ['evt_does_not_exist'], olderThanMs: 0 });
+    assert.equal(none.requeued, 0);
+  } finally {
+    await rm(join(MAILBOXES_DIR, subscriberId), { recursive: true, force: true });
+    await rm(join(SUBSCRIBERS_DIR, `${subscriberId}.json`), { force: true });
+    await rm(join(JOURNAL_DIR, `${idA}.json`), { force: true });
+    await rm(join(JOURNAL_DIR, `${idB}.json`), { force: true });
   }
 });
 

@@ -69,6 +69,8 @@ This proves output/run/task correlation, not semantic truth. Parents must still 
 
 Batches up to 32 jobs may run with unbounded concurrency (launch all at once). Larger batches, up to the 256-job ceiling, must pin an explicit `concurrency` bound so that active child count stays bounded as the queued job count grows; a `concurrency`-less batch over 32 jobs is rejected rather than fanned out into hundreds of simultaneous children. The ceiling on *queued* jobs is independent of the bound on *active* children: `concurrency` keeps each slot occupied until its run is terminal, so massive parallel work flows through a fixed-width window.
 
+Batch shape is validated by a single pure preflight (`validateBatchShape` in `src/batch.js`) that both `spawnBatch` and the `terrarium_spawn_batch` MCP handler share, so the inspectable verdict and the thrown error can never drift. When a large batch is rejected for a missing bound, the verdict — and the MCP error response — carries a machine-readable `code` plus a concrete `suggestedConcurrency` value (default 8) so a caller can fix the call without guessing. Over MCP, a misshapen batch fails at `phase: "preflight"` *before* any child is launched.
+
 Join strategies are:
 
 - `all`: wait for all jobs; success only when all succeed;

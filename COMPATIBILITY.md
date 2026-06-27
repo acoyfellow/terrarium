@@ -35,13 +35,13 @@ These tools remain available with their present ordinary-run meaning:
 | Tool | Stable purpose |
 | --- | --- |
 | `terrarium_spawn` | Spawn exactly one child agent for one bounded delegated task. |
-| `terrarium_spawn_batch` | Additive coordinator: create 1–256 independent ordinary runs under one group and resolve them with an explicit join strategy. Batches over 32 jobs require an explicit `concurrency` bound. |
+| `terrarium_spawn_batch` | Additive coordinator: create 1–256 independent ordinary runs under one group and resolve them with an explicit join strategy. Batches over 32 jobs require an explicit `concurrency` bound; a missing bound is rejected at `phase: "preflight"` (before any child launches) with a machine-readable `code` and a `suggestedConcurrency` value. |
 | `terrarium_status` | Inspect one run or list/poll runs. |
 | `terrarium_read` | Read a recorded Terrarium or MRE log. |
 | `terrarium_cancel` | Additive control: cancel one active lineage-scoped run. |
 | `terrarium_group` | Additive view: group existing independent runs; never spawns children. |
 | `terrarium_callbacks` | Additive durable pull queue: scoped subscribe/claim/ack/status/requeue/recover/prune/unsubscribe; concrete subscriptions close finish-before-subscribe races. |
-| `terrarium_doctor` | Additive top-level diagnostics for durable state, active/orphaned runs, groups, callbacks, and stale claims. Read-only over MCP; the `terra doctor --repair [--apply]` CLI adds an opt-in, dry-run-by-default executor for the mechanically-safe recover/requeue/prune subset. |
+| `terrarium_doctor` | Additive top-level diagnostics for durable state, active/orphaned runs, groups, callbacks, and stale claims. Read-only over MCP; the `terra doctor --repair [--apply] [--verify]` CLI adds an opt-in, dry-run-by-default executor for the mechanically-safe recover/requeue/prune subset. `--verify` (with `--apply`) re-diagnoses after the repair and attaches a `residual` evidence block proving each self-healing condition's counter actually dropped to zero. |
 
 Existing arguments preserve their semantics. Optional fields may be added later for sandbox selection, run role, scenario identity, or campaign identity; ordinary callers do not need them.
 

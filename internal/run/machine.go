@@ -235,20 +235,19 @@ func terminalDecision(state *State) *TerminalState {
 	}
 	ce := state.ChildExit
 
-	contractOrNA := func() string {
-		if state.Receipt == ReceiptPending {
-			return "not-applicable"
-		}
-		return string(state.Receipt)
-	}
-
 	// Cancellation/deadline intent wins if observed before terminal commit,
-	// independent of exit code or receipt arrival ordering.
+	// independent of exit code or receipt arrival ordering. A run terminated by
+	// cancellation or deadline is treated as having produced no trusted
+	// completion: the contract status collapses to "not-applicable" even when a
+	// verified receipt was observed before the terminating intent, and no
+	// task-result summary survives. This matches the JS run-machine fix (a
+	// terminated run can no longer be reconstructed as a verified task success)
+	// and the orphan terminal convention.
 	if state.CancelRequested {
-		return &TerminalState{Status: StatusCancelled, OK: false, ExitCode: ce.ExitCode, Signal: ce.Signal, TaskContractStatus: contractOrNA(), Reason: "cancel-requested"}
+		return &TerminalState{Status: StatusCancelled, OK: false, ExitCode: ce.ExitCode, Signal: ce.Signal, TaskContractStatus: "not-applicable", Reason: "cancel-requested"}
 	}
 	if state.DeadlineReached {
-		return &TerminalState{Status: StatusFailed, OK: false, ExitCode: ce.ExitCode, Signal: ce.Signal, TaskContractStatus: contractOrNA(), Reason: "deadline-reached"}
+		return &TerminalState{Status: StatusFailed, OK: false, ExitCode: ce.ExitCode, Signal: ce.Signal, TaskContractStatus: "not-applicable", Reason: "deadline-reached"}
 	}
 	if state.RuntimeError != "" {
 		return &TerminalState{Status: StatusError, OK: false, ExitCode: ce.ExitCode, Signal: nil, Error: state.RuntimeError, TaskContractStatus: string(state.Receipt), Reason: "runtime-error"}

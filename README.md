@@ -437,8 +437,9 @@ terra group create "research batch" <runIdA> <runIdB>
 terra group status <groupId>
 terra group read <groupId>
 terra doctor
-terra doctor --repair          # dry-run the mechanically-safe repair subset (recover/requeue/prune)
-terra doctor --repair --apply  # execute it; judgement/quarantine steps stay skipped for an operator
+terra doctor --repair                    # dry-run the mechanically-safe repair subset (recover/requeue/prune)
+terra doctor --repair --apply            # execute it; judgement/quarantine steps stay skipped for an operator
+terra doctor --repair --apply --verify   # execute, then re-diagnose and attach residual evidence each condition cleared
 terra schedule replay fixtures/run-schedules/cancel-before-completion.v1.json
 ```
 

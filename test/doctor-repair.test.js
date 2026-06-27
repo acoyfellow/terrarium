@@ -117,20 +117,65 @@ test('executeRepairPlan collapses multiple stale child-claim steps into a single
   }
 });
 
+test('executeRepairPlan with verify attaches residual evidence that the cleared condition reconciled', async () => {
+  if (IS_CHILD) return; // requeue is a top-level-only affordance
+  const suffix = `${process.pid}_${Date.now()}_verify`;
+  const subscriberId = `repair_verify_${suffix}`;
+  const inflightDir = `${MAILBOXES_DIR}/${subscriberId}/inflight`;
+  const inflightId = `evt_stale_${suffix}`;
+  await registerSubscriber({ subscriberId, ownerRunId: null });
+  await mkdir(inflightDir, { recursive: true });
+  await writeFile(`${inflightDir}/${inflightId}.json`, JSON.stringify({ eventId: inflightId, type: 'Completed', runId: `ter_${suffix}`, at: '2020-01-01T00:00:00.000Z', claimedAt: '2020-01-01T00:00:00.000Z' }));
+  try {
+    const plan = [{ kind: 'staleInflightCallback', subscriberId, action: 'requeue', tool: 'terrarium_callbacks', args: { action: 'requeue', subscriberId } }];
+    const result = await executeRepairPlan({ plan, dryRun: false, verify: true });
+    assert.equal(result.ok, true);
+    assert.ok(result.residual, 'apply+verify must attach a residual evidence block');
+    const condition = result.residual.conditions.find((entry) => entry.kind === 'staleInflightCallback');
+    assert.ok(condition, 'residual must include the repaired condition');
+    assert.equal(condition.counter, 'staleInflightCallbacks');
+    assert.equal(condition.after, 0, 're-diagnosis must show the stale-inflight counter cleared');
+    assert.equal(condition.cleared, true);
+    assert.equal(condition.before, null, 'no baseline supplied -> before is recorded as null');
+    // No other stale inflight callbacks should leak into this freshly-created
+    // subscriber, so the whole verification should pass.
+    assert.equal(result.residual.verified, true);
+  } finally {
+    await unregisterSubscriber(subscriberId, { ownerRunId: null }).catch(() => {});
+    await rm(`${MAILBOXES_DIR}/${subscriberId}`, { recursive: true, force: true });
+  }
+});
+
+test('executeRepairPlan verify records the pre-repair count when a baseline is supplied', async () => {
+  const baseline = { checks: { staleInflightCallbacks: 3 }, repairPlan: [] };
+  const plan = [{ kind: 'staleInflightCallback', action: 'requeue' }]; // no subscriberId -> skipped, no mutation
+  const result = await executeRepairPlan({ plan, dryRun: false, verify: true, baseline });
+  const condition = result.residual.conditions.find((entry) => entry.kind === 'staleInflightCallback');
+  assert.equal(condition.before, 3, 'before must come from the supplied baseline diagnosis');
+});
+
+test('executeRepairPlan never verifies a dry run (nothing changed to re-measure)', async () => {
+  const plan = [{ kind: 'staleInflightCallback', subscriberId: `sub_${Date.now()}`, action: 'requeue' }];
+  const result = await executeRepairPlan({ plan, verify: true }); // dryRun defaults true
+  assert.equal(result.dryRun, true);
+  assert.equal(result.residual, undefined, 'a dry run must not attach residual evidence');
+});
+
 test('executeRepairPlan refuses to run for a child requester', async () => {
   await assert.rejects(() => executeRepairPlan({ plan: [], requesterRunId: 'ter_child' }), /top-level controller/);
 });
 
-test('executeRepairPlan attributes a per-step failure without aborting the whole plan', async () => {
-  // A stale-inflight step whose subscriber does not exist: requeue will throw,
-  // which must be captured as a skipped step, not crash the executor.
+test('executeRepairPlan records no-op repair attempts and keeps malformed steps skipped', async () => {
+  // Requeue for a nonexistent subscriber is an idempotent no-op in the router
+  // primitive (0 requeued), while an unattributed step is still skipped.
   const plan = [
     { kind: 'staleInflightCallback', subscriberId: `nonexistent_${Date.now()}`, action: 'requeue' },
     { kind: 'staleInflightCallback', action: 'requeue' }, // no subscriberId -> skipped
   ];
   const result = await executeRepairPlan({ plan, dryRun: false });
   assert.equal(result.ok, false);
-  assert.equal(result.appliedCount, 0);
-  assert.equal(result.skippedCount, 2);
+  assert.equal(result.appliedCount, 1);
+  assert.equal(result.applied[0].requeued, 0);
+  assert.equal(result.skippedCount, 1);
   assert.ok(result.skipped.some((entry) => /could not be attributed/.test(entry.reason)));
 });
