@@ -56,11 +56,34 @@ export async function spawnBatch(opts = {}) {
   if (!Number.isInteger(limit) || limit < 1) throw new Error("concurrency must be a positive integer");
   if (!Number.isFinite(Number(cleanupTimeoutMs)) || Number(cleanupTimeoutMs) < 0) throw new Error("cleanupTimeoutMs must be a non-negative number");
 
-  const { started, launchError, launchErrors } = await launchBounded(jobs, limit);
+  const { started, launchError, launchErrors, launchTimedOut } = await launchBounded(jobs, limit, timeoutMs);
   const runIds = started.filter(Boolean).map((run) => run.runId);
-  if (runIds.length === 0) throw launchError;
+  if (runIds.length === 0) {
+    if (launchTimedOut) return { ok: false, apiVersion: BATCH_API_VERSION, schemaVersion: MCP_SCHEMA_VERSION, supportedOptions: BATCH_SUPPORTED_OPTIONS, strategy, reason: "timeout", timedOut: true, phase: "launch", runIds: [], launchedCount: 0, unlaunchedCount: jobs.length, cleanupErrors: [] };
+    throw launchError;
+  }
 
   const group = await createRunGroup({ label, runIds });
+  if (launchTimedOut) {
+    const status = await getRunGroupStatus({ groupId: group.groupId });
+    const cleanupErrors = await cancelLosers(status, { all: true, collectErrors: true, maxWaitMs: Number(cleanupTimeoutMs) });
+    return {
+      ok: false,
+      apiVersion: BATCH_API_VERSION,
+      schemaVersion: MCP_SCHEMA_VERSION,
+      supportedOptions: BATCH_SUPPORTED_OPTIONS,
+      strategy,
+      groupId: group.groupId,
+      runIds,
+      reason: "timeout",
+      timedOut: true,
+      phase: "launch",
+      launchedCount: runIds.length,
+      unlaunchedCount: jobs.length - runIds.length,
+      cleanupErrors,
+      group: await getRunGroupStatus({ groupId: group.groupId }),
+    };
+  }
   if (launchError) {
     const status = await getRunGroupStatus({ groupId: group.groupId });
     const cleanupErrors = await cancelLosers(status, { collectErrors: true, maxWaitMs: Number(cleanupTimeoutMs) });
@@ -103,12 +126,15 @@ export async function spawnBatch(opts = {}) {
   };
 }
 
-async function launchBounded(jobs, limit) {
+async function launchBounded(jobs, limit, timeoutMs) {
   const results = new Array(jobs.length);
   let next = 0;
   let stopped = false;
+  let launchTimedOut = false;
+  const deadline = timeoutMs > 0 ? Date.now() + Number(timeoutMs) : null;
   async function worker() {
     while (!stopped) {
+      if (deadline && Date.now() >= deadline) { launchTimedOut = true; stopped = true; return; }
       const index = next++;
       if (index >= jobs.length) return;
       try {
@@ -131,11 +157,21 @@ async function launchBounded(jobs, limit) {
     }
   }
   const workers = Array.from({ length: Math.min(limit, jobs.length) }, () => worker());
-  const settled = await Promise.allSettled(workers);
+  const settled = deadline
+    ? await Promise.race([
+        Promise.allSettled(workers),
+        sleep(Math.max(0, deadline - Date.now())).then(() => {
+          launchTimedOut = true;
+          stopped = true;
+          return null;
+        }),
+      ])
+    : await Promise.allSettled(workers);
+  if (settled === null) return { started: results, launchError: null, launchErrors: [], launchTimedOut: true };
   const rejected = settled.filter((result) => result.status === "rejected");
   const launchError = rejected[0]?.reason;
   const launchErrors = rejected.map((result) => String(result.reason?.message ?? result.reason));
-  return { started: results, launchError, launchErrors };
+  return { started: results, launchError, launchErrors, launchTimedOut };
 }
 
 async function waitUntilTerminal(runId, maxWaitMs = 30000) {

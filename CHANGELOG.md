@@ -28,6 +28,7 @@ Succinct, product-facing changes to Terrarium. This is not a full commit log; it
 
 ### Batch: durable IDs survive cleanup races
 
+- Batch `timeoutMs` / CLI `--batch-timeout-ms` now bounds the active-concurrency launch stage too, returning durable IDs for launched children and `phase: "launch"` instead of waiting for every queued job to launch before timing out.
 - Bounded-concurrency launch no longer has a hidden 30s terminal-wait cap that could turn long but healthy child runs into false launch failures while their durable run records kept progressing.
 - `cleanupTimeoutMs` bounds synchronous loser-cancellation settlement for batch calls. The default remains 5 seconds.
 - Batch results preserve durable `groupId`, `runIds`, launch counts, launch errors, and `cleanupErrors` so callers can inspect follow-up state instead of losing correlation to a client timeout.
