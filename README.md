@@ -28,7 +28,7 @@ one bounded task → one child run → one inspectable result
 | Validate repository work inside the hardened profile. | `terra secure "run the repository tests"` | secure-v1, opt-in |
 | Wrap Pi around a secure workspace without giving it host tools. | `terra secure-agent --model <id> "fix the bug"` | Node fixture vertical slice |
 | Replay the permanent attack corpus before release. | `terra hardening verify` | Implemented |
-| Inspect real attempts, findings, fixes, and safe traces. | [`terrarium.coey.dev`](https://terrarium.coey.dev) | Live |
+| Inspect the public run ledger and changelog for real hardening runs. | [`terrarium.coey.dev`](https://terrarium.coey.dev) | Live |
 
 Ordinary children inherit host authority and environment; use them for cooperative work, not as a security boundary. `secure-v1` is the opt-in Docker profile with explicit [guarantees and non-guarantees](./docs/SECURE_V1.md).
 
@@ -234,7 +234,7 @@ The original delegation contract remains foundational:
 - Node API: bounded single-run primitives from `src/core.js`
 - MCP: `terrarium_spawn`, `terrarium_status`, `terrarium_read`
 
-Batch calls wait for the selected join strategy. `timeoutMs` bounds that join; when cancellation is needed, `cleanupTimeoutMs` (default 5000 ms; CLI `--cleanup-timeout-ms`) separately bounds synchronous settlement so an MCP client can receive durable `groupId`/`runIds` before its own request deadline. Any runs still settling are reported in `cleanupErrors` and remain inspectable through `terrarium_group`/`terrarium_status`. Batch responses include `apiVersion`, `schemaVersion`, and `supportedOptions`; use those fields to distinguish repository/API support from stale client tool metadata.
+Batch calls wait for the selected join strategy. `timeoutMs` bounds that join; when cancellation is needed, `cleanupTimeoutMs` (default 5000 ms; CLI `--cleanup-timeout-ms`) separately bounds synchronous settlement so an MCP client can receive durable `groupId`/`runIds` before its own request deadline. Any runs still settling are reported in `cleanupErrors` and remain inspectable through `terrarium_group`/`terrarium_status`. Batch responses include `apiVersion`, `schemaVersion`, and `supportedOptions` on two distinct axes: `apiVersion` is the batch contract version (`terrarium-batch-*`), while `schemaVersion` is the MCP wire/tool-metadata version (`terrarium-mcp-*`). Compare a response's `schemaVersion` against the `schemaVersion` carried in your cached tool metadata to detect stale client metadata; use `apiVersion`/`supportedOptions` to confirm repository/API feature support.
 
 Compatibility promises:
 
@@ -395,8 +395,8 @@ Tools:
 - `terrarium_status` — inspect one run or list recent runs, including last activity, concise progress, idle time, and a factual needs-attention flag.
 - `terrarium_read` — read a recorded run log; pass `kind: "mre"` for the MRE side log.
 - `terrarium_cancel` — cancel one active run and its descendant process group within the caller's lineage scope.
-- `terrarium_group` — create/status/read/cancel a parent-owned collection of already-started independent runs; it never spawns or hides fan-out.
-- `terrarium_callbacks` — create a durable **pull** subscription for terminal run events, atomically claim each callback, acknowledge delivery, requeue abandoned inflight events, recover a terminal run, and prune stale state. Terminal events are journaled even when no subscriber is online; journal entries contain correlation/status facts, not task prompts, child output, or local paths. A concrete run subscription replays a completion that raced ahead; acknowledged events are not redelivered. Subscribing alone does not wake a conversation—the consumer or Pi extension must claim the queue. High-frequency progress remains in run status/logs, not callback mailboxes.
+- `terrarium_group` — create/status/read/cancel a parent-owned collection of already-started independent runs; it never spawns or hides fan-out. Group state is a fail-closed roll-up of member receipts: `ok` requires every member `done` with `ok: true`, and missing or inaccessible members are not complete. It is not independent success proof; the per-run verified receipts are.
+- `terrarium_callbacks` — create a durable **pull** subscription for terminal run events, atomically claim each callback, acknowledge delivery, requeue abandoned inflight events, recover a terminal run, and prune stale state. Terminal events are journaled even when no subscriber is online; journal entries contain correlation/status facts, not task prompts, child output, or local paths. A concrete run subscription replays a completion that raced ahead; acknowledged events are not redelivered. Subscribing alone does not wake a conversation—the consumer or Pi extension must claim the queue. High-frequency progress remains in run status/logs, not callback mailboxes. A terminal callback is a notification that a run finished, not authoritative proof the task succeeded; confirm with the run's verified receipt.
 - `terrarium_doctor` — top-level-only diagnostics for storage, runs, attention, callbacks, groups, and stale claims.
 
 Terrarium does not auto-load its Pi host extension. The durable callback queue remains available through `terrarium_callbacks` for hosts that want to subscribe, claim, acknowledge, requeue, recover, and prune terminal events explicitly. By default, Pi users should use the normal MCP tools or CLI (`terrarium_status`, `terrarium_read`, `terrarium_cancel`, `terra status`, `terra read`, `terra cancel`). Hosts may explicitly install `src/pi-extension.js` to get a run widget and callback-triggered follow-ups; the extension subscribes only to concrete runs spawned by that Pi session. This keeps Terrarium out of unrelated Pi sessions by default.
@@ -420,7 +420,27 @@ Run-schedule replay is local-only and does not add an MCP surface. It replays bo
 
 Spawn and status default to concise responses so parent transcripts stay small. The full envelope remains on disk under `~/.terrarium/runs/<runId>.json`, or can be requested inline with `verbose: true`.
 
-## Proof of the original primitive
+## Authoritative success proof
+
+For an ordinary delegated run, success has exactly one authoritative proof chain:
+
+```text
+child exits 0  +  verified TERRARIUM_RESULT receipt (runId, taskFingerprint, nonce, summary)
+  → terminal result status: done, ok: true
+```
+
+Exit 0 alone is never success: a missing, mismatched, or malformed receipt settles as `inconclusive` (exit 0) or `failed`, with `process exit is not accepted as task success`. The verified receipt and the run's tests/commits are the evidence.
+
+The following surfaces are deliberately **not** authoritative success proof, and must not be read as one:
+
+- **Callbacks** are terminal-event notifications carrying correlation/status facts only. A terminal callback says a run finished; it does not by itself prove the task succeeded. Confirm with the run's verified receipt.
+- **Groups** report aggregate state derived from their members. A group is `ok` only when every member is `done` with `ok: true`; missing or inaccessible members are not complete. The group view is a fail-closed roll-up of per-run receipts, not an independent proof.
+- **The public run ledger** at [`terrarium.coey.dev`](https://terrarium.coey.dev) is a presentation layer over safe manifest/receipt files; as stated above it is not authoritative proof by itself.
+- **`CHANGELOG.md`** is a product-facing change record, not a per-run success record.
+
+When in doubt, the run/task-correlated receipt (and the tests it claims to have passed) is the source of truth; callbacks, groups, the ledger, and the changelog are convenience surfaces around it.
+
+## Adoption signal for the original primitive
 
 - Installed as MCP, Terrarium was selected without explicit prompting across unrelated work: **24 unprompted spawns in 5 sessions**.
 - In a same-model, same-task 14-point eval building *Wake*, baseline scored **11/14**; a run using one read-only Terrarium design dig scored **14/14**.

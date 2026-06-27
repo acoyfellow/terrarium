@@ -4,6 +4,12 @@ Succinct, product-facing changes to Terrarium. This is not a full commit log; it
 
 ## Unreleased
 
+### Docs: one authoritative success proof, not four
+
+- README now has an "Authoritative success proof" section that names the single proof chain (child exit 0 + verified `TERRARIUM_RESULT` receipt → `done`/`ok:true`) and explicitly states that callbacks, groups, the public ledger, and the changelog are not that proof.
+- The MCP `terrarium_callbacks` and `terrarium_group` descriptions now carry the not-proof disclaimer inline.
+- Renamed the README "Proof of the original primitive" adoption section to "Adoption signal for the original primitive" so adoption metrics are not confused with per-run success proof.
+
 ### Receipts: exit 0 is still not success
 
 - `TERRARIUM_RESULT=` is now an exact four-field object: `runId`, `taskFingerprint`, `nonce`, and `summary`.
@@ -15,6 +21,7 @@ Succinct, product-facing changes to Terrarium. This is not a full commit log; it
 
 - Callback events now require canonical UTC millisecond timestamps before journal persistence.
 - Concrete replay validates legacy journal records before mailbox enqueue. Malformed historical records stay retained for diagnosis, but are not delivered as callbacks.
+- MCP callback descriptions now say delivery is at-least-once with dedup: acknowledged events are not redelivered, but requeue can replay an inflight event that was claimed and never acknowledged.
 - Missing callback subscribers are normalized to the same concise denial as inaccessible subscribers.
 - Router and doctor validation now agree on canonical timestamps, subscriber IDs, event IDs, and state-specific pending/inflight/acked callback shapes.
 
@@ -24,7 +31,7 @@ Succinct, product-facing changes to Terrarium. This is not a full commit log; it
 - Batch results preserve durable `groupId`, `runIds`, launch counts, launch errors, and `cleanupErrors` so callers can inspect follow-up state instead of losing correlation to a client timeout.
 - `terra batch --cleanup-timeout-ms` now forwards the same cleanup budget available through the Node/MCP batch API.
 - Repository MCP schema exposes `cleanupTimeoutMs`; stale live MCP hosts may need a tool-metadata refresh before the field appears in a running client.
-- Batch responses now include `apiVersion`, `schemaVersion`, and `supportedOptions` so callers can distinguish repo/API support from stale host tool metadata.
+- Batch responses now include `apiVersion`, `schemaVersion`, and `supportedOptions` so callers can distinguish repo/API support from stale host tool metadata. `apiVersion` is the batch contract version (`terrarium-batch-*`); `schemaVersion` is the MCP wire/tool-metadata version (`terrarium-mcp-*`) so it can be compared directly against the `schemaVersion` in cached tool metadata.
 
 ### Cancellation and orphaning: terminal means one callback
 
