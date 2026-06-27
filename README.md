@@ -370,7 +370,14 @@ If an isolated Git workspace leaves a diff, Terrarium writes a patch receipt at 
 --dry-run              Print the child invocation without executing it.
 --json                 Print structured JSON.
 --log <path>           Write the transcript to a chosen path.
+--task                 Force the argument to run as a task even if it looks like a mistyped command.
 ```
+
+Mistyped subcommands fail closed. `terra statsu`, `terra group` (no subcommand),
+or `terra schedule run f.json` print a suggestion and exit non-zero instead of
+silently spawning a child agent to "run" the broken command as a task. Genuine
+free-form tasks are never affected. If a real task legitimately looks like a
+command typo, pass `--task "..."` or set `TERRARIUM_NO_COMMAND_GUARD=1`.
 
 Agent resolution precedence: explicit `--agent` → configured `--read-only` command → `$TERRARIUM_AGENT` → `config.defaultAgent` → built-in `opencode run`.
 

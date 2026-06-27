@@ -220,10 +220,38 @@ async function awaitStrategy({ groupId, strategy, quorumTarget, pollMs, timeoutM
   }
 }
 
-function decide(status, strategy, quorumTarget) {
+// Order terminal runs by who actually finished first, not by job-array
+// position. At large batch scale many jobs go terminal within one poll
+// interval, so a single getRunGroupStatus snapshot routinely contains several
+// freshly-terminal runs at once. Picking runs[0] would make the "first terminal
+// / first success wins" contract a lie that silently resolves to whichever job
+// the caller happened to list first. We sort by finishedAt (the durable per-run
+// terminal timestamp) and break exact ties by runId so winner selection is
+// deterministic and reproducible across snapshots.
+//
+// A run that is terminal but whose snapshot is momentarily missing finishedAt
+// must sort *last*, never first. Treating an absent timestamp as "" would make
+// the empty string sort before every real ISO timestamp, so a run with no known
+// finish time could hijack the race/any/quorum winner ahead of runs that
+// demonstrably finished earlier. A run that provably finished at a known time
+// always beats one whose finish time we cannot read yet.
+function byFinishedAt(a, b) {
+  const fa = a.finishedAt || "";
+  const fb = b.finishedAt || "";
+  if (fa !== fb) {
+    if (!fa) return 1;  // a has no known finish time -> a sorts after b
+    if (!fb) return -1; // b has no known finish time -> a sorts before b
+    return fa < fb ? -1 : 1;
+  }
+  return a.runId < b.runId ? -1 : a.runId > b.runId ? 1 : 0;
+}
+
+// Exported for deterministic unit coverage of winner selection. Pure: it reads
+// a group-status snapshot and returns a decision, with no side effects.
+export function decide(status, strategy, quorumTarget) {
   const runs = status.runs;
-  const terminal = runs.filter((run) => isTerminal(run.status));
-  const successes = runs.filter(isSuccess);
+  const terminal = runs.filter((run) => isTerminal(run.status)).sort(byFinishedAt);
+  const successes = runs.filter(isSuccess).sort(byFinishedAt);
   const allTerminal = terminal.length === runs.length;
 
   switch (strategy) {
@@ -239,17 +267,18 @@ function decide(status, strategy, quorumTarget) {
       return { settled: true, ok: successes.length === runs.length, reason: "all-settled", successCount: successes.length, failureCount: runs.length - successes.length };
 
     case "race":
-      // First terminal wins, whatever its outcome; cancel the rest.
+      // Earliest-finishing terminal run wins, whatever its outcome; cancel the rest.
       if (terminal.length === 0) return { settled: false };
       return { settled: true, cancelLosers: true, ok: isSuccess(terminal[0]), reason: "race-winner", winner: terminal[0].runId };
 
     case "any":
-      // First SUCCESS wins; cancel the rest. Fail only if all terminal w/o success.
+      // Earliest-finishing SUCCESS wins; cancel the rest. Fail only if all terminal w/o success.
       if (successes.length > 0) return { settled: true, cancelLosers: true, ok: true, reason: "any-success", winner: successes[0].runId };
       if (allTerminal) return { settled: true, ok: false, reason: "any-exhausted" };
       return { settled: false };
 
     case "quorum":
+      // The first k successes by finish time win; cancel the rest.
       if (successes.length >= quorumTarget) return { settled: true, cancelLosers: true, ok: true, reason: "quorum-reached", winners: successes.slice(0, quorumTarget).map((r) => r.runId) };
       if (allTerminal) return { settled: true, ok: false, reason: "quorum-unreached", successCount: successes.length, quorum: quorumTarget };
       return { settled: false };

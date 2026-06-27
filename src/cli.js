@@ -17,6 +17,7 @@ import { runSecureAgent } from "./secure-agent.js";
 import { diagnoseTerrarium } from "./doctor.js";
 import { replayScheduleFile } from "./schedule-replay.js";
 import { goCoreVersion, goCoreDryRun } from "./go-core-adapter.ts";
+import { detectMistypedCommand } from "./command-guard.js";
 
 function help() {
   return `terrarium ${VERSION}
@@ -31,6 +32,7 @@ Usage:
   terra --read-only "task"
   terra --profile minimal "task"
   terra --dry-run "task"
+  terra --task "status of the migration"   force prose that looks like a command to run as a task
   terra --json "task"
   terra --isolation copy "task"
   terra --isolation worktree "task"
@@ -112,6 +114,7 @@ function parse(argv) {
     else if (a === "--keep-workspace") out.keepWorkspace = true;
     else if (a === "--unsafe-network") out.unsafeNetwork = true;
     else if (a === "--read-only" || a === "--readonly") out.readOnly = true;
+    else if (a === "--task") out.forceTask = true;
     else if (a === "--profile") out.profile = argv[++i];
     else if (a === "--agent") out.agent = argv[++i];
     else if (a === "--model") out.model = argv[++i];
@@ -138,6 +141,12 @@ function parse(argv) {
 
 const opts = parse(process.argv.slice(2));
 const [cmd, ...rest] = opts.task;
+// Fail closed on a likely-mistyped subcommand instead of silently spawning a
+// child agent to "run" the typo. --task or TERRARIUM_NO_COMMAND_GUARD=1 opts out.
+if (!opts.help && !opts.version && !opts.forceTask && process.env.TERRARIUM_NO_COMMAND_GUARD !== "1") {
+  const mistyped = detectMistypedCommand(opts.task);
+  if (mistyped) { console.error(`terrarium: ${mistyped.message}`); process.exit(2); }
+}
 if (opts.help) console.log(help());
 else if (opts.version) { const v = goCoreVersion(); console.log(opts.json ? JSON.stringify({ ...v.value, source: v.source, ...(v.fallbackReason ? { fallbackReason: v.fallbackReason } : {}) }) : v.value.version); }
 else if (cmd === "plan") {

@@ -28,11 +28,22 @@ Status: live in production at `terrarium.coey.dev` and proven end-to-end (emit �
 - **One Durable Object per router name** keeps the journal, subscribers, and mailboxes colocated and serialized. The name is regex-clamped (`^[A-Za-z0-9_-]{1,64}$`); anything else falls back to the default `global`. Callers may shard via `?router=` or a `router` field in the body.
 - **DO SQLite tables** (`src/pulse/do.js`): `journal(event_id, payload, at)` is the dedup + replay source of truth; `subscribers(...)` holds filter lists and `owner_run_id`; `mailbox(subscriber_id, event_id, state, ...)` carries each event through `pending → inflight → acked`.
 - **eventId = `evt_` + the first 32 hex chars of sha256(`[runId, type, at, status, exitCode]`)** (`src/pulse/shared.js`; matched by `/^evt_[0-9a-f]{32}$/` in the tests). The same terminal event always hashes to the same id, so re-emitting is a no-op and a given id appears at most once per mailbox. A caller-supplied `event.eventId` is honored if present (validated by `assertId`).
+- **Decide-payload (`receipt`).** An emitter may attach a bounded `receipt` object to a terminal event. `receipt` is part of `ALLOWED_EVENT_FIELDS` in `src/pulse/shared.js` — the single source of truth for which fields survive routing and claim-read validation — so it **survives route → journal → claim** and is handed back to the consumer on `claim` alongside the rest of the sanitized event. It is **not** part of the `eventId`/dedup hash (which only covers `[runId, type, at, status, exitCode]`), so attaching a receipt never changes dedup behavior and preserves byte-for-byte dedup parity with the filesystem router. The receipt lets a downstream decider choose reuse / log-learning / fire-next from the wake event alone, without re-reading the run's full result. Keep it small: it rides every claimed copy of the event.
 - Mounted through the existing merged control worker (`src/control-worker.js`), which delegates `/pulse`, `/claim`, `/ack`, and `/status` to the Pulse worker (`src/pulse/worker.js`). The DO migration is additive (`v2 new_sqlite_classes: ["PulseRouter"]`) over the existing `CampaignLock` v1.
 
 ## Auth
 
 Every route except `GET /health` requires a capability bearer token compared against the `PULSE_TOKEN` secret with a constant-time comparison. It is **fail-closed**: a missing request token *or* an unset `PULSE_TOKEN` env returns `401`. There are no secrets in code; `PULSE_TOKEN` is a wrangler secret. In production, Cloudflare Access (Zero Trust) sits in front of this token gate, and `workers_dev` / `preview_urls` are disabled.
+
+## Browser / CORS
+
+The Worker is cross-origin friendly so browser and WKWebView consumers (e.g. mote, which fetches from its dev-server origin) can call it directly:
+
+- **Preflight:** `OPTIONS` is answered with `204` **before** the auth gate (browsers send preflight with no credentials, so gating it `401` would break every cross-origin consumer). It returns `Access-Control-Allow-Origin` (echoing the request `Origin`, falling back to `*`), `Access-Control-Allow-Methods: GET, POST, OPTIONS`, `Access-Control-Allow-Headers: authorization, content-type`, `Access-Control-Max-Age: 86400`, and `Vary: Origin`.
+- **All responses** (including `/health`, `401` unauthorized, and DO-proxied results) carry `Access-Control-Allow-Origin`, so the browser can read them.
+- **The bearer token remains the security boundary, not the origin.** Reflecting any origin is safe here: a hostile page still cannot read the `PULSE_TOKEN`, and every gated request must present it. CORS only governs which origins the browser will *expose the response to* — it is not an authentication mechanism.
+
+See `corsHeaders` / `withCors` and the OPTIONS branch in `src/pulse/worker.js`.
 
 ## Quick start (curl)
 

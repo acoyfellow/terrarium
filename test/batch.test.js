@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync, writeFileSync, chmodSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { spawnBatch, BATCH_STRATEGIES } from '../src/batch.js';
+import { spawnBatch, BATCH_STRATEGIES, decide } from '../src/batch.js';
 import { getRunGroupStatus } from '../src/groups.js';
 import { BATCH_API_VERSION, MCP_SCHEMA_VERSION } from '../src/versions.js';
 import { clearInheritedTerrariumEnv } from './helpers/terrarium-env.js';
@@ -189,6 +189,72 @@ test('quorum: small cleanup timeout returns a durable result instead of throwing
   assert.ok(Array.isArray(r.cleanupErrors));
   assert.ok(r.cleanupErrors.length <= 1);
   if (r.cleanupErrors.length) assert.match(r.cleanupErrors[0], /run did not become terminal within/);
+});
+
+test('decide: winners are chosen by earliest finishedAt, not job-array order', () => {
+  // A single status snapshot routinely reports several freshly-terminal runs at
+  // once. Place the later-finishing run first in the array to prove ordering is
+  // by finishedAt, not by position. Tie is broken by runId.
+  const snapshot = (runs) => ({ runs });
+  const r1 = { runId: 'ter_1', status: 'done', ok: true, finishedAt: '2026-01-01T00:00:02.000Z' };
+  const r2 = { runId: 'ter_2', status: 'done', ok: true, finishedAt: '2026-01-01T00:00:01.000Z' };
+  const r3 = { runId: 'ter_3', status: 'failed', ok: false, finishedAt: '2026-01-01T00:00:00.500Z' };
+
+  // race: earliest terminal of any outcome wins (r3 failed first).
+  const race = decide(snapshot([r1, r2, r3]), 'race');
+  assert.equal(race.winner, 'ter_3');
+  assert.equal(race.ok, false, 'race winner reports its own outcome');
+
+  // any: earliest SUCCESS wins, ignoring the earlier-but-failed r3.
+  const any = decide(snapshot([r1, r2, r3]), 'any');
+  assert.equal(any.winner, 'ter_2');
+  assert.equal(any.ok, true);
+
+  // quorum: first k successes by finish time (r2 then r1), in finish order.
+  const quorum = decide(snapshot([r1, r2, r3]), 'quorum', 2);
+  assert.deepEqual(quorum.winners, ['ter_2', 'ter_1']);
+  assert.equal(quorum.ok, true);
+});
+
+test('decide: equal finishedAt breaks ties deterministically by runId', () => {
+  const ts = '2026-01-01T00:00:00.000Z';
+  const runs = [
+    { runId: 'ter_c', status: 'done', ok: true, finishedAt: ts },
+    { runId: 'ter_a', status: 'done', ok: true, finishedAt: ts },
+    { runId: 'ter_b', status: 'done', ok: true, finishedAt: ts },
+  ];
+  const any = decide({ runs }, 'any');
+  assert.equal(any.winner, 'ter_a', 'lowest runId wins on an exact finishedAt tie');
+  const quorum = decide({ runs }, 'quorum', 2);
+  assert.deepEqual(quorum.winners, ['ter_a', 'ter_b']);
+});
+
+test('decide: a terminal run with no finishedAt never out-races one with a known finish time', () => {
+  // At large batch scale a run can be terminal in a snapshot before its
+  // finishedAt timestamp is readable. Such a run must not be crowned the
+  // earliest winner ahead of runs that provably finished at a known time.
+  const known = { runId: 'ter_known', status: 'done', ok: true, finishedAt: '2026-01-01T00:00:05.000Z' };
+  const noTs = { runId: 'ter_none', status: 'done', ok: true }; // finishedAt absent
+
+  // noTs is listed first to prove it does not win by position or by empty-string
+  // ordering; the run with a known finish time wins every winner-picking strategy.
+  const race = decide({ runs: [noTs, known] }, 'race');
+  assert.equal(race.winner, 'ter_known');
+
+  const any = decide({ runs: [noTs, known] }, 'any');
+  assert.equal(any.winner, 'ter_known');
+
+  // quorum still includes the no-timestamp run, but only after the known one,
+  // so winner order stays [known, none] rather than [none, known].
+  const quorum = decide({ runs: [noTs, known] }, 'quorum', 2);
+  assert.deepEqual(quorum.winners, ['ter_known', 'ter_none']);
+
+  // Two runs both missing finishedAt fall back to deterministic runId order.
+  const tieless = decide(
+    { runs: [{ runId: 'ter_z', status: 'done', ok: true }, { runId: 'ter_a', status: 'done', ok: true }] },
+    'race',
+  );
+  assert.equal(tieless.winner, 'ter_a');
 });
 
 test('concurrency holds a slot until the active run is terminal', { timeout: 45000 }, async () => {

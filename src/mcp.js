@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { createInterface } from "node:readline";
-import { cancelRun, ensureTerminalCallback, getRunStatus, isRunAccessible, listRuns, readRun, runTerrarium, spawnTerrariumBackground, VERSION } from "./core.js";
+import { cancelRun, ensureTerminalCallback, getRunStatus, isRunAccessible, listRuns, pruneStaleChildClaims, readRun, runTerrarium, spawnTerrariumBackground, VERSION } from "./core.js";
 import { createRunGroup, getRunGroupStatus, readRunGroupLogs } from "./groups.js";
 import { spawnBatch, BATCH_STRATEGIES } from "./batch.js";
 import { acknowledgeMailboxEvent, claimMailboxEvents, getMailboxStatus, getSubscriber, pruneRouter, registerSubscriber, requeueInflightEvents, unregisterSubscriber } from "./router.js";
@@ -401,12 +401,16 @@ async function handle(msg) {
         }
         if (args.action === "prune") {
           if (policy.requesterRunId) throw new Error("callback pruning is available only to a top-level controller");
-          return send(msg.id, content(await pruneRouter({
+          const router = await pruneRouter({
             acknowledgedOlderThanMs: args.olderThanMs,
             journalOlderThanMs: args.olderThanMs,
             callbackOlderThanMs: args.olderThanMs,
             subscriberOlderThanMs: args.olderThanMs,
-          })));
+          });
+          // Pruning also reclaims stale child-slot claims so a parent's bounded
+          // child budget is not permanently consumed by a dead/missing child.
+          const childClaims = await pruneStaleChildClaims({ requesterRunId: policy.requesterRunId });
+          return send(msg.id, content({ ...router, staleChildClaims: childClaims }));
         }
         if (!args.subscriberId) throw new Error(`callback ${args.action} requires subscriberId`);
         if (args.action === "ack" && !args.eventId) throw new Error("callback ack requires eventId");

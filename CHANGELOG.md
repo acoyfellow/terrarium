@@ -4,6 +4,32 @@ Succinct, product-facing changes to Terrarium. This is not a full commit log; it
 
 ## Unreleased
 
+### CLI: mistyped subcommands fail closed instead of spawning a child for the typo
+
+- `terra statsu`, `terra docter`, and other near-miss commands now print a suggestion (`Did you mean "terra status"?`) and exit `2` instead of silently spawning a child agent whose task is the typo itself.
+- Reserved verb commands fail closed when their subcommand is missing or unrecognized: `terra group` lists `create, status, read`; `terra schedule run f.json` is corrected toward `replay`; `terra group stats <id>` suggests `group status`. Previously these fell through the dispatch chain and burned a real run on the broken command.
+- Genuine free-form tasks are never reclassified as command typos: the guard only fires on short, lowercase, flagless, command-shaped first tokens within a length-scaled edit distance of a known command. Capitalized, multi-word, or option-shaped inputs always run as tasks.
+- Added `--task` (force the argument to run as a task) and `TERRARIUM_NO_COMMAND_GUARD=1` escape hatches for the rare case where a real task looks like a command typo.
+- New `src/command-guard.js` holds the pure, unit-tested recognition logic (Levenshtein distance, command/subcommand tables) so the dispatch contract is testable independently of the CLI process. README documents the behavior and escape hatches.
+
+### Receipts: verified contract survives trailing stdout floods
+
+- The synchronous (foreground) run path now validates the `TERRARIUM_RESULT` task receipt against the full captured stdout, not the bounded ~12 KB display tail. A child could legitimately emit a valid receipt and then print more than a tail window of trailing output (verbose summaries, diffs, logs), which pushed the receipt line out of the tail and misreported a genuinely verified run as `missing` / `inconclusive`. This made the receipt — Terrarium's single source of operational truth — fragile to reconstruct under noisy children.
+- The background supervisor path already validated against full stdout; this closes the asymmetry so both paths reach the same verdict for the same output.
+- The persisted `stdoutTail` is still bounded for display, and the full contract output is never written to durable metadata. Added a regression test that emits a receipt followed by 50 KB of trailing stdout and asserts the run finalizes `done` / `verified`.
+
+### Repair: stale child-slot claims are now mechanically prunable
+
+- `terrarium_callbacks { action: "prune" }` now also reclaims stale child-slot claims, not just router/journal records. A child-slot claim that points at a missing/invalid run log (the child was pruned, or its supervisor died during the launch handoff before writing a log) permanently consumed one of the parent's bounded child-budget slots with no mechanical remedy.
+- `terra doctor`'s `repairPlan` `staleChildClaim` step now carries a runnable `tool`/`args` (`terrarium_callbacks { action: "prune" }`) and is counted in `repairPlanSummary.actionable`, instead of being a detection-only signal a reconstructing agent could not dispatch.
+- Pruning uses doctor's exact staleness criteria, never removes a slot held by a live run log, is restricted to a top-level controller (rejects child callers), and garbage-collects any `.children` directory it empties. Added `test/prune-child-claims.test.js`.
+
+### Batch: winner-picking strategies resolve by true finish order
+
+- `race`, `any`, and `quorum` now select winners by each run's durable `finishedAt` timestamp instead of job-array position. At large batch scale a single status snapshot routinely reports several freshly-terminal runs at once; the previous code returned the run the caller happened to list first, making "first terminal / first success wins" a lie.
+- A terminal run whose snapshot is momentarily missing `finishedAt` sorts last, so it can never out-race a run with a known, earlier finish time. Exact-timestamp ties break deterministically by `runId`.
+- `decide()` is now exported as a pure function and covered by deterministic unit tests (finish-order selection, tie-breaking, and the missing-timestamp guard) that need no spawned children.
+
 ### Go core migration: first runnable kernel slice
 
 - Added an experimental Go module with `cmd/terra-core`, a pure single-run state machine, JSON command protocol, and a prototype one-process runner under `go/runner`.
@@ -44,6 +70,13 @@ Succinct, product-facing changes to Terrarium. This is not a full commit log; it
 - MCP callback descriptions now say delivery is at-least-once with dedup: acknowledged events are not redelivered, but requeue can replay an inflight event that was claimed and never acknowledged.
 - Missing callback subscribers are normalized to the same concise denial as inaccessible subscribers.
 - Router and doctor validation now agree on canonical timestamps, subscriber IDs, event IDs, and state-specific pending/inflight/acked callback shapes.
+
+### Batch: winner-picking joins resolve by finish time, not job order
+
+- `race`, `any`, and `quorum` now pick winners by who actually finished first (earliest per-run `finishedAt`), not by the order jobs were listed. At large batch scale many runs go terminal within one poll interval, so a single status snapshot routinely contains several freshly-terminal runs; the old code resolved to whichever job the caller happened to list first, quietly contradicting the documented "first terminal / first success wins" contract.
+- Exact `finishedAt` ties break deterministically by `runId`, so winner selection is reproducible across snapshots.
+- A run that is terminal in a snapshot but whose `finishedAt` is momentarily unreadable sorts last, never first, so a run with no known finish time can never out-race a run that provably finished earlier.
+- Added deterministic unit coverage of the pure `decide` join function for finish-time ordering, tie-breaking, and the missing-`finishedAt` edge case, exercised without racing real subprocesses.
 
 ### Batch: durable IDs survive cleanup races
 

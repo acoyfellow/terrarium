@@ -109,6 +109,27 @@ test('self-scoped runs cannot inspect sibling status or logs', async () => {
   });
 });
 
+test('verified receipt survives more than a tail window of trailing stdout', async () => {
+  // Operational-truth regression: a child may legitimately emit its receipt and
+  // then print far more than the bounded display tail (12000 bytes). The
+  // synchronous run path must validate the contract against full captured stdout,
+  // not result.stdoutTail, or a genuine verified run is misreported as missing.
+  const dir = mkdtempSync(join(tmpdir(), 'terra-trailing-agent-'));
+  const path = join(dir, 'agent.mjs');
+  writeFileSync(path, `const prompt=process.argv[2]||'';const line=prompt.split('\\n').find(x=>x.startsWith('TERRARIUM_RESULT='));const expected=JSON.parse(line.slice('TERRARIUM_RESULT='.length));console.log('TERRARIUM_RESULT='+JSON.stringify({...expected,summary:'completed despite trailing flood'}));process.stdout.write('x'.repeat(50000)+'\\n');`);
+  try {
+    const result = await runTerrarium({ task: 'trailing flood task', agent: `${process.execPath} ${path}`, requireTaskContract: true, stream: false });
+    assert.equal(result.ok, true);
+    assert.equal(result.status, 'done');
+    assert.equal(result.taskContractStatus, 'verified');
+    assert.equal(result.taskResultSummary, 'completed despite trailing flood');
+    // The persisted display tail still drops the receipt line; verification must
+    // not depend on it, and the raw contract output must not be persisted.
+    assert.doesNotMatch(result.stdoutTail, /TERRARIUM_RESULT=/);
+    assert.equal('contractOutput' in result, false);
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
+
 test('wrong or missing task receipts are not successful', async () => {
   const dir = mkdtempSync(join(tmpdir(), 'terra-wrong-agent-'));
   const wrong = join(dir, 'wrong.mjs');
