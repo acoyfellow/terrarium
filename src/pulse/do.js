@@ -247,20 +247,38 @@ export class PulseRouter {
     return { eventId: id, duplicate: false, delivered };
   }
 
-  claim({ subscriberId, limit = 20, ownerRunId } = {}) {
+  claim({ subscriberId, limit = 20, maxDeliveryAttempts, ownerRunId } = {}) {
     const sub = this.getSubscriber(subscriberId);
     this.#assertOwner(sub, ownerRunId);
     const bounded = Math.min(Math.max(Number(limit) || 20, 1), 100);
+    // maxDeliveryAttempts caps poison-event redelivery, mirroring the fs router:
+    // a pending row whose recorded deliveryAttempts already reached the cap is
+    // moved to the 'dead' state instead of being re-served, so a consumer that
+    // keeps crashing on it stops looping while the row stays inspectable.
+    const cap = Number.isInteger(maxDeliveryAttempts) && maxDeliveryAttempts > 0 ? maxDeliveryAttempts : null;
+    // Scan enough rows to fill the claim limit even if some are quarantined.
     const rows = this.sql.exec(
       "SELECT event_id, payload FROM mailbox WHERE subscriber_id = ? AND state = 'pending' ORDER BY event_id ASC LIMIT ?",
-      subscriberId, bounded,
+      subscriberId, cap ? Math.min(bounded + 100, 200) : bounded,
     ).toArray();
     const events = [];
+    let quarantined = 0;
     const claimedAt = new Date().toISOString();
     for (const row of rows) {
+      if (events.length >= bounded) break;
       let parsed;
       try { parsed = JSON.parse(row.payload); } catch { continue; }
       if (!isValidCallbackEvent(parsed, row.event_id, { state: 'pending' })) continue;
+      const attempts = Number.isInteger(parsed.deliveryAttempts) ? parsed.deliveryAttempts : 0;
+      if (cap && attempts >= cap) {
+        // Quarantine: keep the pending-shape payload (no claimedAt) under 'dead'.
+        this.sql.exec(
+          "UPDATE mailbox SET state = 'dead', claimed_at = NULL WHERE subscriber_id = ? AND event_id = ?",
+          subscriberId, row.event_id,
+        );
+        quarantined++;
+        continue;
+      }
       const event = { ...sanitizeCallbackEvent(parsed), claimedAt };
       this.sql.exec(
         "UPDATE mailbox SET state = 'inflight', payload = ?, claimed_at = ? WHERE subscriber_id = ? AND event_id = ?",
@@ -268,7 +286,7 @@ export class PulseRouter {
       );
       events.push(event);
     }
-    return { subscriberId, events };
+    return { subscriberId, events, quarantined };
   }
 
   ack({ subscriberId, eventId: id, ownerRunId } = {}) {
@@ -303,6 +321,7 @@ export class PulseRouter {
       pending: count('pending', 'pending'),
       inflight: count('inflight', 'claimed'),
       acknowledged: count('acked', 'claimed'),
+      dead: count('dead', 'pending'),
     };
   }
 
@@ -342,7 +361,7 @@ export class PulseRouter {
       const ts = Date.parse(event.claimedAt || event.at || '');
       return Number.isFinite(ts) ? now - ts : Infinity;
     };
-    let acknowledgedRemoved = 0, pendingRemoved = 0, inflightRemoved = 0, journalRemoved = 0, subscribersRemoved = 0;
+    let acknowledgedRemoved = 0, pendingRemoved = 0, inflightRemoved = 0, deadRemoved = 0, journalRemoved = 0, subscribersRemoved = 0;
 
     for (const row of this.sql.exec('SELECT subscriber_id FROM subscribers').toArray()) {
       const subscriberId = row.subscriber_id;
@@ -355,6 +374,9 @@ export class PulseRouter {
         ['acked', 'claimed', ackCutoff],
         ['pending', 'pending', callbackCutoff],
         ['inflight', 'claimed', callbackCutoff],
+        // Quarantined poison callbacks carry the pending shape and expire on the
+        // callback cutoff, same as the fs router dead-letter sweep.
+        ['dead', 'pending', callbackCutoff],
       ]) {
         for (const mrow of this.sql.exec('SELECT event_id, payload FROM mailbox WHERE subscriber_id = ? AND state = ?', subscriberId, state).toArray()) {
           if (eventFilter && !eventFilter.includes(mrow.event_id)) continue;
@@ -364,7 +386,8 @@ export class PulseRouter {
           this.sql.exec('DELETE FROM mailbox WHERE subscriber_id = ? AND event_id = ?', subscriberId, mrow.event_id);
           if (state === 'acked') acknowledgedRemoved++;
           else if (state === 'pending') pendingRemoved++;
-          else inflightRemoved++;
+          else if (state === 'inflight') inflightRemoved++;
+          else deadRemoved++;
         }
       }
     }
@@ -387,13 +410,14 @@ export class PulseRouter {
       const age = now - Date.parse(subscription.createdAt || '');
       if (!Number.isFinite(age) || age < subscriberCutoff) continue;
       const st = this.status(subscriberId, subscription.ownerRunId);
-      if (st.pending || st.inflight) continue;
+      // Keep a subscriber alive while it still holds quarantined poison events.
+      if (st.pending || st.inflight || st.dead) continue;
       this.sql.exec('DELETE FROM mailbox WHERE subscriber_id = ?', subscriberId);
       this.sql.exec('DELETE FROM subscribers WHERE subscriber_id = ?', subscriberId);
       subscribersRemoved++;
     }
 
-    return { acknowledgedRemoved, pendingRemoved, inflightRemoved, journalRemoved, subscribersRemoved };
+    return { acknowledgedRemoved, pendingRemoved, inflightRemoved, deadRemoved, journalRemoved, subscribersRemoved };
   }
 
   requeue({ subscriberId, olderThanMs = 300000, ownerRunId } = {}) {

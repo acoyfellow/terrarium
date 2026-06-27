@@ -27,7 +27,7 @@ test('callbacks route, deduplicate, claim, and acknowledge exactly once', async 
     assert.equal(ack.acknowledged, true);
     const ackAgain = await acknowledgeMailboxEvent({ subscriberId, eventId: event.eventId });
     assert.equal(ackAgain.duplicate, true);
-    assert.deepEqual(await getMailboxStatus(subscriberId), { subscriberId, pending: 0, inflight: 0, acknowledged: 1 });
+    assert.deepEqual(await getMailboxStatus(subscriberId), { subscriberId, pending: 0, inflight: 0, acknowledged: 1, dead: 0 });
   } finally {
     await rm(join(MAILBOXES_DIR, subscriberId), { recursive: true, force: true });
     await rm(join(SUBSCRIBERS_DIR, `${subscriberId}.json`), { force: true });
@@ -88,6 +88,74 @@ test('requeueInflightEvents tracks deliveryAttempts so poison events are observa
     const fresh = await requeueInflightEvents({ subscriberId, olderThanMs: 3_600_000 });
     assert.equal(fresh.requeued, 0);
     assert.equal(fresh.maxAttempts, 0);
+  } finally {
+    await rm(join(MAILBOXES_DIR, subscriberId), { recursive: true, force: true });
+    await rm(join(SUBSCRIBERS_DIR, `${subscriberId}.json`), { force: true });
+    await rm(join(JOURNAL_DIR, `${eventId}.json`), { force: true });
+  }
+});
+
+test('claimMailboxEvents quarantines a poison event once it reaches maxDeliveryAttempts', async () => {
+  const suffix = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+  const subscriberId = `sub_quarantine_${suffix}`;
+  const runId = `ter_quarantine_${suffix}`;
+  const eventId = `evt_quarantine_${suffix}`;
+  try {
+    await registerSubscriber({ subscriberId, runIds: [runId], eventTypes: ['Completed'], channels: ['*'], workflowIds: ['*'] });
+    await routeEvent({ eventId, type: 'Completed', runId, channel: 'x', at: '2020-01-01T00:00:00.000Z' });
+
+    // Simulate a consumer that always fails delivery: claim then requeue, twice,
+    // driving deliveryAttempts up to the cap of 2.
+    for (let i = 1; i <= 2; i++) {
+      const claimed = await claimMailboxEvents({ subscriberId, maxDeliveryAttempts: 2 });
+      assert.equal(claimed.events.length, 1, `claim ${i} still serves the event below the cap`);
+      assert.equal(claimed.quarantined, 0);
+      await requeueInflightEvents({ subscriberId, olderThanMs: 0 });
+    }
+
+    // deliveryAttempts is now 2 (== cap). The next claim must NOT re-serve it; it
+    // is quarantined to the dead-letter mailbox instead and reported, so a poison
+    // event stops wedging the consumer loop.
+    const capped = await claimMailboxEvents({ subscriberId, maxDeliveryAttempts: 2 });
+    assert.equal(capped.events.length, 0, 'a capped event is no longer claimed');
+    assert.equal(capped.quarantined, 1);
+    const status = await getMailboxStatus(subscriberId);
+    assert.equal(status.pending, 0);
+    assert.equal(status.inflight, 0);
+    assert.equal(status.dead, 1, 'the poison event is preserved in the dead-letter mailbox');
+
+    // It stays quarantined: a later claim never re-serves or re-quarantines it.
+    const after = await claimMailboxEvents({ subscriberId, maxDeliveryAttempts: 2 });
+    assert.equal(after.events.length, 0);
+    assert.equal(after.quarantined, 0);
+    assert.equal((await getMailboxStatus(subscriberId)).dead, 1);
+
+    // Doctor surfaces the dead-letter, and prune can clear it on the callback cutoff.
+    const pruned = await pruneRouter({ callbackOlderThanMs: 0, subscriberIds: [subscriberId], eventIds: [eventId] });
+    assert.equal(pruned.deadRemoved, 1);
+    assert.equal((await getMailboxStatus(subscriberId)).dead, 0);
+  } finally {
+    await rm(join(MAILBOXES_DIR, subscriberId), { recursive: true, force: true });
+    await rm(join(SUBSCRIBERS_DIR, `${subscriberId}.json`), { force: true });
+    await rm(join(JOURNAL_DIR, `${eventId}.json`), { force: true });
+  }
+});
+
+test('claimMailboxEvents without a cap keeps redelivering and never quarantines', async () => {
+  const suffix = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+  const subscriberId = `sub_no_cap_${suffix}`;
+  const runId = `ter_no_cap_${suffix}`;
+  const eventId = `evt_no_cap_${suffix}`;
+  try {
+    await registerSubscriber({ subscriberId, runIds: [runId], eventTypes: ['Completed'], channels: ['*'], workflowIds: ['*'] });
+    await routeEvent({ eventId, type: 'Completed', runId, channel: 'x', at: '2020-01-01T00:00:00.000Z' });
+    for (let i = 0; i < 4; i++) {
+      const claimed = await claimMailboxEvents({ subscriberId });
+      assert.equal(claimed.events.length, 1, `claim ${i} still serves the event with no cap`);
+      assert.equal(claimed.quarantined, 0);
+      await requeueInflightEvents({ subscriberId, olderThanMs: 0 });
+    }
+    assert.equal((await getMailboxStatus(subscriberId)).dead, 0);
   } finally {
     await rm(join(MAILBOXES_DIR, subscriberId), { recursive: true, force: true });
     await rm(join(SUBSCRIBERS_DIR, `${subscriberId}.json`), { force: true });
@@ -405,7 +473,7 @@ test('router operations reject malformed callback and subscriber timestamps cons
     assert.deepEqual((await claimMailboxEvents({ subscriberId })).events, []);
     await assert.rejects(acknowledgeMailboxEvent({ subscriberId, eventId: inflightId }), /event is not inflight/);
     assert.equal((await requeueInflightEvents({ subscriberId, olderThanMs: 0 })).requeued, 0);
-    assert.deepEqual(await getMailboxStatus(subscriberId), { subscriberId, pending: 0, inflight: 0, acknowledged: 0 });
+    assert.deepEqual(await getMailboxStatus(subscriberId), { subscriberId, pending: 0, inflight: 0, acknowledged: 0, dead: 0 });
     const pruned = await pruneRouter({ callbackOlderThanMs: 0, subscriberIds: [subscriberId], eventIds: [pendingId, inflightId] });
     assert.equal(pruned.pendingRemoved, 0);
     assert.equal(pruned.inflightRemoved, 0);
@@ -432,7 +500,7 @@ test('mailbox status excludes malformed pending and inflight records and prune r
     await registerSubscriber({ subscriberId, runIds: ['*'] });
     await writeFile(badPending, '{bad');
     await writeFile(badInflight, JSON.stringify({ eventId: 'wrong', type: 'Completed', runId: `ter_${suffix}`, at: '2020-01-01T00:00:00.000Z' }));
-    assert.deepEqual(await getMailboxStatus(subscriberId), { subscriberId, pending: 0, inflight: 0, acknowledged: 0 });
+    assert.deepEqual(await getMailboxStatus(subscriberId), { subscriberId, pending: 0, inflight: 0, acknowledged: 0, dead: 0 });
     const result = await pruneRouter({ callbackOlderThanMs: 0, subscriberIds: [subscriberId] });
     assert.equal(result.pendingRemoved, 0);
     assert.equal(result.inflightRemoved, 0);
@@ -493,7 +561,7 @@ test('state-specific validation prevents claim, ack, status, and prune from acce
     await writeFile(inflight, JSON.stringify({ eventId: inflightId, type: 'Completed', runId: `ter_${suffix}`, at: '2020-01-01T00:00:00.000Z' }));
     assert.deepEqual((await claimMailboxEvents({ subscriberId })).events, []);
     await assert.rejects(acknowledgeMailboxEvent({ subscriberId, eventId: inflightId }), /event is not inflight/);
-    assert.deepEqual(await getMailboxStatus(subscriberId), { subscriberId, pending: 0, inflight: 0, acknowledged: 0 });
+    assert.deepEqual(await getMailboxStatus(subscriberId), { subscriberId, pending: 0, inflight: 0, acknowledged: 0, dead: 0 });
     const pruned = await pruneRouter({ callbackOlderThanMs: 0, subscriberIds: [subscriberId], eventIds: [pendingId, inflightId] });
     assert.equal(pruned.pendingRemoved, 0);
     assert.equal(pruned.inflightRemoved, 0);

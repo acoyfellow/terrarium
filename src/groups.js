@@ -47,6 +47,27 @@ export async function listRunGroups({ limit = 20 } = {}) {
   return { count: bounded.length, groups: bounded };
 }
 
+// Task-contract status values that count as a genuinely trusted completion. A
+// group-level truth reconstruction must NOT treat a process that merely exited
+// 0 (or a cancelled/deadlined run that carries a stale receipt the run-machine
+// already collapsed to not-applicable) as a verified task receipt.
+export const CONTRACT_TRUTH_BUCKETS = ["verified", "not-required", "not-applicable", "pending", "unverified", "unknown"];
+
+// Reconstruct the contract-layer truth of one run independent of its process
+// status. This is the security/operational answer to "can I trust this member's
+// task receipt?" — distinct from the process-level ok/exit code.
+export function reconstructContractTruth(run) {
+  const status = run?.taskContractStatus;
+  if (status === "verified") return "verified";
+  if (status === "not-required") return "not-required";
+  if (status === "not-applicable") return "not-applicable";
+  if (status === "pending") return "pending";
+  // missing / mismatch / malformed receipts are present-but-untrusted claims.
+  if (["missing", "mismatch", "malformed"].includes(status)) return "unverified";
+  // A record we could not read (missing/error) yields no contract evidence.
+  return "unknown";
+}
+
 export async function getRunGroupStatus({ groupId, verbose = false, requesterRunId, scope } = {}) {
   const group = await getRunGroup(groupId);
   const runs = await Promise.all(group.runIds.map(async (runId) => {
@@ -61,7 +82,19 @@ export async function getRunGroupStatus({ groupId, verbose = false, requesterRun
   // Unknown/missing records are not evidence that every member reached a terminal state.
   const complete = runs.every((run) => terminalStatuses.has(run.status));
   const ok = complete && runs.every((run) => run.status === "done" && run.ok === true);
-  return { ...group, complete, ok, counts, runs: verbose ? runs : runs.map(({ runId, status, ok, exitCode, taskContractStatus, terminalCallback, progressText, needsAttention, idleMs, startedAt, finishedAt, error, note }) => ({ runId, status, ok, exitCode, taskContractStatus, terminalCallback, progressText, needsAttention, idleMs, startedAt, finishedAt, error, note })) };
+  // Operational truth reconstruction: how many members can actually be trusted at
+  // the task-contract layer, regardless of how their process exited. fullyVerified
+  // is intentionally strict — every member must be a genuine verified receipt, so a
+  // single not-applicable/unverified/unknown member fails closed.
+  const contractBuckets = Object.fromEntries(CONTRACT_TRUTH_BUCKETS.map((bucket) => [bucket, runs.filter((run) => reconstructContractTruth(run) === bucket).length]));
+  const contractTruth = {
+    buckets: contractBuckets,
+    // A member contributes trusted evidence iff its receipt is verified or the
+    // contract was legitimately not required for it.
+    trusted: contractBuckets.verified + contractBuckets["not-required"],
+    fullyVerified: complete && runs.length > 0 && runs.every((run) => reconstructContractTruth(run) === "verified"),
+  };
+  return { ...group, complete, ok, counts, contractTruth, runs: verbose ? runs : runs.map(({ runId, status, ok, exitCode, taskContractStatus, terminalCallback, progressText, needsAttention, idleMs, startedAt, finishedAt, error, note }) => ({ runId, status, ok, exitCode, taskContractStatus, terminalCallback, progressText, needsAttention, idleMs, startedAt, finishedAt, error, note })) };
 }
 
 export async function readRunGroupLogs({ groupId, kind = "terrarium", tailBytes = 2000, requesterRunId, scope } = {}) {

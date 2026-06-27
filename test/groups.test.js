@@ -4,8 +4,8 @@ import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { mkdir, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { cancelRun, getRunStatus, isPidAlive, readRun, runTerrarium, spawnTerrariumBackground } from '../src/core.js';
-import { createRunGroup, getRunGroupStatus, listRunGroups, readRunGroupLogs } from '../src/groups.js';
+import { cancelRun, getRunStatus, isPidAlive, metadataPath, readRun, runTerrarium, spawnTerrariumBackground } from '../src/core.js';
+import { createRunGroup, getRunGroupStatus, listRunGroups, readRunGroupLogs, reconstructContractTruth } from '../src/groups.js';
 import { clearInheritedTerrariumEnv } from './helpers/terrarium-env.js';
 
 clearInheritedTerrariumEnv();
@@ -44,6 +44,65 @@ test('group truthfulness rejects traversal IDs and does not call missing records
     assert.equal(status.complete, false, 'missing state is unknown, not terminal');
     assert.equal(status.ok, false);
   } finally { rmSync(path, { force: true }); }
+});
+
+test('reconstructContractTruth maps every task-contract status to a trust bucket', () => {
+  assert.equal(reconstructContractTruth({ taskContractStatus: 'verified' }), 'verified');
+  assert.equal(reconstructContractTruth({ taskContractStatus: 'not-required' }), 'not-required');
+  assert.equal(reconstructContractTruth({ taskContractStatus: 'not-applicable' }), 'not-applicable');
+  assert.equal(reconstructContractTruth({ taskContractStatus: 'pending' }), 'pending');
+  for (const untrusted of ['missing', 'mismatch', 'malformed']) {
+    assert.equal(reconstructContractTruth({ taskContractStatus: untrusted }), 'unverified', `${untrusted} is present-but-untrusted`);
+  }
+  // No record / unreadable member yields no contract evidence.
+  assert.equal(reconstructContractTruth({ status: 'missing' }), 'unknown');
+  assert.equal(reconstructContractTruth(undefined), 'unknown');
+});
+
+test('group status reconstructs contract-layer truth distinct from process ok', async () => {
+  // Seed terminal member records directly. reconcileRun is a no-op for already
+  // terminal records, so the taskContractStatus we write flows straight through
+  // getRunStatus into the group roll-up.
+  const stamp = Date.now();
+  const seed = (suffix, status, taskContractStatus, ok) => {
+    const runId = `ter_${'c'.repeat(16)}${suffix}`;
+    writeFileSync(metadataPath(runId), JSON.stringify({
+      version: 1, runId, status, ok, exitCode: ok ? 0 : 1, taskContractStatus,
+      startedAt: new Date(stamp).toISOString(), finishedAt: new Date(stamp).toISOString(),
+    }));
+    return runId;
+  };
+  const seeded = [
+    seed('a0', 'done', 'verified', true),
+    seed('b1', 'cancelled', 'not-applicable', false),
+    seed('c2', 'inconclusive', 'missing', false),
+  ];
+  try {
+    const group = await createRunGroup({ label: 'truth recon', runIds: seeded });
+    const status = await getRunGroupStatus({ groupId: group.groupId });
+    // Process-level: not all done, so process ok is false even though one member verified.
+    assert.equal(status.complete, true, 'all members terminal');
+    assert.equal(status.ok, false, 'a cancelled + inconclusive member fails process ok');
+    // Contract-level truth reconstruction.
+    assert.equal(status.contractTruth.buckets.verified, 1);
+    assert.equal(status.contractTruth.buckets['not-applicable'], 1, 'cancelled run is untrusted, not verified');
+    assert.equal(status.contractTruth.buckets.unverified, 1, 'a missing receipt is a present-but-untrusted claim');
+    assert.equal(status.contractTruth.trusted, 1, 'only the genuinely verified member contributes trust');
+    assert.equal(status.contractTruth.fullyVerified, false, 'one verified member does not verify the whole group');
+  } finally {
+    for (const runId of seeded) rmSync(metadataPath(runId), { force: true });
+  }
+});
+
+test('group contractTruth.fullyVerified requires every member verified', async () => {
+  const a = await runTerrarium({ task: 'verify alpha', dryRun: false, stream: false, requireTaskContract: false });
+  const b = await runTerrarium({ task: 'verify beta', dryRun: false, stream: false, requireTaskContract: false });
+  const group = await createRunGroup({ label: 'all not-required', runIds: [a.runId, b.runId] });
+  const status = await getRunGroupStatus({ groupId: group.groupId });
+  // These dry/non-contract runs are not-required: trusted, but not 'verified'.
+  assert.equal(status.contractTruth.buckets['not-required'], 2);
+  assert.equal(status.contractTruth.trusted, 2, 'not-required members are trusted evidence');
+  assert.equal(status.contractTruth.fullyVerified, false, 'fullyVerified is strict: not-required is not verified');
 });
 
 test('cancel terminates the child process group and records cancelled status', { timeout: 15000 }, async () => {

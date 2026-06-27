@@ -84,6 +84,11 @@ func parseArgs(argv []string) (protocol.Command, error) {
 		cmd.RunID = rest[0]
 		return cmd, nil
 
+	case "replay":
+		// replay carries an input sequence that is only practical to express as
+		// JSON, so it is driven through the --stdin protocol path.
+		return cmd, fmt.Errorf("replay reads a JSON command on stdin: echo '{\"command\":\"replay\",\"inputs\":[...]}' | terra-core --stdin")
+
 	case "dry-run":
 		cmd.Command = protocol.CmdDryRun
 		i := 0
@@ -131,6 +136,12 @@ Usage:
   terra-core version
   terra-core dry-run "task" [--agent "opencode run"] [--cwd .] [--no-receipt]
   terra-core status <runId>
+  terra-core replay --stdin     drive a JSON input sequence through the run machine
   terra-core --stdin            read one JSON Command, write JSON Response
+
+The replay command reads {"command":"replay","inputs":[...]} on stdin and
+returns the final run-machine state plus per-step decisions. It is the
+cross-language conformance entry point: the same input sequence fed to the TS
+transition() and this Go core must produce identical terminal classification.
 
 All commands are inert: no process spawning, no deployment, no state mutation.`

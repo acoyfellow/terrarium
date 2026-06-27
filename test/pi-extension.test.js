@@ -11,7 +11,7 @@ import { getMailboxStatus, routeEvent, unregisterSubscriber } from '../src/route
 const source = readFileSync(new URL('../src/pi-extension.js', import.meta.url), 'utf8');
 const pkg = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'));
 
-function host(sessionFile, { failFirstSend = false } = {}) {
+function host(sessionFile, { failFirstSend = false, alwaysFailSend = false } = {}) {
   const handlers = {};
   const messages = [];
   const options = [];
@@ -20,6 +20,7 @@ function host(sessionFile, { failFirstSend = false } = {}) {
     on: (name, handler) => { handlers[name] = handler; },
     registerCommand: () => {},
     sendMessage: (message, opts) => {
+      if (alwaysFailSend) throw new Error('simulated permanent Pi sendMessage failure');
       if (failNext) { failNext = false; throw new Error('simulated Pi sendMessage failure'); }
       messages.push(message); options.push(opts);
     },
@@ -177,6 +178,42 @@ test('one poison callback does not strand a sibling callback in the same batch',
     assert.equal(mailbox.pending, 0);
     assert.equal(mailbox.inflight, 0);
     assert.ok(mailbox.acknowledged >= 2);
+  } finally {
+    await h.handlers.session_shutdown({}, h.ctx).catch(() => {});
+    await unregisterSubscriber(subscriberId).catch(() => {});
+  }
+});
+
+test('the Pi host passes a delivery-attempt cap so a poison callback is bounded', () => {
+  assert.match(source, /MAX_DELIVERY_ATTEMPTS/);
+  assert.match(source, /maxDeliveryAttempts: MAX_DELIVERY_ATTEMPTS/);
+  assert.match(source, /claimed\.quarantined/);
+});
+
+test('a permanently poison callback is quarantined after the cap instead of looping forever', { timeout: 15000 }, async () => {
+  const suffix = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+  const sessionFile = `/tmp/pi-session-${suffix}.jsonl`;
+  const subscriberId = `pi_${createHash('sha256').update(sessionFile).digest('hex').slice(0, 20)}`;
+  const runId = `ter_pi_poison_perm_${suffix}`;
+  // Every sendMessage throws, so the event can never be delivered/acked. Without
+  // a cap it would re-claim and re-crash the loop forever; the cap moves it to
+  // the dead-letter mailbox after MAX_DELIVERY_ATTEMPTS and stops re-serving it.
+  const h = host(sessionFile, { alwaysFailSend: true });
+  try {
+    await h.handlers.session_start({}, h.ctx);
+    await h.handlers.tool_result({ toolName: 'terrarium_spawn', isError: false, content: [{ type: 'text', text: JSON.stringify({ runId, background: true, status: 'running' }) }] }, h.ctx);
+    await routeEvent({ eventId: `evt_${runId}_Completed`, type: 'Completed', runId, workflowId: runId, channel: 'test', at: new Date().toISOString(), status: 'done', ok: true, exitCode: 0 });
+    // Drive refreshes: each one claims, throws on send, requeues with a bumped
+    // attempt count. The event ends up quarantined and stops cycling.
+    await waitUntil(async () => { await h.handlers.agent_end({}, h.ctx); return (await getMailboxStatus(subscriberId)).dead >= 1; });
+    const mailbox = await getMailboxStatus(subscriberId);
+    assert.equal(mailbox.dead, 1, 'the poison event lands in the dead-letter mailbox');
+    assert.equal(mailbox.pending, 0, 'it stops cycling through pending');
+    assert.equal(mailbox.inflight, 0, 'it is not stranded inflight');
+    assert.equal(h.messages.filter((m) => m.content.includes(runId)).length, 0, 'it was never delivered');
+    // Further refreshes never re-serve or re-quarantine it.
+    await h.handlers.agent_end({}, h.ctx);
+    assert.equal((await getMailboxStatus(subscriberId)).dead, 1);
   } finally {
     await h.handlers.session_shutdown({}, h.ctx).catch(() => {});
     await unregisterSubscriber(subscriberId).catch(() => {});

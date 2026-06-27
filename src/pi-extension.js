@@ -5,6 +5,12 @@ import { acknowledgeMailboxEvent, claimMailboxEvents, registerSubscriber, requeu
 
 const WIDGET = "terrarium-runs";
 const TERMINAL_TYPES = ["Completed", "Failed", "TimedOut", "Cancelled"];
+// A genuinely poison callback (one sendMessage always throws on) is requeued by
+// the failure path below on every refresh, so without a cap it would re-claim and
+// re-crash the delivery loop forever. Stop re-serving an event after this many
+// recorded redeliveries: claim quarantines it to the dead-letter mailbox instead,
+// and the session is notified once so the operator can inspect it via doctor.
+const MAX_DELIVERY_ATTEMPTS = 5;
 
 function subscriberId(ctx) {
   const source = ctx.sessionManager.getSessionFile() || ctx.cwd;
@@ -65,7 +71,8 @@ export default function terrariumPiExtension(pi) {
         }
       }
       if (currentSubscriber) {
-        const claimed = await claimMailboxEvents({ subscriberId: currentSubscriber, limit: 20 });
+        const claimed = await claimMailboxEvents({ subscriberId: currentSubscriber, limit: 20, maxDeliveryAttempts: MAX_DELIVERY_ATTEMPTS });
+        if (claimed.quarantined && ctx.hasUI) ctx.ui.notify(`Terrarium quarantined ${claimed.quarantined} undeliverable callback(s) after ${MAX_DELIVERY_ATTEMPTS} attempts`, "warning");
         for (const event of claimed.events) {
           let run; try { run = await getRunStatus({ runId: event.runId }); } catch { run = { runId: event.runId, status: event.type }; }
           // Pi supports an immediate model turn for extension messages. followUp

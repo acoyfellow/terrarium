@@ -74,6 +74,7 @@ Higher-level coordination should compose these primitives or live in separate mo
 - MCP-spawned non-dry runs require a structured run/task receipt. Exit zero without correlation is returned as `inconclusive`/`ok:false`; concise and verbose response envelopes remain additive-compatible.
 - A batch job or campaign action must leave an ordinary Terrarium run ID and receipt behind.
 - A run emits at most one terminal result and one deterministic terminal callback event. The journal is written even with no online subscriber; concrete late subscriptions can replay it, while acknowledged events remain suppressed. Background terminal classification is driven by the pure run transition core; versioned schedule replay is diagnostic evidence, not a second persisted source of truth.
+- The pure run transition core has two implementations — TypeScript (`src/run-machine.js`) and a faithful Go port (`internal/run`) — that must stay in lockstep on `RUN_MACHINE_VERSION` and terminal classification. The inert Go core `replay` command (`terra-core --stdin`, additive to `dry-run`/`status`/`version`) drives an ordered input sequence through the Go machine and returns the final terminal classification; `test/go-vs-ts-replay-conformance-shard-p.test.js` feeds identical sequences to both cores and asserts byte-for-byte parity of the consumer-facing terminal fields. Any change to one machine must be mirrored in the other or conformance fails.
 
 ## Security boundary distinction
 

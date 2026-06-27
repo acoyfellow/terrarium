@@ -26,6 +26,7 @@ const (
 	CmdDryRun  CommandType = "dry-run"
 	CmdStatus  CommandType = "status"
 	CmdVersion CommandType = "version"
+	CmdReplay  CommandType = "replay"
 )
 
 // Command is the JSON request envelope read from stdin.
@@ -39,6 +40,21 @@ type Command struct {
 	RequireReceipt *bool    `json:"requireReceipt,omitempty"`
 	// Status fields.
 	RunID string `json:"runId,omitempty"`
+	// Replay fields: an ordered sequence of already-observed inputs driven
+	// through the pure run machine. Inert: no clocks, processes, or I/O.
+	Inputs []ReplayInput `json:"inputs,omitempty"`
+}
+
+// ReplayInput is the JSON shape of one observed run input for the replay
+// command. It mirrors the input objects accepted by transition() in
+// src/run-machine.js so the same sequence can drive both cores.
+type ReplayInput struct {
+	Type     string  `json:"type"`
+	ExitCode *int    `json:"exitCode,omitempty"`
+	Signal   *string `json:"signal,omitempty"`
+	Status   string  `json:"status,omitempty"`
+	Summary  *string `json:"summary,omitempty"`
+	Error    string  `json:"error,omitempty"`
 }
 
 // Response is the JSON response envelope written to stdout.
@@ -51,6 +67,24 @@ type Response struct {
 	DryRun  *DryRunPayload  `json:"dryRun,omitempty"`
 	Status  *StatusPayload  `json:"status,omitempty"`
 	Version *VersionPayload `json:"version,omitempty"`
+	Replay  *ReplayPayload  `json:"replay,omitempty"`
+}
+
+// ReplayPayload is the deterministic result of driving a fixed input sequence
+// through the pure run machine. It carries the final state plus the decision
+// list emitted at each step, so a TS conformance harness can assert the Go and
+// TS cores agree byte-for-byte on the same sequence.
+type ReplayPayload struct {
+	MachineVer int                `json:"machineVersion"`
+	Steps      []ReplayStep       `json:"steps"`
+	FinalState run.State          `json:"finalState"`
+	Terminal   *run.TerminalState `json:"terminal"`
+}
+
+// ReplayStep records the decisions emitted by one applied input.
+type ReplayStep struct {
+	Input     string         `json:"input"`
+	Decisions []run.Decision `json:"decisions"`
 }
 
 // DryRunPayload describes the child invocation that would run, without running
@@ -93,6 +127,8 @@ func Handle(cmd Command) Response {
 		return handleStatus(cmd)
 	case CmdVersion:
 		return handleVersion()
+	case CmdReplay:
+		return handleReplay(cmd)
 	case "":
 		return errResponse(cmd.Command, "missing command")
 	default:
@@ -133,6 +169,58 @@ func handleDryRun(cmd Command) Response {
 			InitialState:   run.InitialState(requireReceipt),
 		},
 	}
+}
+
+func handleReplay(cmd Command) Response {
+	requireReceipt := true
+	if cmd.RequireReceipt != nil {
+		requireReceipt = *cmd.RequireReceipt
+	}
+	state := run.InitialState(requireReceipt)
+	steps := make([]ReplayStep, 0, len(cmd.Inputs))
+	for i, ri := range cmd.Inputs {
+		input, err := toRunInput(ri)
+		if err != nil {
+			return errResponse(CmdReplay, fmt.Sprintf("inputs[%d]: %v", i, err))
+		}
+		res, err := run.Transition(state, input)
+		if err != nil {
+			return errResponse(CmdReplay, fmt.Sprintf("inputs[%d]: %v", i, err))
+		}
+		state = res.State
+		decisions := res.Decisions
+		if decisions == nil {
+			decisions = []run.Decision{}
+		}
+		steps = append(steps, ReplayStep{Input: ri.Type, Decisions: decisions})
+	}
+	return Response{
+		OK:         true,
+		Command:    CmdReplay,
+		APIVersion: APIVersion,
+		Replay: &ReplayPayload{
+			MachineVer: run.MachineVersion,
+			Steps:      steps,
+			FinalState: state,
+			Terminal:   state.Terminal,
+		},
+	}
+}
+
+// toRunInput converts the JSON replay input into the typed machine input.
+func toRunInput(ri ReplayInput) (run.Input, error) {
+	in := run.Input{
+		Type:     run.InputType(ri.Type),
+		ExitCode: ri.ExitCode,
+		Signal:   ri.Signal,
+		Status:   run.ReceiptStatus(ri.Status),
+		Summary:  ri.Summary,
+		Error:    ri.Error,
+	}
+	if ri.Type == "" {
+		return in, fmt.Errorf("input type is required")
+	}
+	return in, nil
 }
 
 func handleStatus(cmd Command) Response {

@@ -121,3 +121,95 @@ func TestDecodeInvalidJSON(t *testing.T) {
 		t.Fatal("expected decode error")
 	}
 }
+
+func intp(i int) *int       { return &i }
+func strp(s string) *string { return &s }
+
+func TestReplayVerifiedReceiptFinalizesDone(t *testing.T) {
+	resp := Handle(Command{
+		Command: CmdReplay,
+		Inputs: []ReplayInput{
+			{Type: "ChildExited", ExitCode: intp(0)},
+			{Type: "ReceiptObserved", Status: "verified", Summary: strp("done")},
+		},
+	})
+	if !resp.OK || resp.Replay == nil || resp.Replay.Terminal == nil {
+		t.Fatalf("replay failed: %+v", resp)
+	}
+	term := resp.Replay.Terminal
+	if term.Status != run.StatusDone || !term.OK || term.TaskContractStatus != "verified" {
+		t.Fatalf("unexpected terminal: %+v", term)
+	}
+	if resp.Replay.MachineVer != run.MachineVersion {
+		t.Fatalf("machine version mismatch: %d", resp.Replay.MachineVer)
+	}
+	if len(resp.Replay.Steps) != 2 {
+		t.Fatalf("want 2 steps, got %d", len(resp.Replay.Steps))
+	}
+}
+
+func TestReplayCancelAfterVerifiedReceiptIsNotApplicable(t *testing.T) {
+	// Pins the Go side of the cancelled/deadlined-receipt truth fix: a verified
+	// receipt observed before cancellation must NOT survive as a verified task
+	// contract on the cancelled terminal record.
+	resp := Handle(Command{
+		Command: CmdReplay,
+		Inputs: []ReplayInput{
+			{Type: "ReceiptObserved", Status: "verified", Summary: strp("win")},
+			{Type: "CancelRequested"},
+			{Type: "ChildExited", ExitCode: intp(0)},
+		},
+	})
+	if !resp.OK || resp.Replay == nil || resp.Replay.Terminal == nil {
+		t.Fatalf("replay failed: %+v", resp)
+	}
+	term := resp.Replay.Terminal
+	if term.Status != run.StatusCancelled || term.OK {
+		t.Fatalf("want cancelled+!ok, got %+v", term)
+	}
+	if term.TaskContractStatus != "not-applicable" {
+		t.Fatalf("want not-applicable contract, got %q", term.TaskContractStatus)
+	}
+	if term.TaskResultSummary != "" {
+		t.Fatalf("cancelled run must not leak a summary, got %q", term.TaskResultSummary)
+	}
+}
+
+func TestReplayMissingReceiptInconclusive(t *testing.T) {
+	resp := Handle(Command{
+		Command: CmdReplay,
+		Inputs: []ReplayInput{
+			{Type: "ChildExited", ExitCode: intp(0)},
+			{Type: "ReceiptObserved", Status: "missing"},
+		},
+	})
+	if !resp.OK || resp.Replay.Terminal == nil {
+		t.Fatalf("replay failed: %+v", resp)
+	}
+	if resp.Replay.Terminal.Status != run.StatusInconclusive || resp.Replay.Terminal.TaskContractStatus != "missing" {
+		t.Fatalf("unexpected terminal: %+v", resp.Replay.Terminal)
+	}
+}
+
+func TestReplayRejectsBadInput(t *testing.T) {
+	resp := Handle(Command{
+		Command: CmdReplay,
+		Inputs:  []ReplayInput{{Type: "ChildExited"}}, // missing exitCode
+	})
+	if resp.OK || resp.Error == "" {
+		t.Fatalf("expected error for ChildExited without exitCode: %+v", resp)
+	}
+	if !strings.Contains(resp.Error, "inputs[0]") {
+		t.Fatalf("error should index the bad input: %q", resp.Error)
+	}
+}
+
+func TestReplayEmptyInputsStaysRunning(t *testing.T) {
+	resp := Handle(Command{Command: CmdReplay})
+	if !resp.OK || resp.Replay == nil {
+		t.Fatalf("replay failed: %+v", resp)
+	}
+	if resp.Replay.FinalState.Phase != run.PhaseRunning || resp.Replay.Terminal != nil {
+		t.Fatalf("empty replay should remain running with no terminal: %+v", resp.Replay)
+	}
+}

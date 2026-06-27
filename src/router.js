@@ -24,7 +24,7 @@ export const MAILBOXES_DIR = join(ROUTER_DIR, 'mailboxes');
 
 function mailboxDirs(subscriberId) {
   const root = join(MAILBOXES_DIR, assertId(subscriberId, 'subscriber id'));
-  return { root, pending: join(root, 'pending'), inflight: join(root, 'inflight'), acked: join(root, 'acked') };
+  return { root, pending: join(root, 'pending'), inflight: join(root, 'inflight'), acked: join(root, 'acked'), dead: join(root, 'dead') };
 }
 function eventId(event) {
   if (event.eventId) return assertId(event.eventId, 'event id');
@@ -177,13 +177,24 @@ export async function routeEvent(event) {
   return { eventId: id, duplicate: false, delivered };
 }
 
-export async function claimMailboxEvents({ subscriberId, limit = 20, ownerRunId } = {}) {
-  if (!(await resolveOptionalSubscriber(subscriberId, ownerRunId))) return { subscriberId, events: [] };
+export async function claimMailboxEvents({ subscriberId, limit = 20, maxDeliveryAttempts, ownerRunId } = {}) {
+  if (!(await resolveOptionalSubscriber(subscriberId, ownerRunId))) return { subscriberId, events: [], quarantined: 0 };
   const dirs = mailboxDirs(subscriberId);
   await Promise.all([mkdir(dirs.pending, { recursive: true }), mkdir(dirs.inflight, { recursive: true })]);
-  const files = (await readdir(dirs.pending)).filter((file) => file.endsWith('.json')).sort().slice(0, Math.min(Math.max(Number(limit) || 20, 1), 100));
+  // A poison callback (one a consumer always crashes delivering) cycles
+  // pending->inflight->pending forever via requeue, incrementing deliveryAttempts
+  // each time. maxDeliveryAttempts caps that loop: a pending event whose recorded
+  // attempts have already reached the cap is moved to a `dead` quarantine instead
+  // of being re-served, so it stops wedging the consumer while staying inspectable
+  // (the dead-letter is never silently deleted). A consumer that never sets the
+  // cap keeps the historical unbounded redelivery behaviour.
+  const cap = Number.isInteger(maxDeliveryAttempts) && maxDeliveryAttempts > 0 ? maxDeliveryAttempts : null;
+  const files = (await readdir(dirs.pending)).filter((file) => file.endsWith('.json')).sort();
+  const claimLimit = Math.min(Math.max(Number(limit) || 20, 1), 100);
   const events = [];
+  let quarantined = 0;
   for (const file of files) {
+    if (events.length >= claimLimit) break;
     try {
       const target = join(dirs.inflight, file);
       await rename(join(dirs.pending, file), target);
@@ -197,12 +208,23 @@ export async function claimMailboxEvents({ subscriberId, limit = 20, ownerRunId 
         await rename(target, join(dirs.pending, file)).catch(() => {});
         continue;
       }
+      const attempts = Number.isInteger(parsed.deliveryAttempts) ? parsed.deliveryAttempts : 0;
+      if (cap && attempts >= cap) {
+        // Quarantine in place: write the sanitized pending-shape record (no
+        // claimedAt) into dead/ and drop it from the live cycle. Counted but not
+        // returned, so the consumer never re-attempts a known-poison event.
+        await mkdir(dirs.dead, { recursive: true });
+        await atomicJson(target, sanitizeCallbackEvent(parsed));
+        await rename(target, join(dirs.dead, file)).catch(() => {});
+        quarantined++;
+        continue;
+      }
       const event = { ...sanitizeCallbackEvent(parsed), claimedAt: new Date().toISOString() };
       await atomicJson(target, event);
       events.push(event);
     } catch (error) { if (error.code !== 'ENOENT') throw error; }
   }
-  return { subscriberId, events };
+  return { subscriberId, events, quarantined };
 }
 
 export async function acknowledgeMailboxEvent({ subscriberId, eventId: id, ownerRunId } = {}) {
@@ -235,7 +257,7 @@ export async function getMailboxStatus(subscriberId, { ownerRunId } = {}) {
     }
     return count;
   };
-  return { subscriberId, pending: await countValidEvents(dirs.pending, 'pending'), inflight: await countValidEvents(dirs.inflight, 'claimed'), acknowledged: await countValidEvents(dirs.acked, 'claimed') };
+  return { subscriberId, pending: await countValidEvents(dirs.pending, 'pending'), inflight: await countValidEvents(dirs.inflight, 'claimed'), acknowledged: await countValidEvents(dirs.acked, 'claimed'), dead: await countValidEvents(dirs.dead, 'pending') };
 }
 
 export async function requeueInflightEvents({ subscriberId, olderThanMs = 300000, eventIds, ownerRunId } = {}) {
@@ -280,7 +302,7 @@ function eventAge(now, event) {
 
 export async function pruneRouter({ acknowledgedOlderThanMs = 7 * 86400000, journalOlderThanMs = 7 * 86400000, callbackOlderThanMs = 7 * 86400000, subscriberOlderThanMs = 7 * 86400000, subscriberIds, eventIds, ownerRunId } = {}) {
   const now = Date.now();
-  let acknowledgedRemoved = 0, pendingRemoved = 0, inflightRemoved = 0, journalRemoved = 0, subscribersRemoved = 0;
+  let acknowledgedRemoved = 0, pendingRemoved = 0, inflightRemoved = 0, deadRemoved = 0, journalRemoved = 0, subscribersRemoved = 0;
   const callbackCutoff = Math.max(0, Number(callbackOlderThanMs) || 0);
   const subscriberCutoff = Math.max(0, Number(subscriberOlderThanMs) || 0);
   try {
@@ -295,17 +317,21 @@ export async function pruneRouter({ acknowledgedOlderThanMs = 7 * 86400000, jour
         ['acked', dirs.acked, acknowledgedOlderThanMs],
         ['pending', dirs.pending, callbackCutoff],
         ['inflight', dirs.inflight, callbackCutoff],
+        // Quarantined poison callbacks expire on the same callback cutoff. They
+        // carry no claimedAt (pending shape) and are pruned by their own age.
+        ['dead', dirs.dead, callbackCutoff],
       ]) {
         let files = []; try { files = (await readdir(dir)).filter((file) => file.endsWith('.json')); } catch {}
         for (const file of files) {
           if (Array.isArray(eventIds) && !eventIds.includes(file.slice(0, -5))) continue;
           let event; try { event = JSON.parse(await readFile(join(dir, file), 'utf8')); } catch { continue; }
-          if (!isValidCallbackEvent(event, file.slice(0, -5), { state: kind === 'pending' ? 'pending' : 'claimed' })) continue;
+          if (!isValidCallbackEvent(event, file.slice(0, -5), { state: kind === 'acked' || kind === 'inflight' ? 'claimed' : 'pending' })) continue;
           if (eventAge(now, event) < Math.max(0, Number(cutoff) || 0)) continue;
           await rm(join(dir, file), { force: true });
           if (kind === 'acked') acknowledgedRemoved++;
           else if (kind === 'pending') pendingRemoved++;
-          else inflightRemoved++;
+          else if (kind === 'inflight') inflightRemoved++;
+          else deadRemoved++;
         }
       }
     }
@@ -326,10 +352,12 @@ export async function pruneRouter({ acknowledgedOlderThanMs = 7 * 86400000, jour
       const age = now - Date.parse(sub.createdAt || '');
       if (!Number.isFinite(age) || age < subscriberCutoff) continue;
       const status = await getMailboxStatus(sub.subscriberId, { ownerRunId: sub.ownerRunId });
-      if (status.pending || status.inflight) continue;
+      // Keep a subscriber alive while it still holds quarantined poison events so
+      // expiry never silently drops a dead-letter an operator has not inspected.
+      if (status.pending || status.inflight || status.dead) continue;
       await unregisterSubscriber(sub.subscriberId, { ownerRunId: sub.ownerRunId });
       subscribersRemoved++;
     }
   } catch {}
-  return { acknowledgedRemoved, pendingRemoved, inflightRemoved, journalRemoved, subscribersRemoved };
+  return { acknowledgedRemoved, pendingRemoved, inflightRemoved, deadRemoved, journalRemoved, subscribersRemoved };
 }
