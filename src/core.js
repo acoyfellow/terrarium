@@ -476,6 +476,17 @@ async function emitCompletionEvent(result) {
         await writeFile(join(dir, `${result.runId}.json`), `${JSON.stringify(event)}\n`, { flag: "wx" });
       } catch (error) { if (error.code !== "EEXIST") throw error; }
     }
+    // Link the authoritative run envelope to the durable callback journal entry.
+    // The callback is still only a notification, but this handle lets operators
+    // reconstruct delivery/routing state without trusting child prose.
+    try {
+      const path = metadataPath(result.runId);
+      const current = JSON.parse(await readFile(path, "utf8"));
+      await writeFile(path, `${JSON.stringify({
+        ...current,
+        terminalCallback: { eventId: routed.eventId, delivered: routed.delivered, duplicate: routed.duplicate === true },
+      }, null, 2)}\n`);
+    } catch {}
     return routed;
 }
 

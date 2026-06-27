@@ -135,6 +135,15 @@ test("model is applied to opencode and pi child commands", () => {
   assert.throws(() => applyModelToAgent("pi -p --model old", "new"), /already contains a model flag/);
 });
 
+test("terminal run envelope links to durable callback journal event", async () => {
+  const run = await runTerrarium({ task: "callback journal handle", dryRun: true, stream: false });
+  const status = await getRunStatus({ runId: run.runId });
+  assert.equal(status.status, "done");
+  assert.equal(status.terminalCallback.eventId, `evt_${run.runId}_Completed`);
+  assert.equal(typeof status.terminalCallback.delivered, "number");
+  assert.equal(typeof status.terminalCallback.duplicate, "boolean");
+});
+
 test("runTerrarium dry-run wires readOnly preset into the child invocation when no agent is given", async () => {
   const result = await runTerrarium({ task: "dig", readOnly: true, dryRun: true, stream: false, config: {} });
   assert.equal(result.ok, true);
