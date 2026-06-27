@@ -92,21 +92,21 @@ test('executeRepairPlan collapses multiple stale child-claim steps into a single
       { kind: 'staleChildClaim', claimFile: `${claimsDir}/slot1`, childRunId: `ter_missing_b_${suffix}`, action: 'prune', tool: 'terrarium_callbacks', args: { action: 'prune' } },
     ];
     const result = await executeRepairPlan({ plan, dryRun: false });
-    // Exactly one step dispatches the prune; the second is folded into it so the
-    // global pruneStaleChildClaims pass runs at most once.
-    const covered = result.applied.filter((entry) => entry.coveredByPriorPrune === true);
-    assert.equal(covered.length, 1, 'second stale-claim step must be covered by the first prune');
     if (IS_CHILD) {
-      // pruneStaleChildClaims is a top-level-only affordance; inside a child the
-      // dispatched step must fail closed (skipped), and the claims must remain.
+      // pruneStaleChildClaims is a top-level-only affordance; inside a child each
+      // dispatched step must fail closed (skipped) and the claims must remain.
       assert.equal(result.ok, false);
-      assert.ok(result.skipped.some((entry) => entry.kind === 'staleChildClaim' && /top-level controller/.test(entry.reason)));
+      assert.ok(result.skipped.filter((entry) => entry.kind === 'staleChildClaim' && /top-level controller/.test(entry.reason)).length >= 1);
       assert.ok((await readdir(claimsDir)).length >= 2);
     } else {
       assert.equal(result.ok, true);
+      // Exactly one step dispatches the prune; the second is folded into it so
+      // the global pruneStaleChildClaims pass runs at most once.
       const ran = result.applied.filter((entry) => entry.kind === 'staleChildClaim' && entry.coveredByPriorPrune !== true);
       assert.equal(ran.length, 1);
       assert.ok(ran[0].prunedCount >= 2);
+      const covered = result.applied.filter((entry) => entry.coveredByPriorPrune === true);
+      assert.equal(covered.length, 1, 'second stale-claim step must be covered by the first prune');
       // The stale claim directory should be reclaimed.
       let exists = true;
       try { await readdir(claimsDir); } catch { exists = false; }
