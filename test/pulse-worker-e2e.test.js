@@ -159,6 +159,57 @@ test('gate1: cross-owner claim is denied (403) through the real worker', async (
   }
 });
 
+// Browser / CORS contract (docs/PULSE.md "Browser / CORS"). These cross real
+// HTTP into the Worker's fetch handler with an Origin header and assert the
+// exact CORS headers — the documented guarantee that was previously untested.
+test('gate1: OPTIONS preflight is answered 204 with CORS headers, pre-auth (no token)', async () => {
+  const mf = makeMf();
+  try {
+    const origin = 'https://mote.dev.local:5173';
+    // Deliberately NO authorization header — preflight is pre-auth.
+    const res = await mf.dispatchFetch('https://pulse.local/claim', {
+      method: 'OPTIONS',
+      headers: { origin },
+    });
+    assert.equal(res.status, 204, 'OPTIONS preflight returns 204 without a bearer token');
+    // echoes the request origin
+    assert.equal(res.headers.get('access-control-allow-origin'), origin);
+    const methods = res.headers.get('access-control-allow-methods') || '';
+    for (const m of ['GET', 'POST', 'OPTIONS']) {
+      assert.ok(methods.includes(m), `allow-methods contains ${m} (got: ${methods})`);
+    }
+    const allowHeaders = (res.headers.get('access-control-allow-headers') || '').toLowerCase();
+    for (const h of ['authorization', 'content-type']) {
+      assert.ok(allowHeaders.includes(h), `allow-headers contains ${h} (got: ${allowHeaders})`);
+    }
+  } finally {
+    await mf.dispose();
+  }
+});
+
+test('gate1: a 401 unauthorized response still carries Access-Control-Allow-Origin', async () => {
+  const mf = makeMf();
+  try {
+    const origin = 'https://mote.dev.local:5173';
+    // Gated route with NO token -> 401, but the browser must still be able to read it.
+    const res = await mf.dispatchFetch('https://pulse.local/claim', {
+      method: 'POST',
+      headers: { origin, 'content-type': 'application/json' },
+      body: JSON.stringify({ subscriberId: 'x' }),
+    });
+    assert.equal(res.status, 401, 'gated route without a token is 401');
+    assert.equal(
+      res.headers.get('access-control-allow-origin'),
+      origin,
+      '401 still echoes the request origin so the browser can read the error',
+    );
+    const body = await res.json();
+    assert.equal(body.error, 'unauthorized');
+  } finally {
+    await mf.dispose();
+  }
+});
+
 test('gate1: finish-before-subscribe then subscribe replays the journaled event', async () => {
   const mf = makeMf();
   try {

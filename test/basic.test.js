@@ -428,3 +428,67 @@ test("reconcileRun marks stale running metadata orphaned when no pid is alive", 
     rmSync(logDir, { recursive: true, force: true });
   }
 });
+
+test("reconcileRun normalizes a pending task contract to not-applicable when orphaning", async () => {
+  const logDir = mkdtempSync(join(tmpdir(), "terra-orphan-contract-"));
+  const logPath = join(logDir, "run.log");
+  writeFileSync(logPath, "old log");
+  // A receipt-requiring run whose supervisor died before classification leaves
+  // taskContractStatus "pending". A terminal run must never report "pending":
+  // it lies to group roll-ups / mcp retry / the Pi extension that evaluation
+  // continues. It must also not retain contract secret material.
+  const meta = {
+    runId: "ter_test_orphan_pending",
+    status: "running",
+    pid: 99999998,
+    logPath,
+    taskContractStatus: "pending",
+    taskContract: { runId: "ter_test_orphan_pending", taskFingerprint: "abc", nonce: "secret-nonce" },
+  };
+  await new Promise((resolve) => setTimeout(resolve, 5));
+  const reconciled = await reconcileRun(meta, { staleMs: 0 });
+  try {
+    assert.equal(reconciled.status, "orphaned");
+    assert.equal(reconciled.ok, false);
+    assert.equal(reconciled.taskContractStatus, "not-applicable");
+    assert.equal(reconciled.taskContract, undefined);
+  } finally {
+    rmSync(logDir, { recursive: true, force: true });
+  }
+});
+
+test("reconcileRun refuses to propagate a verified contract claim from an unfinalized orphan", async () => {
+  const logDir = mkdtempSync(join(tmpdir(), "terra-orphan-verified-"));
+  const logPath = join(logDir, "run.log");
+  writeFileSync(logPath, "old log");
+  // Defense in depth: a still-"running" record claiming a verified receipt was
+  // never finalized through the run machine, so its success claim is untrusted.
+  // Orphaning must not let that unverified "verified" survive as operational truth.
+  const meta = { runId: "ter_test_orphan_verified", status: "running", pid: 99999997, logPath, taskContractStatus: "verified" };
+  await new Promise((resolve) => setTimeout(resolve, 5));
+  const reconciled = await reconcileRun(meta, { staleMs: 0 });
+  try {
+    assert.equal(reconciled.status, "orphaned");
+    assert.equal(reconciled.ok, false);
+    assert.equal(reconciled.taskContractStatus, "not-applicable");
+  } finally {
+    rmSync(logDir, { recursive: true, force: true });
+  }
+});
+
+test("reconcileRun preserves an already-classified failed contract status when orphaning", async () => {
+  const logDir = mkdtempSync(join(tmpdir(), "terra-orphan-mismatch-"));
+  const logPath = join(logDir, "run.log");
+  writeFileSync(logPath, "old log");
+  // A real classification (mismatch/missing/malformed) is durable operational
+  // truth and must survive orphaning unchanged.
+  const meta = { runId: "ter_test_orphan_mismatch", status: "running", pid: 99999996, logPath, taskContractStatus: "mismatch" };
+  await new Promise((resolve) => setTimeout(resolve, 5));
+  const reconciled = await reconcileRun(meta, { staleMs: 0 });
+  try {
+    assert.equal(reconciled.status, "orphaned");
+    assert.equal(reconciled.taskContractStatus, "mismatch");
+  } finally {
+    rmSync(logDir, { recursive: true, force: true });
+  }
+});

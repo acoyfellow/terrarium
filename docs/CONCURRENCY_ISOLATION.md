@@ -71,9 +71,11 @@ Join strategies are:
 
 - `all`: wait for all jobs; success only when all succeed;
 - `allSettled`: wait for and collect every outcome;
-- `race`: first terminal result wins, then cancel remaining runs;
-- `any`: first successful result wins, then cancel remaining runs;
-- `quorum`: first requested number of successes wins, then cancel remaining runs.
+- `race`: the earliest-finishing terminal result wins, then cancel remaining runs;
+- `any`: the earliest-finishing successful result wins, then cancel remaining runs;
+- `quorum`: the earliest-finishing requested number of successes win, then cancel remaining runs.
+
+Winners are chosen by per-run finish time (`finishedAt`), not by the order jobs were listed. Because a single status poll can observe several runs that all went terminal within the interval, ordering by finish time keeps "first wins" honest; exact ties break deterministically by run ID, and a terminal run whose finish time is not yet readable sorts last so it cannot out-race a run that provably finished earlier.
 
 Optional `concurrency` bounds simultaneous launches. For write-capable winner-picking jobs, use copy/worktree isolation so cancellation does not leave competing edits in the caller's checkout.
 

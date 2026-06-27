@@ -54,6 +54,7 @@ export async function diagnoseTerrarium() {
     orphanedRunIds: runs.runs.filter((run) => run.status === "orphaned").map((run) => run.runId),
     needsAttentionRunIds: runs.runs.filter((run) => run.needsAttention === true).map((run) => run.runId),
     missingTerminalCallbackRunIds: [],
+    staleInflightCallbackSubscriberIds: [],
     staleChildClaims: [],
   };
   const subscriberHealth = await jsonHealth(SUBSCRIBERS_DIR, validSubscriber);
@@ -104,13 +105,18 @@ export async function diagnoseTerrarium() {
       checks.malformedAcknowledgedCallbacks += acknowledged.malformed;
       checks.routerRepairCandidates += pending.malformed + inflight.malformed + acknowledged.malformed;
       try {
+        let staleHere = 0;
         for (const file of (await readdir(`${MAILBOXES_DIR}/${subscriber}/inflight`)).filter((name) => name.endsWith('.json'))) {
           let event; try { event = JSON.parse(await readFile(`${MAILBOXES_DIR}/${subscriber}/inflight/${file}`, 'utf8')); } catch { continue; }
           if (validClaimedEvent(event, file) && Date.now() - Date.parse(event.claimedAt) >= 300000) {
             checks.staleInflightCallbacks++;
             checks.routerRepairCandidates++;
+            staleHere++;
           }
         }
+        // Record which subscriber(s) own stale claims so the repair plan can emit
+        // a runnable per-subscriber requeue step (requeue requires a subscriberId).
+        if (staleHere && validId(subscriber)) details.staleInflightCallbackSubscriberIds.push(subscriber);
       } catch {}
     }
   } catch {}
@@ -154,10 +160,20 @@ function buildRepairPlan(checks, details) {
     plan.push({ kind: "missingTerminalCallback", runId, action: "recover", tool: "terrarium_callbacks", args: { action: "recover", runId }, reason: "Terminal run is missing its durable callback event; recover rebuilds the journal entry and mailbox fan-out." });
   }
   if (checks.staleInflightCallbacks) {
-    plan.push({ kind: "staleInflightCallback", count: checks.staleInflightCallbacks, action: "requeue", tool: "terrarium_callbacks", args: { action: "requeue" }, reason: "Inflight callbacks claimed but never acked past the staleness window; requeue returns them to pending for redelivery." });
+    // requeue requires a subscriberId, so emit one runnable step per affected
+    // subscriber rather than a single argument-less step an agent cannot run.
+    if (details.staleInflightCallbackSubscriberIds.length) {
+      for (const subscriberId of details.staleInflightCallbackSubscriberIds) {
+        plan.push({ kind: "staleInflightCallback", subscriberId, action: "requeue", tool: "terrarium_callbacks", args: { action: "requeue", subscriberId }, reason: "Inflight callbacks claimed but never acked past the staleness window; requeue returns them to pending for redelivery." });
+      }
+    } else {
+      // Stale claims detected but no subscriber could be attributed (e.g. an
+      // invalid mailbox directory name); flag manually without a tool handle.
+      plan.push({ kind: "staleInflightCallback", count: checks.staleInflightCallbacks, action: "requeue", reason: "Inflight callbacks claimed but never acked past the staleness window, but their owning subscriber could not be attributed; requeue each affected subscriber by id out-of-band." });
+    }
   }
   for (const claim of details.staleChildClaims) {
-    plan.push({ kind: "staleChildClaim", claimFile: claim.claimFile, childRunId: claim.childRunId, action: "prune", reason: "Child-slot claim points at a missing or invalid run log; remove the stale slot claim to free the parent slot." });
+    plan.push({ kind: "staleChildClaim", claimFile: claim.claimFile, childRunId: claim.childRunId, action: "prune", tool: "terrarium_callbacks", args: { action: "prune" }, reason: "Child-slot claim points at a missing or invalid run log; prune removes every stale slot claim to free the parent budget." });
   }
   for (const runId of details.orphanedRunIds) {
     plan.push({ kind: "orphanedRun", runId, action: "inspect", tool: "terrarium_read", args: { runId }, reason: "Run lost its supervisor before recording a terminal state; inspect its log to confirm outcome, then cancel or recover." });
@@ -173,8 +189,8 @@ function buildRepairPlan(checks, details) {
 
 // Roll the repair plan up into an at-a-glance triage summary: total steps,
 // per-action counts, and whether any step is mechanically actionable (has a
-// tool a reconstructing agent can call). Manual-only steps (e.g. quarantine,
-// prune) still count toward the total but not toward `actionable`.
+// tool a reconstructing agent can call). Manual-only steps (e.g. quarantine)
+// still count toward the total but not toward `actionable`.
 function summarizeRepairPlan(plan) {
   const byAction = {};
   let actionable = 0;

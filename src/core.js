@@ -386,6 +386,38 @@ async function releaseChildSlot(claimPath) {
   try { await rmdir(dirname(claimPath)); } catch {}
 }
 
+// A child-slot claim is stale when its contents are not a valid run id or the
+// referenced run log no longer exists (e.g. the child was pruned, or the
+// supervisor died during the launch handoff before it could ever write the
+// log). A stale claim permanently occupies one of the parent's bounded child
+// slots, so doctor flags them. This is the mechanical remediation doctor's
+// repairPlan points at: it removes only claims that match doctor's staleness
+// criteria exactly, never a slot held by a live run log, and garbage-collects
+// any `.children` directory it empties. Top-level controller only.
+export async function pruneStaleChildClaims({ requesterRunId } = {}) {
+  if (requesterRunId || process.env.TERRARIUM_RUN_ID) throw new Error("child-slot claim pruning is available only to a top-level controller");
+  const pruned = [];
+  let entries = [];
+  try { entries = await readdir(LOG_DIR); } catch { return { pruned, count: 0 }; }
+  for (const entry of entries) {
+    if (!entry.endsWith(".children")) continue;
+    const dir = join(LOG_DIR, entry);
+    let slots = [];
+    try { slots = await readdir(dir); } catch { continue; }
+    for (const slot of slots) {
+      const claimFile = join(dir, slot);
+      let childId = "";
+      try { childId = (await readFile(claimFile, "utf8")).trim(); } catch {}
+      const stale = !/^ter_[A-Za-z0-9_]+$/.test(childId) || !existsSync(metadataPath(childId));
+      if (!stale) continue;
+      try { await rm(claimFile, { force: true }); pruned.push({ claimFile, childRunId: childId || null }); }
+      catch {}
+    }
+    try { await rmdir(dir); } catch {}
+  }
+  return { pruned, count: pruned.length };
+}
+
 async function prepareRun(opts = {}) {
   const config = opts.config ?? await loadConfig();
   const run = buildRun(opts, config);
@@ -519,11 +551,17 @@ async function persistFinishedRun(base, patch) {
     // A run-machine adapter already made the contract/terminal decision.
   } else if (patch.dryRun === true && base.taskContractStatus === "pending") result.taskContractStatus = "not-applicable";
   else if (base.taskContractStatus === "pending") {
-    const contract = validateTaskContractOutput(result.stdoutTail, base.taskContract);
+    // Validate the receipt against the FULL captured stdout, not the bounded
+    // display tail. A child can legitimately emit its TERRARIUM_RESULT line and
+    // then print more than the tail window of trailing output; scanning only the
+    // tail would drop a genuine receipt and misreport a verified run as missing.
+    const contractOutput = patch.contractOutput != null ? patch.contractOutput : result.stdoutTail;
+    const contract = validateTaskContractOutput(contractOutput, base.taskContract);
     result.taskContractStatus = contract.status;
     if (contract.summary) result.taskResultSummary = contract.summary;
     if (contract.status !== "verified") result = { ...result, ok: false, status: result.exitCode === 0 ? "inconclusive" : result.status, note: `Task contract ${contract.status}; process exit is not accepted as task success.` };
   }
+  delete result.contractOutput;
   delete result.taskContract;
   await writeMetadata(result);
   return result;
@@ -586,10 +624,20 @@ export async function reconcileRun(meta, { staleMs = 30000 } = {}) {
       ...meta,
       ok: false,
       status: "orphaned",
+      // An orphaned run is terminal: its supervisor and child are gone, so the
+      // task contract will never be classified. Leaving "pending" here lies to
+      // reconstructing consumers (group roll-ups, mcp retry classification, the
+      // Pi extension) that the receipt is still being evaluated. Normalize to
+      // "not-applicable" to match the cancel/deadline terminal convention, and
+      // never report a stale "verified"/"done" claim for a run that died.
+      taskContractStatus: ["pending", "verified"].includes(meta.taskContractStatus) ? "not-applicable" : (meta.taskContractStatus ?? "not-applicable"),
       orphanedAt: new Date().toISOString(),
       finishedAt: new Date().toISOString(),
       note: `No live Terrarium child process found and log is stale${logAgeMs === null ? "" : ` (${Math.round(logAgeMs)}ms old)`}.`,
     };
+    // Drop any lingering contract material (nonce/fingerprint) from the durable
+    // terminal record; an orphaned run produced no trusted receipt to retain.
+    delete next.taskContract;
     await writeMetadata(next);
     try { await emitCompletionEvent(next); } catch {}
     return next;
@@ -842,7 +890,7 @@ export async function runTerrarium(opts = {}) {
       if (timer) clearTimeout(timer);
       await log(run.logPath, `\nerror: ${e.message}\n`);
       const ws = await finalizeWorkspace(workspace, base);
-      resolve(await finishRun(base, { ok: false, status: "error", exitCode: 127, error: e.message, stdoutTail: tail(stdout), stderrTail: tail(stderr), ...ws }));
+      resolve(await finishRun(base, { ok: false, status: "error", exitCode: 127, error: e.message, stdoutTail: tail(stdout), stderrTail: tail(stderr), contractOutput: stdout, ...ws }));
     });
     child.on("close", async (code, signal) => {
       if (settled) return;
@@ -852,7 +900,7 @@ export async function runTerrarium(opts = {}) {
       const cancelled = existsSync(cancelMarkerPath(run.runId));
       await log(run.logPath, `\nexit: ${exitCode}${signal ? ` signal: ${signal}` : ""}${cancelled ? " cancelled" : ""}\n`);
       const ws = await finalizeWorkspace(workspace, base);
-      resolve(await finishRun(base, { ok: cancelled ? false : exitCode === 0, status: cancelled ? "cancelled" : exitCode === 0 ? "done" : "failed", exitCode, signal, stdoutTail: tail(stdout), stderrTail: tail(stderr), ...ws }));
+      resolve(await finishRun(base, { ok: cancelled ? false : exitCode === 0, status: cancelled ? "cancelled" : exitCode === 0 ? "done" : "failed", exitCode, signal, stdoutTail: tail(stdout), stderrTail: tail(stderr), contractOutput: stdout, ...ws }));
       if (cancelled) await rm(cancelMarkerPath(run.runId), { force: true });
     });
   });

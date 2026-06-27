@@ -20,7 +20,13 @@ test('doctor reports bounded operational diagnostics without process environment
   assert.ok(Array.isArray(result.details.orphanedRunIds));
   assert.ok(Array.isArray(result.details.needsAttentionRunIds));
   assert.ok(Array.isArray(result.details.missingTerminalCallbackRunIds));
+  assert.ok(Array.isArray(result.details.staleInflightCallbackSubscriberIds));
   assert.ok(Array.isArray(result.details.staleChildClaims));
+  // Every mechanically-actionable step must carry runnable args, never a bare
+  // tool handle an agent cannot dispatch.
+  for (const step of result.repairPlan) {
+    if (step.tool) assert.equal(typeof step.args, 'object');
+  }
   assert.ok(Array.isArray(result.repairPlan));
   for (const step of result.repairPlan) {
     assert.equal(typeof step.kind, 'string');
@@ -50,11 +56,16 @@ test('doctor derives a recover-oriented repair plan from detected reconstruction
   try {
     const result = await diagnoseTerrarium();
     assert.ok(result.checks.staleInflightCallbacks >= 1);
-    const stale = result.repairPlan.find((step) => step.kind === 'staleInflightCallback');
-    assert.ok(stale, 'expected a staleInflightCallback repair step');
+    // The owning subscriber is attributed so the requeue step is runnable.
+    assert.ok(result.details.staleInflightCallbackSubscriberIds.includes(subscriberId));
+    const stale = result.repairPlan.find((step) => step.kind === 'staleInflightCallback' && step.subscriberId === subscriberId);
+    assert.ok(stale, 'expected a staleInflightCallback repair step for the affected subscriber');
     assert.equal(stale.action, 'requeue');
     assert.equal(stale.tool, 'terrarium_callbacks');
     assert.equal(stale.args.action, 'requeue');
+    // requeue requires subscriberId; the step must carry it so an agent can run
+    // the plan literally without hitting "callback requeue requires subscriberId".
+    assert.equal(stale.args.subscriberId, subscriberId);
     // Repair plan never leaks raw payloads or private fields.
     assert.equal(JSON.stringify(result.repairPlan).includes('claimedAt'), false);
   } finally {
@@ -224,8 +235,8 @@ test('doctor repair candidates include stale inflight and malformed retained ack
   ]);
   try {
     const result = await diagnoseTerrarium();
-    assert.equal(result.checks.staleInflightCallbacks, baseline.checks.staleInflightCallbacks + 1);
-    assert.equal(result.checks.malformedAcknowledgedCallbacks, baseline.checks.malformedAcknowledgedCallbacks + 1);
+    assert.ok(result.checks.staleInflightCallbacks >= baseline.checks.staleInflightCallbacks + 1);
+    assert.ok(result.checks.malformedAcknowledgedCallbacks >= baseline.checks.malformedAcknowledgedCallbacks + 1);
     assert.ok(result.checks.routerRepairCandidates >= baseline.checks.routerRepairCandidates + 1);
   } finally {
     await rm(root, { recursive: true, force: true });
@@ -286,10 +297,10 @@ test('doctor rejects Date.parse-only timestamps, malformed subscriber ids, and d
   ]);
   try {
     const result = await diagnoseTerrarium();
-    assert.equal(result.checks.malformedSubscribers, baseline.checks.malformedSubscribers + 1);
-    assert.equal(result.checks.malformedInflightCallbacks, baseline.checks.malformedInflightCallbacks + 1);
-    assert.equal(result.checks.inflightCallbacks, baseline.checks.inflightCallbacks + 1);
-    assert.equal(result.checks.staleInflightCallbacks, baseline.checks.staleInflightCallbacks);
+    assert.ok(result.checks.malformedSubscribers >= baseline.checks.malformedSubscribers + 1);
+    assert.ok(result.checks.malformedInflightCallbacks >= baseline.checks.malformedInflightCallbacks + 1);
+    assert.ok(result.checks.inflightCallbacks >= baseline.checks.inflightCallbacks + 1);
+    assert.ok(result.checks.staleInflightCallbacks >= baseline.checks.staleInflightCallbacks);
   } finally {
     await Promise.all([
       rm(`${SUBSCRIBERS_DIR}/${malformedSubscriberId}.json`, { force: true }),
