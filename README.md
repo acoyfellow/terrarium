@@ -234,7 +234,7 @@ The original delegation contract remains foundational:
 - Node API: bounded single-run primitives from `src/core.js`
 - MCP: `terrarium_spawn`, `terrarium_status`, `terrarium_read`
 
-Batch calls wait for the selected join strategy. `timeoutMs` bounds that join; when cancellation is needed, `cleanupTimeoutMs` (default 5000 ms; CLI `--cleanup-timeout-ms`) separately bounds synchronous settlement so an MCP client can receive durable `groupId`/`runIds` before its own request deadline. Any runs still settling are reported in `cleanupErrors` and remain inspectable through `terrarium_group`/`terrarium_status`. Batch responses include `apiVersion`, `schemaVersion`, and `supportedOptions` on two distinct axes: `apiVersion` is the batch contract version (`terrarium-batch-*`), while `schemaVersion` is the MCP wire/tool-metadata version (`terrarium-mcp-*`). Compare a response's `schemaVersion` against the `schemaVersion` carried in your cached tool metadata to detect stale client metadata; use `apiVersion`/`supportedOptions` to confirm repository/API feature support.
+Batch calls wait for the selected join strategy. `timeoutMs` bounds that join in the Node/MCP API; CLI callers use `--batch-timeout-ms` for the same whole-batch wait budget so it stays separate from per-child `--timeout-ms`. When cancellation is needed, `cleanupTimeoutMs` (default 5000 ms; CLI `--cleanup-timeout-ms`) separately bounds synchronous settlement so an MCP client can receive durable `groupId`/`runIds` before its own request deadline. Any runs still settling are reported in `cleanupErrors` and remain inspectable through `terrarium_group`/`terrarium_status`. Batch responses include `apiVersion`, `schemaVersion`, and `supportedOptions` on two distinct axes: `apiVersion` is the batch contract version (`terrarium-batch-*`), while `schemaVersion` is the MCP wire/tool-metadata version (`terrarium-mcp-*`). Compare a response's `schemaVersion` against the `schemaVersion` carried in your cached tool metadata to detect stale client metadata; use `apiVersion`/`supportedOptions` to confirm repository/API feature support.
 
 Compatibility promises:
 
@@ -408,7 +408,7 @@ CLI equivalents:
 ```sh
 terra cancel <runId>
 terra batch --strategy any "try approach A" "try approach B" "try approach C"
-terra batch --strategy quorum --quorum 2 --concurrency 2 "job1" "job2" "job3"
+terra batch --strategy quorum --quorum 2 --concurrency 2 --batch-timeout-ms 120000 "job1" "job2" "job3"
 terra group create "research batch" <runIdA> <runIdB>
 terra group status <groupId>
 terra group read <groupId>

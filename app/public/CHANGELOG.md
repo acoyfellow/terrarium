@@ -31,7 +31,7 @@ Succinct, product-facing changes to Terrarium. This is not a full commit log; it
 - Bounded-concurrency launch no longer has a hidden 30s terminal-wait cap that could turn long but healthy child runs into false launch failures while their durable run records kept progressing.
 - `cleanupTimeoutMs` bounds synchronous loser-cancellation settlement for batch calls. The default remains 5 seconds.
 - Batch results preserve durable `groupId`, `runIds`, launch counts, launch errors, and `cleanupErrors` so callers can inspect follow-up state instead of losing correlation to a client timeout.
-- `terra batch --cleanup-timeout-ms` now forwards the same cleanup budget available through the Node/MCP batch API.
+- `terra batch --batch-timeout-ms` now exposes the whole-batch wait budget separately from per-child `--timeout-ms`; `terra batch --cleanup-timeout-ms` continues to forward the cancellation-settlement budget available through the Node/MCP batch API.
 - Repository MCP schema exposes `cleanupTimeoutMs`; stale live MCP hosts may need a tool-metadata refresh before the field appears in a running client.
 - Batch responses now include `apiVersion`, `schemaVersion`, and `supportedOptions` so callers can distinguish repo/API support from stale host tool metadata. `apiVersion` is the batch contract version (`terrarium-batch-*`); `schemaVersion` is the MCP wire/tool-metadata version (`terrarium-mcp-*`) so it can be compared directly against the `schemaVersion` in cached tool metadata.
 - Every advertised MCP tool now carries `schemaVersion`, matching the initialize handshake, so stale cached tool metadata is detectable per tool.
