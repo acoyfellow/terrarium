@@ -59,7 +59,10 @@ export async function spawnBatch(opts = {}) {
   const { started, launchError, launchErrors, launchTimedOut } = await launchBounded(jobs, limit, timeoutMs);
   const runIds = started.filter(Boolean).map((run) => run.runId);
   if (runIds.length === 0) {
-    if (launchTimedOut) return { ok: false, apiVersion: BATCH_API_VERSION, schemaVersion: MCP_SCHEMA_VERSION, supportedOptions: BATCH_SUPPORTED_OPTIONS, strategy, reason: "timeout", timedOut: true, phase: "launch", runIds: [], launchedCount: 0, unlaunchedCount: jobs.length, cleanupErrors: [] };
+    // No runs ever started, so there is nothing to cancel. Still emit an empty
+    // stillSettling so every batch return path carries the same shape and
+    // dogfooders can read result.stillSettling unconditionally.
+    if (launchTimedOut) return { ok: false, apiVersion: BATCH_API_VERSION, schemaVersion: MCP_SCHEMA_VERSION, supportedOptions: BATCH_SUPPORTED_OPTIONS, strategy, reason: "timeout", timedOut: true, phase: "launch", runIds: [], launchedCount: 0, unlaunchedCount: jobs.length, cleanupErrors: [], stillSettling: [] };
     throw launchError;
   }
 
@@ -81,6 +84,7 @@ export async function spawnBatch(opts = {}) {
       launchedCount: runIds.length,
       unlaunchedCount: jobs.length - runIds.length,
       cleanupErrors,
+      stillSettling: cleanupErrors.stillSettling ?? [],
       group: await getRunGroupStatus({ groupId: group.groupId }),
     };
   }
@@ -101,6 +105,7 @@ export async function spawnBatch(opts = {}) {
       launchedCount: runIds.length,
       unlaunchedCount: jobs.length - runIds.length,
       cleanupErrors,
+      stillSettling: cleanupErrors.stillSettling ?? [],
       group: await getRunGroupStatus({ groupId: group.groupId }),
     };
   }
@@ -196,6 +201,7 @@ async function awaitStrategy({ groupId, strategy, quorumTarget, pollMs, timeoutM
       return {
         ...decision,
         cleanupErrors,
+        stillSettling: cleanupErrors.stillSettling ?? [],
         group: await getRunGroupStatus({ groupId }),
       };
     }
@@ -206,6 +212,7 @@ async function awaitStrategy({ groupId, strategy, quorumTarget, pollMs, timeoutM
         reason: "timeout",
         timedOut: true,
         cleanupErrors,
+        stillSettling: cleanupErrors.stillSettling ?? [],
         group: await getRunGroupStatus({ groupId }),
       };
     }
@@ -258,15 +265,22 @@ async function cancelLosers(status, { all = false, collectErrors = false, maxWai
     // keep none running; winners are already terminal
   }
   const failures = [];
+  // Run IDs whose cancellation was requested but did not reach a terminal
+  // status within maxWaitMs. The cancel signal is durable and these runs keep
+  // settling in the background, so callers need their exact IDs (not parsed
+  // free-text error strings) to poll/recover them after the batch returns.
+  const stillSettling = [];
   await Promise.all(targets.map(async (run) => {
     try {
       await cancelRun({ runId: run.runId });
       await waitUntilTerminal(run.runId, maxWaitMs);
     } catch (error) {
       failures.push(`${run.runId}: ${error.message}`);
+      stillSettling.push(run.runId);
     }
   }));
   if (failures.length && !collectErrors) throw new AggregateError(failures.map((message) => new Error(message)), `failed to settle ${failures.length} cancelled run(s)`);
+  failures.stillSettling = stillSettling;
   return failures;
 }
 

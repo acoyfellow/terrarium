@@ -21,6 +21,45 @@ test('doctor reports bounded operational diagnostics without process environment
   assert.ok(Array.isArray(result.details.needsAttentionRunIds));
   assert.ok(Array.isArray(result.details.missingTerminalCallbackRunIds));
   assert.ok(Array.isArray(result.details.staleChildClaims));
+  assert.ok(Array.isArray(result.repairPlan));
+  for (const step of result.repairPlan) {
+    assert.equal(typeof step.kind, 'string');
+    assert.equal(typeof step.action, 'string');
+    assert.equal(typeof step.reason, 'string');
+  }
+  // repairPlanSummary is an at-a-glance triage rollup derived from repairPlan.
+  assert.equal(typeof result.repairPlanSummary, 'object');
+  assert.equal(result.repairPlanSummary.total, result.repairPlan.length);
+  assert.equal(typeof result.repairPlanSummary.actionable, 'number');
+  assert.ok(result.repairPlanSummary.actionable <= result.repairPlanSummary.total);
+  assert.equal(typeof result.repairPlanSummary.byAction, 'object');
+  const summedByAction = Object.values(result.repairPlanSummary.byAction).reduce((a, b) => a + b, 0);
+  assert.equal(summedByAction, result.repairPlan.length);
+  // Steps carrying a tool are exactly the ones counted as mechanically actionable.
+  assert.equal(result.repairPlan.filter((step) => step.tool).length, result.repairPlanSummary.actionable);
+});
+
+test('doctor derives a recover-oriented repair plan from detected reconstruction signals', async () => {
+  const suffix = `${process.pid}_${Date.now()}_repairplan`;
+  const subscriberId = `doctor_repair_${suffix}`;
+  const inflightDir = `${MAILBOXES_DIR}/${subscriberId}/inflight`;
+  const inflightId = `evt_stale_${suffix}`;
+  await mkdir(inflightDir, { recursive: true });
+  // A valid claimed event whose claim is older than the staleness window.
+  await writeFile(`${inflightDir}/${inflightId}.json`, JSON.stringify({ eventId: inflightId, type: 'Completed', runId: `ter_${suffix}`, at: '2020-01-01T00:00:00.000Z', claimedAt: '2020-01-01T00:00:00.000Z' }));
+  try {
+    const result = await diagnoseTerrarium();
+    assert.ok(result.checks.staleInflightCallbacks >= 1);
+    const stale = result.repairPlan.find((step) => step.kind === 'staleInflightCallback');
+    assert.ok(stale, 'expected a staleInflightCallback repair step');
+    assert.equal(stale.action, 'requeue');
+    assert.equal(stale.tool, 'terrarium_callbacks');
+    assert.equal(stale.args.action, 'requeue');
+    // Repair plan never leaks raw payloads or private fields.
+    assert.equal(JSON.stringify(result.repairPlan).includes('claimedAt'), false);
+  } finally {
+    await rm(`${MAILBOXES_DIR}/${subscriberId}`, { recursive: true, force: true });
+  }
 });
 
 test('doctor reports malformed router JSON without crashing', async () => {

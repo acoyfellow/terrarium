@@ -1,7 +1,7 @@
 // Pulse Worker — plain HTTP front for the PulseRouter Durable Object.
 //
 // Routes (all require a capability bearer token):
-//   POST /pulse   -> emit/route a terminal event (also: subscribe/unsubscribe/requeue)
+//   POST /pulse   -> emit/route a terminal event (also: subscribe/unsubscribe/requeue/prune)
 //   POST /claim   -> claim pending mailbox events
 //   POST /ack     -> acknowledge an inflight event
 //   GET  /status  -> mailbox counts for a subscriber
@@ -77,7 +77,7 @@ export default {
       const body = await readJson(request);
       const action = body.action || 'route';
       const routerName = body.router || url.searchParams.get('router');
-      const opMap = { route: 'route', emit: 'route', subscribe: 'subscribe', unsubscribe: 'unsubscribe', requeue: 'requeue', getSubscriber: 'getSubscriber' };
+      const opMap = { route: 'route', emit: 'route', subscribe: 'subscribe', unsubscribe: 'unsubscribe', requeue: 'requeue', prune: 'prune', getSubscriber: 'getSubscriber' };
       const op = opMap[action];
       if (!op) return Response.json({ ok: false, error: 'unknown action' }, { status: 400 });
       const args = op === 'route' ? { event: body.event ?? body } : (body.args ?? body);

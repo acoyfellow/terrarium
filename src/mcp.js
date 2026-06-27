@@ -44,7 +44,7 @@ const tools = [
   },
   {
     name: "terrarium_spawn_batch",
-    description: "Fan out an array of jobs as independent background runs under one group, then resolve by join strategy. Each job is a normal single spawn (same options as terrarium_spawn). Strategies: all (every job must finish; ok if all succeed), allSettled (collect all outcomes), race (first terminal wins), any (first success wins), quorum (first k successes). Winner-picking strategies cancel losing runs; cancellation settlement is synchronously bounded and cleanupErrors report runs still settling. Prefer isolation copy|worktree for jobs with side effects. Capability-scoped like terrarium_spawn.",
+    description: "Fan out an array of jobs as independent background runs under one group, then resolve by join strategy. Each job is a normal single spawn (same options as terrarium_spawn). Strategies: all (every job must finish; ok if all succeed), allSettled (collect all outcomes), race (first terminal wins), any (first success wins), quorum (first k successes). Winner-picking strategies cancel losing runs; cancellation settlement is synchronously bounded; cleanupErrors describe failures and stillSettling lists the exact run IDs whose cancellation is still settling in the background (poll/recover them after the batch returns). Prefer isolation copy|worktree for jobs with side effects. Capability-scoped like terrarium_spawn.",
     schemaVersion: MCP_SCHEMA_VERSION,
     inputSchema: {
       type: "object",
@@ -305,6 +305,7 @@ export function conciseBatch(full) {
     launchedCount: full.launchedCount,
     unlaunchedCount: full.unlaunchedCount,
     cleanupErrors: full.cleanupErrors,
+    stillSettling: Array.isArray(full.stillSettling) && full.stillSettling.length ? full.stillSettling : undefined,
     counts: group.counts,
     complete: group.complete,
     runs: Array.isArray(group.runs) ? group.runs.map((r) => defined({ runId: r.runId, status: r.status, ok: r.ok, exitCode: r.exitCode, taskContractStatus: r.taskContractStatus, error: r.error, note: r.note })) : undefined,

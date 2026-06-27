@@ -141,5 +141,46 @@ export async function diagnoseTerrarium() {
   if (checks.staleInflightCallbacks) warnings.push(`${checks.staleInflightCallbacks} stale inflight callback(s) are repair candidates for requeue`);
   if (checks.missingTerminalCallbacks) warnings.push(`${checks.missingTerminalCallbacks} terminal run(s) are missing durable callback events; recover those run IDs`);
   if (checks.staleChildClaims) warnings.push(`${checks.staleChildClaims} stale child-slot claim(s) exist from older runs`);
-  return { ok: warnings.length === 0, version: VERSION, apiVersion: TERRARIUM_API_VERSION, schemaVersion: MCP_SCHEMA_VERSION, batchApiVersion: BATCH_API_VERSION, batchSupportedOptions: BATCH_SUPPORTED_OPTIONS, checks, details, warnings, paths: { home: HOME, logs: LOG_DIR, workspaces: WORKSPACE_DIR, events: EVENT_DIR, router: ROUTER_DIR } };
+  const repairPlan = buildRepairPlan(checks, details);
+  const repairPlanSummary = summarizeRepairPlan(repairPlan);
+  return { ok: warnings.length === 0, version: VERSION, apiVersion: TERRARIUM_API_VERSION, schemaVersion: MCP_SCHEMA_VERSION, batchApiVersion: BATCH_API_VERSION, batchSupportedOptions: BATCH_SUPPORTED_OPTIONS, checks, details, warnings, repairPlan, repairPlanSummary, paths: { home: HOME, logs: LOG_DIR, workspaces: WORKSPACE_DIR, events: EVENT_DIR, router: ROUTER_DIR } };
+}
+
+// Map detected reconstruction signals to explicit, ready-to-run remediation steps.
+// Derived purely from already-computed checks/details, so it adds no extra I/O.
+function buildRepairPlan(checks, details) {
+  const plan = [];
+  for (const runId of details.missingTerminalCallbackRunIds) {
+    plan.push({ kind: "missingTerminalCallback", runId, action: "recover", tool: "terrarium_callbacks", args: { action: "recover", runId }, reason: "Terminal run is missing its durable callback event; recover rebuilds the journal entry and mailbox fan-out." });
+  }
+  if (checks.staleInflightCallbacks) {
+    plan.push({ kind: "staleInflightCallback", count: checks.staleInflightCallbacks, action: "requeue", tool: "terrarium_callbacks", args: { action: "requeue" }, reason: "Inflight callbacks claimed but never acked past the staleness window; requeue returns them to pending for redelivery." });
+  }
+  for (const claim of details.staleChildClaims) {
+    plan.push({ kind: "staleChildClaim", claimFile: claim.claimFile, childRunId: claim.childRunId, action: "prune", reason: "Child-slot claim points at a missing or invalid run log; remove the stale slot claim to free the parent slot." });
+  }
+  for (const runId of details.orphanedRunIds) {
+    plan.push({ kind: "orphanedRun", runId, action: "inspect", tool: "terrarium_read", args: { runId }, reason: "Run lost its supervisor before recording a terminal state; inspect its log to confirm outcome, then cancel or recover." });
+  }
+  for (const runId of details.needsAttentionRunIds) {
+    plan.push({ kind: "needsAttentionRun", runId, action: "inspect", tool: "terrarium_read", args: { runId }, reason: "Active run produced no observed output past its attention window; inspect its log to decide whether to keep waiting or cancel." });
+  }
+  if (checks.malformedSubscribers || checks.malformedJournalEvents || checks.malformedPendingCallbacks || checks.malformedInflightCallbacks || checks.malformedAcknowledgedCallbacks) {
+    plan.push({ kind: "malformedRouterRecords", count: checks.routerRepairCandidates, action: "quarantine", reason: "Malformed router records cannot be parsed; quarantine or repair them out-of-band so doctor returns ok." });
+  }
+  return plan;
+}
+
+// Roll the repair plan up into an at-a-glance triage summary: total steps,
+// per-action counts, and whether any step is mechanically actionable (has a
+// tool a reconstructing agent can call). Manual-only steps (e.g. quarantine,
+// prune) still count toward the total but not toward `actionable`.
+function summarizeRepairPlan(plan) {
+  const byAction = {};
+  let actionable = 0;
+  for (const step of plan) {
+    byAction[step.action] = (byAction[step.action] ?? 0) + 1;
+    if (step.tool) actionable++;
+  }
+  return { total: plan.length, actionable, byAction };
 }

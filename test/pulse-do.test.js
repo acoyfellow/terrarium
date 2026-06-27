@@ -226,6 +226,65 @@ test('do: requeue moves stale inflight and leaves not-yet-stale alone', async ()
   assert.equal(claimed.events.length, 1, 'requeued event is claimable again (claimedAt dropped)');
 });
 
+test('do: prune ages out acked mailbox + journal rows and reaps idle subscribers', async () => {
+  const { router } = makeRouter();
+  // Old event (well in the past) so age-from-`at`/`claimedAt` exceeds any cutoff.
+  await router.subscribe({ subscriberId: 'sub-prune', ownerRunId: OWNER });
+  await router.route(terminalEvent({ runId: 'ter_old', at: '2020-01-01T00:00:00.000Z' }));
+  const claimed = router.claim({ subscriberId: 'sub-prune', ownerRunId: OWNER });
+  assert.equal(claimed.events.length, 1);
+  router.ack({ subscriberId: 'sub-prune', eventId: claimed.events[0].eventId, ownerRunId: OWNER });
+  assert.deepEqual(router.status('sub-prune', OWNER), { subscriberId: 'sub-prune', pending: 0, inflight: 0, acknowledged: 1 });
+
+  // A huge cutoff keeps everything (nothing is "old enough").
+  const noop = router.prune({
+    acknowledgedOlderThanMs: 10 * 365 * 86400000,
+    journalOlderThanMs: 10 * 365 * 86400000,
+    subscriberOlderThanMs: 10 * 365 * 86400000,
+    ownerRunId: OWNER,
+  });
+  assert.deepEqual(noop, { acknowledgedRemoved: 0, pendingRemoved: 0, inflightRemoved: 0, journalRemoved: 0, subscribersRemoved: 0 });
+  assert.equal(router.status('sub-prune', OWNER).acknowledged, 1, 'acked row survives a huge cutoff');
+
+  // cutoff 0 reaps the acked mailbox row, the journal row, and the now-idle subscriber.
+  const res = router.prune({
+    acknowledgedOlderThanMs: 0,
+    journalOlderThanMs: 0,
+    subscriberOlderThanMs: 0,
+    ownerRunId: OWNER,
+  });
+  assert.equal(res.acknowledgedRemoved, 1);
+  assert.equal(res.journalRemoved, 1);
+  assert.equal(res.subscribersRemoved, 1, 'idle subscriber with no pending/inflight is reaped');
+  assert.throws(() => router.status('sub-prune', OWNER), /subscriber not found/);
+});
+
+test('do: prune is owner-scoped and never reaps a subscriber holding pending events', async () => {
+  const { router } = makeRouter();
+  // Owner A holds an UNclaimed (pending) old event -> must NOT be reaped.
+  await router.subscribe({ subscriberId: 'sub-busy', ownerRunId: OWNER });
+  await router.route(terminalEvent({ runId: 'ter_busy', at: '2020-01-01T00:00:00.000Z' }));
+  // Owner B (intruder) owns an unrelated subscriber.
+  await router.subscribe({ subscriberId: 'sub-other', ownerRunId: OTHER });
+
+  // Prune as OWNER with a huge callbackOlderThanMs so the pending row is NOT
+  // aged out; the subscriber-reap guard must then refuse to remove a subscriber
+  // that still holds a pending event, even with subscriberOlderThanMs:0. The
+  // OTHER-owned subscriber must also be untouched by an OWNER-scoped prune.
+  const res = router.prune({
+    acknowledgedOlderThanMs: 0,
+    journalOlderThanMs: 0,
+    callbackOlderThanMs: 10 * 365 * 86400000,
+    subscriberOlderThanMs: 0,
+    ownerRunId: OWNER,
+  });
+  assert.equal(res.subscribersRemoved, 0, 'subscriber with a pending event is never reaped');
+  // pending event still claimable.
+  assert.equal(router.status('sub-busy', OWNER).pending, 1);
+  // cross-owner subscriber is intact and untouched.
+  assert.doesNotThrow(() => router.status('sub-other', OTHER));
+});
+
 // --------------------------- adversarial cases (Dane) ---------------------------
 
 test('do(adversarial): malformed / non-terminal events are rejected by route', async () => {

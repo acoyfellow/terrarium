@@ -306,6 +306,96 @@ export class PulseRouter {
     };
   }
 
+  // Garbage-collect bounded mailbox/journal/subscriber rows, mirroring the fs
+  // router pruneRouter (src/router.js). Without this the journal + acked mailbox
+  // rows accumulate forever inside the DO's SQLite, which is a long-running
+  // reliability hazard. Semantics are byte-for-byte parity with the fs router:
+  //   - per-subscriber, owner-scoped: a prune for ownerRunId X never touches a
+  //     mailbox/subscriber owned by anyone else (children stay isolated).
+  //   - acked rows age out by acknowledgedOlderThanMs (age from claimedAt||at).
+  //   - pending/inflight rows age out by callbackOlderThanMs (age from claimedAt||at).
+  //   - journal rows age out by journalOlderThanMs (age from event.at).
+  //   - subscribers age out by subscriberOlderThanMs (age from createdAt) ONLY
+  //     when they hold no pending/inflight events.
+  //   - optional subscriberIds / eventIds narrow the sweep.
+  prune({
+    acknowledgedOlderThanMs = 7 * 86400000,
+    journalOlderThanMs = 7 * 86400000,
+    callbackOlderThanMs = 7 * 86400000,
+    subscriberOlderThanMs = 7 * 86400000,
+    subscriberIds,
+    eventIds,
+    ownerRunId,
+  } = {}) {
+    const owner = ownerRunId ?? null;
+    const now = Date.now();
+    const ackCutoff = Math.max(0, Number(acknowledgedOlderThanMs) || 0);
+    const callbackCutoff = Math.max(0, Number(callbackOlderThanMs) || 0);
+    const journalCutoff = Math.max(0, Number(journalOlderThanMs) || 0);
+    const subscriberCutoff = Math.max(0, Number(subscriberOlderThanMs) || 0);
+    const subscriberFilter = Array.isArray(subscriberIds) ? subscriberIds : null;
+    const eventFilter = Array.isArray(eventIds) ? eventIds : null;
+    // Mirrors fs router eventAge: prefer claimedAt for claimed mailbox rows, else
+    // the event timestamp; a missing/unparseable stamp is treated as infinitely
+    // old so corrupt rows are eligible for cleanup.
+    const eventAge = (event) => {
+      const ts = Date.parse(event.claimedAt || event.at || '');
+      return Number.isFinite(ts) ? now - ts : Infinity;
+    };
+    let acknowledgedRemoved = 0, pendingRemoved = 0, inflightRemoved = 0, journalRemoved = 0, subscribersRemoved = 0;
+
+    for (const row of this.sql.exec('SELECT subscriber_id FROM subscribers').toArray()) {
+      const subscriberId = row.subscriber_id;
+      if (subscriberFilter && !subscriberFilter.includes(subscriberId)) continue;
+      let subscription; try { subscription = this.getSubscriber(subscriberId); } catch { continue; }
+      // Owner isolation: a top-level prune maintains only its own mailboxes and
+      // must never abort early or reach another owner's data.
+      if ((subscription.ownerRunId ?? null) !== owner) continue;
+      for (const [state, validState, cutoff] of [
+        ['acked', 'claimed', ackCutoff],
+        ['pending', 'pending', callbackCutoff],
+        ['inflight', 'claimed', callbackCutoff],
+      ]) {
+        for (const mrow of this.sql.exec('SELECT event_id, payload FROM mailbox WHERE subscriber_id = ? AND state = ?', subscriberId, state).toArray()) {
+          if (eventFilter && !eventFilter.includes(mrow.event_id)) continue;
+          let event; try { event = JSON.parse(mrow.payload); } catch { continue; }
+          if (!isValidCallbackEvent(event, mrow.event_id, { state: validState })) continue;
+          if (eventAge(event) < cutoff) continue;
+          this.sql.exec('DELETE FROM mailbox WHERE subscriber_id = ? AND event_id = ?', subscriberId, mrow.event_id);
+          if (state === 'acked') acknowledgedRemoved++;
+          else if (state === 'pending') pendingRemoved++;
+          else inflightRemoved++;
+        }
+      }
+    }
+
+    for (const jrow of this.sql.exec('SELECT event_id, payload FROM journal').toArray()) {
+      if (eventFilter && !eventFilter.includes(jrow.event_id)) continue;
+      let event; try { event = JSON.parse(jrow.payload); } catch { continue; }
+      if (!isValidCallbackEvent(event, jrow.event_id, { state: 'pending' })) continue;
+      const age = now - Date.parse(event.at || '');
+      if (!Number.isFinite(age) || age < journalCutoff) continue;
+      this.sql.exec('DELETE FROM journal WHERE event_id = ?', jrow.event_id);
+      journalRemoved++;
+    }
+
+    for (const row of this.sql.exec('SELECT subscriber_id FROM subscribers').toArray()) {
+      const subscriberId = row.subscriber_id;
+      if (subscriberFilter && !subscriberFilter.includes(subscriberId)) continue;
+      let subscription; try { subscription = this.getSubscriber(subscriberId); } catch { continue; }
+      if ((subscription.ownerRunId ?? null) !== owner) continue;
+      const age = now - Date.parse(subscription.createdAt || '');
+      if (!Number.isFinite(age) || age < subscriberCutoff) continue;
+      const st = this.status(subscriberId, subscription.ownerRunId);
+      if (st.pending || st.inflight) continue;
+      this.sql.exec('DELETE FROM mailbox WHERE subscriber_id = ?', subscriberId);
+      this.sql.exec('DELETE FROM subscribers WHERE subscriber_id = ?', subscriberId);
+      subscribersRemoved++;
+    }
+
+    return { acknowledgedRemoved, pendingRemoved, inflightRemoved, journalRemoved, subscribersRemoved };
+  }
+
   requeue({ subscriberId, olderThanMs = 300000, ownerRunId } = {}) {
     const sub = this.getSubscriber(subscriberId);
     this.#assertOwner(sub, ownerRunId);
@@ -342,6 +432,7 @@ export class PulseRouter {
         case 'ack': result = this.ack(args); break;
         case 'status': result = this.status(args.subscriberId, args.ownerRunId); break;
         case 'requeue': result = this.requeue(args); break;
+        case 'prune': result = this.prune(args); break;
         default: return Response.json({ ok: false, error: 'unknown op' }, { status: 400 });
       }
       return Response.json({ ok: true, result });
