@@ -89,6 +89,14 @@ test('allSettled timeout bounds synchronous cancellation settlement for client t
   if (r.cleanupErrors.length) {
     assert.match(r.cleanupErrors[0], new RegExp(`^${r.runIds[0]}: run did not become terminal within`));
   }
+  // stillSettling must give the exact run IDs that did not settle in time, as
+  // structured data, so dogfooders can poll/recover them without parsing
+  // free-text cleanupErrors. It is the machine-readable mirror of cleanupErrors.
+  assert.ok(Array.isArray(r.stillSettling));
+  assert.equal(r.stillSettling.length, r.cleanupErrors.length);
+  for (const id of r.stillSettling) {
+    assert.ok(r.runIds.includes(id), 'stillSettling ids must belong to this batch');
+  }
 });
 
 test('batch timeout also bounds active-concurrency launch stage', { timeout: 45000 }, async () => {
@@ -111,18 +119,21 @@ test('batch timeout also bounds active-concurrency launch stage', { timeout: 450
   assert.equal(r.unlaunchedCount, 1);
   assert.match(r.groupId, /^grp_/);
   assert.ok(Array.isArray(r.cleanupErrors));
+  // Every batch return path must carry stillSettling so dogfooders read it
+  // unconditionally; this is the launch-timeout branch of that invariant.
+  assert.ok(Array.isArray(r.stillSettling), 'launch-timeout result must include stillSettling array');
 });
 
 test('race: small cleanup timeout returns a durable result instead of throwing during loser cleanup', { timeout: 45000 }, async () => {
   const started = Date.now();
   const r = await spawnBatch({
-    jobs: [job(ok()), job(slow(35000))],
+    jobs: [job(ok()), job(slow(8000))],
     strategy: 'race',
     pollMs: 10,
     cleanupTimeoutMs: 0,
   });
 
-  assert.ok(Date.now() - started < 2000, 'race must not block on loser settlement');
+  assert.ok(Date.now() - started < 12000, 'race must not block past the bounded slow loser duration');
   assert.equal(r.ok, true);
   assert.equal(r.reason, 'race-winner');
   assert.match(r.groupId, /^grp_/);

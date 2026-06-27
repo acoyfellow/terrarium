@@ -638,8 +638,19 @@ export async function getRunStatus({ runId, staleMs = 30000, requesterRunId, sco
 }
 
 export async function ensureTerminalCallback({ runId, requesterRunId, scope } = {}) {
-  const result = await getRunStatus({ runId, requesterRunId, scope });
-  if (result.status === "running") return { runId, terminal: false, routed: false, note: "run is still active" };
+  // Recovery must degrade to a structured signal, not a raw filesystem/parse
+  // throw. doctor's repairPlan points operators at this exact action for runs
+  // whose terminal callback is missing; if the run log was pruned or corrupted
+  // the caller needs an actionable reason, not an opaque ENOENT/SyntaxError.
+  let result;
+  try {
+    result = await getRunStatus({ runId, requesterRunId, scope });
+  } catch (error) {
+    if (error?.code === "ENOENT") return { runId, terminal: false, routed: false, reason: "unknown-run", note: "no run log found for runId; nothing to recover (it may have been pruned)" };
+    if (error instanceof SyntaxError) return { runId, terminal: false, routed: false, reason: "unreadable-metadata", note: "run metadata is corrupt and cannot be parsed; quarantine or repair the run log out-of-band" };
+    throw error;
+  }
+  if (result.status === "running") return { runId, terminal: false, routed: false, reason: "active", note: "run is still active" };
   const routed = await emitCompletionEvent(result);
   return { runId, terminal: true, routed: !routed.duplicate, duplicate: routed.duplicate === true, eventId: routed.eventId, delivered: routed.delivered };
 }

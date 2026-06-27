@@ -27,7 +27,7 @@ Status: live in production at `terrarium.coey.dev` and proven end-to-end (emit �
 
 - **One Durable Object per router name** keeps the journal, subscribers, and mailboxes colocated and serialized. The name is regex-clamped (`^[A-Za-z0-9_-]{1,64}$`); anything else falls back to the default `global`. Callers may shard via `?router=` or a `router` field in the body.
 - **DO SQLite tables** (`src/pulse/do.js`): `journal(event_id, payload, at)` is the dedup + replay source of truth; `subscribers(...)` holds filter lists and `owner_run_id`; `mailbox(subscriber_id, event_id, state, ...)` carries each event through `pending → inflight → acked`.
-- **eventId = sha256 of `[runId, type, at, status, exitCode]`** (`src/pulse/shared.js`). The same terminal event always hashes to the same id, so re-emitting is a no-op and a given id appears at most once per mailbox.
+- **eventId = `evt_` + the first 32 hex chars of sha256(`[runId, type, at, status, exitCode]`)** (`src/pulse/shared.js`; matched by `/^evt_[0-9a-f]{32}$/` in the tests). The same terminal event always hashes to the same id, so re-emitting is a no-op and a given id appears at most once per mailbox. A caller-supplied `event.eventId` is honored if present (validated by `assertId`).
 - Mounted through the existing merged control worker (`src/control-worker.js`), which delegates `/pulse`, `/claim`, `/ack`, and `/status` to the Pulse worker (`src/pulse/worker.js`). The DO migration is additive (`v2 new_sqlite_classes: ["PulseRouter"]`) over the existing `CampaignLock` v1.
 
 ## Auth
@@ -57,7 +57,7 @@ curl -s "$PULSE/pulse" \
         "status":"done",
         "exitCode":0,
         "at":"2026-06-27T12:00:00.000Z"}}'
-# -> {"ok":true,"result":{"eventId":"<sha256>","duplicate":false,"delivered":1}}
+# -> {"ok":true,"result":{"eventId":"evt_<32-hex>","duplicate":false,"delivered":1}}
 
 # 3. The consumer claims pending events (pending -> inflight).
 curl -s "$PULSE/claim" \
@@ -67,7 +67,7 @@ curl -s "$PULSE/claim" \
 # 4. The consumer acks after handling (inflight -> acked; idempotent).
 curl -s "$PULSE/ack" \
   -H "authorization: Bearer $TOKEN" -H 'content-type: application/json' \
-  -d '{"subscriberId":"my-consumer","ownerRunId":"ter_owner1","eventId":"<sha256>"}'
+  -d '{"subscriberId":"my-consumer","ownerRunId":"ter_owner1","eventId":"evt_<32-hex>"}'
 
 # 5. Inspect mailbox counts at any time.
 curl -s "$PULSE/status?subscriberId=my-consumer&ownerRunId=ter_owner1" \
