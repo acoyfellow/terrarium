@@ -120,6 +120,63 @@ test('do: route strips private fields before journaling/delivery', async () => {
   assert.equal('output' in claimed.events[0], false);
 });
 
+test('do: receipt decide-payload survives route -> claim (regression: keylists must not drift)', async () => {
+  // Regression guard: ALLOWED_EVENT_FIELDS is the single source of truth, and
+  // both CALLBACK_EVENT_KEYS (route/pending validation) and
+  // CLAIMED_CALLBACK_EVENT_KEYS (claim-read validation) derive from it. A prior
+  // bug had two hand-maintained keylists drift so a nested `receipt` routed fine
+  // but failed claim-read validation and was dropped. Assert receipt survives the
+  // full route -> claim cycle, intact and deeply equal to what was emitted.
+  const { router } = makeRouter();
+
+  // 1. subscribe
+  await router.subscribe({ subscriberId: 'sub-receipt', ownerRunId: OWNER });
+
+  // 2. emit a terminal event WITH a nested receipt (evidence-ref shape).
+  const receipt = {
+    kind: 'hammer',
+    outcome: 'useful',
+    summary: 'x',
+    evidenceRef: {
+      kind: 'run_events',
+      ownerEmail: 'a@b.com',
+      runId: 'ter_run_abc',
+      eventTable: 'run_events',
+      eventId: 'e1',
+    },
+  };
+  const routed = await router.route(terminalEvent({ receipt }));
+  assert.equal(routed.delivered, 1);
+
+  // 3. claim it
+  const claimed = router.claim({ subscriberId: 'sub-receipt', ownerRunId: OWNER });
+  assert.equal(claimed.events.length, 1);
+  const ev = claimed.events[0];
+
+  // 4. receipt is NOT stripped on route or claim-read; deep-equal to emitted.
+  assert.deepEqual(ev.receipt, receipt, 'receipt survives route -> claim intact');
+  assert.equal(ev.receipt.outcome, 'useful');
+  assert.equal(ev.receipt.evidenceRef.kind, 'run_events');
+  assert.equal(ev.receipt.evidenceRef.ownerEmail, 'a@b.com');
+
+  // A delegate-style inline receipt carrying a children[] array also survives.
+  await router.subscribe({ subscriberId: 'sub-receipt2', ownerRunId: OWNER });
+  const delegateReceipt = {
+    kind: 'delegate',
+    outcome: 'useful',
+    summary: 'fanned out',
+    children: [
+      { runId: 'ter_child_1', outcome: 'useful' },
+      { runId: 'ter_child_2', outcome: 'inconclusive' },
+    ],
+  };
+  const routed2 = await router.route(terminalEvent({ runId: 'ter_run_delegate', receipt: delegateReceipt }));
+  assert.ok(routed2.delivered >= 1);
+  const claimed2 = router.claim({ subscriberId: 'sub-receipt2', ownerRunId: OWNER });
+  assert.equal(claimed2.events.length, 1);
+  assert.deepEqual(claimed2.events[0].receipt, delegateReceipt, 'delegate receipt with children[] survives route -> claim');
+});
+
 test('do: duplicate emit is deduped (same eventId, no second delivery)', async () => {
   const { router } = makeRouter();
   await router.subscribe({ subscriberId: 'sub-dedup', ownerRunId: OWNER });
