@@ -86,7 +86,7 @@ curl -s "$PULSE/status?subscriberId=my-consumer&ownerRunId=ter_owner1" \
 # -> {"ok":true,"result":{"subscriberId":"my-consumer","pending":0,"inflight":0,"acknowledged":1}}
 ```
 
-`POST /pulse` also accepts `action: "unsubscribe"`, `requeue`, and `getSubscriber`. Stale inflight events can be returned to pending with `requeue` (default `olderThanMs: 300000`).
+`POST /pulse` also accepts `action: "unsubscribe"`, `requeue`, and `getSubscriber`. Stale inflight events can be returned to pending with `requeue` (default `olderThanMs: 300000`). Each requeue bumps a `deliveryAttempts` counter on the event (the count of prior redeliveries, visible on the next claim) and the requeue response reports `maxAttempts` — the most-redelivered event in that pass — so a poison event a consumer keeps claiming but never acking is observable instead of looping silently forever. The counter is excluded from the `eventId`/dedup hash, so it never breaks dedup parity with the filesystem router.
 
 ## What it proves
 
@@ -100,6 +100,7 @@ Each guarantee below is held by a named test. They mirror the filesystem router'
 | Claim → ack is idempotent | `test/pulse-do.test.js`, `test/pulse-e2e.test.js` |
 | Cross-owner isolation: a different `ownerRunId` cannot claim/ack/read status of another mailbox (`403` through the real worker) | `test/pulse-do.test.js`, `test/pulse-e2e.test.js`, `test/pulse-worker-e2e.test.js` |
 | Requeue moves stale inflight back to pending and leaves not-yet-stale alone | `test/pulse-do.test.js` |
+| Requeue tracks `deliveryAttempts`/`maxAttempts` so a poison (claimed-but-unacked) event is observable | `test/pulse-do.test.js`, `test/router.test.js` |
 | Auth is fail-closed (401 on every gated route, and when `PULSE_TOKEN` is unset) | `test/pulse-e2e.test.js`, `test/pulse-worker-e2e.test.js` |
 | Adversarial: malformed / non-terminal events rejected; oversized/unbounded filters rejected; ack-unclaimed and ack-nonexistent throw; `pi-*`/`pi_` wildcard subscriber holding `"*"` receives no delivery; tampered owner/timestamp records fail closed before the owner check | `test/pulse-do.test.js` |
 | Prod topology: `/pulse`, `/claim`, `/ack`, `/status` reach the worker (hitting the token gate) instead of the SPA fallback, and an unknown route still gets the SPA index | `test/pulse-assets-topology.test.js` |
