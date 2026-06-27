@@ -37,7 +37,7 @@ Usage:
   terra read <runId> [tailBytes]
   terra read <runId> mre [tailBytes]
   terra cancel <runId>
-  terra batch [--strategy all|allSettled|race|any|quorum] [--concurrency N] [--quorum K] [--cleanup-timeout-ms N] "task1" "task2" ...
+  terra batch [--strategy all|allSettled|race|any|quorum] [--concurrency N] [--quorum K] [--batch-timeout-ms N] [--cleanup-timeout-ms N] "task1" "task2" ...
   terra group create <label> <runId...>
   terra group status <groupId>
   terra group read <groupId>
@@ -81,6 +81,8 @@ Options:
                      Orthogonal to --agent / --read-only.
   --cwd <path>       Child working directory. Default: current directory
   --timeout-ms <n>   Kill child after n milliseconds. Default: config or no timeout
+  --batch-timeout-ms <n>
+                     Overall terra batch wait budget before cancelling unfinished runs
   --cleanup-timeout-ms <n>
                      Batch cancellation settlement wait. Default: 5000
   --max-depth <n>    Maximum Terrarium depth. Default: config or 3
@@ -115,6 +117,7 @@ function parse(argv) {
     else if (a === "--cwd") out.cwd = argv[++i];
     else if (a === "--timeout-ms") out.timeoutMs = Number(argv[++i]);
     else if (a === "--cleanup-timeout-ms") out.cleanupTimeoutMs = Number(argv[++i]);
+    else if (a === "--batch-timeout-ms") out.batchTimeoutMs = Number(argv[++i]);
     else if (a === "--turns") out.turns = Number(argv[++i]);
     else if (a === "--scenarios") out.scenarios = argv[++i];
     else if (a === "--publish") out.publish = true;
@@ -139,7 +142,7 @@ else if (cmd === "status" && rest[0]?.startsWith("ter_")) getRunStatus({ runId: 
 else if (cmd === "status") listRuns({ limit: Number(rest[0] || 20) }).then((r) => console.log(JSON.stringify(r, null, 2)));
 else if (cmd === "read") readRun({ runId: rest[0], tailBytes: Number(rest[1] === "mre" ? rest[2] || 20000 : rest[1] || 20000), kind: rest[1] === "mre" ? "mre" : "terrarium" }).then((r) => console.log(r.text));
 else if (cmd === "cancel") cancelRun({ runId: rest[0] }).then((r) => console.log(JSON.stringify(r, null, 2))).catch((e) => { console.error(`terrarium: ${e.message}`); process.exit(1); });
-else if (cmd === "batch") spawnBatch({ jobs: rest.map((task) => ({ task, agent: opts.agent, model: opts.model, profile: opts.profile, cwd: opts.cwd, isolation: opts.isolation, timeoutMs: opts.timeoutMs, requireTaskContract: true })), strategy: opts.strategy || "all", quorum: opts.quorum, concurrency: opts.concurrency, pollMs: opts.pollMs, timeoutMs: undefined, cleanupTimeoutMs: opts.cleanupTimeoutMs }).then((r) => { console.log(JSON.stringify(r, null, 2)); process.exit(r.ok ? 0 : 1); }).catch((e) => { console.error(`terrarium: ${e.message}`); process.exit(1); });
+else if (cmd === "batch") spawnBatch({ jobs: rest.map((task) => ({ task, agent: opts.agent, model: opts.model, profile: opts.profile, cwd: opts.cwd, isolation: opts.isolation, timeoutMs: opts.timeoutMs, requireTaskContract: true })), strategy: opts.strategy || "all", quorum: opts.quorum, concurrency: opts.concurrency, pollMs: opts.pollMs, timeoutMs: opts.batchTimeoutMs, cleanupTimeoutMs: opts.cleanupTimeoutMs }).then((r) => { console.log(JSON.stringify(r, null, 2)); process.exit(r.ok ? 0 : 1); }).catch((e) => { console.error(`terrarium: ${e.message}`); process.exit(1); });
 else if (cmd === "group" && rest[0] === "create") createRunGroup({ label: rest[1], runIds: rest.slice(2) }).then((r) => console.log(JSON.stringify(r, null, 2))).catch((e) => { console.error(`terrarium: ${e.message}`); process.exit(1); });
 else if (cmd === "group" && rest[0] === "status") getRunGroupStatus({ groupId: rest[1], verbose: opts.verbose }).then((r) => console.log(JSON.stringify(r, null, 2))).catch((e) => { console.error(`terrarium: ${e.message}`); process.exit(1); });
 else if (cmd === "group" && rest[0] === "read") readRunGroupLogs({ groupId: rest[1] }).then((r) => console.log(JSON.stringify(r, null, 2))).catch((e) => { console.error(`terrarium: ${e.message}`); process.exit(1); });
