@@ -53,7 +53,7 @@ Succinct, product-facing changes to Terrarium. This is not a full commit log; it
 ### Doctor: local state is diagnostic, not trusted truth
 
 - `terra doctor` / `terrarium_doctor` reports malformed subscribers, journals, pending/inflight/acked callbacks, stale inflight callbacks, stale child claims, missing terminal callbacks, and current API/schema versions.
-- Terminal run envelopes now link to the durable callback journal entry via `terminalCallback.eventId` / delivery facts, keeping callbacks as notifications while making run-to-router reconstruction direct.
+- Terminal run envelopes and concise group member rows now link to the durable callback journal entry via `terminalCallback.eventId` / delivery facts, keeping callbacks as notifications while making run-to-router reconstruction direct.
 - Doctor output now includes bounded ID-level details for active, orphaned, attention-needed, missing-callback, and stale child-claim records so operators can reconstruct local state from concrete handles instead of counts alone.
 - Malformed subscriber/callback timestamps, subscriber IDs, event IDs, and child-claim contents are reported instead of being treated as valid state.
 - Malformed acknowledged callbacks are included in router repair candidate diagnostics where appropriate, while malformed retained history is not silently pruned.

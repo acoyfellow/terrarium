@@ -55,7 +55,7 @@ export async function getRunGroupStatus({ groupId, verbose = false, requesterRun
   // Unknown/missing records are not evidence that every member reached a terminal state.
   const complete = runs.every((run) => terminalStatuses.has(run.status));
   const ok = complete && runs.every((run) => run.status === "done" && run.ok === true);
-  return { ...group, complete, ok, counts, runs: verbose ? runs : runs.map(({ runId, status, ok, exitCode, taskContractStatus, progressText, needsAttention, idleMs, startedAt, finishedAt, error, note }) => ({ runId, status, ok, exitCode, taskContractStatus, progressText, needsAttention, idleMs, startedAt, finishedAt, error, note })) };
+  return { ...group, complete, ok, counts, runs: verbose ? runs : runs.map(({ runId, status, ok, exitCode, taskContractStatus, terminalCallback, progressText, needsAttention, idleMs, startedAt, finishedAt, error, note }) => ({ runId, status, ok, exitCode, taskContractStatus, terminalCallback, progressText, needsAttention, idleMs, startedAt, finishedAt, error, note })) };
 }
 
 export async function readRunGroupLogs({ groupId, kind = "terrarium", tailBytes = 2000, requesterRunId, scope } = {}) {

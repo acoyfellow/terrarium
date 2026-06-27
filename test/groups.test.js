@@ -16,6 +16,7 @@ test('run groups preserve ordered independent runs and summarize status/logs', a
   assert.equal(status.complete, true);
   assert.equal(status.ok, true);
   assert.equal(status.counts.done, 2);
+  assert.deepEqual(status.runs.map((run) => run.terminalCallback?.eventId), [`evt_${a.runId}_Completed`, `evt_${b.runId}_Completed`]);
   const listing = await listRunGroups({ limit: 100 });
   assert.ok(listing.groups.some((item) => item.groupId === group.groupId));
   const logs = await readRunGroupLogs({ groupId: group.groupId, tailBytes: 200 });
