@@ -71,8 +71,20 @@ export default function terrariumPiExtension(pi) {
           // Pi supports an immediate model turn for extension messages. followUp
           // queues safely when a turn is active; triggerTurn wakes an idle session.
           // Ack only after Pi accepted the message, so a throw is replayable.
-          pi.sendMessage(callbackMessage(run), { deliverAs: "followUp", triggerTurn: true });
-          await acknowledgeMailboxEvent({ subscriberId: currentSubscriber, eventId: event.eventId });
+          //
+          // Isolate each delivery: one throwing/poison event must not strand the
+          // rest of the claimed batch inflight. On failure, requeue *only* that
+          // event to pending (olderThanMs:0 forces it back regardless of claim
+          // age) so the next 1.5s refresh retries it, then continue delivering the
+          // surviving siblings. Without this, a single sendMessage throw aborted
+          // the loop and left every later-claimed callback stuck inflight until
+          // the next session_start requeue.
+          try {
+            pi.sendMessage(callbackMessage(run), { deliverAs: "followUp", triggerTurn: true });
+            await acknowledgeMailboxEvent({ subscriberId: currentSubscriber, eventId: event.eventId });
+          } catch {
+            await requeueInflightEvents({ subscriberId: currentSubscriber, eventIds: [event.eventId], olderThanMs: 0 }).catch(() => {});
+          }
         }
       }
     } finally { busy = false; }
@@ -83,6 +95,10 @@ export default function terrariumPiExtension(pi) {
     // Do not create a wildcard run subscription. This Pi session should only
     // wake for concrete runs it spawned; otherwise callbacks leak into sibling
     // Pi sessions that share a channel/cwd.
+    //
+    // A fresh session that never spawned anything has no durable subscriber
+    // record yet; claim/requeue treat that as an empty mailbox no-op, so this
+    // path no longer crashes before the refresh timer is armed.
     await requeueInflightEvents({ subscriberId: currentSubscriber, olderThanMs: 0 });
     await refresh(ctx);
     timer = setInterval(() => { void refresh(ctx); }, 1500);

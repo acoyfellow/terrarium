@@ -56,7 +56,7 @@ Usage:
   terra secure-agent --model <id> "task"
   terra hardening verify
   terra doctor
-  terra doctor --repair [--apply]
+  terra doctor --repair [--apply] [--verify]
   terra schedule replay <fixture.json>
   terra campaign read <campaignId>
   terra campaign verify <campaignId>
@@ -117,6 +117,7 @@ function parse(argv) {
     else if (a === "--read-only" || a === "--readonly") out.readOnly = true;
     else if (a === "--repair") out.repair = true;
     else if (a === "--apply") out.apply = true;
+    else if (a === "--verify") out.verify = true;
     else if (a === "--task") out.forceTask = true;
     else if (a === "--profile") out.profile = argv[++i];
     else if (a === "--agent") out.agent = argv[++i];
@@ -183,7 +184,9 @@ else if (cmd === "secure") runSecureTask({ task: rest.join(" "), cwd: opts.cwd, 
 else if (cmd === "doctor" && opts.repair) diagnoseTerrarium().then(async (diagnosis) => {
   // --repair drives only the mechanically-safe, idempotent self-healing steps
   // (recover/requeue/prune); --apply opts in to mutation, default is dry-run.
-  const repair = await executeRepairPlan({ plan: diagnosis.repairPlan, dryRun: !opts.apply });
+  // --verify (with --apply) re-diagnoses and attaches residual evidence that
+  // each self-healing condition actually cleared.
+  const repair = await executeRepairPlan({ plan: diagnosis.repairPlan, dryRun: !opts.apply, verify: opts.verify, baseline: diagnosis });
   console.log(JSON.stringify({ diagnosis, repair }, null, 2));
   process.exit(repair.ok ? 0 : 1);
 }).catch((e) => { console.error(`terrarium: ${e.message}`); process.exit(1); });

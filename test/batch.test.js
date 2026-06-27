@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync, writeFileSync, chmodSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { spawnBatch, BATCH_STRATEGIES, decide, MAX_BATCH_JOBS, DEFAULT_UNBOUNDED_JOBS } from '../src/batch.js';
+import { spawnBatch, BATCH_STRATEGIES, decide, MAX_BATCH_JOBS, DEFAULT_UNBOUNDED_JOBS, validateBatchShape, SUGGESTED_LARGE_BATCH_CONCURRENCY } from '../src/batch.js';
 import { getRunGroupStatus, MAX_GROUP_RUNS } from '../src/groups.js';
 import { BATCH_API_VERSION, MCP_SCHEMA_VERSION } from '../src/versions.js';
 import { clearInheritedTerrariumEnv } from './helpers/terrarium-env.js';
@@ -40,6 +40,44 @@ test('validates inputs', async () => {
   await assert.rejects(() => spawnBatch({ jobs: [job(ok())], concurrency: 0 }), /concurrency/);
   await assert.rejects(() => spawnBatch({ jobs: [job(ok())], cleanupTimeoutMs: -1 }), /cleanupTimeoutMs/);
   assert.deepEqual(BATCH_STRATEGIES, ['all', 'allSettled', 'race', 'any', 'quorum']);
+});
+
+test('validateBatchShape: pure preflight verdict is single-sourced with spawnBatch throws and suggests a concurrency bound', () => {
+  // A small batch with no bound is fine and reports an effective concurrency
+  // equal to the job count (launch all at once), no suggestion needed.
+  const small = validateBatchShape({ jobs: [{ task: 'a' }] });
+  assert.equal(small.ok, true);
+  assert.equal(small.requiresConcurrency, false);
+  assert.equal(small.suggestedConcurrency, undefined);
+  assert.equal(small.effectiveConcurrency, 1);
+
+  // A large batch with no bound fails closed AND carries an actionable number.
+  const big = validateBatchShape({ jobs: Array.from({ length: DEFAULT_UNBOUNDED_JOBS + 5 }, () => ({ task: 'x' })) });
+  assert.equal(big.ok, false);
+  assert.equal(big.code, 'missing-concurrency');
+  assert.equal(big.requiresConcurrency, true);
+  assert.equal(big.suggestedConcurrency, SUGGESTED_LARGE_BATCH_CONCURRENCY);
+  assert.match(big.error, /try concurrency: 8/);
+  assert.equal(big.effectiveConcurrency, null);
+
+  // Same large batch WITH a bound passes and echoes the effective width.
+  const bounded = validateBatchShape({ jobs: Array.from({ length: DEFAULT_UNBOUNDED_JOBS + 5 }, () => ({ task: 'x' })), concurrency: 4 });
+  assert.equal(bounded.ok, true);
+  assert.equal(bounded.effectiveConcurrency, 4);
+
+  // Job-count, strategy, quorum, and concurrency errors all surface as codes.
+  assert.equal(validateBatchShape({ jobs: [] }).code, 'job-count');
+  assert.equal(validateBatchShape({ jobs: Array.from({ length: MAX_BATCH_JOBS + 1 }, () => ({ task: 'x' })), concurrency: 4 }).code, 'job-count');
+  assert.equal(validateBatchShape({ jobs: [{ task: 'a' }], strategy: 'bogus' }).code, 'strategy');
+  assert.equal(validateBatchShape({ jobs: [{ task: 'a' }], strategy: 'quorum' }).code, 'quorum');
+  assert.equal(validateBatchShape({ jobs: [{ task: 'a' }], concurrency: 0 }).code, 'concurrency');
+  assert.equal(validateBatchShape({ jobs: [{ task: 'a' }], cleanupTimeoutMs: -1 }).code, 'cleanup-timeout');
+
+  // Single-source guarantee: the verdict.error string is exactly what spawnBatch throws.
+  return assert.rejects(
+    () => spawnBatch({ jobs: Array.from({ length: DEFAULT_UNBOUNDED_JOBS + 5 }, () => ({ task: 'x' })) }),
+    (e) => e.message === big.error,
+  );
 });
 
 test('ceiling: jobs over MAX_BATCH_JOBS are rejected; the lifted ceiling is 256', async () => {

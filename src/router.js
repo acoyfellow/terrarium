@@ -98,6 +98,20 @@ function assertSubscriberOwner(subscription, ownerRunId) {
   if (storedOwner !== (ownerRunId ?? null)) throw new Error('callback subscriber access denied');
 }
 
+// A subscriber is created lazily on first spawn/subscribe. Mailbox-draining ops
+// (claim/requeue) run speculatively from the Pi host before any subscriber
+// exists; for those a missing record means "empty mailbox", not an error. This
+// resolves to the owner-checked subscriber when it exists, or null when it does
+// not, so a never-registered subscriber is a graceful no-op instead of an
+// ENOENT that aborts the caller's whole refresh/session-start path.
+async function resolveOptionalSubscriber(subscriberId, ownerRunId) {
+  let subscription;
+  try { subscription = await getSubscriber(subscriberId); }
+  catch (error) { if (error.code === 'ENOENT') return null; throw error; }
+  assertSubscriberOwner(subscription, ownerRunId);
+  return subscription;
+}
+
 export async function unregisterSubscriber(subscriberId, { ownerRunId } = {}) {
   assertId(subscriberId, 'subscriber id');
   assertSubscriberOwner(await getSubscriber(subscriberId), ownerRunId);
@@ -164,7 +178,7 @@ export async function routeEvent(event) {
 }
 
 export async function claimMailboxEvents({ subscriberId, limit = 20, ownerRunId } = {}) {
-  assertSubscriberOwner(await getSubscriber(subscriberId), ownerRunId);
+  if (!(await resolveOptionalSubscriber(subscriberId, ownerRunId))) return { subscriberId, events: [] };
   const dirs = mailboxDirs(subscriberId);
   await Promise.all([mkdir(dirs.pending, { recursive: true }), mkdir(dirs.inflight, { recursive: true })]);
   const files = (await readdir(dirs.pending)).filter((file) => file.endsWith('.json')).sort().slice(0, Math.min(Math.max(Number(limit) || 20, 1), 100));
@@ -224,17 +238,23 @@ export async function getMailboxStatus(subscriberId, { ownerRunId } = {}) {
   return { subscriberId, pending: await countValidEvents(dirs.pending, 'pending'), inflight: await countValidEvents(dirs.inflight, 'claimed'), acknowledged: await countValidEvents(dirs.acked, 'claimed') };
 }
 
-export async function requeueInflightEvents({ subscriberId, olderThanMs = 300000, ownerRunId } = {}) {
-  assertSubscriberOwner(await getSubscriber(subscriberId), ownerRunId);
+export async function requeueInflightEvents({ subscriberId, olderThanMs = 300000, eventIds, ownerRunId } = {}) {
+  if (!(await resolveOptionalSubscriber(subscriberId, ownerRunId))) return { subscriberId, requeued: 0, maxAttempts: 0 };
   const dirs = mailboxDirs(subscriberId);
   await Promise.all([mkdir(dirs.pending, { recursive: true }), mkdir(dirs.inflight, { recursive: true })]);
   const now = Date.now();
   let requeued = 0;
+  // An optional eventIds allowlist requeues only those specific inflight events.
+  // A consumer (e.g. the Pi host) that fails to deliver a single claimed event
+  // uses this to re-pending *just* that event without disturbing siblings it is
+  // still iterating in-memory and will deliver next.
+  const idFilter = Array.isArray(eventIds) && eventIds.length ? new Set(eventIds) : null;
   // maxAttempts surfaces the most-redelivered event in this pass so operators
   // (and doctor) can spot a poison event a consumer keeps crashing on instead of
   // it silently looping forever between pending and inflight.
   let maxAttempts = 0;
   for (const file of (await readdir(dirs.inflight)).filter((name) => name.endsWith('.json'))) {
+    if (idFilter && !idFilter.has(file.slice(0, -5))) continue;
     let event; try { event = JSON.parse(await readFile(join(dirs.inflight, file), 'utf8')); } catch { continue; }
     if (!isValidCallbackEvent(event, file.slice(0, -5), { state: 'claimed' })) continue;
     const age = now - Date.parse(event.claimedAt);

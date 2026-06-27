@@ -210,6 +210,14 @@ function summarizeRepairPlan(plan) {
 // handling (quarantining malformed records) are never auto-executed; they are
 // reported as skipped so the operator stays in the loop.
 const SELF_HEALING_KINDS = new Set(["missingTerminalCallback", "staleInflightCallback", "staleChildClaim"]);
+// Each self-healing kind maps to the diagnosis counter that a successful repair
+// must drive to zero. Post-repair re-diagnosis reads these to prove the fix
+// landed rather than merely ran.
+const SELF_HEALING_EVIDENCE = {
+  missingTerminalCallback: "missingTerminalCallbacks",
+  staleInflightCallback: "staleInflightCallbacks",
+  staleChildClaim: "staleChildClaims",
+};
 const SKIP_REASONS = {
   orphanedRun: "needs operator judgement: inspect the run log before cancelling or recovering",
   needsAttentionRun: "needs operator judgement: inspect the run log before deciding to wait or cancel",
@@ -228,9 +236,17 @@ const SKIP_REASONS = {
 // slot), so the matching steps are collapsed into a single prune action that
 // runs at most once per execution. requesterRunId is rejected for the same
 // reason terrarium_doctor is: self-healing is a top-level controller affordance.
-export async function executeRepairPlan({ plan, dryRun = true, requesterRunId } = {}) {
+//
+// Evidence: pass verify:true on an applied (non-dry) run to re-diagnose after
+// the repair and attach a `residual` block proving each self-healing condition
+// actually cleared. A dry run never verifies (nothing changed to re-measure).
+// Callers that already hold a fresh diagnosis (e.g. the CLI) may pass it as
+// `baseline` so the residual evidence can report the pre-repair `before` count
+// without a redundant diagnose pass; otherwise `before` is recorded as null.
+export async function executeRepairPlan({ plan, dryRun = true, requesterRunId, verify = false, baseline = null } = {}) {
   if (requesterRunId) throw new Error("Terrarium repair execution is available only to a top-level controller");
-  const steps = Array.isArray(plan) ? plan : (await diagnoseTerrarium()).repairPlan;
+  if (!baseline && !Array.isArray(plan)) baseline = await diagnoseTerrarium();
+  const steps = Array.isArray(plan) ? plan : baseline.repairPlan;
   const applied = [], skipped = [];
   let prunedClaims = false;
   for (const step of steps) {
@@ -262,5 +278,27 @@ export async function executeRepairPlan({ plan, dryRun = true, requesterRunId } 
       skipped.push({ kind: step.kind, action: step.action, reason: `repair failed: ${error.message}` });
     }
   }
-  return { ok: skipped.length === 0, dryRun, appliedCount: applied.length, skippedCount: skipped.length, applied, skipped };
+  const receipt = { ok: skipped.length === 0, dryRun, appliedCount: applied.length, skippedCount: skipped.length, applied, skipped };
+  if (verify && !dryRun) receipt.residual = await verifyRepairResidual({ steps, baseline });
+  return receipt;
+}
+
+// Re-diagnose after an applied repair and produce per-condition evidence that
+// the self-healing steps actually drove their target counter to zero. Only the
+// mechanically-safe kinds that were present in the plan are checked, so the
+// evidence maps one-to-one onto what the repair claimed to fix. `verified` is
+// true only when every checked condition cleared; a non-cleared counter means
+// the repair ran but the underlying state was not fully reconciled (e.g. a
+// callback that re-staled, or a claim a concurrent run re-took).
+async function verifyRepairResidual({ steps, baseline }) {
+  const kinds = new Set(steps.map((step) => step.kind).filter((kind) => SELF_HEALING_KINDS.has(kind)));
+  const post = await diagnoseTerrarium();
+  const conditions = [];
+  for (const kind of kinds) {
+    const counter = SELF_HEALING_EVIDENCE[kind];
+    const before = baseline ? (baseline.checks[counter] ?? null) : null;
+    const after = post.checks[counter] ?? 0;
+    conditions.push({ kind, counter, before, after, cleared: after === 0 });
+  }
+  return { verified: conditions.every((condition) => condition.cleared), conditions };
 }

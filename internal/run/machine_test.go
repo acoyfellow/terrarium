@@ -101,6 +101,57 @@ func TestCancelWinsOverVerifiedReceipt(t *testing.T) {
 	if r.State.Terminal.Reason != "cancel-requested" {
 		t.Fatalf("want cancel-requested, got %q", r.State.Terminal.Reason)
 	}
+	// Operational truth: a cancelled run must not be reconstructable as a
+	// verified task success, even though a verified receipt was observed before
+	// the child exited. The contract status collapses to not-applicable and no
+	// task-result summary survives.
+	if r.State.Terminal.TaskContractStatus != "not-applicable" {
+		t.Fatalf("cancelled run leaked taskContractStatus %q (want not-applicable)", r.State.Terminal.TaskContractStatus)
+	}
+	if r.State.Terminal.TaskResultSummary != "" {
+		t.Fatalf("cancelled run leaked taskResultSummary %q", r.State.Terminal.TaskResultSummary)
+	}
+}
+
+// receipt-then-cancel (verified receipt arrives, *then* cancellation, then
+// exit): cancellation still wins and the verified receipt is not preserved as
+// task-contract truth.
+func TestReceiptThenCancelCollapsesContract(t *testing.T) {
+	s := InitialState(true)
+	r := mustTransition(t, s, Input{Type: InputReceiptObserved, Status: ReceiptVerified, Summary: strPtr("finished before cancel")})
+	assertHasDecision(t, r.Decisions, "AcceptReceipt")
+	r = mustTransition(t, r.State, Input{Type: InputCancelRequested})
+	r = mustTransition(t, r.State, Input{Type: InputChildExited, ExitCode: intPtr(0)})
+	if r.State.Terminal.Status != StatusCancelled || r.State.Terminal.OK {
+		t.Fatalf("want cancelled/not-ok, got %+v", r.State.Terminal)
+	}
+	if r.State.Terminal.TaskContractStatus != "not-applicable" {
+		t.Fatalf("cancelled run leaked taskContractStatus %q (want not-applicable)", r.State.Terminal.TaskContractStatus)
+	}
+	if r.State.Terminal.TaskResultSummary != "" {
+		t.Fatalf("cancelled run leaked taskResultSummary %q", r.State.Terminal.TaskResultSummary)
+	}
+}
+
+// receipt-then-deadline: verified receipt arrives before the deadline fires;
+// the deadlined terminal must not retain verified contract truth or a summary.
+func TestReceiptThenDeadlineCollapsesContract(t *testing.T) {
+	s := InitialState(true)
+	r := mustTransition(t, s, Input{Type: InputReceiptObserved, Status: ReceiptVerified, Summary: strPtr("finished before deadline")})
+	r = mustTransition(t, r.State, Input{Type: InputDeadlineReached})
+	r = mustTransition(t, r.State, Input{Type: InputChildExited, ExitCode: intPtr(0)})
+	if r.State.Terminal.Status != StatusFailed || r.State.Terminal.OK {
+		t.Fatalf("want failed/not-ok, got %+v", r.State.Terminal)
+	}
+	if r.State.Terminal.Reason != "deadline-reached" {
+		t.Fatalf("want deadline-reached, got %q", r.State.Terminal.Reason)
+	}
+	if r.State.Terminal.TaskContractStatus != "not-applicable" {
+		t.Fatalf("deadlined run leaked taskContractStatus %q (want not-applicable)", r.State.Terminal.TaskContractStatus)
+	}
+	if r.State.Terminal.TaskResultSummary != "" {
+		t.Fatalf("deadlined run leaked taskResultSummary %q", r.State.Terminal.TaskResultSummary)
+	}
 }
 
 func TestDeadlineWins(t *testing.T) {
@@ -112,6 +163,11 @@ func TestDeadlineWins(t *testing.T) {
 	}
 	if r.State.Terminal.Reason != "deadline-reached" {
 		t.Fatalf("want deadline-reached, got %q", r.State.Terminal.Reason)
+	}
+	// A deadlined run with no receipt observed is already not-applicable; assert
+	// it explicitly so the contract is pinned alongside the receipt-arrival case.
+	if r.State.Terminal.TaskContractStatus != "not-applicable" {
+		t.Fatalf("deadlined run leaked taskContractStatus %q (want not-applicable)", r.State.Terminal.TaskContractStatus)
 	}
 }
 

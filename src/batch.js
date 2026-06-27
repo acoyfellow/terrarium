@@ -17,6 +17,66 @@ const SUCCESS = ["done"];
 function isTerminal(status) { return TERMINAL.includes(status); }
 function isSuccess(run) { return SUCCESS.includes(run.status) && run.ok !== false; }
 
+// Default active-child width suggested for a large batch that must pin a bound
+// but did not. Kept small so the suggestion never silently re-introduces the
+// fan-out the ceiling exists to prevent; the caller is free to raise it.
+export const SUGGESTED_LARGE_BATCH_CONCURRENCY = 8;
+
+/**
+ * Pure, side-effect-free preflight validation of a batch shape. Returns a
+ * structured verdict instead of throwing so callers (CLI, MCP, dogfooders) can
+ * inspect the contract — and an actionable suggested `concurrency` — *before*
+ * any child is launched. `spawnBatch` reuses this so the throw paths and the
+ * inspectable verdict share one source of truth and can never drift.
+ *
+ * @param {object} opts                 the same shape passed to spawnBatch
+ * @returns {{ ok: boolean, code?: string, error?: string, jobCount: number,
+ *            requiresConcurrency: boolean, suggestedConcurrency?: number,
+ *            effectiveConcurrency: number|null }}
+ */
+export function validateBatchShape(opts = {}) {
+  const { jobs, strategy = "all", quorum, concurrency, cleanupTimeoutMs = 5000 } = opts;
+  const jobCount = Array.isArray(jobs) ? jobs.length : 0;
+  // Above DEFAULT_UNBOUNDED_JOBS a bound is mandatory; surface that and a
+  // concrete suggested value regardless of whether the shape is otherwise valid
+  // so a caller missing the bound always gets an actionable number to copy.
+  const requiresConcurrency = jobCount > DEFAULT_UNBOUNDED_JOBS;
+  const suggestedConcurrency = requiresConcurrency
+    ? Math.min(SUGGESTED_LARGE_BATCH_CONCURRENCY, Math.max(1, jobCount))
+    : undefined;
+  const base = { jobCount, requiresConcurrency, suggestedConcurrency };
+
+  if (!Array.isArray(jobs) || jobs.length < 1 || jobs.length > MAX_BATCH_JOBS) {
+    return { ok: false, code: "job-count", error: `batch requires 1-${MAX_BATCH_JOBS} jobs`, effectiveConcurrency: null, ...base };
+  }
+  if (concurrency == null && requiresConcurrency) {
+    return {
+      ok: false,
+      code: "missing-concurrency",
+      error: `batches over ${DEFAULT_UNBOUNDED_JOBS} jobs require an explicit concurrency bound (got ${jobs.length} jobs, max ${MAX_BATCH_JOBS}); try concurrency: ${suggestedConcurrency}`,
+      effectiveConcurrency: null,
+      ...base,
+    };
+  }
+  if (!BATCH_STRATEGIES.includes(strategy)) {
+    return { ok: false, code: "strategy", error: `invalid batch strategy: ${strategy} (expected ${BATCH_STRATEGIES.join(", ")})`, effectiveConcurrency: null, ...base };
+  }
+  if (strategy === "quorum") {
+    const quorumTarget = Number(quorum);
+    if (!Number.isInteger(quorumTarget) || quorumTarget < 1 || quorumTarget > jobs.length) {
+      return { ok: false, code: "quorum", error: "quorum strategy requires an integer quorum between 1 and jobs.length", effectiveConcurrency: null, ...base };
+    }
+  }
+  const limit = concurrency == null ? jobs.length : Number(concurrency);
+  if (!Number.isInteger(limit) || limit < 1) {
+    return { ok: false, code: "concurrency", error: "concurrency must be a positive integer", effectiveConcurrency: null, ...base };
+  }
+  if (!Number.isFinite(Number(cleanupTimeoutMs)) || Number(cleanupTimeoutMs) < 0) {
+    return { ok: false, code: "cleanup-timeout", error: "cleanupTimeoutMs must be a non-negative number", effectiveConcurrency: null, ...base };
+  }
+  return { ok: true, effectiveConcurrency: limit, ...base };
+}
+
 /**
  * Fan out an array of jobs as independent background Terrarium runs, grouped
  * under one correlation handle, and resolve according to a join strategy.
@@ -40,36 +100,20 @@ export async function spawnBatch(opts = {}) {
     jobs,
     strategy = "all",
     quorum,
-    concurrency,
     label = "Terrarium batch",
     pollMs = 500,
     timeoutMs,
     cleanupTimeoutMs = 5000,
   } = opts;
 
-  if (!Array.isArray(jobs) || jobs.length < 1 || jobs.length > MAX_BATCH_JOBS) {
-    throw new Error(`batch requires 1-${MAX_BATCH_JOBS} jobs`);
-  }
-  // The 32-job ceiling only ever existed to bound simultaneous children. Lift it
-  // to MAX_BATCH_JOBS, but only when the caller bounds active concurrency. Above
-  // DEFAULT_UNBOUNDED_JOBS without an explicit `concurrency`, every child would
-  // launch at once, so require the bound instead of fanning out unboundedly.
-  if (concurrency == null && jobs.length > DEFAULT_UNBOUNDED_JOBS) {
-    throw new Error(`batches over ${DEFAULT_UNBOUNDED_JOBS} jobs require an explicit concurrency bound (got ${jobs.length} jobs, max ${MAX_BATCH_JOBS})`);
-  }
-  if (!BATCH_STRATEGIES.includes(strategy)) {
-    throw new Error(`invalid batch strategy: ${strategy} (expected ${BATCH_STRATEGIES.join(", ")})`);
-  }
-  let quorumTarget = null;
-  if (strategy === "quorum") {
-    quorumTarget = Number(quorum);
-    if (!Number.isInteger(quorumTarget) || quorumTarget < 1 || quorumTarget > jobs.length) {
-      throw new Error("quorum strategy requires an integer quorum between 1 and jobs.length");
-    }
-  }
-  const limit = concurrency == null ? jobs.length : Number(concurrency);
-  if (!Number.isInteger(limit) || limit < 1) throw new Error("concurrency must be a positive integer");
-  if (!Number.isFinite(Number(cleanupTimeoutMs)) || Number(cleanupTimeoutMs) < 0) throw new Error("cleanupTimeoutMs must be a non-negative number");
+  // Single-source validation: spawnBatch and the inspectable validateBatchShape
+  // verdict can never drift because the throw path *is* the verdict. The
+  // 32-job ceiling only ever bounded simultaneous children, so beyond it we
+  // require an explicit concurrency bound rather than fanning out unboundedly.
+  const verdict = validateBatchShape(opts);
+  if (!verdict.ok) throw new Error(verdict.error);
+  const quorumTarget = strategy === "quorum" ? Number(quorum) : null;
+  const limit = verdict.effectiveConcurrency;
 
   const { started, launchError, launchErrors, launchTimedOut } = await launchBounded(jobs, limit, timeoutMs);
   const runIds = started.filter(Boolean).map((run) => run.runId);
