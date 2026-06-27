@@ -4,6 +4,13 @@ Succinct, product-facing changes to Terrarium. This is not a full commit log; it
 
 ## Unreleased
 
+### Go core migration: first runnable kernel slice
+
+- Added an experimental Go module with `cmd/terra-core`, a pure single-run state machine, JSON command protocol, and a prototype one-process runner under `go/runner`.
+- Added a thin TypeScript adapter gated by `TERRARIUM_GO_CORE`; default behavior remains JavaScript, and `terra --version --json` can report when the Go core served the call.
+- Documented the intended split: Go core owns receipts/process supervision/batch/sweeps over time; TypeScript keeps CLI/Node/MCP/Pi adapters and Cloudflare Worker Pulse.
+- This is not a deploy and not a runtime cutover. The stable public primitive and existing JavaScript execution path remain authoritative until comparative real-run evidence says otherwise.
+
 ### Docs: Pulse durable edge wake transport
 
 - Added [docs/PULSE.md](./docs/PULSE.md): problem, one-sentence promise, curl quick start (emit/claim/ack/status with the bearer token), a compact emitter → worker → PulseRouter DO + SQLite → claim/ack diagram, a proof-to-test table tying each guarantee to its test file, explicit limits/non-goals, and a where-to-edit map.

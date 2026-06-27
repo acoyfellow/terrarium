@@ -7,16 +7,22 @@
 
 export const TERMINAL_EVENT_TYPES = ['Completed', 'Failed', 'TimedOut', 'Cancelled'];
 
-export const CALLBACK_EVENT_KEYS = new Set([
+// Single source of truth for which event fields survive routing and claim-read
+// validation. CALLBACK_EVENT_KEYS, CLAIMED_CALLBACK_EVENT_KEYS, and
+// sanitizeCallbackEvent all derive from this so they can never drift apart.
+export const ALLOWED_EVENT_FIELDS = [
   'type', 'eventId', 'runId', 'parentRunId', 'taskFingerprint', 'workflowId',
   'sessionId', 'channel', 'at', 'status', 'ok', 'exitCode', 'signal', 'dryRun',
-]);
+  // Decide-payload: a bounded receipt an emitter attaches so a downstream
+  // decider can choose reuse / log-learning / fire-next from the event alone.
+  // Not part of the eventId/dedup hash (which only hashes runId/type/at/status/exitCode),
+  // so adding it preserves dedup parity across the DO and fs-router backends.
+  'receipt',
+];
+export const CALLBACK_EVENT_KEYS = new Set(ALLOWED_EVENT_FIELDS);
 export const CLAIMED_CALLBACK_EVENT_KEYS = new Set([...CALLBACK_EVENT_KEYS, 'claimedAt']);
 
-const ALLOWED_EVENT_FIELDS = [
-  'type', 'eventId', 'runId', 'parentRunId', 'taskFingerprint', 'workflowId',
-  'sessionId', 'channel', 'at', 'status', 'ok', 'exitCode', 'signal', 'dryRun',
-];
+
 
 export function assertId(value, label) {
   if (typeof value !== 'string' || !/^[A-Za-z0-9_-]{1,120}$/.test(value)) throw new Error(`invalid ${label}`);

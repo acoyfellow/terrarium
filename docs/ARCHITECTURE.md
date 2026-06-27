@@ -89,6 +89,10 @@ Pi (model transport; no built-in host tools)
 
 Terrarium remains the wrapper and capability broker; Pi remains the agent. Model credentials never enter Docker.
 
+## Planned: Go core migration
+
+The durable-execution kernel (receipts, process supervision, batch, sweeps) is planned to move to a Go core, while TypeScript adapters (CLI/Node/MCP/Pi) and the Worker Pulse edge transport remain TypeScript. The target component split is documented in [GO_CORE_MIGRATION.md](./GO_CORE_MIGRATION.md). This is a planning skeleton, not a deploy.
+
 ## Current limits
 
 The public campaign/state-machine sections above document frozen historical provenance. See [CORE_PRODUCT_DECISION.md](./CORE_PRODUCT_DECISION.md); they are not the current product roadmap.
