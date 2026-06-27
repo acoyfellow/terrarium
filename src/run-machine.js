@@ -93,8 +93,17 @@ function terminalDecision(state) {
 
   // Cancellation/deadline intent wins if observed before terminal commit,
   // independent of the child's exit code or receipt arrival ordering.
-  if (state.cancelRequested) return { status: "cancelled", ok: false, exitCode: state.childExit.exitCode, signal: state.childExit.signal, taskContractStatus: state.receipt === "pending" ? "not-applicable" : state.receipt, reason: "cancel-requested" };
-  if (state.deadlineReached) return { status: "failed", ok: false, exitCode: state.childExit.exitCode, signal: state.childExit.signal, taskContractStatus: state.receipt === "pending" ? "not-applicable" : state.receipt, reason: "deadline-reached" };
+  // A run terminated by cancellation or deadline did not complete on its own
+  // terms, so a receipt that happened to arrive before the kill is NOT trusted
+  // completion evidence. If the child emitted a verified TERRARIUM_RESULT line
+  // and was then cancelled/deadlined before exiting, retaining
+  // taskContractStatus:"verified" on a status:"cancelled"/status:"failed" run
+  // would mislead every reconstructing consumer (group roll-ups, the Pi
+  // extension, mcp retry classification) into reading a terminated run as a
+  // successful task receipt. Collapse any non-final receipt to "not-applicable",
+  // matching the orphan terminal convention.
+  if (state.cancelRequested) return { status: "cancelled", ok: false, exitCode: state.childExit.exitCode, signal: state.childExit.signal, taskContractStatus: "not-applicable", reason: "cancel-requested" };
+  if (state.deadlineReached) return { status: "failed", ok: false, exitCode: state.childExit.exitCode, signal: state.childExit.signal, taskContractStatus: "not-applicable", reason: "deadline-reached" };
   if (state.runtimeError) return { status: "error", ok: false, exitCode: state.childExit.exitCode, signal: null, error: state.runtimeError, taskContractStatus: state.receipt, reason: "runtime-error" };
 
   // For receipt-requiring runs, defer finalization until receipt classification

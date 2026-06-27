@@ -74,7 +74,7 @@ Every public event is allowlisted and bounded. Callback subscriptions can filter
 
 ## Concurrency
 
-Independent runs may execute concurrently; each run still owns one child and one receipt. Parents can register existing run IDs in a durable group, or explicitly use `terrarium_spawn_batch` to launch 1–32 jobs and create the group in one call. `concurrency` bounds simultaneous launches. Cancellation records durable intent, keeps the supervisor alive through launch handoff, and targets the child's Unix process group so descendants are torn down together. Strategy rounds are separated by a memory barrier. Fixes may be generated concurrently but merge serially; every stale fix must replay against the current head.
+Independent runs may execute concurrently; each run still owns one child and one receipt. Parents can register existing run IDs in a durable group, or explicitly use `terrarium_spawn_batch` to launch 1–256 jobs and create the group in one call. `concurrency` bounds simultaneously active runs (each slot held until its run is terminal) and is required once a batch exceeds 32 jobs, so the queued-job ceiling can grow without unbounding active children. Cancellation records durable intent, keeps the supervisor alive through launch handoff, and targets the child's Unix process group so descendants are torn down together. Strategy rounds are separated by a memory barrier. Fixes may be generated concurrently but merge serially; every stale fix must replay against the current head.
 
 ## Secure agent composition
 

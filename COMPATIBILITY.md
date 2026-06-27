@@ -35,7 +35,7 @@ These tools remain available with their present ordinary-run meaning:
 | Tool | Stable purpose |
 | --- | --- |
 | `terrarium_spawn` | Spawn exactly one child agent for one bounded delegated task. |
-| `terrarium_spawn_batch` | Additive coordinator: create 1–32 independent ordinary runs under one group and resolve them with an explicit join strategy. |
+| `terrarium_spawn_batch` | Additive coordinator: create 1–256 independent ordinary runs under one group and resolve them with an explicit join strategy. Batches over 32 jobs require an explicit `concurrency` bound. |
 | `terrarium_status` | Inspect one run or list/poll runs. |
 | `terrarium_read` | Read a recorded Terrarium or MRE log. |
 | `terrarium_cancel` | Additive control: cancel one active lineage-scoped run. |

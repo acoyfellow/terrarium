@@ -402,18 +402,25 @@ export class PulseRouter {
     const now = Date.now();
     const cutoff = Math.max(0, Number(olderThanMs) || 0);
     let requeued = 0;
+    // maxAttempts mirrors the fs router: the most-redelivered event in this pass
+    // so operators can spot a poison event a consumer keeps crashing on.
+    let maxAttempts = 0;
     for (const row of this.sql.exec("SELECT event_id, payload FROM mailbox WHERE subscriber_id = ? AND state = 'inflight'", subscriberId).toArray()) {
       let event; try { event = JSON.parse(row.payload); } catch { continue; }
       if (!isValidCallbackEvent(event, row.event_id, { state: 'claimed' })) continue;
       if (now - Date.parse(event.claimedAt) < cutoff) continue;
-      const pendingEvent = sanitizeCallbackEvent(event); // drops claimedAt
+      // sanitizeCallbackEvent drops claimedAt; bump the redelivery counter so the
+      // re-pending event records that it has now been delivered one more time.
+      const attempts = (Number.isInteger(event.deliveryAttempts) ? event.deliveryAttempts : 0) + 1;
+      const pendingEvent = { ...sanitizeCallbackEvent(event), deliveryAttempts: attempts };
       this.sql.exec(
         "UPDATE mailbox SET state = 'pending', payload = ?, claimed_at = NULL WHERE subscriber_id = ? AND event_id = ?",
         JSON.stringify(pendingEvent), subscriberId, row.event_id,
       );
       requeued++;
+      if (attempts > maxAttempts) maxAttempts = attempts;
     }
-    return { subscriberId, requeued };
+    return { subscriberId, requeued, maxAttempts };
   }
 
   // ---- HTTP dispatch from the worker ----

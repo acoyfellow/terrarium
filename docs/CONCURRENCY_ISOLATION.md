@@ -65,7 +65,9 @@ This proves output/run/task correlation, not semantic truth. Parents must still 
 
 ## Explicit batch fan-out
 
-`terrarium_spawn_batch` accepts 1–32 job objects and launches each through the normal detached spawn path. Every job keeps its own run ID, task contract, metadata, logs, terminal callback, and lineage. One durable group provides correlation.
+`terrarium_spawn_batch` accepts 1–256 job objects and launches each through the normal detached spawn path. Every job keeps its own run ID, task contract, metadata, logs, terminal callback, and lineage. One durable group provides correlation.
+
+Batches up to 32 jobs may run with unbounded concurrency (launch all at once). Larger batches, up to the 256-job ceiling, must pin an explicit `concurrency` bound so that active child count stays bounded as the queued job count grows; a `concurrency`-less batch over 32 jobs is rejected rather than fanned out into hundreds of simultaneous children. The ceiling on *queued* jobs is independent of the bound on *active* children: `concurrency` keeps each slot occupied until its run is terminal, so massive parallel work flows through a fixed-width window.
 
 Join strategies are:
 
@@ -77,7 +79,7 @@ Join strategies are:
 
 Winners are chosen by per-run finish time (`finishedAt`), not by the order jobs were listed. Because a single status poll can observe several runs that all went terminal within the interval, ordering by finish time keeps "first wins" honest; exact ties break deterministically by run ID, and a terminal run whose finish time is not yet readable sorts last so it cannot out-race a run that provably finished earlier.
 
-Optional `concurrency` bounds simultaneous launches. For write-capable winner-picking jobs, use copy/worktree isolation so cancellation does not leave competing edits in the caller's checkout.
+Optional `concurrency` bounds simultaneously active runs (each slot is held until its run is terminal) and is required once `jobs.length` exceeds 32. For write-capable winner-picking jobs, use copy/worktree isolation so cancellation does not leave competing edits in the caller's checkout.
 
 ## Terminal race invariants
 

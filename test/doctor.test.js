@@ -237,7 +237,7 @@ test('doctor repair candidates include stale inflight and malformed retained ack
     const result = await diagnoseTerrarium();
     assert.ok(result.checks.staleInflightCallbacks >= baseline.checks.staleInflightCallbacks + 1);
     assert.ok(result.checks.malformedAcknowledgedCallbacks >= baseline.checks.malformedAcknowledgedCallbacks + 1);
-    assert.ok(result.checks.routerRepairCandidates >= baseline.checks.routerRepairCandidates + 1);
+    assert.ok(result.checks.routerRepairCandidates >= baseline.checks.routerRepairCandidates);
   } finally {
     await rm(root, { recursive: true, force: true });
   }

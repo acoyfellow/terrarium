@@ -604,7 +604,11 @@ export async function reconcileRun(meta, { staleMs = 30000 } = {}) {
       status: "cancelled",
       exitCode: meta.exitCode ?? null,
       signal: meta.signal ?? null,
-      taskContractStatus: meta.taskContractStatus === "pending" ? "not-applicable" : meta.taskContractStatus,
+      // A cancelled run never produced a trusted completion, so any receipt the
+      // child managed to emit before the kill (pending OR verified) must not be
+      // retained as taskContractStatus; that would let a cancelled run be
+      // reconstructed as a verified task success. Normalize to not-applicable.
+      taskContractStatus: ["pending", "verified"].includes(meta.taskContractStatus) ? "not-applicable" : (meta.taskContractStatus ?? "not-applicable"),
       finishedAt: new Date().toISOString(),
       note: "Cancellation recovered after the background supervisor exited before recording a child process.",
     };
@@ -718,7 +722,10 @@ export async function cancelRun({ runId, requesterRunId, scope } = {}) {
       status: "cancelled",
       exitCode: meta.exitCode ?? null,
       signal: meta.signal ?? null,
-      taskContractStatus: meta.taskContractStatus === "pending" ? "not-applicable" : meta.taskContractStatus,
+      // See reconcileRun: a cancelled run's pre-kill receipt (pending OR
+      // verified) is not trusted completion evidence and must not survive as a
+      // verified taskContractStatus on a cancelled record.
+      taskContractStatus: ["pending", "verified"].includes(meta.taskContractStatus) ? "not-applicable" : (meta.taskContractStatus ?? "not-applicable"),
       finishedAt: new Date().toISOString(),
       note: "Cancellation recovered after the background supervisor exited before recording a child process.",
     };

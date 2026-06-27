@@ -59,6 +59,42 @@ test('stale inflight callbacks can be requeued and acknowledged history can be p
   }
 });
 
+test('requeueInflightEvents tracks deliveryAttempts so poison events are observable', async () => {
+  const suffix = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+  const subscriberId = `sub_attempts_${suffix}`;
+  const runId = `ter_attempts_${suffix}`;
+  const eventId = `evt_attempts_${suffix}`;
+  try {
+    // A single-run subscriber so no concurrent wildcard test can land extra events.
+    await registerSubscriber({ subscriberId, runIds: [runId], eventTypes: ['Completed'], channels: ['*'], workflowIds: ['*'] });
+    await routeEvent({ eventId, type: 'Completed', runId, channel: 'x', at: '2020-01-01T00:00:00.000Z' });
+
+    for (let i = 1; i <= 3; i++) {
+      const claimed = await claimMailboxEvents({ subscriberId });
+      const ev = claimed.events.find((e) => e.eventId === eventId);
+      assert.ok(ev, `claim ${i} returns the event`);
+      // deliveryAttempts is the count of prior redeliveries, visible on claim.
+      assert.equal(ev.deliveryAttempts ?? 0, i - 1, `claim ${i} sees ${i - 1} prior redeliveries`);
+      const res = await requeueInflightEvents({ subscriberId, olderThanMs: 0 });
+      assert.equal(res.requeued, 1);
+      assert.equal(res.maxAttempts, i, `requeue ${i} reports cumulative attempts`);
+    }
+
+    // Counter is a preserved field: it survives the next claim intact.
+    const finalClaim = await claimMailboxEvents({ subscriberId });
+    assert.equal(finalClaim.events.find((e) => e.eventId === eventId).deliveryAttempts, 3);
+
+    // A pass with nothing stale reports zero, never a stale max.
+    const fresh = await requeueInflightEvents({ subscriberId, olderThanMs: 3_600_000 });
+    assert.equal(fresh.requeued, 0);
+    assert.equal(fresh.maxAttempts, 0);
+  } finally {
+    await rm(join(MAILBOXES_DIR, subscriberId), { recursive: true, force: true });
+    await rm(join(SUBSCRIBERS_DIR, `${subscriberId}.json`), { force: true });
+    await rm(join(JOURNAL_DIR, `${eventId}.json`), { force: true });
+  }
+});
+
 test('callback subscriptions default to terminal events rather than progress heartbeats', async () => {
   const suffix = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
   const subscriberId = `sub_terminal_${suffix}`;

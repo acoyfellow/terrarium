@@ -5,6 +5,12 @@ import { HOME, assertRunId, getRunStatus, readRun } from "./core.js";
 
 export const GROUP_DIR = join(HOME, "groups");
 
+// Upper bound on runs per durable group. Kept in step with batch's MAX_BATCH_JOBS
+// so a bounded-concurrency batch over the legacy 32 ceiling can register all of
+// its run IDs in a single group. Groups are correlation handles, not execution
+// fan-out, so this cap is about durable record size, not simultaneous children.
+export const MAX_GROUP_RUNS = 256;
+
 function assertGroupId(groupId) {
   if (typeof groupId !== "string" || !/^grp_[A-Za-z0-9_]+$/.test(groupId)) throw new Error("invalid Terrarium group id");
   return groupId;
@@ -12,7 +18,7 @@ function assertGroupId(groupId) {
 
 export async function createRunGroup({ label = "Terrarium group", runIds, groupId = `grp_${randomUUID().replaceAll("-", "_")}`, requesterRunId, scope } = {}) {
   assertGroupId(groupId);
-  if (!Array.isArray(runIds) || runIds.length < 1 || runIds.length > 32) throw new Error("group requires 1-32 run IDs");
+  if (!Array.isArray(runIds) || runIds.length < 1 || runIds.length > MAX_GROUP_RUNS) throw new Error(`group requires 1-${MAX_GROUP_RUNS} run IDs`);
   const unique = [...new Set(runIds.map(assertRunId))];
   if (unique.length !== runIds.length) throw new Error("group run IDs must be unique");
   for (const runId of unique) await getRunStatus({ runId, requesterRunId, scope });

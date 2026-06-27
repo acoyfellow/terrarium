@@ -3,6 +3,14 @@ import { createRunGroup, getRunGroupStatus } from "./groups.js";
 import { BATCH_API_VERSION, BATCH_SUPPORTED_OPTIONS, MCP_SCHEMA_VERSION } from "./versions.js";
 
 export const BATCH_STRATEGIES = ["all", "allSettled", "race", "any", "quorum"];
+
+// Hard ceiling on jobs per batch. Beyond DEFAULT_UNBOUNDED_JOBS the caller must
+// pin an explicit `concurrency` so that active child count stays bounded even as
+// the queued job count grows. A large batch with unbounded concurrency would
+// launch every child at once and defeat the supervisor's resource discipline,
+// so we refuse it rather than silently fan out hundreds of simultaneous runs.
+export const MAX_BATCH_JOBS = 256;
+export const DEFAULT_UNBOUNDED_JOBS = 32;
 const TERMINAL = ["done", "failed", "inconclusive", "cancelled", "error", "orphaned", "missing"];
 const SUCCESS = ["done"];
 
@@ -18,10 +26,10 @@ function isSuccess(run) { return SUCCESS.includes(run.status) && run.ok !== fals
  * cancel the remaining runs via the existing cancelRun primitive.
  *
  * @param {object} opts
- * @param {Array<object>} opts.jobs       1-32 job option objects (each like a single spawn)
+ * @param {Array<object>} opts.jobs       1-256 job option objects (each like a single spawn); over 32 jobs requires an explicit concurrency bound
  * @param {string} [opts.strategy]        all | allSettled | race | any | quorum
  * @param {number} [opts.quorum]          required successes for the quorum strategy
- * @param {number} [opts.concurrency]     max simultaneously launched runs (default: all at once)
+ * @param {number} [opts.concurrency]     max simultaneously active runs (required when jobs.length > 32; default: all at once)
  * @param {string} [opts.label]           group label
  * @param {number} [opts.pollMs]          status poll interval (default 500)
  * @param {number} [opts.timeoutMs]       overall batch wait budget (default none)
@@ -39,8 +47,15 @@ export async function spawnBatch(opts = {}) {
     cleanupTimeoutMs = 5000,
   } = opts;
 
-  if (!Array.isArray(jobs) || jobs.length < 1 || jobs.length > 32) {
-    throw new Error("batch requires 1-32 jobs");
+  if (!Array.isArray(jobs) || jobs.length < 1 || jobs.length > MAX_BATCH_JOBS) {
+    throw new Error(`batch requires 1-${MAX_BATCH_JOBS} jobs`);
+  }
+  // The 32-job ceiling only ever existed to bound simultaneous children. Lift it
+  // to MAX_BATCH_JOBS, but only when the caller bounds active concurrency. Above
+  // DEFAULT_UNBOUNDED_JOBS without an explicit `concurrency`, every child would
+  // launch at once, so require the bound instead of fanning out unboundedly.
+  if (concurrency == null && jobs.length > DEFAULT_UNBOUNDED_JOBS) {
+    throw new Error(`batches over ${DEFAULT_UNBOUNDED_JOBS} jobs require an explicit concurrency bound (got ${jobs.length} jobs, max ${MAX_BATCH_JOBS})`);
   }
   if (!BATCH_STRATEGIES.includes(strategy)) {
     throw new Error(`invalid batch strategy: ${strategy} (expected ${BATCH_STRATEGIES.join(", ")})`);

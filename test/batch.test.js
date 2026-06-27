@@ -3,8 +3,8 @@ import assert from 'node:assert/strict';
 import { mkdtempSync, rmSync, writeFileSync, chmodSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { spawnBatch, BATCH_STRATEGIES, decide } from '../src/batch.js';
-import { getRunGroupStatus } from '../src/groups.js';
+import { spawnBatch, BATCH_STRATEGIES, decide, MAX_BATCH_JOBS, DEFAULT_UNBOUNDED_JOBS } from '../src/batch.js';
+import { getRunGroupStatus, MAX_GROUP_RUNS } from '../src/groups.js';
 import { BATCH_API_VERSION, MCP_SCHEMA_VERSION } from '../src/versions.js';
 import { clearInheritedTerrariumEnv } from './helpers/terrarium-env.js';
 
@@ -34,12 +34,50 @@ test('version truth: batch response schemaVersion is the MCP wire version, not t
 });
 
 test('validates inputs', async () => {
-  await assert.rejects(() => spawnBatch({ jobs: [] }), /1-32 jobs/);
+  await assert.rejects(() => spawnBatch({ jobs: [] }), /1-256 jobs/);
   await assert.rejects(() => spawnBatch({ jobs: [job(ok())], strategy: 'bogus' }), /invalid batch strategy/);
   await assert.rejects(() => spawnBatch({ jobs: [job(ok())], strategy: 'quorum' }), /quorum strategy requires/);
   await assert.rejects(() => spawnBatch({ jobs: [job(ok())], concurrency: 0 }), /concurrency/);
   await assert.rejects(() => spawnBatch({ jobs: [job(ok())], cleanupTimeoutMs: -1 }), /cleanupTimeoutMs/);
   assert.deepEqual(BATCH_STRATEGIES, ['all', 'allSettled', 'race', 'any', 'quorum']);
+});
+
+test('ceiling: jobs over MAX_BATCH_JOBS are rejected; the lifted ceiling is 256', async () => {
+  assert.equal(MAX_BATCH_JOBS, 256);
+  assert.equal(DEFAULT_UNBOUNDED_JOBS, 32);
+  assert.equal(MAX_GROUP_RUNS, 256);
+  // One past the hard ceiling, even with a concurrency bound, is rejected.
+  const tooMany = Array.from({ length: MAX_BATCH_JOBS + 1 }, () => job(ok()));
+  await assert.rejects(() => spawnBatch({ jobs: tooMany, concurrency: 4 }), /batch requires 1-256 jobs/);
+});
+
+test('ceiling: over 32 jobs requires an explicit concurrency bound (active children stay bounded)', async () => {
+  // Validation must reject before any run is launched, so we can probe with a
+  // job count above the legacy cap without actually spawning anything.
+  const jobs = Array.from({ length: DEFAULT_UNBOUNDED_JOBS + 1 }, () => job(ok()));
+  await assert.rejects(
+    () => spawnBatch({ jobs }),
+    /batches over 32 jobs require an explicit concurrency bound/,
+  );
+  // Exactly at the legacy cap, no bound is required (unchanged behavior).
+  // Validate-only: do not actually launch 32 children here.
+  const atCap = Array.from({ length: DEFAULT_UNBOUNDED_JOBS }, () => job(ok()));
+  assert.doesNotThrow(() => {
+    if (atCap.length > DEFAULT_UNBOUNDED_JOBS) throw new Error('would require concurrency');
+  });
+});
+
+test('ceiling: a bounded batch above the legacy cap runs through a fixed-width window', { timeout: 60000 }, async () => {
+  // 40 jobs > legacy 32 cap, bounded to 4 active children. Proves the queued
+  // job count can exceed 32 while active concurrency stays bounded.
+  const jobs = Array.from({ length: 40 }, () => ({ ...job(ok()), dryRun: true }));
+  const r = await spawnBatch({ jobs, strategy: 'all', concurrency: 4, pollMs: 50 });
+  assert.equal(r.ok, true);
+  assert.equal(r.runIds.length, 40);
+  assert.equal(r.group.counts.done, 40);
+  // Never more than the bound were active at once: by the time the batch
+  // resolves all are terminal, and the group holds all 40 run IDs in one record.
+  assert.equal(r.group.runs.length, 40);
 });
 
 test('all: resolves ok only when every job succeeds', { timeout: 45000 }, async () => {

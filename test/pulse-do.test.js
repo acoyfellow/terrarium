@@ -283,6 +283,36 @@ test('do: requeue moves stale inflight and leaves not-yet-stale alone', async ()
   assert.equal(claimed.events.length, 1, 'requeued event is claimable again (claimedAt dropped)');
 });
 
+test('do: requeue tracks deliveryAttempts so operators can spot a poison event', async () => {
+  const { router } = makeRouter();
+  await router.subscribe({ subscriberId: 'sub-poison', ownerRunId: OWNER });
+  await router.route(terminalEvent());
+
+  // Simulate a consumer that keeps claiming an event and crashing before ack:
+  // each stale requeue must bump the redelivery counter and report it.
+  let lastAttempts = 0;
+  for (let i = 1; i <= 3; i++) {
+    const claimed = router.claim({ subscriberId: 'sub-poison', ownerRunId: OWNER });
+    assert.equal(claimed.events.length, 1);
+    // deliveryAttempts is the count of PRIOR redeliveries, visible on claim.
+    assert.equal(claimed.events[0].deliveryAttempts ?? 0, i - 1, `claim ${i} sees ${i - 1} prior redeliveries`);
+    const res = router.requeue({ subscriberId: 'sub-poison', olderThanMs: 0, ownerRunId: OWNER });
+    assert.equal(res.requeued, 1);
+    assert.equal(res.maxAttempts, i, `requeue ${i} reports cumulative attempts`);
+    lastAttempts = res.maxAttempts;
+  }
+  assert.equal(lastAttempts, 3, 'poison event has been redelivered 3 times');
+
+  // The counter survives a final claim (preserved field, never dropped).
+  const finalClaim = router.claim({ subscriberId: 'sub-poison', ownerRunId: OWNER });
+  assert.equal(finalClaim.events[0].deliveryAttempts, 3);
+
+  // A clean requeue pass with nothing stale reports zero, not a stale max.
+  const fresh = router.requeue({ subscriberId: 'sub-poison', olderThanMs: 3_600_000, ownerRunId: OWNER });
+  assert.equal(fresh.requeued, 0);
+  assert.equal(fresh.maxAttempts, 0);
+});
+
 test('do: prune ages out acked mailbox + journal rows and reaps idle subscribers', async () => {
   const { router } = makeRouter();
   // Old event (well in the past) so age-from-`at`/`claimedAt` exceeds any cutoff.
