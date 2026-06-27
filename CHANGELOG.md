@@ -8,6 +8,7 @@ Succinct, product-facing changes to Terrarium. This is not a full commit log; it
 
 - README now has an "Authoritative success proof" section that names the single proof chain (child exit 0 + verified `TERRARIUM_RESULT` receipt → `done`/`ok:true`) and explicitly states that callbacks, groups, the public ledger, and the changelog are not that proof.
 - The MCP `terrarium_callbacks` and `terrarium_group` descriptions now carry the not-proof disclaimer inline.
+- README now includes an at-a-glance proof table that separates authoritative, evidence, diagnostic, notification, and presentation surfaces.
 - Renamed the README "Proof of the original primitive" adoption section to "Adoption signal for the original primitive" so adoption metrics are not confused with per-run success proof.
 
 ### Receipts: exit 0 is still not success
@@ -32,6 +33,7 @@ Succinct, product-facing changes to Terrarium. This is not a full commit log; it
 - `terra batch --cleanup-timeout-ms` now forwards the same cleanup budget available through the Node/MCP batch API.
 - Repository MCP schema exposes `cleanupTimeoutMs`; stale live MCP hosts may need a tool-metadata refresh before the field appears in a running client.
 - Batch responses now include `apiVersion`, `schemaVersion`, and `supportedOptions` so callers can distinguish repo/API support from stale host tool metadata. `apiVersion` is the batch contract version (`terrarium-batch-*`); `schemaVersion` is the MCP wire/tool-metadata version (`terrarium-mcp-*`) so it can be compared directly against the `schemaVersion` in cached tool metadata.
+- Every advertised MCP tool now carries `schemaVersion`, matching the initialize handshake, so stale cached tool metadata is detectable per tool.
 
 ### Cancellation and orphaning: terminal means one callback
 
@@ -60,6 +62,7 @@ Succinct, product-facing changes to Terrarium. This is not a full commit log; it
 - Secure workspace tools reject direct and nested credential paths and omit them from listing/search.
 - Secure-agent Pi receives only a small non-provider environment allowlist. Provider credentials are not inherited into secure mode.
 - Docker-backed secure workspace verification still requires a Docker-capable host; local non-Docker regressions pass.
+- Secure-v1 docs now enumerate the concrete Docker resource limits and clarify that provider env vars are dropped for the host Pi process while `HOME` credentials may remain reachable by that trusted transport, not by the container.
 
 ### Public ledger and documentation discipline
 

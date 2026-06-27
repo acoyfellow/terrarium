@@ -53,6 +53,21 @@ test('top-level MCP keeps the stable three-tool surface', async () => {
   assert.ok(names.includes('terrarium_doctor'));
 });
 
+test('every advertised tool carries schemaVersion matching the initialize handshake (runtime vs cached)', async () => {
+  const { responses } = await rpc([
+    { jsonrpc: '2.0', id: 1, method: 'initialize' },
+    { jsonrpc: '2.0', id: 2, method: 'tools/list' },
+  ]);
+  const init = responses.find((r) => r.id === 1).result;
+  const listed = responses.find((r) => r.id === 2).result.tools;
+  assert.equal(init.serverInfo.schemaVersion, MCP_SCHEMA_VERSION);
+  assert.ok(listed.length > 0);
+  for (const tool of listed) {
+    assert.equal(tool.schemaVersion, MCP_SCHEMA_VERSION, `tool ${tool.name} missing/mismatched schemaVersion`);
+    assert.equal(tool.schemaVersion, init.serverInfo.schemaVersion, `tool ${tool.name} schemaVersion diverges from runtime handshake`);
+  }
+});
+
 test('child MCP removes spawn and denies sibling status/read', async () => {
   const a = await runTerrarium({ task: 'scope owner', dryRun: true, stream: false });
   const b = await runTerrarium({ task: 'scope sibling', dryRun: true, stream: false });

@@ -7,14 +7,14 @@
 For the exact policy version recorded in the receipt:
 
 - source enters through an archive copy, never a host bind mount;
-- no host environment is forwarded;
+- no host environment is forwarded into the container (`docker run` receives no `-e` flags);
 - no network namespace attachment (`--network none`);
 - read-only container root;
 - non-root UID/GID 65534;
 - all Linux capabilities dropped;
 - `no-new-privileges` enabled;
 - writable workspace and `/tmp` are `noexec,nosuid` tmpfs;
-- CPU, memory, PID, wall-time, and output limits;
+- explicit resource limits for the `secure-v1` profile: `--cpus 1`, `--memory 512m`, `--pids-limit 32`, 300s wall-time, 65536-byte captured-output cap, and `size=64m`/`size=16m` `noexec,nosuid` tmpfs for `/workspace` and `/tmp`;
 - forced container teardown;
 - receipt binds task digest, source revision, profile, timestamps, and result.
 
@@ -43,7 +43,7 @@ Read the JSON receipt. A successful task is not sufficient on its own: `teardown
 terra secure-agent --model <model-id> --cwd ./repo "fix the failing parser test"
 ```
 
-Pi remains the agent and model transport on the host. Terrarium launches it with built-in tools disabled and a run-scoped code-mode MCP. Agent-authored orchestration runs in QuickJS and can call only `list_files`, `read_file`, `search_text`, `write_file`, `run_tests`, and `get_diff` inside the disposable secure-v1 container. `finish` stays a native explicit action.
+Pi remains the agent and model transport on the host. Terrarium launches it with built-in tools disabled and a run-scoped code-mode MCP. The host Pi process receives only an allowlisted environment (`PATH`, `HOME`, `TMPDIR`, `SHELL`, `LANG`, `LC_ALL`, `TERM`, and `XDG_*`); provider/API-key environment variables are dropped. Because `HOME` is forwarded and provider extensions stay enabled, provider credentials stored under `HOME` remain reachable by the trusted host Pi transport. They are never copied into, nor reachable from inside, the disposable container. Agent-authored orchestration runs in QuickJS and can call only `list_files`, `read_file`, `search_text`, `write_file`, `run_tests`, and `get_diff` inside the disposable secure-v1 container. `finish` stays a native explicit action.
 
 The receipt includes only the safe tool audit, final summary, test result, diff, source revision, and teardown proof. Provider/model identity and raw Pi events remain private.
 
