@@ -28,6 +28,15 @@ import {
   eventId as deriveEventId,
 } from './shared.js';
 
+// Allowed top-level keys on a stored subscriber record. Mirrors src/router.js
+// getSubscriber exactly so a record persisted by either backend validates the
+// same way and a tampered/extra-field record fails closed before owner checks.
+const SUBSCRIBER_RECORD_KEYS = new Set([
+  'version', 'subscriberId', 'channels', 'workflowIds', 'eventTypes', 'runIds',
+  'ownerRunId', 'createdAt', 'updatedAt',
+]);
+const OWNER_RUN_ID_RE = /^ter_[A-Za-z0-9_]+$/;
+
 async function sha256Hex(input) {
   const data = new TextEncoder().encode(input);
   const digest = await crypto.subtle.digest('SHA-256', data);
@@ -36,7 +45,7 @@ async function sha256Hex(input) {
 
 function ownerOrNull(value) {
   if (value == null) return null;
-  if (typeof value !== 'string' || !/^ter_[A-Za-z0-9_]+$/.test(value)) throw new Error('invalid subscriber owner run id');
+  if (typeof value !== 'string' || !OWNER_RUN_ID_RE.test(value)) throw new Error('invalid subscriber owner run id');
   return value;
 }
 
@@ -99,6 +108,20 @@ export class PulseRouter {
     assertId(subscriberId, 'subscriber id');
     const sub = this.#loadSubscriber(subscriberId);
     if (!sub) { const e = new Error('subscriber not found'); e.code = 'ENOENT'; throw e; }
+    // Validate the stored record before any owner/access check, identical to the
+    // fs router (src/router.js getSubscriber). A row whose JSON-decoded shape
+    // carries non-allowlisted keys, a malformed ownerRunId, or non-ISO
+    // createdAt/updatedAt fails closed rather than leaking access. #rowToSubscriber
+    // only ever projects allowlisted columns, so this primarily guards against a
+    // corrupt/tampered owner_run_id or timestamp written into the table.
+    if (sub.subscriberId !== subscriberId ||
+        !Object.keys(sub).every((key) => SUBSCRIBER_RECORD_KEYS.has(key)) ||
+        !Object.hasOwn(sub, 'ownerRunId') ||
+        (sub.ownerRunId !== null && !OWNER_RUN_ID_RE.test(sub.ownerRunId)) ||
+        !validTimestamp(sub.createdAt) ||
+        !validTimestamp(sub.updatedAt)) {
+      throw new Error('invalid callback subscriber record');
+    }
     return sub;
   }
 
@@ -204,6 +227,17 @@ export class PulseRouter {
     if (already.length) return { eventId: id, duplicate: true, delivered: 0 };
     this.sql.exec('INSERT INTO journal (event_id, payload, at) VALUES (?, ?, ?)', id, JSON.stringify(routed), routed.at);
 
+    // ownerRunId / matches() isolation decision (conscious, mirrors fs router):
+    //
+    // matches() (src/pulse/shared.js) intentionally has NO ownerRunId dimension.
+    // Delivery fan-out is purely filter-based (channels/workflowIds/eventTypes/
+    // runIds + the pi-*/pi_* wildcard guard). Owner isolation is enforced ONLY at
+    // claim/ack/status/requeue/unsubscribe via #assertOwner. This is host-trust:
+    // the journal+mailbox live inside one trusted DO and an event may legitimately
+    // fan out to multiple subscribers owned by different runs; what an owner must
+    // NOT do is read or settle ANOTHER owner's mailbox. Pushing ownerRunId into
+    // matches() would wrongly suppress legitimate multi-owner fan-out and diverge
+    // from src/router.js, which also isolates only at the mailbox boundary.
     let delivered = 0;
     for (const row of this.sql.exec('SELECT * FROM subscribers').toArray()) {
       const sub = this.#rowToSubscriber(row);
