@@ -41,9 +41,9 @@ test('executeRepairPlan with apply requeues stale inflight callbacks via the rou
   const inflightDir = `${MAILBOXES_DIR}/${subscriberId}/inflight`;
   const pendingDir = `${MAILBOXES_DIR}/${subscriberId}/pending`;
   const inflightId = `evt_stale_${suffix}`;
-  // requeue operates through the router primitive, which requires a registered
-  // subscriber the caller owns. Register it (ownerRunId mirrors the caller).
-  await registerSubscriber({ subscriberId, ownerRunId: process.env.TERRARIUM_RUN_ID || null });
+  // requeue runs as the top-level controller (ownerRunId null), so the
+  // subscriber it repairs must be controller-owned to match.
+  await registerSubscriber({ subscriberId, ownerRunId: null });
   await mkdir(inflightDir, { recursive: true });
   await writeFile(`${inflightDir}/${inflightId}.json`, JSON.stringify({ eventId: inflightId, type: 'Completed', runId: `ter_${suffix}`, at: '2020-01-01T00:00:00.000Z', claimedAt: '2020-01-01T00:00:00.000Z' }));
   try {
@@ -58,7 +58,7 @@ test('executeRepairPlan with apply requeues stale inflight callbacks via the rou
     assert.deepEqual(await readdir(inflightDir), []);
     assert.ok((await readdir(pendingDir)).includes(`${inflightId}.json`));
   } finally {
-    await unregisterSubscriber(subscriberId, { ownerRunId: process.env.TERRARIUM_RUN_ID || null }).catch(() => {});
+    await unregisterSubscriber(subscriberId, { ownerRunId: null }).catch(() => {});
     await rm(`${MAILBOXES_DIR}/${subscriberId}`, { recursive: true, force: true });
   }
 });

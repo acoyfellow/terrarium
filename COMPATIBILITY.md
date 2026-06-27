@@ -41,7 +41,7 @@ These tools remain available with their present ordinary-run meaning:
 | `terrarium_cancel` | Additive control: cancel one active lineage-scoped run. |
 | `terrarium_group` | Additive view: group existing independent runs; never spawns children. |
 | `terrarium_callbacks` | Additive durable pull queue: scoped subscribe/claim/ack/status/requeue/recover/prune/unsubscribe; concrete subscriptions close finish-before-subscribe races. |
-| `terrarium_doctor` | Additive top-level diagnostics for durable state, active/orphaned runs, groups, callbacks, and stale claims. |
+| `terrarium_doctor` | Additive top-level diagnostics for durable state, active/orphaned runs, groups, callbacks, and stale claims. Read-only over MCP; the `terra doctor --repair [--apply]` CLI adds an opt-in, dry-run-by-default executor for the mechanically-safe recover/requeue/prune subset. |
 
 Existing arguments preserve their semantics. Optional fields may be added later for sandbox selection, run role, scenario identity, or campaign identity; ordinary callers do not need them.
 
