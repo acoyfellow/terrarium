@@ -421,7 +421,7 @@ Tools:
 - `terrarium_cancel` — cancel one active run and its descendant process group within the caller's lineage scope.
 - `terrarium_group` — create/status/read/cancel a parent-owned collection of already-started independent runs; it never spawns or hides fan-out. Group state is a fail-closed roll-up of member receipts: `ok` requires every member `done` with `ok: true`, and missing or inaccessible members are not complete. It is not independent success proof; the per-run verified receipts are.
 - `terrarium_callbacks` — create a durable **pull** subscription for terminal run events, atomically claim each callback, acknowledge delivery, requeue abandoned inflight events, recover a terminal run, and prune stale state. Terminal events are journaled even when no subscriber is online; journal entries contain correlation/status facts, not task prompts, child output, or local paths. A concrete run subscription replays a completion that raced ahead; acknowledged events are not redelivered. Subscribing alone does not wake a conversation—the consumer or Pi extension must claim the queue. High-frequency progress remains in run status/logs, not callback mailboxes. A terminal callback is a notification that a run finished, not authoritative proof the task succeeded; confirm with the run's verified receipt. The local filesystem router and experimental Cloudflare Pulse backend share validation and matching semantics; when deployed with the demo SPA, `/pulse`, `/claim`, `/ack`, and `/status` must be worker-first routes so the token gate runs instead of the SPA fallback.
-- `terrarium_doctor` — top-level-only diagnostics for storage, runs, attention, callbacks, groups, stale claims, schema versions, and concrete repair handles for local reconstruction.
+- `terrarium_doctor` — top-level-only diagnostics for storage, runs, attention, callbacks, groups, stale claims, schema versions, and concrete repair handles for local reconstruction. Over MCP it stays read-only; the CLI adds an opt-in self-heal executor (see `terra doctor --repair`).
 
 Terrarium does not auto-load its Pi host extension. The durable callback queue remains available through `terrarium_callbacks` for hosts that want to subscribe, claim, acknowledge, requeue, recover, and prune terminal events explicitly. By default, Pi users should use the normal MCP tools or CLI (`terrarium_status`, `terrarium_read`, `terrarium_cancel`, `terra status`, `terra read`, `terra cancel`). Hosts may explicitly install `src/pi-extension.js` to get a run widget and callback-triggered follow-ups; the extension subscribes only to concrete runs spawned by that Pi session. This keeps Terrarium out of unrelated Pi sessions by default.
 
@@ -437,6 +437,8 @@ terra group create "research batch" <runIdA> <runIdB>
 terra group status <groupId>
 terra group read <groupId>
 terra doctor
+terra doctor --repair          # dry-run the mechanically-safe repair subset (recover/requeue/prune)
+terra doctor --repair --apply  # execute it; judgement/quarantine steps stay skipped for an operator
 terra schedule replay fixtures/run-schedules/cancel-before-completion.v1.json
 ```
 
