@@ -81,6 +81,7 @@ export async function diagnoseTerrarium() {
     malformedInflightCallbacks: 0,
     acknowledgedCallbacks: 0,
     malformedAcknowledgedCallbacks: 0,
+    quarantinedCallbacks: 0,
     staleInflightCallbacks: 0,
     routerRepairCandidates: subscriberHealth.malformed + journalHealth.malformed,
     missingTerminalCallbacks: 0,
@@ -99,6 +100,9 @@ export async function diagnoseTerrarium() {
       const pending = await mailboxHealth(`${MAILBOXES_DIR}/${subscriber}/pending`, validPendingEvent);
       const inflight = await mailboxHealth(`${MAILBOXES_DIR}/${subscriber}/inflight`, validClaimedEvent);
       const acknowledged = await mailboxHealth(`${MAILBOXES_DIR}/${subscriber}/acked`, validClaimedEvent);
+      // Dead-lettered poison callbacks carry the pending event shape (no claimedAt).
+      const dead = await mailboxHealth(`${MAILBOXES_DIR}/${subscriber}/dead`, validPendingEvent);
+      checks.quarantinedCallbacks += dead.valid;
       checks.pendingCallbacks += pending.valid;
       checks.malformedPendingCallbacks += pending.malformed;
       checks.inflightCallbacks += inflight.valid;
@@ -146,6 +150,7 @@ export async function diagnoseTerrarium() {
   if (checks.inflightCallbacks) warnings.push(`${checks.inflightCallbacks} callback(s) are claimed but unacknowledged`);
   if (checks.malformedInflightCallbacks) warnings.push(`${checks.malformedInflightCallbacks} malformed inflight callback(s) need quarantine or repair`);
   if (checks.malformedAcknowledgedCallbacks) warnings.push(`${checks.malformedAcknowledgedCallbacks} malformed acknowledged callback(s) need quarantine or repair`);
+  if (checks.quarantinedCallbacks) warnings.push(`${checks.quarantinedCallbacks} poison callback(s) were quarantined after exceeding the delivery-attempt cap; inspect or prune them`);
   if (checks.staleInflightCallbacks) warnings.push(`${checks.staleInflightCallbacks} stale inflight callback(s) are repair candidates for requeue`);
   if (checks.missingTerminalCallbacks) warnings.push(`${checks.missingTerminalCallbacks} terminal run(s) are missing durable callback events; recover those run IDs`);
   if (checks.staleChildClaims) warnings.push(`${checks.staleChildClaims} stale child-slot claim(s) exist from older runs`);

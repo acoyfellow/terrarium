@@ -18,6 +18,7 @@ import { diagnoseTerrarium, executeRepairPlan } from "./doctor.js";
 import { replayScheduleFile } from "./schedule-replay.js";
 import { goCoreVersion, goCoreDryRun } from "./go-core-adapter.ts";
 import { detectMistypedCommand } from "./command-guard.js";
+import { formatRunList, formatRunStatus } from "./status-format.js";
 
 function help() {
   return `terrarium ${VERSION}
@@ -37,7 +38,7 @@ Usage:
   terra --isolation copy "task"
   terra --isolation worktree "task"
   terra plan "task"            print the inert child-invocation plan (Go-accelerated, JS fallback)
-  terra status [runId]
+  terra status [runId]         compact human-readable run table; add --json for raw JSON
   terra read <runId> [tailBytes]
   terra read <runId> mre [tailBytes]
   terra cancel <runId>
@@ -159,8 +160,8 @@ else if (cmd === "plan") {
   const out = goCoreDryRun({ task: rest.join(" ").trim(), agent: opts.agent, cwd: opts.cwd });
   console.log(opts.json ? JSON.stringify({ ...out.value, source: out.source, ...(out.fallbackReason ? { fallbackReason: out.fallbackReason } : {}) }, null, 2) : `${out.value.agent} (${out.value.core}) :: ${out.value.task}`);
 }
-else if (cmd === "status" && rest[0]?.startsWith("ter_")) getRunStatus({ runId: rest[0] }).then((r) => console.log(JSON.stringify(r, null, 2)));
-else if (cmd === "status") listRuns({ limit: Number(rest[0] || 20) }).then((r) => console.log(JSON.stringify(r, null, 2)));
+else if (cmd === "status" && rest[0]?.startsWith("ter_")) getRunStatus({ runId: rest[0] }).then((r) => console.log(opts.json ? JSON.stringify(r, null, 2) : formatRunStatus(r)));
+else if (cmd === "status") listRuns({ limit: Number(rest[0] || 20) }).then((r) => console.log(opts.json ? JSON.stringify(r, null, 2) : formatRunList(r)));
 else if (cmd === "read") readRun({ runId: rest[0], tailBytes: Number(rest[1] === "mre" ? rest[2] || 20000 : rest[1] || 20000), kind: rest[1] === "mre" ? "mre" : "terrarium" }).then((r) => console.log(r.text));
 else if (cmd === "cancel") cancelRun({ runId: rest[0] }).then((r) => console.log(JSON.stringify(r, null, 2))).catch((e) => { console.error(`terrarium: ${e.message}`); process.exit(1); });
 else if (cmd === "batch") spawnBatch({ jobs: rest.map((task) => ({ task, agent: opts.agent, model: opts.model, profile: opts.profile, cwd: opts.cwd, isolation: opts.isolation, timeoutMs: opts.timeoutMs, requireTaskContract: true })), strategy: opts.strategy || "all", quorum: opts.quorum, concurrency: opts.concurrency, pollMs: opts.pollMs, timeoutMs: opts.batchTimeoutMs, cleanupTimeoutMs: opts.cleanupTimeoutMs }).then((r) => { console.log(JSON.stringify(r, null, 2)); process.exit(r.ok ? 0 : 1); }).catch((e) => { console.error(`terrarium: ${e.message}`); process.exit(1); });

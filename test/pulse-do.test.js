@@ -89,7 +89,7 @@ test('do: happy path emit -> route -> claim -> ack', async () => {
   assert.match(routed.eventId, /^evt_[0-9a-f]{32}$/);
 
   let st = router.status('sub-happy', OWNER);
-  assert.deepEqual(st, { subscriberId: 'sub-happy', pending: 1, inflight: 0, acknowledged: 0 });
+  assert.deepEqual(st, { subscriberId: 'sub-happy', pending: 1, inflight: 0, acknowledged: 0, dead: 0 });
 
   const claimed = router.claim({ subscriberId: 'sub-happy', ownerRunId: OWNER });
   assert.equal(claimed.events.length, 1);
@@ -100,14 +100,14 @@ test('do: happy path emit -> route -> claim -> ack', async () => {
   assert.equal('output' in claimed.events[0], false);
 
   st = router.status('sub-happy', OWNER);
-  assert.deepEqual(st, { subscriberId: 'sub-happy', pending: 0, inflight: 1, acknowledged: 0 });
+  assert.deepEqual(st, { subscriberId: 'sub-happy', pending: 0, inflight: 1, acknowledged: 0, dead: 0 });
 
   const acked = router.ack({ subscriberId: 'sub-happy', eventId: routed.eventId, ownerRunId: OWNER });
   assert.equal(acked.acknowledged, true);
   assert.notEqual(acked.duplicate, true);
 
   st = router.status('sub-happy', OWNER);
-  assert.deepEqual(st, { subscriberId: 'sub-happy', pending: 0, inflight: 0, acknowledged: 1 });
+  assert.deepEqual(st, { subscriberId: 'sub-happy', pending: 0, inflight: 0, acknowledged: 1, dead: 0 });
 });
 
 test('do: route strips private fields before journaling/delivery', async () => {
@@ -235,7 +235,7 @@ test('do: claim then ack is idempotent', async () => {
   assert.equal(secondAck.duplicate, true, 'second ack is idempotent (duplicate:true)');
 
   const st = router.status('sub-idem', OWNER);
-  assert.deepEqual(st, { subscriberId: 'sub-idem', pending: 0, inflight: 0, acknowledged: 1 });
+  assert.deepEqual(st, { subscriberId: 'sub-idem', pending: 0, inflight: 0, acknowledged: 1, dead: 0 });
 });
 
 test('do: cross-owner cannot claim/ack/status another owner mailbox', async () => {
@@ -271,13 +271,13 @@ test('do: requeue moves stale inflight and leaves not-yet-stale alone', async ()
   const noop = router.requeue({ subscriberId: 'sub-requeue', olderThanMs: 3_600_000, ownerRunId: OWNER });
   assert.equal(noop.requeued, 0, 'fresh inflight is not requeued');
   let st = router.status('sub-requeue', OWNER);
-  assert.deepEqual(st, { subscriberId: 'sub-requeue', pending: 0, inflight: 1, acknowledged: 0 });
+  assert.deepEqual(st, { subscriberId: 'sub-requeue', pending: 0, inflight: 1, acknowledged: 0, dead: 0 });
 
   // Stale: olderThanMs:0 requeues regardless of age.
   const res = router.requeue({ subscriberId: 'sub-requeue', olderThanMs: 0, ownerRunId: OWNER });
   assert.equal(res.requeued, 1);
   st = router.status('sub-requeue', OWNER);
-  assert.deepEqual(st, { subscriberId: 'sub-requeue', pending: 1, inflight: 0, acknowledged: 0 });
+  assert.deepEqual(st, { subscriberId: 'sub-requeue', pending: 1, inflight: 0, acknowledged: 0, dead: 0 });
 
   const claimed = router.claim({ subscriberId: 'sub-requeue', ownerRunId: OWNER });
   assert.equal(claimed.events.length, 1, 'requeued event is claimable again (claimedAt dropped)');
@@ -313,6 +313,50 @@ test('do: requeue tracks deliveryAttempts so operators can spot a poison event',
   assert.equal(fresh.maxAttempts, 0);
 });
 
+test('do: claim quarantines a poison event once it reaches maxDeliveryAttempts', async () => {
+  const { router } = makeRouter();
+  await router.subscribe({ subscriberId: 'sub-dead', ownerRunId: OWNER });
+  await router.route(terminalEvent());
+
+  // Drive deliveryAttempts up to the cap of 2 via claim+requeue.
+  for (let i = 1; i <= 2; i++) {
+    const claimed = router.claim({ subscriberId: 'sub-dead', maxDeliveryAttempts: 2, ownerRunId: OWNER });
+    assert.equal(claimed.events.length, 1, `claim ${i} still serves the event below the cap`);
+    assert.equal(claimed.quarantined, 0);
+    router.requeue({ subscriberId: 'sub-dead', olderThanMs: 0, ownerRunId: OWNER });
+  }
+
+  // At the cap, the next claim quarantines instead of serving it.
+  const capped = router.claim({ subscriberId: 'sub-dead', maxDeliveryAttempts: 2, ownerRunId: OWNER });
+  assert.equal(capped.events.length, 0, 'a capped event is no longer claimed');
+  assert.equal(capped.quarantined, 1);
+  assert.deepEqual(router.status('sub-dead', OWNER), { subscriberId: 'sub-dead', pending: 0, inflight: 0, acknowledged: 0, dead: 1 });
+
+  // It stays quarantined and is never re-served or re-quarantined.
+  const after = router.claim({ subscriberId: 'sub-dead', maxDeliveryAttempts: 2, ownerRunId: OWNER });
+  assert.equal(after.events.length, 0);
+  assert.equal(after.quarantined, 0);
+  assert.equal(router.status('sub-dead', OWNER).dead, 1);
+
+  // Prune clears the dead-letter on the callback cutoff.
+  const pruned = router.prune({ callbackOlderThanMs: 0, subscriberIds: ['sub-dead'], ownerRunId: OWNER });
+  assert.equal(pruned.deadRemoved, 1);
+  assert.equal(router.status('sub-dead', OWNER).dead, 0);
+});
+
+test('do: claim without a cap never quarantines, preserving unbounded redelivery', async () => {
+  const { router } = makeRouter();
+  await router.subscribe({ subscriberId: 'sub-no-cap', ownerRunId: OWNER });
+  await router.route(terminalEvent());
+  for (let i = 0; i < 4; i++) {
+    const claimed = router.claim({ subscriberId: 'sub-no-cap', ownerRunId: OWNER });
+    assert.equal(claimed.events.length, 1);
+    assert.equal(claimed.quarantined, 0);
+    router.requeue({ subscriberId: 'sub-no-cap', olderThanMs: 0, ownerRunId: OWNER });
+  }
+  assert.equal(router.status('sub-no-cap', OWNER).dead, 0);
+});
+
 test('do: prune ages out acked mailbox + journal rows and reaps idle subscribers', async () => {
   const { router } = makeRouter();
   // Old event (well in the past) so age-from-`at`/`claimedAt` exceeds any cutoff.
@@ -321,7 +365,7 @@ test('do: prune ages out acked mailbox + journal rows and reaps idle subscribers
   const claimed = router.claim({ subscriberId: 'sub-prune', ownerRunId: OWNER });
   assert.equal(claimed.events.length, 1);
   router.ack({ subscriberId: 'sub-prune', eventId: claimed.events[0].eventId, ownerRunId: OWNER });
-  assert.deepEqual(router.status('sub-prune', OWNER), { subscriberId: 'sub-prune', pending: 0, inflight: 0, acknowledged: 1 });
+  assert.deepEqual(router.status('sub-prune', OWNER), { subscriberId: 'sub-prune', pending: 0, inflight: 0, acknowledged: 1, dead: 0 });
 
   // A huge cutoff keeps everything (nothing is "old enough").
   const noop = router.prune({
@@ -330,7 +374,7 @@ test('do: prune ages out acked mailbox + journal rows and reaps idle subscribers
     subscriberOlderThanMs: 10 * 365 * 86400000,
     ownerRunId: OWNER,
   });
-  assert.deepEqual(noop, { acknowledgedRemoved: 0, pendingRemoved: 0, inflightRemoved: 0, journalRemoved: 0, subscribersRemoved: 0 });
+  assert.deepEqual(noop, { acknowledgedRemoved: 0, pendingRemoved: 0, inflightRemoved: 0, deadRemoved: 0, journalRemoved: 0, subscribersRemoved: 0 });
   assert.equal(router.status('sub-prune', OWNER).acknowledged, 1, 'acked row survives a huge cutoff');
 
   // cutoff 0 reaps the acked mailbox row, the journal row, and the now-idle subscriber.
@@ -414,7 +458,7 @@ test('do(adversarial): ack of an unclaimed (pending) event throws', async () => 
     /event is not inflight/,
   );
   // and it stays pending.
-  assert.deepEqual(router.status('sub-pending', OWNER), { subscriberId: 'sub-pending', pending: 1, inflight: 0, acknowledged: 0 });
+  assert.deepEqual(router.status('sub-pending', OWNER), { subscriberId: 'sub-pending', pending: 1, inflight: 0, acknowledged: 0, dead: 0 });
 });
 
 test('do(adversarial): ack of a nonexistent eventId throws', async () => {
@@ -438,8 +482,8 @@ test('do(adversarial): pi-* / pi_ wildcard subscriber holding "*" runId receives
   const routed = await router.route(terminalEvent());
   assert.equal(routed.delivered, 1, 'only the non-pi wildcard subscriber is delivered to');
 
-  assert.deepEqual(router.status('pi-session-host', OWNER), { subscriberId: 'pi-session-host', pending: 0, inflight: 0, acknowledged: 0 });
-  assert.deepEqual(router.status('pi_other_host', OWNER), { subscriberId: 'pi_other_host', pending: 0, inflight: 0, acknowledged: 0 });
+  assert.deepEqual(router.status('pi-session-host', OWNER), { subscriberId: 'pi-session-host', pending: 0, inflight: 0, acknowledged: 0, dead: 0 });
+  assert.deepEqual(router.status('pi_other_host', OWNER), { subscriberId: 'pi_other_host', pending: 0, inflight: 0, acknowledged: 0, dead: 0 });
   assert.equal(router.status('normal-wild', OWNER).pending, 1);
 
   // But a pi-* subscriber with a CONCRETE runId is allowed (explicit target).

@@ -97,7 +97,7 @@ can move supervision behind a stable, ported transition core.
   deadline precedence, receipt-deferred finalization, and late-input idempotence.
   No clocks, processes, files, or I/O.
 - `internal/protocol` — JSON command protocol envelope (`Command`/`Response`) for
-  the three inert commands `dry-run`, `status`, and `version`, plus stdin/stdout
+  the inert commands `dry-run`, `status`, `version`, and `replay`, plus stdin/stdout
   `Decode`/`Encode`.
 - `cmd/terra-core` — CLI entrypoint. Flag mode (`terra-core dry-run "task"`,
   `status <runId>`, `version`) and a `--stdin` JSON-protocol mode. All commands are
@@ -106,3 +106,39 @@ can move supervision behind a stable, ported transition core.
 Run the Go tests with `go test ./internal/... ./cmd/...`. The transition core is
 kept in lockstep with `RUN_MACHINE_VERSION`; any change to the TS machine must be
 mirrored here and vice versa.
+
+### Cross-language conformance — the `replay` command
+
+Shard A proved the cores agree at the *initial-state* level (machine version,
+initial phase/receipt). It could not catch a divergence in how the two cores
+*classify a terminated run*, which is exactly where the cancelled/deadlined
+"verified receipt survives as verified" lie was reproduced in the Go port.
+
+The Go core now exposes a fourth inert command, `replay`, that drives an ordered
+sequence of already-observed inputs through `internal/run.Transition` and returns
+the final state plus the per-step decision list:
+
+```sh
+echo '{"command":"replay","requireReceipt":true,"inputs":[
+  {"type":"ReceiptObserved","status":"verified","summary":"win"},
+  {"type":"CancelRequested"},
+  {"type":"ChildExited","exitCode":0}
+]}' | terra-core --stdin
+```
+
+The `inputs` shape mirrors the input objects accepted by `transition()` in
+[`src/run-machine.js`](../src/run-machine.js) (`ChildExited`, `ReceiptObserved`,
+`CancelRequested`, `DeadlineReached`, `ProcessTerminated`, `RuntimeError`), so the
+*identical* sequence can drive both cores. `replay` stays inert: no clocks,
+processes, files, or state mutation — it is the pure machine, scripted.
+
+The conformance net is `test/go-vs-ts-replay-conformance-shard-p.test.js`. It
+feeds a battery of sequences (every receipt classification, the
+receipt-before-exit and receipt-before-cancel/deadline races, late-input
+idempotence, runtime error) to both the TS `transition()` core and the Go core's
+`replay`, then asserts byte-for-byte parity on the consumer-facing terminal
+fields (`status`, `ok`, `exitCode`, `taskContractStatus`, `taskResultSummary`,
+`reason`). The Go comparison skips cleanly when no `go` toolchain is available
+(or set `TERRARIUM_GO_CORE` to a prebuilt binary); the TS-only sequence
+assertions always run. A future change that drifts the Go terminal
+classification away from TS now fails conformance instead of shipping silently.

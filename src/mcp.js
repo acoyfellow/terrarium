@@ -124,6 +124,7 @@ const tools = [
         eventId: { type: "string" },
         runId: { type: "string", description: "Terminal run to recover into the durable callback journal and matching mailboxes." },
         limit: { type: "number" },
+        maxDeliveryAttempts: { type: "number", description: "On claim, quarantine (dead-letter) any pending event whose recorded deliveryAttempts already reached this cap instead of re-serving it, so a poison callback a consumer keeps crashing on stops looping. Omit for unbounded redelivery. The claim result reports a quarantined count." },
         olderThanMs: { type: "number" }
       },
       required: ["action"]
@@ -439,6 +440,7 @@ async function handle(msg) {
         if (subscription.ownerRunId !== policy.requesterRunId) throw new Error("callback subscriber access denied");
         const ownedArgs = { subscriberId: args.subscriberId, ownerRunId: policy.requesterRunId };
         if (args.action === "claim" && args.limit !== undefined) ownedArgs.limit = args.limit;
+        if (args.action === "claim" && args.maxDeliveryAttempts !== undefined) ownedArgs.maxDeliveryAttempts = args.maxDeliveryAttempts;
         if (args.action === "ack" && args.eventId !== undefined) ownedArgs.eventId = args.eventId;
         if (args.action === "requeue" && args.olderThanMs !== undefined) ownedArgs.olderThanMs = args.olderThanMs;
         if (args.action === "claim") return send(msg.id, content(await claimMailboxEvents(ownedArgs)));
