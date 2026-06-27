@@ -4,6 +4,20 @@ Succinct, product-facing changes to Terrarium. This is not a full commit log; it
 
 ## Unreleased
 
+### Wow hardening loop: wins 7–10
+
+- **Win 7 — large bounded batches:** `terrarium_spawn_batch` and durable groups now accept up to 256 queued jobs, while requiring explicit `concurrency` above 32 so active children stay bounded.
+- **Win 8 — doctor self-heal dry-run/apply:** `terra doctor --repair` now builds an executable repair summary and `--apply` can run the mechanically safe recover/requeue/prune subset; judgement-heavy steps remain skipped for an operator.
+- **Win 9 — poison callback visibility:** filesystem and Pulse requeue now track `deliveryAttempts` and report `maxAttempts`, making repeatedly claimed-but-unacked callback events visible instead of silently looping forever.
+- **Win 10 — cancelled/deadlined receipt truth:** receipts observed before cancellation or deadline no longer survive as `verified` task-contract status on cancelled/deadlined terminal records.
+
+### Batch: 32-job ceiling lifted to 256 behind a required active-concurrency bound
+
+- `terrarium_spawn_batch` now accepts up to 256 jobs (was 32). The old 32-job cap only ever existed to bound simultaneous children, so it conflated the *queued* job count with the *active* child count.
+- Batches over 32 jobs must pin an explicit `concurrency`. Because `launchBounded` holds each slot until its run is terminal, this keeps active children bounded at a fixed width while the queued job count scales up — massive parallel work flows through a small window instead of fanning out hundreds of simultaneous runs.
+- A batch over 32 jobs *without* `concurrency` fails closed with a clear error rather than silently launching everything at once. Batches up to 32 keep their existing unbounded-by-default behavior, so nothing in the common path changes.
+- `createRunGroup` ceiling raised in step (32 → 256) so a bounded large batch can register all of its run IDs in one durable group; groups remain correlation handles, not execution fan-out. New `MAX_BATCH_JOBS`, `DEFAULT_UNBOUNDED_JOBS`, and `MAX_GROUP_RUNS` constants make the contract testable. MCP schema `maxItems`, ARCHITECTURE/CONCURRENCY_ISOLATION/COMPATIBILITY docs, and `test/batch.test.js` updated.
+
 ### CLI: mistyped subcommands fail closed instead of spawning a child for the typo
 
 - `terra statsu`, `terra docter`, and other near-miss commands now print a suggestion (`Did you mean "terra status"?`) and exit `2` instead of silently spawning a child agent whose task is the typo itself.

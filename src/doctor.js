@@ -1,6 +1,7 @@
 import { access, mkdir, readFile, readdir } from "node:fs/promises";
 import { constants, existsSync } from "node:fs";
-import { CONFIG_PATH, EVENT_DIR, HOME, LOG_DIR, WORKSPACE_DIR, VERSION, listRuns } from "./core.js";
+import { CONFIG_PATH, EVENT_DIR, HOME, LOG_DIR, WORKSPACE_DIR, VERSION, ensureTerminalCallback, listRuns, pruneStaleChildClaims } from "./core.js";
+import { requeueInflightEvents } from "./router.js";
 import { BATCH_API_VERSION, BATCH_SUPPORTED_OPTIONS, MCP_SCHEMA_VERSION, TERRARIUM_API_VERSION } from "./versions.js";
 import { GROUP_DIR } from "./groups.js";
 import { JOURNAL_DIR, MAILBOXES_DIR, ROUTER_DIR, SUBSCRIBERS_DIR } from "./router.js";
@@ -24,13 +25,14 @@ async function jsonHealth(path, validate = () => true) {
 }
 const validOwner = (value) => value === null || (typeof value === "string" && /^ter_[A-Za-z0-9_]+$/.test(value));
 const SUBSCRIBER_KEYS = new Set(["version", "subscriberId", "channels", "workflowIds", "eventTypes", "runIds", "ownerRunId", "createdAt", "updatedAt"]);
-const CALLBACK_KEYS = new Set(["type", "eventId", "runId", "parentRunId", "taskFingerprint", "workflowId", "sessionId", "channel", "at", "status", "ok", "exitCode", "signal", "dryRun", "claimedAt"]);
+const CALLBACK_KEYS = new Set(["type", "eventId", "runId", "parentRunId", "taskFingerprint", "workflowId", "sessionId", "channel", "at", "status", "ok", "exitCode", "signal", "dryRun", "claimedAt", "receipt", "deliveryAttempts"]);
 const TERMINAL_TYPES = new Set(["Completed", "Failed", "TimedOut", "Cancelled"]);
 const hasOnlyKeys = (value, keys) => value && typeof value === "object" && !Array.isArray(value) && Object.keys(value).every((key) => keys.has(key));
 const validTimestamp = (value) => typeof value === "string" && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value) && new Date(value).toISOString() === value;
 const validId = (value) => typeof value === "string" && /^[A-Za-z0-9_-]{1,120}$/.test(value);
 const validSubscriber = (value, file) => hasOnlyKeys(value, SUBSCRIBER_KEYS) && validId(value.subscriberId) && value.subscriberId === file.slice(0, -5) && Object.hasOwn(value, "ownerRunId") && validOwner(value.ownerRunId) && validTimestamp(value.createdAt) && validTimestamp(value.updatedAt);
-const validEvent = (value, file) => hasOnlyKeys(value, CALLBACK_KEYS) && validId(value.eventId) && value.eventId === file.slice(0, -5) && TERMINAL_TYPES.has(value.type) && typeof value.runId === "string" && validTimestamp(value.at);
+const validDeliveryAttempts = (value) => value === undefined || (Number.isInteger(value) && value >= 0 && value <= 1_000_000);
+const validEvent = (value, file) => hasOnlyKeys(value, CALLBACK_KEYS) && validId(value.eventId) && value.eventId === file.slice(0, -5) && TERMINAL_TYPES.has(value.type) && typeof value.runId === "string" && validTimestamp(value.at) && validDeliveryAttempts(value.deliveryAttempts);
 const validPendingEvent = (value, file) => validEvent(value, file) && !Object.hasOwn(value, "claimedAt");
 const validClaimedEvent = (value, file) => validEvent(value, file) && Object.hasOwn(value, "claimedAt") && validTimestamp(value.claimedAt);
 async function mailboxHealth(path, validate) {
@@ -199,4 +201,66 @@ function summarizeRepairPlan(plan) {
     if (step.tool) actionable++;
   }
   return { total: plan.length, actionable, byAction };
+}
+
+// Repair-step kinds that are mechanically safe and idempotent to drive
+// automatically: each maps to an existing durable primitive whose effect is
+// reconstruction (recover/requeue) or reclaiming dead state (prune). Steps that
+// require human judgement (inspecting an orphaned or stuck run) or out-of-band
+// handling (quarantining malformed records) are never auto-executed; they are
+// reported as skipped so the operator stays in the loop.
+const SELF_HEALING_KINDS = new Set(["missingTerminalCallback", "staleInflightCallback", "staleChildClaim"]);
+const SKIP_REASONS = {
+  orphanedRun: "needs operator judgement: inspect the run log before cancelling or recovering",
+  needsAttentionRun: "needs operator judgement: inspect the run log before deciding to wait or cancel",
+  malformedRouterRecords: "needs out-of-band quarantine/repair of unparseable records",
+};
+
+// Drive the mechanically-safe subset of a doctor repair plan. This is a
+// top-level maintenance operation over durable router/log state only; it never
+// spawns, resumes, or mutates the one-child-per-run execution contract. It
+// reuses the same primitives the repair plan already points agents at
+// (ensureTerminalCallback, requeueInflightEvents, pruneStaleChildClaims), so an
+// applied repair is identical to running each plan step by hand.
+//
+// Safety: dryRun defaults to true, so callers must opt in to mutation. Stale
+// child-claim pruning is global (pruneStaleChildClaims reclaims every stale
+// slot), so the matching steps are collapsed into a single prune action that
+// runs at most once per execution. requesterRunId is rejected for the same
+// reason terrarium_doctor is: self-healing is a top-level controller affordance.
+export async function executeRepairPlan({ plan, dryRun = true, requesterRunId } = {}) {
+  if (requesterRunId) throw new Error("Terrarium repair execution is available only to a top-level controller");
+  const steps = Array.isArray(plan) ? plan : (await diagnoseTerrarium()).repairPlan;
+  const applied = [], skipped = [];
+  let prunedClaims = false;
+  for (const step of steps) {
+    if (!SELF_HEALING_KINDS.has(step.kind)) {
+      skipped.push({ kind: step.kind, action: step.action, reason: SKIP_REASONS[step.kind] ?? "not a mechanically self-healing step" });
+      continue;
+    }
+    try {
+      if (step.kind === "missingTerminalCallback") {
+        if (!step.runId) { skipped.push({ kind: step.kind, action: step.action, reason: "missing runId" }); continue; }
+        if (dryRun) { applied.push({ kind: step.kind, action: "recover", runId: step.runId, dryRun: true }); continue; }
+        const result = await ensureTerminalCallback({ runId: step.runId });
+        applied.push({ kind: step.kind, action: "recover", runId: step.runId, dryRun: false, recovered: result?.recovered ?? null });
+      } else if (step.kind === "staleInflightCallback") {
+        if (!step.subscriberId) { skipped.push({ kind: step.kind, action: step.action, reason: "subscriber could not be attributed; requeue by id out-of-band" }); continue; }
+        if (dryRun) { applied.push({ kind: step.kind, action: "requeue", subscriberId: step.subscriberId, dryRun: true }); continue; }
+        const result = await requeueInflightEvents({ subscriberId: step.subscriberId });
+        applied.push({ kind: step.kind, action: "requeue", subscriberId: step.subscriberId, dryRun: false, requeued: result?.requeued ?? 0 });
+      } else if (step.kind === "staleChildClaim") {
+        // pruneStaleChildClaims reclaims every stale slot in one pass, so run it
+        // at most once and attribute the single result to all matching steps.
+        if (prunedClaims) { applied.push({ kind: step.kind, action: "prune", claimFile: step.claimFile, dryRun, coveredByPriorPrune: true }); continue; }
+        if (dryRun) { applied.push({ kind: step.kind, action: "prune", claimFile: step.claimFile, dryRun: true }); prunedClaims = true; continue; }
+        const result = await pruneStaleChildClaims({});
+        prunedClaims = true;
+        applied.push({ kind: step.kind, action: "prune", dryRun: false, prunedCount: result?.count ?? 0 });
+      }
+    } catch (error) {
+      skipped.push({ kind: step.kind, action: step.action, reason: `repair failed: ${error.message}` });
+    }
+  }
+  return { ok: skipped.length === 0, dryRun, appliedCount: applied.length, skippedCount: skipped.length, applied, skipped };
 }

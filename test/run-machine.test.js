@@ -53,6 +53,33 @@ test('late verified receipt after cancellation is ignored and cannot replace the
   assertSingleTerminal(r);
 });
 
+test('verified receipt observed BEFORE cancellation does not survive as taskContractStatus on a cancelled run', () => {
+  // Race: the child emits a valid TERRARIUM_RESULT line (receipt verified)
+  // while still running, then the operator cancels, then the child is killed
+  // and exits. Cancellation must win the status, AND the pre-kill verified
+  // receipt must NOT be retained: a cancelled run produced no trusted
+  // completion, so reconstructing it as taskContractStatus:"verified" would
+  // mislead group roll-ups / the Pi extension / mcp into reading a terminated
+  // run as a successful task receipt.
+  const r = replay([receipt, cancel, { type: 'ChildExited', exitCode: 143, signal: 'SIGTERM' }]);
+  assert.equal(r.state.terminal.status, 'cancelled');
+  assert.equal(r.state.terminal.ok, false);
+  assert.equal(r.state.terminal.taskContractStatus, 'not-applicable');
+  assert.equal(r.state.terminal.taskResultSummary, undefined);
+  assert.equal(count(r, 'Finalize'), 1);
+  assertSingleTerminal(r);
+});
+
+test('verified receipt observed BEFORE deadline does not survive as taskContractStatus on a deadlined run', () => {
+  const r = replay([receipt, { type: 'DeadlineReached' }, { type: 'ChildExited', exitCode: 137, signal: 'SIGKILL' }]);
+  assert.equal(r.state.terminal.status, 'failed');
+  assert.equal(r.state.terminal.ok, false);
+  assert.equal(r.state.terminal.reason, 'deadline-reached');
+  assert.equal(r.state.terminal.taskContractStatus, 'not-applicable');
+  assert.equal(r.state.terminal.taskResultSummary, undefined);
+  assertSingleTerminal(r);
+});
+
 test('ChildExited -> ReceiptObserved -> CancelRequested: completion wins once', () => {
   const r = replay([exited, receipt, cancel]);
   assert.equal(r.state.terminal.status, 'done');
@@ -160,6 +187,39 @@ test('cancel recovers a dead launch supervisor with no child pid exactly once an
   } finally {
     await unregisterSubscriber(subscriberId).catch(() => {});
     await rm(join(JOURNAL_DIR, `${eventId}.json`), { force: true });
+    await rm(metadataPath(runId), { force: true });
+    await rm(marker, { force: true });
+  }
+});
+
+test('dead-supervisor cancel recovery strips a pre-kill verified receipt to not-applicable', { timeout: 15000 }, async () => {
+  // The child emitted a verified TERRARIUM_RESULT (taskContractStatus already
+  // "verified" in the running record) but the background supervisor died before
+  // recording the terminal result. Cancel recovery must settle the run as
+  // cancelled WITHOUT preserving the verified receipt, otherwise a cancelled run
+  // is reconstructed as a verified task success.
+  const suffix = `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+  const runId = `ter_dead_verified_${suffix}`;
+  const marker = join(LOG_DIR, `${runId}.cancel`);
+  await mkdir(LOG_DIR, { recursive: true });
+  await writeFile(metadataPath(runId), JSON.stringify({
+    runId, parentRunId: process.env.TERRARIUM_RUN_ID || null, task: 'dead supervisor verified receipt', taskFingerprint: 'deadbeef', status: 'running', ok: true,
+    background: true, supervisorPid: 2147483647, startedAt: new Date().toISOString(),
+    lastActivityAt: new Date().toISOString(), needsAttentionAfterMs: 60000,
+    logPath: join(LOG_DIR, `${runId}.log`), channel: 'test', workflowId: runId,
+    taskContractStatus: 'verified', taskResultSummary: 'child claimed success',
+  }));
+  try {
+    const cancelled = await cancelRun({ runId });
+    assert.equal(cancelled.status, 'cancelled');
+    assert.equal(cancelled.cancelled, true);
+    const persisted = JSON.parse(await readFile(metadataPath(runId), 'utf8'));
+    assert.equal(persisted.status, 'cancelled');
+    assert.equal(persisted.ok, false);
+    assert.equal(persisted.taskContractStatus, 'not-applicable');
+    assert.equal(existsSync(marker), false);
+  } finally {
+    await rm(join(JOURNAL_DIR, `evt_${runId}_Cancelled.json`), { force: true });
     await rm(metadataPath(runId), { force: true });
     await rm(marker, { force: true });
   }

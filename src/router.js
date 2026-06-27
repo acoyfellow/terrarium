@@ -230,19 +230,27 @@ export async function requeueInflightEvents({ subscriberId, olderThanMs = 300000
   await Promise.all([mkdir(dirs.pending, { recursive: true }), mkdir(dirs.inflight, { recursive: true })]);
   const now = Date.now();
   let requeued = 0;
+  // maxAttempts surfaces the most-redelivered event in this pass so operators
+  // (and doctor) can spot a poison event a consumer keeps crashing on instead of
+  // it silently looping forever between pending and inflight.
+  let maxAttempts = 0;
   for (const file of (await readdir(dirs.inflight)).filter((name) => name.endsWith('.json'))) {
     let event; try { event = JSON.parse(await readFile(join(dirs.inflight, file), 'utf8')); } catch { continue; }
     if (!isValidCallbackEvent(event, file.slice(0, -5), { state: 'claimed' })) continue;
     const age = now - Date.parse(event.claimedAt);
     if (age < Math.max(0, Number(olderThanMs) || 0)) continue;
-    const pendingEvent = sanitizeCallbackEvent(event);
+    // sanitizeCallbackEvent drops claimedAt; bump the redelivery counter so the
+    // re-pending event records that it has now been delivered one more time.
+    const attempts = (Number.isInteger(event.deliveryAttempts) ? event.deliveryAttempts : 0) + 1;
+    const pendingEvent = { ...sanitizeCallbackEvent(event), deliveryAttempts: attempts };
     try {
       await atomicJson(join(dirs.inflight, file), pendingEvent);
       await rename(join(dirs.inflight, file), join(dirs.pending, file));
       requeued++;
+      if (attempts > maxAttempts) maxAttempts = attempts;
     } catch (error) { if (error.code !== 'ENOENT') throw error; }
   }
-  return { subscriberId, requeued };
+  return { subscriberId, requeued, maxAttempts };
 }
 
 function eventAge(now, event) {

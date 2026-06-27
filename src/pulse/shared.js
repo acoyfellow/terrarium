@@ -18,6 +18,12 @@ export const ALLOWED_EVENT_FIELDS = [
   // Not part of the eventId/dedup hash (which only hashes runId/type/at/status/exitCode),
   // so adding it preserves dedup parity across the DO and fs-router backends.
   'receipt',
+  // Redelivery counter: how many times this event was requeued from inflight back
+  // to pending because it was claimed but never acked. Lets operators detect a
+  // "poison" event a consumer keeps crashing on instead of silently looping
+  // forever. Like 'receipt', it is excluded from the eventId/dedup hash, so it
+  // never breaks dedup parity across the DO and fs-router backends.
+  'deliveryAttempts',
 ];
 export const CALLBACK_EVENT_KEYS = new Set(ALLOWED_EVENT_FIELDS);
 export const CLAIMED_CALLBACK_EVENT_KEYS = new Set([...CALLBACK_EVENT_KEYS, 'claimedAt']);
@@ -58,6 +64,14 @@ export function validTimestamp(value) {
     new Date(value).toISOString() === value;
 }
 
+// A redelivery counter is optional; when present it must be a bounded
+// non-negative integer so a corrupted payload can never spoof an absurd attempt
+// count (which doctor/operators use to flag poison events).
+export function validDeliveryAttempts(value) {
+  if (value === undefined) return true;
+  return Number.isInteger(value) && value >= 0 && value <= 1_000_000;
+}
+
 export function isValidCallbackEvent(event, expectedEventId, { state = 'any' } = {}) {
   if (!event || typeof event !== 'object' || Array.isArray(event)) return false;
   if (event.eventId !== expectedEventId || !TERMINAL_EVENT_TYPES.includes(event.type) || typeof event.runId !== 'string') return false;
@@ -65,7 +79,9 @@ export function isValidCallbackEvent(event, expectedEventId, { state = 'any' } =
   if (state === 'pending' && claimed) return false;
   if (state === 'claimed' && !claimed) return false;
   const allowed = claimed ? CLAIMED_CALLBACK_EVENT_KEYS : CALLBACK_EVENT_KEYS;
-  return Object.keys(event).every((key) => allowed.has(key)) && validTimestamp(event.at) && (!claimed || validTimestamp(event.claimedAt));
+  return Object.keys(event).every((key) => allowed.has(key)) &&
+    validTimestamp(event.at) && (!claimed || validTimestamp(event.claimedAt)) &&
+    validDeliveryAttempts(event.deliveryAttempts);
 }
 
 // Subscription <-> event matching, identical to the fs router including the

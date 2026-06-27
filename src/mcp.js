@@ -49,10 +49,10 @@ const tools = [
     inputSchema: {
       type: "object",
       properties: {
-        jobs: { type: "array", minItems: 1, maxItems: 32, description: "Job option objects, each accepting the same fields as terrarium_spawn (task required).", items: { type: "object", properties: { task: { type: "string" }, agent: { type: "string" }, model: { type: "string" }, readOnly: { type: "boolean" }, ephemeral: { type: "boolean" }, profile: { type: "string", enum: ["default", "minimal"] }, cwd: { type: "string" }, channel: { type: "string" }, workflowId: { type: "string" }, sessionId: { type: "string" }, isolation: { type: "string", enum: ["none", "copy", "worktree"] }, keepWorkspace: { type: "boolean" }, timeoutMs: { type: "number" }, needsAttentionAfterMs: { type: "number" }, maxDepth: { type: "number" }, allowSpawn: { type: "boolean" }, statusScope: { type: "string", enum: ["self", "descendants", "all"] }, readScope: { type: "string", enum: ["self", "descendants", "all"] }, logPath: { type: "string" }, mreLogPath: { type: "string" } }, required: ["task"] } },
+        jobs: { type: "array", minItems: 1, maxItems: 256, description: "Job option objects, each accepting the same fields as terrarium_spawn (task required). Over 32 jobs requires an explicit concurrency bound.", items: { type: "object", properties: { task: { type: "string" }, agent: { type: "string" }, model: { type: "string" }, readOnly: { type: "boolean" }, ephemeral: { type: "boolean" }, profile: { type: "string", enum: ["default", "minimal"] }, cwd: { type: "string" }, channel: { type: "string" }, workflowId: { type: "string" }, sessionId: { type: "string" }, isolation: { type: "string", enum: ["none", "copy", "worktree"] }, keepWorkspace: { type: "boolean" }, timeoutMs: { type: "number" }, needsAttentionAfterMs: { type: "number" }, maxDepth: { type: "number" }, allowSpawn: { type: "boolean" }, statusScope: { type: "string", enum: ["self", "descendants", "all"] }, readScope: { type: "string", enum: ["self", "descendants", "all"] }, logPath: { type: "string" }, mreLogPath: { type: "string" } }, required: ["task"] } },
         strategy: { type: "string", enum: BATCH_STRATEGIES, description: "Join strategy. Default: all." },
         quorum: { type: "number", description: "Required successes for the quorum strategy (1..jobs.length)." },
-        concurrency: { type: "number", minimum: 1, description: "Max simultaneously launched runs. Default: launch all at once." },
+        concurrency: { type: "number", minimum: 1, description: "Max simultaneously active runs. Required when jobs.length > 32. Default: launch all at once." },
         label: { type: "string", description: "Group label." },
         pollMs: { type: "number", description: "Status poll interval in ms. Default: 500." },
         timeoutMs: { type: "number", description: "Overall batch wait budget in ms; on timeout, remaining runs are cancelled." },
@@ -101,7 +101,7 @@ const tools = [
         action: { type: "string", enum: ["create", "status", "read", "cancel"] },
         groupId: { type: "string" },
         label: { type: "string" },
-        runIds: { type: "array", items: { type: "string" }, minItems: 1, maxItems: 32 },
+        runIds: { type: "array", items: { type: "string" }, minItems: 1, maxItems: 256 },
         verbose: { type: "boolean" },
         kind: { type: "string", enum: ["terrarium", "mre"] },
         tailBytes: { type: "number" }
