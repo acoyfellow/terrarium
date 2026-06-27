@@ -20,6 +20,9 @@ test('README explicitly disclaims the four confusable surfaces as proof', () => 
     assert.ok(section.includes(surface), `proof section must address ${surface}`);
   }
   assert.match(section, /not\b[^\n]*authoritative success proof/i);
+  for (const role of ['Authoritative', 'Evidence', 'Diagnostic', 'Notification', 'Presentation']) {
+    assert.ok(section.includes(`| ${role} |`), `proof table must include ${role} role`);
+  }
 });
 
 test('MCP tool descriptions carry the not-proof disclaimer inline', () => {

@@ -94,7 +94,7 @@ const tools = [
   },
   {
     name: "terrarium_group",
-    description: "Create or inspect a parent-owned collection of already-started independent Terrarium runs. This tool does not spawn or fan out.",
+    description: "Create or inspect a parent-owned collection of already-started independent Terrarium runs. This tool does not spawn or fan out. Group status is a fail-closed aggregate roll-up of member receipts (ok only when every member is done with ok:true; missing/inaccessible members are not complete), not independent success proof — confirm with each run's verified receipt.",
     inputSchema: {
       type: "object",
       properties: {
@@ -111,7 +111,7 @@ const tools = [
   },
   {
     name: "terrarium_callbacks",
-    description: "Low-level durable pull callbacks, terminal-only by default. Concrete run subscriptions replay finish-before-subscribe and offline/restart races; consumers atomically claim then ack, and acknowledged events are not redelivered (at-least-once with dedup, not guaranteed exactly-once: requeue can replay an inflight event claimed but never acked). Subscribing alone does not wake a host. In Pi, prefer background terrarium_spawn: its extension auto-subscribes and triggers/queues delivery. Never sleep waiting for callbacks.",
+    description: "Low-level durable pull callbacks, terminal-only by default. Concrete run subscriptions replay finish-before-subscribe and offline/restart races; consumers atomically claim then ack, and acknowledged events are not redelivered (at-least-once with dedup, not guaranteed exactly-once: requeue can replay an inflight event claimed but never acked). Subscribing alone does not wake a host. In Pi, prefer background terrarium_spawn: its extension auto-subscribes and triggers/queues delivery. Never sleep waiting for callbacks. A terminal callback is a notification that a run finished, not authoritative proof the task succeeded; confirm with the run's verified receipt.",
     inputSchema: {
       type: "object",
       properties: {
@@ -147,11 +147,16 @@ function capabilityPolicy(env = process.env) {
 }
 
 function visibleTools(policy) {
-  return tools.filter((tool) => {
-    if (!policy.allowSpawn && (tool.name === "terrarium_spawn" || tool.name === "terrarium_spawn_batch")) return false;
-    if (policy.requesterRunId && tool.name === "terrarium_doctor") return false;
-    return true;
-  });
+  return tools
+    .filter((tool) => {
+      if (!policy.allowSpawn && (tool.name === "terrarium_spawn" || tool.name === "terrarium_spawn_batch")) return false;
+      if (policy.requesterRunId && tool.name === "terrarium_doctor") return false;
+      return true;
+    })
+    // Stamp every advertised tool with the runtime schema version so a client that
+    // caches tools/list can detect per-tool schema drift by comparing the cached
+    // schemaVersion against serverInfo.schemaVersion from a fresh initialize handshake.
+    .map((tool) => (tool.schemaVersion ? tool : { ...tool, schemaVersion: MCP_SCHEMA_VERSION }));
 }
 
 const SPAWN_ARG_KEYS = new Set(["task", "agent", "model", "readOnly", "ephemeral", "profile", "cwd", "channel", "workflowId", "sessionId", "isolation", "keepWorkspace", "timeoutMs", "needsAttentionAfterMs", "maxDepth", "allowSpawn", "statusScope", "readScope", "dryRun", "background", "logPath", "mreLogPath", "verbose"]);
