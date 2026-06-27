@@ -69,7 +69,7 @@ test('allSettled timeout bounds synchronous cancellation settlement for client t
     jobs: [job(slow(35000))],
     strategy: 'allSettled',
     pollMs: 10,
-    timeoutMs: 1,
+    timeoutMs: 500,
     cleanupTimeoutMs: 100,
   });
 
@@ -86,6 +86,28 @@ test('allSettled timeout bounds synchronous cancellation settlement for client t
   if (r.cleanupErrors.length) {
     assert.match(r.cleanupErrors[0], new RegExp(`^${r.runIds[0]}: run did not become terminal within`));
   }
+});
+
+test('batch timeout also bounds active-concurrency launch stage', { timeout: 45000 }, async () => {
+  const started = Date.now();
+  const r = await spawnBatch({
+    jobs: [job(slow(35000)), job(ok())],
+    strategy: 'allSettled',
+    concurrency: 1,
+    pollMs: 10,
+    timeoutMs: 500,
+    cleanupTimeoutMs: 0,
+  });
+  assert.ok(Date.now() - started < 2000, 'batch timeout must apply before every concurrency-limited job launches');
+  assert.equal(r.ok, false);
+  assert.equal(r.reason, 'timeout');
+  assert.equal(r.timedOut, true);
+  assert.equal(r.phase, 'launch');
+  assert.equal(r.runIds.length, 1);
+  assert.equal(r.launchedCount, 1);
+  assert.equal(r.unlaunchedCount, 1);
+  assert.match(r.groupId, /^grp_/);
+  assert.ok(Array.isArray(r.cleanupErrors));
 });
 
 test('race: small cleanup timeout returns a durable result instead of throwing during loser cleanup', { timeout: 45000 }, async () => {
