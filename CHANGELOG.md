@@ -8,6 +8,9 @@ Succinct, product-facing changes to Terrarium. This is not a full commit log; it
 
 - Added an experimental Go module with `cmd/terra-core`, a pure single-run state machine, JSON command protocol, and a prototype one-process runner under `go/runner`.
 - Added a thin TypeScript adapter gated by `TERRARIUM_GO_CORE`; default behavior remains JavaScript, and `terra --version --json` can report when the Go core served the call.
+- Added `terra plan` as an inert, read-only child-invocation planner. It can be served by Go via `TERRARIUM_GO_CORE` or fall back to JavaScript; it does not spawn a child or mutate run state.
+- Fixed the adapter wire protocol to drive the Go binary in `--stdin` JSON-envelope mode, preventing silent payload corruption where `status` / `dry-run` could otherwise return placeholder fields with exit 0.
+- Added a Go-vs-TypeScript decision rubric and real-run evidence tests. Current evidence says TypeScript remains better for production execution today while Go continues behind the stable adapter boundary.
 - Documented the intended split: Go core owns receipts/process supervision/batch/sweeps over time; TypeScript keeps CLI/Node/MCP/Pi adapters and Cloudflare Worker Pulse.
 - This is not a deploy and not a runtime cutover. The stable public primitive and existing JavaScript execution path remain authoritative until comparative real-run evidence says otherwise.
 
