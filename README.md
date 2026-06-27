@@ -436,7 +436,7 @@ Every surface Terrarium exposes falls into exactly one role below. Only the **au
 | Surface | Role | Rank | What it proves | What it must never be read as |
 | --- | --- | --- | --- | --- |
 | Verified `TERRARIUM_RESULT` receipt + terminal `done, ok: true` | Authoritative | P0 | The one proof chain: child exited 0 **and** returned a matching `runId`/`taskFingerprint`/`nonce`/`summary` receipt. | — (this *is* the proof) |
-| Run's claimed tests, commits, run IDs, and on-disk envelope (`~/.terrarium/runs/<runId>.json`) | Evidence | P0 | The substantive artifacts the receipt points at; verify these before acting. | A receipt substitute — the receipt must still verify. |
+| Run's claimed tests, commits, run IDs, and on-disk envelope (`~/.terrarium/runs/<runId>.json`, including `terminalCallback.eventId` when routed) | Evidence | P0 | The substantive artifacts the receipt points at; verify these before acting. | A receipt substitute — the receipt must still verify. |
 | `terra status`, `terra doctor`, run logs/MRE logs | Diagnostic | P1 | Operational/liveness facts: state, attention, storage, stale claims, progress. | Task success — diagnostics describe process, not outcome. |
 | Callbacks (`terrarium_callbacks`) and Groups roll-ups (`terrarium_group`) | Notification | P1 | A run *finished* (callback) or an aggregate fail-closed roll-up of member receipts (`ok` only when every member is `done, ok: true`). | Independent success — confirm with each run's verified receipt. |
 | The public run ledger at [`terrarium.coey.dev`](https://terrarium.coey.dev) and `CHANGELOG.md` | Presentation | P2 | A presentation layer over safe manifest/receipt files and a product-facing change record. | Per-run success proof — it restates receipts, it does not establish them. |
