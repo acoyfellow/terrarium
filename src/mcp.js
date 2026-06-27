@@ -10,7 +10,7 @@ import { MCP_SCHEMA_VERSION } from "./versions.js";
 const tools = [
   {
     name: "terrarium_spawn",
-    description: "Spawn exactly one child agent for one bounded task. For background=true, do not sleep or poll: terminal callbacks only. The Terrarium Pi extension automatically subscribes this session, durably claims/acks completion exactly once, and triggers an idle Pi turn (or queues a follow-up while busy). Without that host extension, use terrarium_callbacks pull claim/ack or terrarium_status. Omitted background remains synchronous.",
+    description: "Spawn exactly one child agent for one bounded task. For background=true, do not sleep or poll: terminal callbacks only. The Terrarium Pi extension automatically subscribes this session and claims the completion, injects one follow-up, then acks so acknowledged events are not redelivered (at-least-once delivery with dedup; a crash between inject and ack can replay), and triggers an idle Pi turn (or queues a follow-up while busy). Without that host extension, use terrarium_callbacks pull claim/ack or terrarium_status. Omitted background remains synchronous.",
     inputSchema: {
       type: "object",
       properties: {
@@ -111,7 +111,7 @@ const tools = [
   },
   {
     name: "terrarium_callbacks",
-    description: "Low-level durable pull callbacks, terminal-only by default. Concrete run subscriptions replay finish-before-subscribe and offline/restart races; consumers atomically claim then ack exactly once. Subscribing alone does not wake a host. In Pi, prefer background terrarium_spawn: its extension auto-subscribes and triggers/queues delivery. Never sleep waiting for callbacks.",
+    description: "Low-level durable pull callbacks, terminal-only by default. Concrete run subscriptions replay finish-before-subscribe and offline/restart races; consumers atomically claim then ack, and acknowledged events are not redelivered (at-least-once with dedup, not guaranteed exactly-once: requeue can replay an inflight event claimed but never acked). Subscribing alone does not wake a host. In Pi, prefer background terrarium_spawn: its extension auto-subscribes and triggers/queues delivery. Never sleep waiting for callbacks.",
     inputSchema: {
       type: "object",
       properties: {

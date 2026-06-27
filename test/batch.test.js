@@ -5,7 +5,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnBatch, BATCH_STRATEGIES } from '../src/batch.js';
 import { getRunGroupStatus } from '../src/groups.js';
-import { BATCH_API_VERSION } from '../src/versions.js';
+import { BATCH_API_VERSION, MCP_SCHEMA_VERSION } from '../src/versions.js';
 
 let dir;
 function agent(name, body) {
@@ -24,6 +24,12 @@ const slow = (ms) => agent('slow-' + Math.random().toString(36).slice(2), `setTi
 test.before(() => { dir = mkdtempSync(join(tmpdir(), 'terra-batch-')); });
 test.after(() => { if (dir) rmSync(dir, { recursive: true, force: true }); });
 
+test('version truth: batch response schemaVersion is the MCP wire version, not the batch contract version', () => {
+  assert.notEqual(MCP_SCHEMA_VERSION, BATCH_API_VERSION);
+  assert.ok(MCP_SCHEMA_VERSION.startsWith('terrarium-mcp-'));
+  assert.ok(BATCH_API_VERSION.startsWith('terrarium-batch-'));
+});
+
 test('validates inputs', async () => {
   await assert.rejects(() => spawnBatch({ jobs: [] }), /1-32 jobs/);
   await assert.rejects(() => spawnBatch({ jobs: [job(ok())], strategy: 'bogus' }), /invalid batch strategy/);
@@ -37,7 +43,7 @@ test('all: resolves ok only when every job succeeds', { timeout: 45000 }, async 
   const good = await spawnBatch({ jobs: [job(ok()), job(ok())], strategy: 'all', pollMs: 100 });
   assert.equal(good.ok, true);
   assert.equal(good.apiVersion, BATCH_API_VERSION);
-  assert.equal(good.schemaVersion, BATCH_API_VERSION);
+  assert.equal(good.schemaVersion, MCP_SCHEMA_VERSION);
   assert.ok(good.supportedOptions.includes('cleanupTimeoutMs'));
   assert.equal(good.group.counts.done, 2);
 
