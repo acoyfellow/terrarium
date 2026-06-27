@@ -4,6 +4,12 @@ Succinct, product-facing changes to Terrarium. This is not a full commit log; it
 
 ## Unreleased
 
+### Docs: Pulse durable edge wake transport
+
+- Added [docs/PULSE.md](./docs/PULSE.md): problem, one-sentence promise, curl quick start (emit/claim/ack/status with the bearer token), a compact emitter → worker → PulseRouter DO + SQLite → claim/ack diagram, a proof-to-test table tying each guarantee to its test file, explicit limits/non-goals, and a where-to-edit map.
+- README now carries a focused Pulse section and links to the full doc; the capability table and doc list reference Pulse.
+- Limits are stated plainly: owner isolation is enforced at claim/ack/status (not at delivery/match, a conscious host-trust choice), production e2e against the live Access URL is pending, and existing consumers are not yet rewired to read from the cloud router.
+
 ### Docs: one authoritative success proof, not four
 
 - README now has an "Authoritative success proof" section that names the single proof chain (child exit 0 + verified `TERRARIUM_RESULT` receipt → `done`/`ok:true`) and explicitly states that callbacks, groups, the public ledger, and the changelog are not that proof.

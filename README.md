@@ -29,6 +29,7 @@ one bounded task → one child run → one inspectable result
 | Wrap Pi around a secure workspace without giving it host tools. | `terra secure-agent --model <id> "fix the bug"` | Node fixture vertical slice |
 | Replay the permanent attack corpus before release. | `terra hardening verify` | Implemented |
 | Inspect the public run ledger and changelog for real hardening runs. | [`terrarium.coey.dev`](https://terrarium.coey.dev) | Live |
+| Deliver a finished run's wake event across closes, sessions, and machines. | [Pulse](./docs/PULSE.md) durable edge transport (`POST /pulse` · `/claim` · `/ack` · `/status`) | Implemented + tested locally; prod e2e pending |
 
 Ordinary children inherit host authority and environment; use them for cooperative work, not as a security boundary. `secure-v1` is the opt-in Docker profile with explicit [guarantees and non-guarantees](./docs/SECURE_V1.md).
 
@@ -47,7 +48,23 @@ npm run deploy        # personal Cloudflare account + custom domain
 
 Documentation rule: when behavior, public surfaces, safety semantics, or CLI/MCP outputs change, update this README if the getting-started or product description changes, and update [CHANGELOG.md](./CHANGELOG.md) with a concise entry. The product-hardening loop should include this documentation check before committing.
 
-Start with [Architecture](./docs/ARCHITECTURE.md) and the [core product decision](./docs/CORE_PRODUCT_DECISION.md). See [concurrency and context isolation](./docs/CONCURRENCY_ISOLATION.md), the [pi-subagents comparison](./docs/PI_SUBAGENTS_COMPARISON.md), the [secure-agent proof](./docs/SECURE_AGENT_PROOF.md), and [landscape research](./docs/SECURE_AGENT_LANDSCAPE.md).
+Start with [Architecture](./docs/ARCHITECTURE.md) and the [core product decision](./docs/CORE_PRODUCT_DECISION.md). See [concurrency and context isolation](./docs/CONCURRENCY_ISOLATION.md), the [pi-subagents comparison](./docs/PI_SUBAGENTS_COMPARISON.md), the [secure-agent proof](./docs/SECURE_AGENT_PROOF.md), [landscape research](./docs/SECURE_AGENT_LANDSCAPE.md), and [Pulse, the durable edge wake transport](./docs/PULSE.md).
+
+## Pulse: durable edge wake transport
+
+The local callback router only works while the parent process is alive. Pulse lifts that same router — journal, claim, ack, replay, per-owner mailboxes — onto Cloudflare so a finished run's terminal event reaches the right consumer **across closes, sessions, and machines**.
+
+A `PulseRouter` Durable Object on DO SQLite holds the journal, subscribers, and mailboxes; a token-gated Worker exposes `POST /pulse` (emit), `POST /claim`, `POST /ack`, and `GET /status`, mounted through the merged control worker.
+
+```text
+emitter ──POST /pulse──► Worker (token gate) ──► PulseRouter DO + SQLite journal
+                                                       │  dedup by eventId, fan out
+consumer ◄─claim/ack/status─ Worker ◄──────────────────┘  to matching mailboxes
+```
+
+It is **at-least-once with dedup** (`eventId = sha256[runId,type,at,status,exitCode]`), replays the journal for concrete `runIds` subscribed after a run finished, makes claim→ack idempotent, and isolates mailboxes by `ownerRunId`. Auth is fail-closed (`401` when the bearer token or `PULSE_TOKEN` is missing). Honest limits: owner isolation is enforced at claim/ack/status — not at delivery/match (a conscious host-trust choice) — production e2e against the live Access URL is still pending, and existing consumers are not yet rewired to read from the cloud router.
+
+Full quick start (curl emit/claim/ack/status), the proof-to-test mapping, and where to edit behavior live in **[docs/PULSE.md](./docs/PULSE.md)**.
 
 ## Quick start: ordinary delegation
 
