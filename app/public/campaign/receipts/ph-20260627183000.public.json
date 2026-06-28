@@ -1,0 +1,8 @@
+{
+  "iterationId": "ph-20260627183000",
+  "contentKind": "product-summary",
+  "evidenceClaim": true,
+  "evidenceRef": "commit:65f5f1c",
+  "title": "Command typo guard prevents accidental child runs",
+  "summary": "Mistyped CLI commands now fail closed with suggestions instead of spawning a task for the typo."
+}

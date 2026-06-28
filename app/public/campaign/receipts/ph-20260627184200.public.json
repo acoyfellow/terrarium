@@ -1,0 +1,8 @@
+{
+  "iterationId": "ph-20260627184200",
+  "contentKind": "product-summary",
+  "evidenceClaim": true,
+  "evidenceRef": "commit:56deac8",
+  "title": "Doctor repair residual evidence",
+  "summary": "doctor --repair --apply --verify re-diagnoses after repair and reports before/after counters."
+}

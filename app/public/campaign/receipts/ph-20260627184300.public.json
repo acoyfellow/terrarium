@@ -1,0 +1,8 @@
+{
+  "iterationId": "ph-20260627184300",
+  "contentKind": "product-summary",
+  "evidenceClaim": true,
+  "evidenceRef": "commit:56deac8",
+  "title": "Go terminated-run truth parity",
+  "summary": "The Go run-machine now matches JS terminated-run task-contract normalization."
+}

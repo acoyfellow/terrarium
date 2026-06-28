@@ -1,0 +1,8 @@
+{
+  "iterationId": "ph-20260627184700",
+  "contentKind": "product-summary",
+  "evidenceClaim": true,
+  "evidenceRef": "commit:69b4a7f",
+  "title": "Callback dead-letter cap",
+  "summary": "Filesystem and Pulse claim paths can quarantine poison callbacks into a dead mailbox after a retry cap."
+}

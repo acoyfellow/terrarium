@@ -1,0 +1,8 @@
+{
+  "iterationId": "ph-20260627184900",
+  "contentKind": "product-summary",
+  "evidenceClaim": true,
+  "evidenceRef": "commit:69b4a7f",
+  "title": "Pi bounded poison replay",
+  "summary": "The Pi host uses the delivery-attempt cap so a permanently failing callback stops waking forever."
+}

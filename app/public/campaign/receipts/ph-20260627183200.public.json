@@ -1,0 +1,8 @@
+{
+  "iterationId": "ph-20260627183200",
+  "contentKind": "product-summary",
+  "evidenceClaim": true,
+  "evidenceRef": "commit:65f5f1c",
+  "title": "Orphan truth normalization",
+  "summary": "Orphaned runs no longer preserve pending or unfinalized verified task-contract claims."
+}

@@ -1,0 +1,8 @@
+{
+  "iterationId": "ph-20260627183500",
+  "contentKind": "product-summary",
+  "evidenceClaim": true,
+  "evidenceRef": "commit:65f5f1c",
+  "title": "Browser-ready Pulse CORS",
+  "summary": "Pulse handles preflight and CORS response headers while keeping the bearer token as the security boundary."
+}

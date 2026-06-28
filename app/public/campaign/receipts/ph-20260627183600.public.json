@@ -1,0 +1,8 @@
+{
+  "iterationId": "ph-20260627183600",
+  "contentKind": "product-summary",
+  "evidenceClaim": true,
+  "evidenceRef": "commit:d0c830c",
+  "title": "Large bounded batches",
+  "summary": "Batch and group ceilings rose to 256 queued jobs with mandatory explicit concurrency above 32."
+}
