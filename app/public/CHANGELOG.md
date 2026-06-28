@@ -4,14 +4,28 @@ Succinct, product-facing changes to Terrarium. This is not a full commit log; it
 
 ## Unreleased
 
-### Wow hardening loop: wins 15–20
+### Hardening loop: 20 shipped wins
 
-- **Win 15 — honest human status tables:** `terra status` now defaults to a compact operator table that separates liveness status from task-contract truth; `--json` preserves the raw machine contract.
-- **Win 16 — group contract-truth rollups:** run groups now report `contractTruth` buckets (`verified`, `not-required`, `not-applicable`, `pending`, `unverified`, `unknown`) so a group cannot hide cancelled or inconclusive members behind process-level `ok`.
-- **Win 17 — Go/TS replay conformance:** the inert Go core now supports `replay` and the JS harness drives identical run-machine input sequences through Go and TypeScript to assert terminal-classification parity.
-- **Win 18 — callback dead-letter cap:** filesystem and Pulse claim paths can cap `deliveryAttempts` and quarantine poison callbacks into a `dead` mailbox instead of redelivering forever.
-- **Win 19 — precise inflight requeue:** `requeueInflightEvents` accepts an `eventIds` allowlist so one failed Pi follow-up can be retried without disturbing sibling callbacks still held by the consumer.
-- **Win 20 — Pi bounded poison replay:** the Pi host passes a delivery-attempt cap and tests prove a permanently failing callback is quarantined instead of waking the session forever.
+- **Win 1 — command typo guard:** `terra statsu` and mistyped reserved subcommands now fail closed with suggestions instead of silently spawning an agent for the typo.
+- **Win 2 — full-stdout receipt validation:** foreground runs validate `TERRARIUM_RESULT` against full captured stdout, so a valid receipt followed by lots of output is not misclassified as missing.
+- **Win 3 — orphan truth normalization:** orphaned runs cannot preserve stale `pending` or unfinalized `verified` task-contract claims.
+- **Win 4 — runnable doctor repair plans:** doctor records concrete repair handles for stale inflight callbacks and stale child-slot claims.
+- **Win 5 — deterministic batch winners:** `race`, `any`, and `quorum` choose winners by durable `finishedAt`, not job-array order.
+- **Win 6 — browser-ready Pulse CORS:** Pulse supports pre-auth browser preflight and CORS-readable responses while keeping bearer-token auth as the security boundary.
+- **Win 7 — large bounded batches:** `terrarium_spawn_batch` and durable groups accept up to 256 queued jobs, with explicit `concurrency` required above 32.
+- **Win 8 — doctor self-heal dry-run/apply:** `terra doctor --repair` dry-runs safe repairs and `--apply` executes only the recover/requeue/prune subset.
+- **Win 9 — poison callback visibility:** filesystem and Pulse requeue track `deliveryAttempts` and report `maxAttempts` for claimed-but-unacked events.
+- **Win 10 — cancelled/deadlined receipt truth:** receipts observed before cancellation or deadline no longer survive as `verified` on terminated runs.
+- **Win 11 — batch preflight verdicts:** `validateBatchShape` exposes structured batch errors before launching any child.
+- **Win 12 — large-batch concurrency hints:** over-32-job batch preflight returns an actionable suggested concurrency value.
+- **Win 13 — doctor repair residual evidence:** `terra doctor --repair --apply --verify` re-diagnoses after repair and reports before/after counters.
+- **Win 14 — Go terminated-run truth parity:** the Go run-machine now matches the JS cancelled/deadlined `not-applicable` contract normalization.
+- **Win 15 — honest human status tables:** `terra status` separates liveness status from task-contract truth; `--json` preserves raw machine output.
+- **Win 16 — group contract-truth rollups:** run groups report `contractTruth` buckets so process `ok` cannot hide cancelled or inconclusive members.
+- **Win 17 — Go/TS replay conformance:** the inert Go core supports `replay`, and JS tests drive identical input sequences through both cores.
+- **Win 18 — callback dead-letter cap:** filesystem and Pulse claim paths can cap `deliveryAttempts` and quarantine poison callbacks into a `dead` mailbox.
+- **Win 19 — precise inflight requeue:** `requeueInflightEvents` accepts an `eventIds` allowlist so one failed follow-up can be retried without disturbing siblings.
+- **Win 20 — Pi bounded poison replay:** the Pi host passes a delivery-attempt cap so permanently failing callbacks are quarantined instead of waking forever.
 
 ### Go/TS parity: a cross-language replay conformance net that drives identical input sequences through both run-machine cores
 
