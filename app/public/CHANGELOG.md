@@ -2,9 +2,9 @@
 
 Succinct, product-facing changes to Terrarium. This is not a full commit log; it records notable behavior, API, safety, and public-site changes.
 
-## Unreleased
+## 2026-06-27 — Hardening loop shipped
 
-### Hardening loop: 20 shipped wins
+### 20 shipped wins
 
 - **Win 1 — command typo guard:** `terra statsu` and mistyped reserved subcommands now fail closed with suggestions instead of silently spawning an agent for the typo.
 - **Win 2 — full-stdout receipt validation:** foreground runs validate `TERRARIUM_RESULT` against full captured stdout, so a valid receipt followed by lots of output is not misclassified as missing.
