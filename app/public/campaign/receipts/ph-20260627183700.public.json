@@ -1,0 +1,8 @@
+{
+  "iterationId": "ph-20260627183700",
+  "contentKind": "product-summary",
+  "evidenceClaim": true,
+  "evidenceRef": "commit:d0c830c",
+  "title": "Doctor self-heal executor",
+  "summary": "terra doctor --repair and --apply execute only mechanically safe recover, requeue, and prune steps."
+}

@@ -1,0 +1,8 @@
+{
+  "iterationId": "ph-20260627183900",
+  "contentKind": "product-summary",
+  "evidenceClaim": true,
+  "evidenceRef": "commit:d0c830c",
+  "title": "Cancelled receipt truth",
+  "summary": "Cancelled or deadlined runs collapse pre-kill receipts to not-applicable instead of verified."
+}

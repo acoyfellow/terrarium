@@ -1,0 +1,8 @@
+{
+  "iterationId": "ph-20260627184400",
+  "contentKind": "product-summary",
+  "evidenceClaim": true,
+  "evidenceRef": "commit:69b4a7f",
+  "title": "Honest human status tables",
+  "summary": "terra status now separates liveness status from task-contract truth in its human table."
+}

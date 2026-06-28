@@ -1,0 +1,8 @@
+{
+  "iterationId": "ph-20260627183800",
+  "contentKind": "product-summary",
+  "evidenceClaim": true,
+  "evidenceRef": "commit:d0c830c",
+  "title": "Poison callback visibility",
+  "summary": "Callback requeue tracks deliveryAttempts and maxAttempts so repeated claimed-but-unacked events are visible."
+}

@@ -1,0 +1,8 @@
+{
+  "iterationId": "ph-20260627183100",
+  "contentKind": "product-summary",
+  "evidenceClaim": true,
+  "evidenceRef": "commit:65f5f1c",
+  "title": "Receipts survive trailing stdout floods",
+  "summary": "Foreground receipt validation scans full captured stdout while persisting only bounded display tails."
+}

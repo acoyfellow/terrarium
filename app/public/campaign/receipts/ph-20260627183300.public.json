@@ -1,0 +1,8 @@
+{
+  "iterationId": "ph-20260627183300",
+  "contentKind": "product-summary",
+  "evidenceClaim": true,
+  "evidenceRef": "commit:65f5f1c",
+  "title": "Runnable doctor repair plans",
+  "summary": "Doctor repair plans now carry runnable handles for stale inflight callbacks and stale child-slot claims."
+}

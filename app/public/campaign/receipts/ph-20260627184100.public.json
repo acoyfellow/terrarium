@@ -1,0 +1,8 @@
+{
+  "iterationId": "ph-20260627184100",
+  "contentKind": "product-summary",
+  "evidenceClaim": true,
+  "evidenceRef": "commit:56deac8",
+  "title": "Large-batch concurrency hints",
+  "summary": "MCP preflight returns missing-concurrency with an actionable suggested value."
+}

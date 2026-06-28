@@ -1,0 +1,8 @@
+{
+  "iterationId": "ph-20260627184600",
+  "contentKind": "product-summary",
+  "evidenceClaim": true,
+  "evidenceRef": "commit:69b4a7f",
+  "title": "Go and TypeScript replay conformance",
+  "summary": "The inert Go replay command and JS harness assert run-machine terminal-classification parity."
+}

@@ -1,0 +1,8 @@
+{
+  "iterationId": "ph-20260627184500",
+  "contentKind": "product-summary",
+  "evidenceClaim": true,
+  "evidenceRef": "commit:69b4a7f",
+  "title": "Group contract-truth rollups",
+  "summary": "Run groups expose contractTruth buckets so process ok cannot hide untrusted members."
+}

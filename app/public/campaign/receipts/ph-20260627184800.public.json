@@ -1,0 +1,8 @@
+{
+  "iterationId": "ph-20260627184800",
+  "contentKind": "product-summary",
+  "evidenceClaim": true,
+  "evidenceRef": "commit:69b4a7f",
+  "title": "Precise inflight requeue",
+  "summary": "requeueInflightEvents can target eventIds so one failed follow-up does not disturb siblings."
+}

@@ -1,0 +1,8 @@
+{
+  "iterationId": "ph-20260627183400",
+  "contentKind": "product-summary",
+  "evidenceClaim": true,
+  "evidenceRef": "commit:65f5f1c",
+  "title": "Batch winners use true finish order",
+  "summary": "Race, any, and quorum winners are chosen by durable finishedAt rather than job-array order."
+}

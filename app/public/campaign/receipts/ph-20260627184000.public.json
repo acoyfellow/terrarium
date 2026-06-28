@@ -1,0 +1,8 @@
+{
+  "iterationId": "ph-20260627184000",
+  "contentKind": "product-summary",
+  "evidenceClaim": true,
+  "evidenceRef": "commit:56deac8",
+  "title": "Batch preflight verdicts",
+  "summary": "validateBatchShape exposes batch errors and suggested concurrency before any child launches."
+}
