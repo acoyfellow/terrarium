@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync, execSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
+import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { applyModelToAgent, assertRunId, capturePatch, childPrompt, classifyRunnerFailure, defaultMreLogPath, finalizeWorkspace, getRunStatus, isPidAlive, prepareWorkspace, readRun, reconcileRun, resolveAgent, resolveModel, resolvePromptProfile, runTerrarium, spawnTerrariumBackground, splitCommand, validateTaskContractOutput, READ_ONLY_AGENT } from "../src/core.js";
 import { clearInheritedTerrariumEnv } from "./helpers/terrarium-env.js";
@@ -426,6 +426,23 @@ test("reconcileRun marks stale running metadata orphaned when no pid is alive", 
     assert.match(reconciled.note, /No live Terrarium child process/);
   } finally {
     rmSync(logDir, { recursive: true, force: true });
+  }
+});
+
+test("reconcileRun orphans a stale run when only the supervisor pid remains alive", async () => {
+  const logDir = mkdtempSync(join(tmpdir(), "terra-supervisor-only-"));
+  const logPath = join(logDir, "run.log");
+  writeFileSync(logPath, "old log");
+  const meta = { runId: "ter_test_supervisor_only", status: "running", pid: 99999996, childPid: 99999996, supervisorPid: process.pid, logPath };
+  await new Promise((resolve) => setTimeout(resolve, 5));
+  const reconciled = await reconcileRun(meta, { staleMs: 0 });
+  try {
+    assert.equal(reconciled.status, "orphaned");
+    assert.equal(reconciled.ok, false);
+    assert.match(reconciled.note, /No live Terrarium child process/);
+  } finally {
+    rmSync(logDir, { recursive: true, force: true });
+    rmSync(join(homedir(), ".terrarium", "runs", "ter_test_supervisor_only.json"), { force: true });
   }
 });
 

@@ -2,6 +2,11 @@
 
 Succinct, product-facing changes to Terrarium. This is not a full commit log; it records notable behavior, API, safety, and public-site changes.
 
+## 2026-06-29 — Active-run truth fix
+
+- `terra status` / `terrarium_status` no longer keeps stale runs active when the child process is gone but a detached supervisor process remains alive. Stale supervisor-only records reconcile to `orphaned`, so old leaks cannot keep the active count or Pi spinner alive.
+- The Pi Terrarium extension now rechecks durable run records and live PIDs before keeping its spinner active, and periodically clears stale active IDs even if a callback/tool-result edge was missed.
+
 ## 2026-06-27 — Hardening loop shipped
 
 ### 20 shipped wins
