@@ -593,7 +593,8 @@ export async function reconcileRun(meta, { staleMs = 30000 } = {}) {
   const cancelled = existsSync(cancelMarkerPath(meta.runId));
   const childPids = [meta.pid, meta.childPid, meta.runnerPid].filter(Boolean);
   const supervisorAlive = isPidAlive(meta.supervisorPid);
-  const alive = [...childPids, meta.supervisorPid].filter(Boolean).some(isPidAlive);
+  const childAlive = childPids.some(isPidAlive);
+  const alive = childAlive || supervisorAlive;
   // A detached supervisor can die during the launch handoff, before it records a
   // child PID. A durable cancellation marker is sufficient to settle that run:
   // there is then no process left that could observe the marker or finish it.
@@ -623,7 +624,7 @@ export async function reconcileRun(meta, { staleMs = 30000 } = {}) {
     const st = await stat(meta.logPath);
     logAgeMs = now - st.mtimeMs;
   } catch {}
-  if (!alive && (logAgeMs === null || logAgeMs >= staleMs)) {
+  if ((!alive || (!childAlive && supervisorAlive && childPids.length > 0)) && (logAgeMs === null || logAgeMs >= staleMs)) {
     const next = {
       ...meta,
       ok: false,
