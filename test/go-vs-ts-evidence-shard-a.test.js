@@ -8,7 +8,7 @@
 // machine on initial state and echoes exact run ids.
 //
 // The Go overlap is conditional: if `go` is not installed (and no
-// TERRARIUM_GO_CORE override is provided) those assertions are skipped rather
+// TEST_TERRARIUM_GO_CORE override is provided) those assertions are skipped rather
 // than failing, so the suite stays portable. The JS real-run assertions always
 // run.
 
@@ -35,7 +35,7 @@ const CASES = [
 ];
 
 function resolveGoBinary() {
-  if (process.env.TERRARIUM_GO_CORE) return process.env.TERRARIUM_GO_CORE;
+  if (process.env.TEST_TERRARIUM_GO_CORE) return process.env.TEST_TERRARIUM_GO_CORE;
   const out = join(tmpdir(), "terra-core-shardA-test");
   const b = spawnSync("go", ["build", "-o", out, "./cmd/terra-core"], { cwd: repoRoot, encoding: "utf8" });
   return b.status === 0 ? out : null;
@@ -89,7 +89,7 @@ test("shard-A: five real JS runs classify every receipt status", async () => {
 
 test("shard-A: Go core agrees with JS run machine (skipped if go unavailable)", (t) => {
   const bin = resolveGoBinary();
-  if (!bin) { t.skip("go core unavailable (no go toolchain and no TERRARIUM_GO_CORE)"); return; }
+  if (!bin) { t.skip("go core unavailable (no go toolchain and no TEST_TERRARIUM_GO_CORE)"); return; }
 
   const version = goCore(bin, ["version"]);
   assert.equal(version.status, 0, "go version exit 0");

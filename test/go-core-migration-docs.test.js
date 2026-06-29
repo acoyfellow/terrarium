@@ -1,7 +1,5 @@
-// Go core migration shard 4: the migration doc must record the agreed target
-// split — Go core owns receipts/process supervision/batch/sweeps; TypeScript
-// adapters and Worker Pulse stay TypeScript. These tests pin that split so the
-// doc cannot silently drift from the decision.
+// Go core migration doc: retained as internal research only. These tests pin
+// that it cannot drift back into an operator-facing alternate engine story.
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -11,10 +9,12 @@ import { fileURLToPath } from 'node:url';
 const root = fileURLToPath(new URL('..', import.meta.url));
 const doc = readFileSync(root + 'docs/GO_CORE_MIGRATION.md', 'utf8');
 
-test('doc declares itself a non-deploy planning skeleton', () => {
+test('doc declares itself internal research, not a deployable product engine', () => {
   assert.match(doc, /target shape/i);
-  assert.match(doc, /planning skeleton/i);
-  assert.match(doc, /not a deploy plan|no runtime is migrated|does not .* change deploy/i);
+  assert.match(doc, /internal research/i);
+  assert.match(doc, /not a deploy plan/i);
+  assert.match(doc, /not an operator feature/i);
+  assert.match(doc, /current engine\s+decision is TypeScript/i);
 });
 
 test('Go core owns receipts, process supervision, batch, and sweeps', () => {

@@ -14,7 +14,7 @@
 // the two cores are now driven by identical sequences and compared directly,
 // not merely asserted equivalent at the initial-state level (shard A).
 //
-// Go overlap is conditional: if `go` is unavailable (and no TERRARIUM_GO_CORE
+// Go overlap is conditional: if `go` is unavailable (and no TEST_TERRARIUM_GO_CORE
 // override is set) the Go-comparison assertions skip rather than fail, so the
 // suite stays CI-portable. The TS-only sequence assertions always run.
 
@@ -149,7 +149,7 @@ function projectTerminal(t) {
 }
 
 function resolveGoBinary() {
-  if (process.env.TERRARIUM_GO_CORE) return process.env.TERRARIUM_GO_CORE;
+  if (process.env.TEST_TERRARIUM_GO_CORE) return process.env.TEST_TERRARIUM_GO_CORE;
   const out = join(tmpdir(), "terra-core-shardP-test");
   const b = spawnSync("go", ["build", "-o", out, "./cmd/terra-core"], { cwd: repoRoot, encoding: "utf8" });
   return b.status === 0 ? out : null;
@@ -194,7 +194,7 @@ test("shard-P: TS replay produces the expected terminal classification per seque
 
 test("shard-P: Go core replay agrees with TS transition on every sequence (skipped if go unavailable)", (t) => {
   const bin = resolveGoBinary();
-  if (!bin) { t.skip("go core unavailable (no go toolchain and no TERRARIUM_GO_CORE)"); return; }
+  if (!bin) { t.skip("go core unavailable (no go toolchain and no TEST_TERRARIUM_GO_CORE)"); return; }
 
   for (const seq of SEQUENCES) {
     const go = goReplay(bin, seq);

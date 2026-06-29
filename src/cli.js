@@ -16,7 +16,7 @@ import { verifyHardening } from "./hardening.js";
 import { runSecureAgent } from "./secure-agent.js";
 import { diagnoseTerrarium, executeRepairPlan } from "./doctor.js";
 import { replayScheduleFile } from "./schedule-replay.js";
-import { goCoreVersion, goCoreDryRun } from "./go-core-adapter.ts";
+import { initialRunState } from "./run-machine.js";
 import { detectMistypedCommand } from "./command-guard.js";
 import { formatRunList, formatRunStatus } from "./status-format.js";
 
@@ -153,12 +153,14 @@ if (!opts.help && !opts.version && !opts.forceTask && process.env.TERRARIUM_NO_C
   if (mistyped) { console.error(`terrarium: ${mistyped.message}`); process.exit(2); }
 }
 if (opts.help) console.log(help());
-else if (opts.version) { const v = goCoreVersion(); console.log(opts.json ? JSON.stringify({ ...v.value, source: v.source, ...(v.fallbackReason ? { fallbackReason: v.fallbackReason } : {}) }) : v.value.version); }
+else if (opts.version) console.log(opts.json ? JSON.stringify({ version: VERSION, core: "typescript" }) : VERSION);
 else if (cmd === "plan") {
-  // Read-only: compute the inert child-invocation plan (Go-accelerated when
-  // TERRARIUM_GO_CORE is set, JS fallback otherwise). No spawn, no mutation.
-  const out = goCoreDryRun({ task: rest.join(" ").trim(), agent: opts.agent, cwd: opts.cwd });
-  console.log(opts.json ? JSON.stringify({ ...out.value, source: out.source, ...(out.fallbackReason ? { fallbackReason: out.fallbackReason } : {}) }, null, 2) : `${out.value.agent} (${out.value.core}) :: ${out.value.task}`);
+  // Read-only: compute the inert child-invocation plan in the production TypeScript engine.
+  // No spawn, no mutation, no alternate engine flag.
+  const task = rest.join(" ").trim();
+  if (!task) { console.error("terrarium: plan requires a non-empty task"); process.exit(1); }
+  const out = { task, agent: opts.agent || "opencode run", args: [], cwd: opts.cwd || ".", requireReceipt: true, initialState: initialRunState({ requireReceipt: true }), core: "typescript" };
+  console.log(opts.json ? JSON.stringify(out, null, 2) : `${out.agent} (${out.core}) :: ${out.task}`);
 }
 else if (cmd === "status" && rest[0]?.startsWith("ter_")) getRunStatus({ runId: rest[0] }).then((r) => console.log(opts.json ? JSON.stringify(r, null, 2) : formatRunStatus(r)));
 else if (cmd === "status") listRuns({ limit: Number(rest[0] || 20) }).then((r) => console.log(opts.json ? JSON.stringify(r, null, 2) : formatRunList(r)));

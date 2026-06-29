@@ -2,6 +2,12 @@
 
 Succinct, product-facing changes to Terrarium. This is not a full commit log; it records notable behavior, API, safety, and public-site changes.
 
+## 2026-06-29 — Engine decision: TypeScript only
+
+- Removed the user-facing Go-core adapter path. Terrarium no longer presents `TERRARIUM_GO_CORE` as an alternate runtime flag for `terra plan` or `terra --version`.
+- Added `docs/ENGINE_DECISION.md`: TypeScript is the production engine; Go remains internal conformance/research code unless it replaces the normal path with full proof.
+- Updated operator docs so planning is simply `terra plan`, not a Go-backed experimental path.
+
 ## 2026-06-29 — Active-run truth fix
 
 - `terra status` / `terrarium_status` no longer keeps stale runs active when the child process is gone but a detached supervisor process remains alive. Stale supervisor-only records reconcile to `orphaned`, so old leaks cannot keep the active count or Pi spinner alive.
@@ -36,7 +42,7 @@ Succinct, product-facing changes to Terrarium. This is not a full commit log; it
 
 - **The gap.** The Go run machine (`internal/run`) is a faithful port of `src/run-machine.js`, but the only cross-language check (shard A) compared the two cores at the *initial-state* level — machine version, initial phase, initial receipt. It could not observe how each core *classifies a terminated run*, which is exactly the surface where the cancelled/deadlined "a verified receipt observed before the kill survives as `taskContractStatus: verified`" lie was reproduced in the Go port and fixed only after the JS fix. There was no mechanism to feed the same ordered input sequence to both cores and assert they finalize identically.
 - **The fix.** The inert Go core gains a fourth command, `replay` (`internal/protocol`), driven over `terra-core --stdin`. It drives an ordered sequence of already-observed inputs (`ChildExited`, `ReceiptObserved`, `CancelRequested`, `DeadlineReached`, `ProcessTerminated`, `RuntimeError` — the same input shapes `transition()` accepts) through `run.Transition` and returns the final state plus the per-step decision list. It stays inert: no clocks, processes, files, or state mutation, consistent with `dry-run`/`status`/`version`. A bad input is a clean per-index failure response (`inputs[0]: ...`), not a crash.
-- **The conformance net.** New `test/go-vs-ts-replay-conformance-shard-p.test.js` feeds a battery of sequences — every receipt classification (`verified`/`missing`/`mismatch`/`malformed`/`not-required`), the receipt-before-exit and receipt-before-cancel/deadline races, verified-but-nonzero-exit, late-input idempotence, and runtime error — to both the TS `transition()` core and the Go core's `replay`, then asserts byte-for-byte parity on the consumer-facing terminal fields (`status`, `ok`, `exitCode`, `taskContractStatus`, `taskResultSummary`, `reason`). The cancelled/deadlined invariant is pinned directly: a `not-applicable` terminal must leak no `taskResultSummary` in either core. The Go comparison skips cleanly when no `go` toolchain is present (or set `TERRARIUM_GO_CORE`); the TS-only sequence assertions always run, keeping the suite CI-portable.
+- **The conformance net.** New `test/go-vs-ts-replay-conformance-shard-p.test.js` feeds a battery of sequences — every receipt classification (`verified`/`missing`/`mismatch`/`malformed`/`not-required`), the receipt-before-exit and receipt-before-cancel/deadline races, verified-but-nonzero-exit, late-input idempotence, and runtime error — to both the TS `transition()` core and the Go core's `replay`, then asserts byte-for-byte parity on the consumer-facing terminal fields (`status`, `ok`, `exitCode`, `taskContractStatus`, `taskResultSummary`, `reason`). The cancelled/deadlined invariant is pinned directly: a `not-applicable` terminal must leak no `taskResultSummary` in either core. The Go comparison skips cleanly when no `go` toolchain is present (or use the test-built binary); the TS-only sequence assertions always run, keeping the suite CI-portable.
 - New Go tests in `internal/protocol/protocol_test.go` cover the `replay` happy paths, the cancel-after-verified-receipt `not-applicable` collapse, the missing-receipt inconclusive path, bad-input rejection, and an empty-input replay that stays `running`. `COMPATIBILITY.md` records the two-implementation lockstep invariant and `docs/GO_CORE_MIGRATION.md` documents the `replay` entry point. `go test ./...` and the JS shard-A/shard-P suites are green with the Go comparison active. No deploy.
 
 ### Pi extension: a missing-subscriber session start and one poison callback can no longer wedge follow-up delivery
@@ -123,8 +129,8 @@ Succinct, product-facing changes to Terrarium. This is not a full commit log; it
 ### Go core migration: first runnable kernel slice
 
 - Added an experimental Go module with `cmd/terra-core`, a pure single-run state machine, JSON command protocol, and a prototype one-process runner under `go/runner`.
-- Added a thin TypeScript adapter gated by `TERRARIUM_GO_CORE`; default behavior remains JavaScript, and `terra --version --json` can report when the Go core served the call.
-- Added `terra plan` as an inert, read-only child-invocation planner. It can be served by Go via `TERRARIUM_GO_CORE` or fall back to JavaScript; it does not spawn a child or mutate run state.
+- Added a thin TypeScript adapter gated by `TERRARIUM_GO_CORE` at the time; this path was later removed by the 2026-06-29 engine decision so TypeScript is the only product engine.
+- Added `terra plan` as an inert, read-only child-invocation planner. It is now served by TypeScript only; it does not spawn a child or mutate run state.
 - Fixed the adapter wire protocol to drive the Go binary in `--stdin` JSON-envelope mode, preventing silent payload corruption where `status` / `dry-run` could otherwise return placeholder fields with exit 0.
 - Added a Go-vs-TypeScript decision rubric and real-run evidence tests. Current evidence says TypeScript remains better for production execution today while Go continues behind the stable adapter boundary.
 - Documented the intended split: Go core owns receipts/process supervision/batch/sweeps over time; TypeScript keeps CLI/Node/MCP/Pi adapters and Cloudflare Worker Pulse.

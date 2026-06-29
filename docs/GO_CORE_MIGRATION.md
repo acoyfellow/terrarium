@@ -1,11 +1,10 @@
 # Go core migration — target shape
 
-Status: **planning skeleton** (shard 4). This document records the agreed target
+Status: **internal research / invalidated as product surface**. This document records a prior target
 component split for moving Terrarium's durable-execution kernel from TypeScript to
-a Go core. It is descriptive of intent, not a deploy plan; no runtime is migrated
-by this document. It must stay consistent with the stable contract in
-[CORE_PRODUCT_DECISION.md](./CORE_PRODUCT_DECISION.md) and the current runtime in
-[ARCHITECTURE.md](./ARCHITECTURE.md).
+a Go core. It is not a deploy plan and not an operator feature. The current engine
+decision is TypeScript; do not expose a Go engine flag in user-facing docs or CLI
+behavior. See [ENGINE_DECISION.md](./ENGINE_DECISION.md), [CORE_PRODUCT_DECISION.md](./CORE_PRODUCT_DECISION.md), and [ARCHITECTURE.md](./ARCHITECTURE.md).
 
 ## Why a Go core
 
@@ -139,6 +138,6 @@ idempotence, runtime error) to both the TS `transition()` core and the Go core's
 `replay`, then asserts byte-for-byte parity on the consumer-facing terminal
 fields (`status`, `ok`, `exitCode`, `taskContractStatus`, `taskResultSummary`,
 `reason`). The Go comparison skips cleanly when no `go` toolchain is available
-(or set `TERRARIUM_GO_CORE` to a prebuilt binary); the TS-only sequence
+(or use the test-built binary path); the TS-only sequence
 assertions always run. A future change that drifts the Go terminal
 classification away from TS now fails conformance instead of shipping silently.
