@@ -111,7 +111,8 @@ function renderDocs() {
   const code = (value) => `<pre><code>${String(value).replace(/[&<>]/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;' }[char]))}</code></pre>`;
   const callout = (title, copy) => `<div class="docs-callout"><b>${title}</b><p>${copy}</p></div>`;
   const card = (title, copy) => `<div><b>${title}</b><p>${copy}</p></div>`;
-  const shell = (title, kicker, body) => `<main class="shell docs-shell"><header class="top"><a class="brand" href="/"><span class="mark"></span>TERRARIUM</a><nav class="top-nav"><a href="/docs">docs</a><a href="/runs">runs</a><a href="/#changelog">changelog</a></nav><time class="status">${runStamp()}</time></header><section class="docs-layout"><aside class="docs-nav"><b>Terrarium docs</b>${nav.map(([id,label]) => link(id,label)).join('')}<hr><a href="/CHANGELOG.md">raw changelog</a><a href="https://github.com/acoyfellow/terrarium">source</a></aside><article class="docs-page"><div class="eyebrow">${kicker}</div><h1>${title}</h1>${body}</article></section></main>`;
+  const mobileJump = `<label class="docs-mobile-jump"><span>Section</span><select data-docs-jump>${nav.map(([id,label]) => `<option value="${id}"${page === id ? ' selected' : ''}>${label}</option>`).join('')}</select></label>`;
+  const shell = (title, kicker, body) => `<main class="shell docs-shell"><header class="top"><a class="brand" href="/"><span class="mark"></span>TERRARIUM</a><nav class="top-nav"><a href="/docs">docs</a><a href="/runs">runs</a><a href="/#changelog">changelog</a></nav><time class="status">${runStamp()}</time></header><section class="docs-layout"><aside class="docs-nav"><b>Terrarium docs</b>${nav.map(([id,label]) => link(id,label)).join('')}<hr><a href="/CHANGELOG.md">raw changelog</a><a href="https://github.com/acoyfellow/terrarium">source</a></aside><article class="docs-page">${mobileJump}<div class="eyebrow">${kicker}</div><h1>${title}</h1>${body}</article></section></main>`;
   const pages = {
     start: shell('Delegate bounded work. Reconstruct truth.', 'Start here', `${callout('Terrarium in one sentence', 'Terrarium turns agent orchestration from prompt discipline into receipt-backed loop structure: fan out bounded tasks, collect evidence, repair durable state, and feed every run’s exhaust into the next loop.')}
       <div class="docs-grid">${card('Use', 'Run one bounded child, inspect status/logs, and verify the receipt before believing success.')}${card('Run', 'Operate callbacks, Pulse, Pi follow-ups, groups, cancellation, and doctor self-heal without confusing notifications for proof.')}${card('Scale', 'Default to parallel, constrain active concurrency, and integrate only validated artifacts.')}</div>
@@ -167,4 +168,9 @@ async function load() {
 }
 
 window.addEventListener('hashchange', render);
+app.addEventListener('change', (event) => {
+  const select = event.target.closest?.('[data-docs-jump]');
+  if (!select) return;
+  location.href = `/docs?page=${encodeURIComponent(select.value)}`;
+});
 load();
