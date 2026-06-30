@@ -2,6 +2,11 @@
 
 Succinct, product-facing changes to Terrarium. This is not a full commit log; it records notable behavior, API, safety, and public-site changes.
 
+## 2026-06-29 — Website layout polish
+
+- Standardized homepage, docs, runs, and changelog page widths around one readable container instead of mixing full-bleed and narrow layouts.
+- Tightened mobile behavior for docs and run ledger pages: one docs navigator per breakpoint, horizontally safe code blocks/tables, and card-style run rows on small screens.
+
 ## 2026-06-29 — Engine decision: TypeScript only
 
 - Removed the user-facing Go-core adapter path. Terrarium no longer presents `TERRARIUM_GO_CORE` as an alternate runtime flag for `terra plan` or `terra --version`.
