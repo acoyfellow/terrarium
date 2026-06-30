@@ -28,3 +28,5 @@ html,body{max-width:100%;overflow-x:hidden}.shell{max-width:var(--page-max);marg
 /* design loop correction: one docs navigator per breakpoint */
 @media(min-width:621px) and (max-width:1040px){.docs-mobile-jump{display:none!important}}
 @media(max-width:620px){.docs-nav{display:none!important}.docs-mobile-jump{display:flex!important}}
+/* svelte migration: force nav reset across component boundaries */
+.top .top-nav{display:flex;align-items:center;gap:14px;margin-right:auto}.top .top-nav a{color:#9fb3a5!important;text-decoration:none!important;font:10px DM Mono,monospace!important;text-transform:uppercase;letter-spacing:.08em}.top .top-nav a:hover{color:var(--mint)!important}.changelog pre{white-space:pre-wrap;font:12px/1.5 Manrope;color:#a9bbae;margin:0}

@@ -52,7 +52,9 @@
     "pi-package"
   ],
   "devDependencies": {
+    "@sveltejs/vite-plugin-svelte": "^6.2.4",
     "miniflare": "^4.20260625.0",
+    "svelte": "^5.56.4",
     "vite": "^7.3.3",
     "wrangler": "^4.98.0"
   },
@@ -67,6 +69,7 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
     "effect": "^3.21.3",
+    "hono": "^4.12.27",
     "mcp-code-mode": "github:acoyfellow/mcp-code-mode#f27af39d5aa020200f712f222c02d682c7ab9c2a"
   }
 }
