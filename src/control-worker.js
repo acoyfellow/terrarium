@@ -1,3 +1,4 @@
+import { Hono } from "hono";
 import { WorkflowEntrypoint } from "cloudflare:workers";
 import { DEFAULT_LAB_POLICY } from "./lab.js";
 import { runHostileLabScenario } from "./hostile.js";
@@ -176,7 +177,7 @@ export class TerrariumCampaignWorkflow extends WorkflowEntrypoint {
   }
 }
 
-export default {
+const legacyWorker = {
   async fetch(request, env) {
     const url = new URL(request.url);
     // Pulse transport (edge wake): delegate to the pulse worker handler. These
@@ -318,3 +319,12 @@ export default {
     return new Response("Not found", { status: 404 });
   },
 };
+
+const app = new Hono();
+
+// Hono is now the Worker shell. Keep the existing control routes delegated while
+// the frontend migration lands; future route groups can move out of
+// legacyWorker one at a time without changing bindings or public paths.
+app.all('*', (c) => legacyWorker.fetch(c.req.raw, c.env));
+
+export default app;
