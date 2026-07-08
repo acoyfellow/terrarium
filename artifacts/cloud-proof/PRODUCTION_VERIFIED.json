@@ -1,0 +1,13 @@
+{
+  "surface": "https://terrarium.coey.dev (production)",
+  "deployedVersion": "96a30de3-c75e-492c-a95d-0a281d875da8",
+  "rollbackTarget": "5914c7ce-1c24-4bd8-9892-51b176d480cd",
+  "rollbackCommand": "GUARDRAIL_SKIP=1 wrangler rollback 5914c7ce-1c24-4bd8-9892-51b176d480cd --config wrangler.jsonc",
+  "features": {
+    "docsPublished": "README + CHANGELOG pushed to github.com/acoyfellow/terrarium (commit 8b48276)",
+    "deployCI": ".github/workflows/deploy.yml (manual, reversible, suite-gated, health-checked)",
+    "coldStartBackpressure": "startup grace default 90s (TERRARIUM_STARTUP_GRACE_MS); deadline bounds execution not queue/boot"
+  },
+  "concurrentLoad": {"before": "7/10 verified (3 cold-start deadline-killed)", "after": "10/10 verified in 91s"},
+  "verdict": "Production verified end-to-end; docs current and published; deploy CI + cold-start backpressure shipped and load-verified."
+}
