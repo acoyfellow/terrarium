@@ -1,0 +1,120 @@
+name: Deploy
+
+# Reversible production deploy for the Terrarium control worker + cloud Pi
+# execution cell. Manual-only (workflow_dispatch): a human chooses to promote,
+# and the job captures the pre-deploy version id so a rollback is always one
+# command away. Nothing deploys on push.
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Target config"
+        required: true
+        default: qualification
+        type: choice
+        options:
+          - qualification
+          - production
+      confirm:
+        description: 'Type "deploy" to confirm'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-${{ github.event.inputs.environment }}
+  cancel-in-progress: false
+
+jobs:
+  gate:
+    name: Pre-deploy gate (tests + suite)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    if: ${{ github.event.inputs.confirm == 'deploy' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install
+        run: npm ci
+      - name: Full isolated suite
+        run: npm test
+
+  deploy:
+    name: Deploy ${{ github.event.inputs.environment }}
+    needs: gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: ${{ github.event.inputs.environment }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install
+        run: npm ci
+
+      - name: Resolve wrangler config
+        id: cfg
+        shell: bash
+        run: |
+          if [ "${{ github.event.inputs.environment }}" = "production" ]; then
+            echo "config=wrangler.jsonc" >> "$GITHUB_OUTPUT"
+          else
+            echo "config=wrangler.qual.jsonc" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Capture rollback target (pre-deploy version)
+        id: rollback
+        shell: bash
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          # Last already-live version id becomes the rollback target. Best-effort:
+          # a first-ever deploy has none, which is fine.
+          prev="$(npx wrangler deployments list --config '${{ steps.cfg.outputs.config }}' 2>/dev/null \
+            | awk '/Version\(s\)/{ id=$NF } END{ print id }')" || prev=""
+          echo "target=$prev" >> "$GITHUB_OUTPUT"
+          echo "Pre-deploy rollback target: ${prev:-<none>}"
+
+      - name: Deploy
+        shell: bash
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          npx wrangler deploy --config '${{ steps.cfg.outputs.config }}'
+
+      - name: Post-deploy health check
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event.inputs.environment }}" = "production" ]; then
+            base="https://terrarium.coey.dev"
+          else
+            base="$(npx wrangler deployments status --config '${{ steps.cfg.outputs.config }}' 2>/dev/null | grep -oE 'https://[a-z0-9.-]+workers.dev' | head -1 || true)"
+          fi
+          echo "Health target: ${base:-unknown}"
+          if [ -n "${base:-}" ]; then
+            code="$(curl -s -o /dev/null -w '%{http_code}' "$base/health")"
+            echo "GET /health -> $code"
+            [ "$code" = "200" ] || { echo "health check failed"; exit 1; }
+            # Sensitive surface must be auth-gated.
+            acode="$(curl -s -o /dev/null -w '%{http_code}' -X POST "$base/api/runs" -H 'content-type: application/json' -d '{"task":"x"}')"
+            echo "unauth POST /api/runs -> $acode"
+            [ "$acode" = "401" ] || { echo "auth gate not fail-closed"; exit 1; }
+          fi
+
+      - name: Rollback instructions
+        if: always()
+        shell: bash
+        run: |
+          echo "## Deploy: ${{ github.event.inputs.environment }}" >> "$GITHUB_STEP_SUMMARY"
+          echo "Rollback target: \`${{ steps.rollback.outputs.target }}\`" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          echo "npx wrangler rollback ${{ steps.rollback.outputs.target }} --config ${{ steps.cfg.outputs.config }}" >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"

@@ -375,7 +375,9 @@ test("RunControlDO cancel yields partial logs without a TERRARIUM_RESULT marker"
 test("RunControlDO alarm enforces deadline: blocking run past deadline => timeout terminal", async () => {
   const state = makeStateOverDb(new DatabaseSync(":memory:"));
   const backend = new DetachedProcessBackend();
-  const doInst = new RunControlDO(state, { __TERRARIUM_TEST_BACKEND__: backend });
+  // Startup grace is a capacity knob; this test isolates deadline enforcement,
+  // so disable the grace to keep the deadline at Date.now() + max(1000, ms).
+  const doInst = new RunControlDO(state, { __TERRARIUM_TEST_BACKEND__: backend, TERRARIUM_STARTUP_GRACE_MS: "0" });
 
   const admit = await doInst.fetch(new Request("https://do/admit", {
     method: "POST", headers: { "content-type": "application/json" },
@@ -402,6 +404,26 @@ test("RunControlDO alarm enforces deadline: blocking run past deadline => timeou
   const body = await collect.json();
   assert.equal(body.terminal.status, "failed");
   assert.equal(body.terminal.reason, "deadline-reached");
+});
+
+test("RunControlDO adds a bounded startup grace so cold-boot does not eat the deadline", async () => {
+  const state = makeStateOverDb(new DatabaseSync(":memory:"));
+  const backend = new DetachedProcessBackend();
+  // 60s grace, 1s task deadline. The durable deadline_at must reflect both, so
+  // a run that waits ~seconds for a cold container is not killed before it runs.
+  const doInst = new RunControlDO(state, { __TERRARIUM_TEST_BACKEND__: backend, TERRARIUM_STARTUP_GRACE_MS: "60000" });
+  const t0 = Date.now();
+  const admit = await doInst.fetch(new Request("https://do/admit", {
+    method: "POST", headers: { "content-type": "application/json" },
+    body: JSON.stringify({ task: "grace check", ownerId: "owner-G", spec: { deadlineMs: 1000 } }),
+  }));
+  assert.equal(admit.status, 202);
+  const runId = (await admit.json()).runId;
+  const rows = state.storage.sql.exec("SELECT deadline_at FROM run_state WHERE run_id = ?", runId).toArray();
+  const deadlineAt = Number(rows[0].deadline_at);
+  // deadline_at ~= t0 + 1000 (task) + 60000 (grace); allow scheduling slack.
+  assert.ok(deadlineAt - t0 >= 60000, `expected >= 60s grace, got ${deadlineAt - t0}ms`);
+  assert.ok(deadlineAt - t0 <= 65000, `grace must stay bounded, got ${deadlineAt - t0}ms`);
 });
 
 // ---------------- 7. Fail-closed missing backend ----------------

@@ -2,6 +2,19 @@
 
 Succinct, product-facing changes to Terrarium. This is not a full commit log; it records notable behavior, API, safety, and public-site changes.
 
+## 2026-07-06 — Deploy CI + cold-start backpressure
+
+- Added a manual, reversible deploy workflow (`.github/workflows/deploy.yml`): a human dispatches it, choosing qualification or production; it runs the full suite as a gate, captures the pre-deploy version as a rollback target, deploys, and health-checks `/health` (200) and unauthenticated `/api/runs` (401 fail-closed) before reporting rollback instructions. Nothing deploys on push.
+- Cold-start backpressure: the run deadline now includes a bounded, server-only startup grace (default 90s, env `TERRARIUM_STARTUP_GRACE_MS`, clamped) so container cold-boot/queue time no longer consumes the caller's execution budget. A burst of simultaneous cold boots previously deadline-killed healthy runs before their process started; the grace bounds execution, not queueing. Never client-controlled.
+
+## 2026-07-06 — Cloud execution cell live in production
+
+- The cloud execution service is live on `terrarium.coey.dev`: authenticated `POST /api/runs` admits one bounded task, runs it in a Cloudflare-managed Pi execution cell, and returns a durable run with a verified correlated receipt, durable logs, and a principal-scoped terminal callback — no local machine in the loop.
+- Execution runtime is Pi (`@earendil-works/pi-coding-agent`, pinned), built on the plain `cloudflare/sandbox` amd64 base (`Dockerfile.pi`). The cell reaches the model only through a credentialless server-owned Workers AI route intercepted by `ContainerProxy`; no reusable model credential enters the cell. OpenCode is no longer the cloud runtime path.
+- Receipt authority holds under adversarial test: a prompt-injection task that emits a forged `TERRARIUM_RESULT` cannot change the server-minted `runId`/`taskFingerprint`/`nonce` correlation; only `summary` (advisory) is influenced. The nonce is always server-minted; a client-supplied `spec.nonce` is ignored.
+- Verified in production: real task execution and computed answers, idempotency (same key → same runId), cancel and deadline precedence (fail-closed, no receipt), auth fail-closed (401/400), cross-principal isolation (401), oversized-task admission gate (413), R2 log overflow retrieval with byte-count + SHA-256 integrity (receipt-in-overflow bug fixed), restart/reattach across a mid-run redeploy, and exactly-once terminal callback claim/ack.
+- Known limit: broad simultaneous cold container boots beyond warm capacity can be deadline-killed (fail-closed, no fake receipt); operational/capacity work, not a correctness defect.
+
 ## 2026-06-29 — Website layout polish
 
 - Standardized homepage, docs, runs, and changelog page widths around one readable container instead of mixing full-bleed and narrow layouts.

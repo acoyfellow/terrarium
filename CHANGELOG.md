@@ -2,6 +2,11 @@
 
 Succinct, product-facing changes to Terrarium. This is not a full commit log; it records notable behavior, API, safety, and public-site changes.
 
+## 2026-07-06 — Deploy CI + cold-start backpressure
+
+- Added a manual, reversible deploy workflow (`.github/workflows/deploy.yml`): a human dispatches it, choosing qualification or production; it runs the full suite as a gate, captures the pre-deploy version as a rollback target, deploys, and health-checks `/health` (200) and unauthenticated `/api/runs` (401 fail-closed) before reporting rollback instructions. Nothing deploys on push.
+- Cold-start backpressure: the run deadline now includes a bounded, server-only startup grace (default 90s, env `TERRARIUM_STARTUP_GRACE_MS`, clamped) so container cold-boot/queue time no longer consumes the caller's execution budget. A burst of simultaneous cold boots previously deadline-killed healthy runs before their process started; the grace bounds execution, not queueing. Never client-controlled.
+
 ## 2026-07-06 — Cloud execution cell live in production
 
 - The cloud execution service is live on `terrarium.coey.dev`: authenticated `POST /api/runs` admits one bounded task, runs it in a Cloudflare-managed Pi execution cell, and returns a durable run with a verified correlated receipt, durable logs, and a principal-scoped terminal callback — no local machine in the loop.
