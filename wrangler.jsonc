@@ -17,7 +17,8 @@
     // Operational knobs, not correctness invariants; failures fail closed.
     "TERRARIUM_BUDGET_MAX_ACTIVE": "20",
     "TERRARIUM_BUDGET_MAX_PER_MINUTE": "120",
-    "TERRARIUM_BUDGET_MAX_PER_DAY": "5000"
+    "TERRARIUM_BUDGET_MAX_PER_DAY": "5000",
+    "TERRARIUM_STARTUP_GRACE_MS": "90000"
   },
   "kv_namespaces": [
     {
