@@ -130,6 +130,22 @@ test('5D handler retries a transient upstream 5xx then succeeds, but does not re
   assert.equal(m, 1, 'must not retry a 4xx');
 });
 
+test('5D server model is deployment-config-owned, allowlisted, never client-chosen', async () => {
+  const { resolveServerModel, WORKERS_AI_MODEL } = _testables;
+  // Default when unset.
+  assert.equal(resolveServerModel({}), WORKERS_AI_MODEL);
+  // Allowlisted env value is honored.
+  assert.equal(resolveServerModel({ TERRARIUM_WORKERS_AI_MODEL: '@cf/meta/llama-3.1-8b-instruct-fast' }), '@cf/meta/llama-3.1-8b-instruct-fast');
+  // Non-allowlisted value falls back to the default (fail-safe).
+  assert.equal(resolveServerModel({ TERRARIUM_WORKERS_AI_MODEL: '@cf/evil/backdoor' }), WORKERS_AI_MODEL);
+  // The env-selected model is what env.AI.run receives; client body.model is ignored.
+  const calls = [];
+  const env = { AI: { run: async (...a) => { calls.push(a); return { response: 'ok' }; } }, TERRARIUM_WORKERS_AI_MODEL: '@cf/meta/llama-3.1-8b-instruct-fast' };
+  const res = await handleWorkersAiEgress(request({ model: 'attacker/model', messages: [{ role: 'user', content: 'x' }] }), env);
+  assert.equal(res.status, 200);
+  assert.equal(calls[0][0], '@cf/meta/llama-3.1-8b-instruct-fast');
+});
+
 test('5D handler fails closed without AI and selects fixed server model instead of client model', async () => {
   const body = { model: 'attacker/model', messages: [{ role: 'user', content: 'hello' }] };
   assert.equal((await handleWorkersAiEgress(request(body), {})).status, 503);

@@ -1,0 +1,69 @@
+{
+  // Qualification-only Worker. NEVER targets the production custom domain.
+  // Deploys to a unique *.workers.dev name to prove the Pi execution cell
+  // end-to-end before any production promotion. Explicit resource inventory:
+  //   - Worker name: terrarium-qual-pi (unique; workers.dev subdomain only)
+  //   - R2 bucket:   terrarium-qual-pi-artifacts (isolated from prod)
+  //   - KV:          reuses existing ledger namespace read-only paths only
+  //   - Container:   Dockerfile.pi (Pi execution cell)
+  // Cleanup after qualification: `wrangler delete --name terrarium-qual-pi`
+  // and remove the qual R2 bucket.
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "terrarium-qual-pi",
+  "main": "src/control-worker.js",
+  "compatibility_date": "2026-06-05",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "account_id": "bfcb6ac5b3ceaf42a09607f6f7925823",
+  "vars": {
+    "TERRARIUM_MODE": "fixture",
+    // Admission concurrency is aligned to container capacity (max_instances
+    // below). Admitting more active runs than there are container instances
+    // lets excess runs be deadline-killed while waiting for a slot; matching
+    // the two gives clean 429 backpressure instead. These are operational
+    // knobs, not correctness invariants.
+    "TERRARIUM_BUDGET_MAX_ACTIVE": "5",
+    "TERRARIUM_BUDGET_MAX_PER_MINUTE": "120",
+    "TERRARIUM_BUDGET_MAX_PER_DAY": "5000"
+  },
+  "kv_namespaces": [
+    { "binding": "TERRARIUM_LEDGER", "id": "7e322bfe94234a52896706a5c8231407" },
+    { "binding": "TERRARIUM_POLICY", "id": "7e322bfe94234a52896706a5c8231407" }
+  ],
+  "r2_buckets": [
+    { "binding": "TERRARIUM_ARTIFACTS", "bucket_name": "terrarium-qual-pi-artifacts" }
+  ],
+  "observability": { "enabled": true },
+  "ai": { "binding": "AI" },
+  "durable_objects": {
+    "bindings": [
+      { "name": "CAMPAIGN_LOCK", "class_name": "CampaignLock" },
+      { "name": "PULSE_ROUTER", "class_name": "PulseRouter" },
+      { "name": "TERRARIUM_RUN", "class_name": "RunControlDO" },
+      { "name": "TERRARIUM_SANDBOX", "class_name": "TerrariumSandbox" },
+      { "name": "TERRARIUM_PRINCIPAL_BUDGET", "class_name": "PrincipalBudgetDO" }
+    ]
+  },
+  "containers": [
+    {
+      "class_name": "TerrariumSandbox",
+      "image": "./Dockerfile.pi",
+      "image_build_context": ".",
+      "max_instances": 5
+    }
+  ],
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["CampaignLock"] },
+    { "tag": "v2", "new_sqlite_classes": ["PulseRouter"] },
+    { "tag": "v3", "new_sqlite_classes": ["RunControlDO"] },
+    { "tag": "v4", "new_sqlite_classes": ["TerrariumSandbox"] },
+    { "tag": "v5", "new_sqlite_classes": ["PrincipalBudgetDO"] }
+  ],
+  "workflows": [
+    {
+      "name": "terrarium-qual-campaign",
+      "binding": "TERRARIUM_CAMPAIGN",
+      "class_name": "TerrariumCampaignWorkflow"
+    }
+  ]
+}
