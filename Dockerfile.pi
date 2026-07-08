@@ -1,0 +1,36 @@
+# Terrarium production sandbox image — Pi execution cell.
+#
+# Base is the plain cloudflare/sandbox image, which ships
+# Node 22 + npm + Bun on Ubuntu 22.04 (linux/amd64, the Cloudflare container
+# target arch). On top of it we install a pinned Pi runtime and drop in the
+# runtime-neutral Terrarium runner plus a single credentialless provider
+# extension. Task/contract text is delivered as files; the cell holds no
+# reusable model credential — the outbound model fetch is intercepted by the
+# exact-host ContainerProxy handler and Workers AI authority is attached
+# server-side.
+#
+# Fixed runner argv (see src/cloud/sandbox-backend.js DEFAULT_RUNNER_COMMAND):
+#   /bin/sh /usr/local/bin/terrarium-runner
+#
+# Required runtime env (set by RunControlDO / image, never by the task):
+#   TERRARIUM_MODEL             must be "terrarium/workers-ai"
+#   TERRARIUM_MODEL_BASE_URL    intercepted server-owned model route
+#   NODE_EXTRA_CA_CERTS         runtime CA for HTTPS interception (cloud only)
+FROM docker.io/cloudflare/sandbox:0.12.3@sha256:23f67e16131b780865a5fa5aa3c8607408a730105c248836409f4e02bb6bf042
+
+# Pin the Pi runtime. --ignore-scripts keeps install hermetic; the bin is a
+# plain Node CLI so no native postinstall is required.
+RUN npm install -g --ignore-scripts @earendil-works/pi-coding-agent@0.80.3 \
+    && ln -sf "$(npm root -g)/@earendil-works/pi-coding-agent/dist/cli.js" /usr/local/bin/pi \
+    && chmod +x /usr/local/bin/pi \
+    && PIPKG="$(npm root -g)/@earendil-works/pi-coding-agent" \
+    && rm -rf "$PIPKG/docs" "$PIPKG/examples" "$PIPKG/CHANGELOG.md" \
+    && npm cache clean --force 2>/dev/null || true
+
+# Runtime-neutral bounded runner + the single credentialless provider extension.
+COPY scripts/terrarium-runner-pi /usr/local/bin/terrarium-runner
+COPY scripts/pi-runtime/terrarium-provider.mjs /etc/terrarium/terrarium-provider.mjs
+RUN chmod +x /usr/local/bin/terrarium-runner \
+    && chmod 1777 /workspace
+
+WORKDIR /workspace
