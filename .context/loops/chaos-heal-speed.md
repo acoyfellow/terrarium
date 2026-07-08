@@ -75,6 +75,8 @@ regression, no invariant weakened, and a reversible deploy + rollback target.
 | date | change | metric | before | after | samples | invariant check | deploy/rollback |
 |------|--------|--------|--------|-------|---------|-----------------|-----------------|
 | 2026-07-06 | baseline measurement (no change) | admit->terminal warm | n/a | 8.2-12.5s cluster, 1 tail spike 59s/5 | 5 | n/a | n/a |
+| 2026-07-06 | attribution: full runner vs zero-latency mock | Pi startup+session+validation | n/a | 549-953ms (PROVEN LOCAL) | 3 | receipts verified | n/a |
+| 2026-07-06 | attribution: bare pi --version | process spawn | n/a | ~380ms (LOCAL) | 3 | n/a | n/a |
 
 ## Regression corpus (append survived-chaos + new-failure probes)
 
@@ -88,6 +90,25 @@ regression, no invariant weakened, and a reversible deploy + rollback target.
 - Status: started.
 - Baselines captured: warm single ~13.5s; 10-wide 10/10 ~91s (post grace).
 - Housekeeping done: pruned ~15k stale run records (159M→102M), workspaces preserved.
+
+### Round 4 (2026-07-06) — smaller-model A/B REJECTED
+- Made the Workers AI model deployment-config-owned (env.TERRARIUM_WORKERS_AI_MODEL), allowlisted, never client-chosen (test added; 9 egress tests pass, full suite 556 pass). Deployed llama-3.1-8b-instruct-fast to QUAL (version d1d10a9c), 70b untouched on prod.
+- A/B (PROVEN): qual 8b end-to-end latencies 9685/8087/9981/11329ms — statistically indistinguishable from prod 70b (9.3-12s). AND quality regressed: 4/5 verified but wrong/nonexact answers (1381, 39) on "17*23" where 70b reliably returns 391.
+- REJECTED: a smaller model buys NO latency (the floor is not model compute) and costs correctness. Reverting qual to the default 70b. The ~8-10s warm floor is fixed overhead (container network transport + Workers AI queue/setup), not model size or Pi.
+- Speed-focus conclusion: the only proven, deployed, invariant-safe latency/throughput win this campaign is the cold-start deadline grace (Round via cloud-pi-cell loop: 10/10 vs 7/10 concurrent, deployed prod). Smaller-model and Pi-trim levers are REJECTED. Remaining theoretical lever (streaming/transport) needs deeper infra work with uncertain payoff on a ~9s floor; not a quick win — deferred as HYPOTHESIS.
+
+### Round 3 (2026-07-06) — latency attribution DECISIVE
+- M2 (PROVEN LOCAL-ONLY): the full in-cell runner path (Pi launch + provider registration + model session + receipt strip/validate) against a zero-latency localhost model returns in 549-953ms across 3 samples with a verified receipt each.
+- Conclusion: Pi is NOT the ~8s prod warm floor. With bare `pi --version` ~380ms and the whole runner <1s against a fast endpoint, essentially all of the ~8-12s prod warm latency is the Workers AI model round-trip (@cf/meta/llama-3.3-70b-instruct-fp8-fast), plus a variance tail (the 27-59s spikes) from upstream model slowness.
+- Redirect: speed focus B should target the MODEL PATH, not Pi startup. Candidate experiments (each must keep invariants): (a) a smaller/faster Workers AI model for bounded C0 tasks where quality allows; (b) streaming passthrough so terminal detection does not wait for full buffering; (c) trim max_tokens default for short tasks; (d) measure model latency directly via the egress handler to separate model compute from transport.
+- Rejected as low-value: warm-pool / trimmed-Pi-footprint work (would save <1s of a ~9s run). REJECTED for C0 priority.
+- Next smallest experiment: A/B a faster Workers AI model vs llama-3.3-70b on the same bounded task, measured end-to-end on qual, keeping receipt authority; only promote if faster AND correct.
+
+### Round 2 (2026-07-06) — dogfood model + public benchmarks
+- Set Terrarium's own default child model to gpt-5.6-sol (config.defaultModel + defaultAgent pi/opencode.cloudflare.dev). PROVEN via terra dry-run and a real dogfood spawn ("dogfood verified").
+- Added a live production benchmarks section to the website (app/public/benchmarks.json + App.svelte + style.css), numbers measured on prod: best warm 9.3s, typical ~12s, 10/10 fan-out, 100% receipt integrity. Built (446ms), data loads, deployed to prod version 7edce59a with rollback target 96a30de3; health 200, api-unauth 401 post-deploy. PROVEN.
+- Pushed tweet-ready cloud-launch content to the owner agent-experience session (Master) via my-ax inject.
+- Speed measurement M1: bare `pi --version` process startup ~380ms x3 (LOCAL-ONLY) — Pi CLI cold start alone is NOT the ~8s floor; the floor is dominated by Pi model-session setup + the model round-trip, not process spawn.
 
 ### Round 1 reconciliation (2026-07-06)
 - Chaos C1 (mid-boot cancel): PROVEN PASS — cancel ~0.5s post-admit before warm still settles cancelled/not-applicable/cancel-requested, no receipt. Retained as regression corpus C1.

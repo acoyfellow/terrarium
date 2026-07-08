@@ -5,6 +5,19 @@
 const MODEL_HOST = "terrarium.coey.dev";
 const MODEL_PATH = "/_terrarium_model/v1/chat/completions";
 const WORKERS_AI_MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
+// Server-owned model allowlist. The model is chosen by DEPLOYMENT config
+// (env.TERRARIUM_WORKERS_AI_MODEL), never by the client request body. Only
+// vetted Workers AI text models are accepted; anything else falls back to the
+// default so a misconfiguration cannot route to an unexpected model.
+const ALLOWED_WORKERS_AI_MODELS = new Set([
+  "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+  "@cf/meta/llama-3.1-8b-instruct-fast",
+  "@cf/meta/llama-3.1-8b-instruct",
+]);
+function resolveServerModel(env) {
+  const m = env?.TERRARIUM_WORKERS_AI_MODEL;
+  return typeof m === "string" && ALLOWED_WORKERS_AI_MODELS.has(m) ? m : WORKERS_AI_MODEL;
+}
 const MAX_REQUEST_BYTES = 256 * 1024;
 const MAX_RESPONSE_BYTES = 512 * 1024;
 const MAX_MESSAGES = 128;
@@ -126,13 +139,13 @@ function boundedAiInput(body) {
   return input;
 }
 
-function normalizeCompletion(result) {
+function normalizeCompletion(result, model = WORKERS_AI_MODEL) {
   if (result && Array.isArray(result.choices) && result.choices.length > 0) {
     return {
       id: typeof result.id === "string" ? result.id : "chatcmpl-terrarium",
       object: "chat.completion",
       created: Number.isInteger(result.created) ? result.created : Math.floor(Date.now() / 1000),
-      model: WORKERS_AI_MODEL,
+      model,
       choices: result.choices,
       ...(result.usage && typeof result.usage === "object" ? { usage: result.usage } : {}),
     };
@@ -156,7 +169,7 @@ function normalizeCompletion(result) {
       id: "chatcmpl-terrarium",
       object: "chat.completion",
       created: Math.floor(Date.now() / 1000),
-      model: WORKERS_AI_MODEL,
+      model,
       choices: [{ index: 0, message, finish_reason: message.tool_calls ? "tool_calls" : "stop" }],
     };
   }
@@ -173,11 +186,12 @@ function boundedJsonResponse(completion) {
 function boundedSseResponse(completion) {
   const choice = completion.choices[0] || {};
   const message = choice.message || choice.delta || {};
+  const model = completion.model || WORKERS_AI_MODEL;
   const first = {
     id: completion.id,
     object: "chat.completion.chunk",
     created: completion.created,
-    model: WORKERS_AI_MODEL,
+    model,
     choices: [{
       index: Number.isInteger(choice.index) ? choice.index : 0,
       delta: {
@@ -192,7 +206,7 @@ function boundedSseResponse(completion) {
     id: completion.id,
     object: "chat.completion.chunk",
     created: completion.created,
-    model: WORKERS_AI_MODEL,
+    model,
     choices: [{ index: 0, delta: {}, finish_reason: choice.finish_reason || "stop" }],
   };
   const text = `data: ${JSON.stringify(first)}\n\ndata: ${JSON.stringify(last)}\n\ndata: [DONE]\n\n`;
@@ -208,6 +222,7 @@ export async function handleWorkersAiEgress(request, env) {
   try {
     const body = await readBoundedJson(request);
     const input = boundedAiInput(body);
+    const serverModel = resolveServerModel(env);
     let timer;
     const timeout = new Promise((_, reject) => {
       timer = setTimeout(() => reject(Object.assign(new Error("model deadline exceeded"), { status: 504 })), MODEL_DEADLINE_MS);
@@ -220,7 +235,7 @@ export async function handleWorkersAiEgress(request, env) {
       let lastError;
       for (let attempt = 1; attempt <= MODEL_MAX_ATTEMPTS; attempt++) {
         try {
-          result = await Promise.race([env.AI.run(WORKERS_AI_MODEL, input), timeout]);
+          result = await Promise.race([env.AI.run(serverModel, input), timeout]);
           lastError = null;
           break;
         } catch (err) {
@@ -234,7 +249,7 @@ export async function handleWorkersAiEgress(request, env) {
     } finally {
       clearTimeout(timer);
     }
-    const completion = normalizeCompletion(result);
+    const completion = normalizeCompletion(result, serverModel);
     return body.stream === true ? boundedSseResponse(completion) : boundedJsonResponse(completion);
   } catch (error) {
     const status = Number.isInteger(error?.status) ? error.status : 502;
@@ -287,4 +302,6 @@ export const _testables = {
   MAX_MESSAGES,
   MODEL_DEADLINE_MS,
   normalizeCompletion,
+  resolveServerModel,
+  ALLOWED_WORKERS_AI_MODELS,
 };
