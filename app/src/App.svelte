@@ -45,6 +45,7 @@
 
   let campaign = null;
   let changelog = '';
+  let benchmarks = null;
   let path = location.pathname;
   let hash = location.hash;
   let selectedDoc = new URLSearchParams(location.search).get('page') || 'start';
@@ -70,9 +71,14 @@
   }
   function docSelect(event) { navigate(`/docs?page=${event.target.value}`); selectedDoc = event.target.value; }
   async function load() {
-    const [campaignRes, changelogRes] = await Promise.all([fetch('/campaign/manifest.json'), fetch('/CHANGELOG.md')]);
+    const [campaignRes, changelogRes, benchRes] = await Promise.all([
+      fetch('/campaign/manifest.json'),
+      fetch('/CHANGELOG.md'),
+      fetch('/benchmarks.json').catch(() => null),
+    ]);
     campaign = await campaignRes.json();
     changelog = await changelogRes.text();
+    try { benchmarks = benchRes && benchRes.ok ? await benchRes.json() : null; } catch { benchmarks = null; }
   }
   addEventListener('popstate', () => { path = location.pathname; hash = location.hash; selectedDoc = new URLSearchParams(location.search).get('page') || 'start'; });
   load();
@@ -91,6 +97,14 @@
   {#if route() === 'home'}
     <section class="home-hero"><div class="eyebrow">Agent execution with receipts</div><h1>Delegate bounded work. Reconstruct what happened.</h1><p>Terrarium runs one bounded task as one child process with one correlated receipt, then gives agents status, logs, callbacks, groups, batches, and repair tools without turning success into a story.</p><div class="home-actions"><a href="/docs" on:click|preventDefault={() => navigate('/docs')}>Read the docs</a><a href="/runs" on:click|preventDefault={() => navigate('/runs')}>View {turns().length} runs</a></div></section>
     <section class="home-grid"><div><span class="verb-icon use-icon"><i></i></span><b>Use</b><p>Spawn a child, inspect its receipt, read logs, cancel safely.</p></div><div><span class="verb-icon run-icon"><i></i></span><b>Run</b><p>Operate callbacks, Pulse, Pi follow-ups, doctor repair, and groups.</p></div><div><span class="verb-icon scale-icon"><i></i></span><b>Scale</b><p>Fan out bounded batches with explicit concurrency and durable run IDs.</p></div></section>
+    {#if benchmarks}
+    <section class="bench">
+      <div class="bench-head"><div class="eyebrow">Now running in the cloud</div><h2>Live production benchmarks</h2><p>{benchmarks.note}</p></div>
+      <div class="bench-grid">{#each benchmarks.metrics as m}<div class="bench-card"><b>{m.value}</b><span>{m.label}</span><small>{m.detail}</small></div>{/each}</div>
+      <ul class="bench-invariants">{#each benchmarks.invariants as inv}<li>{inv}</li>{/each}</ul>
+      <p class="bench-src">Measured on <code>{benchmarks.surface}</code> · {benchmarks.generatedAt}</p>
+    </section>
+    {/if}
   {:else if route() === 'docs'}
     <section class="docs-layout"><aside class="docs-nav"><b>Terrarium docs</b>{#each docs as doc}<a class:active={currentDoc().id === doc.id} href="/docs?page={doc.id}" on:click|preventDefault={() => { selectedDoc = doc.id; navigate(`/docs?page=${doc.id}`); }}>{doc.label}</a>{/each}<hr><a href="/CHANGELOG.md">raw changelog</a><a href="https://github.com/acoyfellow/terrarium">source</a></aside><article class="docs-page"><label class="docs-mobile-jump"><span>Section</span><select on:change={docSelect} value={currentDoc().id}>{#each docs as doc}<option value={doc.id}>{doc.label}</option>{/each}</select></label><div class="eyebrow">{currentDoc().kicker}</div><h1>{currentDoc().title}</h1>{#each currentDoc().sections as section}<section class="docs-section"><h2>{section[0]}</h2>{#if section[1].includes('\n') || section[1].startsWith('terra') || section[1].startsWith('one bounded') || section[1].startsWith('terrarium_spawn')}<pre><code>{section[1]}</code></pre>{:else}<p>{section[1]}</p>{/if}</section>{/each}</article></section>
   {:else if route() === 'runs'}

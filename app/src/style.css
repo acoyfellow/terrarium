@@ -30,3 +30,21 @@ html,body{max-width:100%;overflow-x:hidden}.shell{max-width:var(--page-max);marg
 @media(max-width:620px){.docs-nav{display:none!important}.docs-mobile-jump{display:flex!important}}
 /* svelte migration: force nav reset across component boundaries */
 .top .top-nav{display:flex;align-items:center;gap:14px;margin-right:auto}.top .top-nav a{color:#9fb3a5!important;text-decoration:none!important;font:10px DM Mono,monospace!important;text-transform:uppercase;letter-spacing:.08em}.top .top-nav a:hover{color:var(--mint)!important}.changelog pre{white-space:pre-wrap;font:12px/1.5 Manrope;color:#a9bbae;margin:0}
+
+.bench{margin:18px 0 4px;border:1px solid var(--line);border-radius:10px;background:linear-gradient(180deg,#0c1811,#0a130e);padding:clamp(16px,3vw,26px);position:relative;overflow:hidden}
+.bench:before{content:"";position:absolute;inset:auto -10% -60% -10%;height:80%;background:radial-gradient(ellipse at 50% 100%,#8ff0ad14 0,transparent 65%);pointer-events:none}
+.bench-head h2{margin:6px 0 0;font-size:clamp(24px,4vw,34px);line-height:1;letter-spacing:-.04em;color:#effaf1}
+.bench-head p{max-width:820px;margin:8px 0 0;color:#9fb3a5;font-size:12px;line-height:1.45}
+.bench-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:16px 0}
+.bench-card{border:1px solid var(--line);border-radius:8px;background:#0b1710;padding:14px;display:flex;flex-direction:column;gap:4px;transition:border-color .18s ease,transform .18s ease}
+.bench-card:hover{border-color:#5d8b6a;transform:translateY(-2px)}
+.bench-card b{font:700 30px Manrope;color:var(--mint);letter-spacing:-.03em;line-height:1}
+.bench-card span{font:600 12px Manrope;color:#edf8f0}
+.bench-card small{color:#879d8d;font:10px/1.35 Manrope}
+.bench-invariants{list-style:none;margin:14px 0 0;padding:0;display:grid;grid-template-columns:1fr 1fr;gap:6px 18px}
+.bench-invariants li{position:relative;padding-left:16px;color:#a9bbae;font-size:11px;line-height:1.4}
+.bench-invariants li:before{content:"";position:absolute;left:0;top:6px;width:7px;height:7px;border-radius:50%;background:var(--mint);box-shadow:0 0 8px #8ff0ad66}
+.bench-src{margin:14px 0 0;color:#6f8876;font:9px DM Mono,monospace;letter-spacing:.06em}
+.bench-src code{color:#bfe8c8}
+@media(max-width:900px){.bench-grid{grid-template-columns:1fr 1fr}.bench-invariants{grid-template-columns:1fr}}
+@media(max-width:520px){.bench-grid{grid-template-columns:1fr}}

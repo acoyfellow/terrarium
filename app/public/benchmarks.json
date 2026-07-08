@@ -1,0 +1,33 @@
+{
+  "generatedAt": "2026-07-06",
+  "surface": "terrarium.coey.dev (production, Cloudflare-managed)",
+  "note": "Live measurements against the production cloud execution service. A run is one authenticated task admitted over the Worker API, executed in a Cloudflare-managed Pi cell, verified by a correlated receipt, and delivered via a durable callback \u2014 no local machine in the loop.",
+  "metrics": [
+    {
+      "label": "End-to-end verified run",
+      "value": "9.3s",
+      "detail": "Best warm admit\u2192verified latency (authenticated task \u2192 Pi cell \u2192 Workers AI \u2192 correlated receipt)."
+    },
+    {
+      "label": "Typical warm run",
+      "value": "~12s",
+      "detail": "Median warm admit\u2192verified over live samples; tail varies with upstream model latency."
+    },
+    {
+      "label": "Concurrent fan-out",
+      "value": "10/10",
+      "detail": "Ten simultaneous runs all reached verified receipts in ~91s after the cold-start deadline grace."
+    },
+    {
+      "label": "Receipt integrity",
+      "value": "100%",
+      "detail": "Every failure mode (cancel, deadline, bad auth, transient model, prompt-injection) fails closed. No fabricated receipt has ever passed."
+    }
+  ],
+  "invariants": [
+    "Only a TERRARIUM_RESULT matching server-minted runId + taskFingerprint + nonce is success.",
+    "The execution cell holds no reusable model credential; model access is intercepted server-side.",
+    "A prompt-injection task cannot forge a receipt for another run \u2014 correlation is server-controlled.",
+    "Cold-boot time is bounded by a startup grace so it never consumes the task's execution budget."
+  ]
+}
