@@ -1,0 +1,231 @@
+#!/bin/sh
+# terrarium-runner-pi — bounded runner executed inside the Pi execution cell.
+#
+# Runtime: Pi (@earendil-works/pi-coding-agent), non-interactive, isolated home,
+# no ambient extensions/skills/config, ephemeral session. Model access is the
+# credentialless server-owned Terrarium route registered by a single checked-in
+# provider extension; the cell holds no reusable model credential.
+#
+# Contract (runtime-neutral receipt authority, identical to the prior runner):
+#   * Task text lives at /workspace/terrarium-task.txt. It is never interpolated
+#     into a shell command and is delivered to Pi as file content only.
+#   * Contract JSON (runId, taskFingerprint, nonce) lives at
+#     /workspace/terrarium-contract.json. It is never eval'd.
+#   * The runner streams the agent's normal stdout WITHOUT any TERRARIUM_RESULT=
+#     line, then structurally validates candidate markers and, only if exactly
+#     one matches the contract, emits one verified TERRARIUM_RESULT= line as its
+#     final line before TASK_ENDED. It never synthesizes a receipt.
+set -eu
+
+TASK="${TERRARIUM_TASK_FILE:-/workspace/terrarium-task.txt}"
+CONTRACT="${TERRARIUM_CONTRACT_FILE:-/workspace/terrarium-contract.json}"
+PROVIDER_EXT="${TERRARIUM_PI_PROVIDER:-/etc/terrarium/terrarium-provider.mjs}"
+
+# --- tiny JSON field reader (no jq dependency) -----------------------------
+json_field() {
+  awk -v k="\"$2\"" '
+    {
+      s = $0
+      while ((p = index(s, k)) > 0) {
+        r = substr(s, p + length(k))
+        sub(/^[[:space:]]*:[[:space:]]*/, "", r)
+        if (substr(r, 1, 1) == "\"") {
+          r = substr(r, 2)
+          out = ""
+          while (r != "") {
+            c = substr(r, 1, 1)
+            if (c == "\\") { out = out substr(r, 1, 2); r = substr(r, 3); continue }
+            if (c == "\"") { print out; exit 0 }
+            out = out c
+            r = substr(r, 2)
+          }
+        }
+        s = substr(s, p + length(k))
+      }
+    }' "$1"
+}
+
+echo "TASK_RECEIVED"
+
+if [ ! -f "$CONTRACT" ] || [ ! -f "$TASK" ]; then
+  echo "[terrarium:runner] missing task or contract file"
+  echo "TASK_ENDED"
+  exit 1
+fi
+
+RUN_ID=$(json_field "$CONTRACT" runId || true)
+TASK_FP=$(json_field "$CONTRACT" taskFingerprint || true)
+NONCE=$(json_field "$CONTRACT" nonce || true)
+
+if [ -z "${RUN_ID:-}" ] || [ -z "${TASK_FP:-}" ] || [ -z "${NONCE:-}" ]; then
+  echo "[terrarium:runner] invalid contract"
+  echo "TASK_ENDED"
+  exit 1
+fi
+
+# --- Explicit nonsecret model config gate ----------------------------------
+# TERRARIUM_MODEL selects the fixed Terrarium provider/model. No API secrets are
+# accepted from task or contract. The provider extension must exist; without it
+# Pi has no route to the credentialless model and we refuse to launch.
+MODEL_SPEC="${TERRARIUM_MODEL:-}"
+if [ -z "$MODEL_SPEC" ]; then
+  echo "[terrarium:runner] TERRARIUM_MODEL is not configured; refusing to launch agent"
+  echo "TASK_ENDED"
+  exit 2
+fi
+case "$MODEL_SPEC" in
+  terrarium/workers-ai) : ;;
+  *)
+    echo "[terrarium:runner] TERRARIUM_MODEL must select the fixed Terrarium Workers AI model"
+    echo "TASK_ENDED"
+    exit 2
+    ;;
+esac
+if [ ! -r "$PROVIDER_EXT" ]; then
+  echo "[terrarium:runner] Terrarium provider extension is missing or unreadable"
+  echo "TASK_ENDED"
+  exit 2
+fi
+
+# HTTPS interception requires the runtime-provided CA. Fail before Pi so a
+# missing trust anchor cannot degrade into an opaque provider hang. Local
+# non-intercepted probes may leave NODE_EXTRA_CA_CERTS unset.
+if [ -n "${NODE_EXTRA_CA_CERTS:-}" ]; then
+  case "$NODE_EXTRA_CA_CERTS" in
+    /*) : ;;
+    *) echo "[terrarium:runner] NODE_EXTRA_CA_CERTS must be an absolute path"; echo "TASK_ENDED"; exit 11 ;;
+  esac
+  if [ ! -f "$NODE_EXTRA_CA_CERTS" ] || [ ! -r "$NODE_EXTRA_CA_CERTS" ]; then
+    echo "[terrarium:runner] NODE_EXTRA_CA_CERTS is not a readable regular file"
+    echo "TASK_ENDED"
+    exit 11
+  fi
+fi
+
+# Locate the Pi binary.
+AGENT_BIN=""
+for candidate in /usr/local/bin/pi /usr/bin/pi "$(command -v pi 2>/dev/null || true)"; do
+  if [ -n "$candidate" ] && [ -x "$candidate" ]; then AGENT_BIN="$candidate"; break; fi
+done
+if [ -z "$AGENT_BIN" ]; then
+  echo "[terrarium:runner] no Pi agent binary present in image"
+  echo "TASK_ENDED"
+  exit 3
+fi
+
+# Isolated ephemeral home so no ambient config/extensions/skills/auth leak in.
+CELL_HOME="${TERRARIUM_CELL_HOME:-/workspace/.pi-home}"
+mkdir -p "$CELL_HOME"
+
+# The bounded task body is read from the task file and delivered to Pi via a
+# prompt FILE (@path), never interpolated into the shell command line. Pi runs
+# with NO tools: a bounded C0 task is a single text turn, so there is no tool
+# loop to diverge (an earlier live run showed Pi calling the model 45+ times in
+# a non-converging read-tool loop). The task text is embedded as data in a
+# prompt file whose path is passed to Pi; the file content is never a program.
+PROMPT_FILE="$(mktemp)"
+trap 'rm -f "$PROMPT_FILE" "${TMP_OUT:-}"' EXIT
+{
+  printf '%s\n\n' "You are a Terrarium bounded worker. Complete exactly the task below in a single reply. Do not ask questions. Do not use tools."
+  printf 'Task:\n'
+  cat "$TASK"
+  printf '\n\n'
+  printf 'Your final line MUST be exactly one JSON receipt, nothing after it:\n'
+  printf 'TERRARIUM_RESULT={"runId":"%s","taskFingerprint":"%s","nonce":"%s","summary":"<short result>"}\n' "$RUN_ID" "$TASK_FP" "$NONCE"
+} > "$PROMPT_FILE"
+
+TMP_OUT=$(mktemp)
+AGENT_TIMEOUT_SECONDS="${TERRARIUM_AGENT_TIMEOUT_SECONDS:-120}"
+if ! command -v timeout >/dev/null 2>&1; then
+  echo "[terrarium:runner] timeout supervisor is required"
+  echo "TASK_ENDED"
+  exit 10
+fi
+
+# --- Pi invocation ---------------------------------------------------------
+# Non-interactive (-p), ephemeral (--no-session), ambient discovery disabled
+# (-ne -ns -np -nc), exactly one explicit provider extension (-e), fixed
+# provider/model. Tools restricted to read only for the bounded demo task.
+set +e
+HOME="$CELL_HOME" \
+timeout --signal=TERM --kill-after=5s "${AGENT_TIMEOUT_SECONDS}s" \
+  "$AGENT_BIN" -p --no-session -ne -ns -np -nc --no-tools \
+  -e "$PROVIDER_EXT" \
+  --provider terrarium --model workers-ai \
+  "@${PROMPT_FILE}" >"$TMP_OUT" 2>&1
+AGENT_EXIT=$?
+set -e
+
+# --- Stream logs WITHOUT candidate marker lines ----------------------------
+grep -av '^TERRARIUM_RESULT=' "$TMP_OUT" || true
+
+CANDIDATES=$(grep -ac '^TERRARIUM_RESULT=' "$TMP_OUT" || true)
+CANDIDATES=${CANDIDATES:-0}
+
+if [ "$AGENT_EXIT" -ne 0 ]; then
+  echo "[terrarium:runner] agent exited nonzero (${AGENT_EXIT}); not emitting receipt"
+  echo "TASK_ENDED"
+  exit "$AGENT_EXIT"
+fi
+if [ "$CANDIDATES" -eq 0 ]; then
+  echo "[terrarium:runner] agent emitted no TERRARIUM_RESULT= line"
+  echo "TASK_ENDED"
+  exit 4
+fi
+if [ "$CANDIDATES" -gt 1 ]; then
+  echo "[terrarium:runner] agent emitted multiple TERRARIUM_RESULT= lines (${CANDIDATES}); refusing to pick"
+  echo "TASK_ENDED"
+  exit 5
+fi
+
+MATCH=$(grep -a '^TERRARIUM_RESULT=' "$TMP_OUT" | head -n 1)
+JSON_BODY=${MATCH#TERRARIUM_RESULT=}
+if ! command -v node >/dev/null 2>&1; then
+  echo "[terrarium:runner] node is required for receipt validation but is not present in image"
+  echo "TASK_ENDED"
+  exit 9
+fi
+VALIDATION=$(RUN_ID="$RUN_ID" TASK_FP="$TASK_FP" NONCE="$NONCE" JSON_BODY="$JSON_BODY" node -e '
+try {
+  const allowed = new Set(["runId","taskFingerprint","nonce","summary"]);
+  let obj;
+  try { obj = JSON.parse(process.env.JSON_BODY); }
+  catch (e) { console.log("malformed:" + (e && e.message ? e.message : "parse")); process.exit(0); }
+  if (!obj || typeof obj !== "object" || Array.isArray(obj)) { console.log("malformed:not-object"); process.exit(0); }
+  const keys = Object.keys(obj);
+  const extra = keys.filter((k) => !allowed.has(k));
+  if (extra.length) { console.log("malformed:extra-keys:" + extra.sort().join(",")); process.exit(0); }
+  if (obj.runId !== process.env.RUN_ID) { console.log("mismatch:runId"); process.exit(0); }
+  if (obj.taskFingerprint !== process.env.TASK_FP) { console.log("mismatch:taskFingerprint"); process.exit(0); }
+  if (obj.nonce !== process.env.NONCE) { console.log("mismatch:nonce"); process.exit(0); }
+  const summary = obj.summary;
+  if (typeof summary !== "string" || summary.trim() === "") { console.log("malformed:summary-empty"); process.exit(0); }
+  if (Buffer.byteLength(summary, "utf8") > 2000) { console.log("malformed:summary-too-long"); process.exit(0); }
+  console.log("ok");
+} catch (e) {
+  console.log("malformed:" + (e && e.message ? e.message : "unknown"));
+}
+' 2>&1 || true)
+
+case "$VALIDATION" in
+  ok)
+    echo "TASK_ENDED"
+    printf '%s\n' "$MATCH"
+    exit 0
+    ;;
+  mismatch:*)
+    echo "[terrarium:runner] receipt did not match contract (${VALIDATION})"
+    echo "TASK_ENDED"
+    exit 6
+    ;;
+  malformed:*)
+    echo "[terrarium:runner] receipt malformed (${VALIDATION})"
+    echo "TASK_ENDED"
+    exit 7
+    ;;
+  *)
+    echo "[terrarium:runner] receipt validation failed: ${VALIDATION}"
+    echo "TASK_ENDED"
+    exit 8
+    ;;
+esac

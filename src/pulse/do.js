@@ -31,11 +31,19 @@ import {
 // Allowed top-level keys on a stored subscriber record. Mirrors src/router.js
 // getSubscriber exactly so a record persisted by either backend validates the
 // same way and a tampered/extra-field record fails closed before owner checks.
+//
+// Round 5C2: adds principalId as the durable owner of a production subscriber.
+// principalId is the stable Cloud Terrarium principal identity from
+// TERRARIUM_PRINCIPAL_ID; unlike ownerRunId (a per-run scope kept for parity
+// with the fs router record shape), it survives across many runs of the same
+// caller and is the *only* dimension the public worker uses to isolate
+// mailboxes and route fan-out.
 const SUBSCRIBER_RECORD_KEYS = new Set([
   'version', 'subscriberId', 'channels', 'workflowIds', 'eventTypes', 'runIds',
-  'ownerRunId', 'createdAt', 'updatedAt',
+  'ownerRunId', 'principalId', 'createdAt', 'updatedAt',
 ]);
 const OWNER_RUN_ID_RE = /^ter_[A-Za-z0-9_]+$/;
+const PRINCIPAL_ID_RE = /^[A-Za-z0-9._:-]{1,128}$/;
 
 async function sha256Hex(input) {
   const data = new TextEncoder().encode(input);
@@ -47,6 +55,20 @@ function ownerOrNull(value) {
   if (value == null) return null;
   if (typeof value !== 'string' || !OWNER_RUN_ID_RE.test(value)) throw new Error('invalid subscriber owner run id');
   return value;
+}
+
+function principalOrNull(value) {
+  if (value == null) return null;
+  if (typeof value !== 'string' || !PRINCIPAL_ID_RE.test(value)) throw new Error('invalid subscriber principal');
+  return value;
+}
+
+// Round 5C2: a "not found" that the worker normalizes to a generic 404 so a
+// probing caller cannot enumerate the subscriber space.
+function notFoundError(message) {
+  const err = new Error(message || 'subscriber not found');
+  err.code = 'ENOENT';
+  return err;
 }
 
 export class PulseRouter {
@@ -64,9 +86,21 @@ export class PulseRouter {
       event_types TEXT NOT NULL,
       run_ids TEXT NOT NULL,
       owner_run_id TEXT,
+      principal_id TEXT,
       created_at TEXT NOT NULL,
       updated_at TEXT NOT NULL
     );`);
+    // Round 5C2: idempotent principal_id migration for tables created before
+    // this round. PRAGMA is used to detect the column; adding it is safe even
+    // on legacy rows (existing rows will have NULL principal_id and can only
+    // be used from the internal DO surface, never re-adopted from the public
+    // worker without a matching principalId subscribe).
+    try {
+      const info = this.sql.exec('PRAGMA table_info(subscribers)');
+      const rows = info.toArray ? info.toArray() : [...info];
+      const hasCol = rows.some((r) => (r.name || r[1]) === 'principal_id');
+      if (!hasCol) this.sql.exec('ALTER TABLE subscribers ADD COLUMN principal_id TEXT');
+    } catch { /* older SQL shims may not support PRAGMA; new column exists in CREATE */ }
     this.sql.exec(`CREATE TABLE IF NOT EXISTS journal (
       event_id TEXT PRIMARY KEY,
       payload TEXT NOT NULL,
@@ -92,6 +126,7 @@ export class PulseRouter {
       eventTypes: JSON.parse(row.event_types),
       runIds: JSON.parse(row.run_ids),
       ownerRunId: row.owner_run_id ?? null,
+      principalId: row.principal_id ?? null,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
     };
@@ -107,7 +142,7 @@ export class PulseRouter {
   getSubscriber(subscriberId) {
     assertId(subscriberId, 'subscriber id');
     const sub = this.#loadSubscriber(subscriberId);
-    if (!sub) { const e = new Error('subscriber not found'); e.code = 'ENOENT'; throw e; }
+    if (!sub) throw notFoundError('subscriber not found');
     // Validate the stored record before any owner/access check, identical to the
     // fs router (src/router.js getSubscriber). A row whose JSON-decoded shape
     // carries non-allowlisted keys, a malformed ownerRunId, or non-ISO
@@ -118,6 +153,7 @@ export class PulseRouter {
         !Object.keys(sub).every((key) => SUBSCRIBER_RECORD_KEYS.has(key)) ||
         !Object.hasOwn(sub, 'ownerRunId') ||
         (sub.ownerRunId !== null && !OWNER_RUN_ID_RE.test(sub.ownerRunId)) ||
+        (sub.principalId !== null && sub.principalId !== undefined && !PRINCIPAL_ID_RE.test(sub.principalId)) ||
         !validTimestamp(sub.createdAt) ||
         !validTimestamp(sub.updatedAt)) {
       throw new Error('invalid callback subscriber record');
@@ -130,15 +166,34 @@ export class PulseRouter {
     if (stored !== (ownerRunId ?? null)) throw new Error('callback subscriber access denied');
   }
 
+  // Round 5C2: enforce exact principal match on every access. Cross-principal
+  // and missing-principal accesses are normalized to a generic not-found by
+  // the worker (anti-enumeration). A subscriber with no principal_id (legacy
+  // internal-only row) cannot be adopted by any authenticated principal.
+  #assertPrincipal(subscription, principalId) {
+    if (principalId == null) return; // internal (DO-only) callers bypass this check
+    const stored = subscription.principalId ?? null;
+    if (stored !== principalId) throw notFoundError('subscriber not found');
+  }
+
   async subscribe(subscription) {
     const subscriberId = assertId(subscription.subscriberId, 'subscriber id');
     const requestedOwner = ownerOrNull(subscription.ownerRunId);
+    const requestedPrincipal = principalOrNull(subscription.principalId);
     const existing = this.#loadSubscriber(subscriberId);
+    // Check stable-principal ownership before legacy ownerRunId so a
+    // cross-principal re-subscribe cannot distinguish an existing ID by
+    // varying ownerRunId.
+    if (existing && (existing.principalId ?? null) !== (requestedPrincipal ?? existing.principalId ?? null)) {
+      throw notFoundError('subscriber not found');
+    }
     if (existing && (existing.ownerRunId ?? null) !== requestedOwner) {
-      // Re-subscription must not silently re-home an existing subscriber.
+      // Direct legacy/test callers may still use ownerRunId, but the public
+      // worker strips it and normalizes this response.
       throw new Error('subscriber is owned by another run or controller');
     }
     const ownerRunId = requestedOwner ?? existing?.ownerRunId ?? null;
+    const principalId = requestedPrincipal ?? existing?.principalId ?? null;
     const now = new Date().toISOString();
     const normalized = {
       version: 1,
@@ -148,28 +203,33 @@ export class PulseRouter {
       eventTypes: mergeFilters(subscription.eventTypes, existing?.eventTypes, TERMINAL_EVENT_TYPES),
       runIds: mergeFilters(subscription.runIds, existing?.runIds, ['*'], { narrowWildcard: subscription.narrowWildcardRunIds === true }),
       ownerRunId,
+      principalId,
       createdAt: existing?.createdAt ?? now,
       updatedAt: now,
     };
     this.sql.exec(
-      `INSERT INTO subscribers (subscriber_id, channels, workflow_ids, event_types, run_ids, owner_run_id, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      `INSERT INTO subscribers (subscriber_id, channels, workflow_ids, event_types, run_ids, owner_run_id, principal_id, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
        ON CONFLICT(subscriber_id) DO UPDATE SET
          channels=excluded.channels, workflow_ids=excluded.workflow_ids,
          event_types=excluded.event_types, run_ids=excluded.run_ids,
-         owner_run_id=excluded.owner_run_id, updated_at=excluded.updated_at`,
+         owner_run_id=excluded.owner_run_id, principal_id=excluded.principal_id,
+         updated_at=excluded.updated_at`,
       subscriberId,
       JSON.stringify(normalized.channels),
       JSON.stringify(normalized.workflowIds),
       JSON.stringify(normalized.eventTypes),
       JSON.stringify(normalized.runIds),
       normalized.ownerRunId,
+      normalized.principalId,
       normalized.createdAt,
       normalized.updatedAt,
     );
 
     // Replay: only concrete (non-wildcard) run subscriptions replay journal history.
     // Match against the *requested* filters (not merged) like the fs router.
+    // Round 5C2: replay only fans events whose event.ownerId matches this
+    // subscriber's principalId (when the subscriber has one).
     const requestedRuns = boundedList(subscription.runIds);
     const replayed = requestedRuns.includes('*') ? 0 : this.#replay({
       subscriberId,
@@ -177,6 +237,7 @@ export class PulseRouter {
       workflowIds: boundedList(subscription.workflowIds),
       eventTypes: boundedList(subscription.eventTypes, TERMINAL_EVENT_TYPES),
       runIds: requestedRuns,
+      principalId,
     });
     return { ...normalized, replayed };
   }
@@ -188,6 +249,12 @@ export class PulseRouter {
       let event;
       try { event = sanitizeCallbackEvent(JSON.parse(row.payload)); } catch { continue; }
       if (!isValidCallbackEvent(event, row.event_id, { state: 'pending' })) continue;
+      // Round 5C2: replay cross-principal isolation. A subscriber owned by a
+      // principal must never enqueue an event whose ownerId belongs to
+      // another principal.
+      const subPrincipal = requestedSubscription.principalId ?? null;
+      const eventOwner = event.ownerId ?? null;
+      if (subPrincipal !== null && eventOwner !== subPrincipal) continue;
       if (!matches(requestedSubscription, event)) continue;
       if (this.#enqueue(requestedSubscription.subscriberId, event)) replayed++;
     }
@@ -205,50 +272,72 @@ export class PulseRouter {
     return true;
   }
 
-  unsubscribe(subscriberId, ownerRunId) {
+  unsubscribe(subscriberId, ownerRunId, principalId) {
     assertId(subscriberId, 'subscriber id');
-    const sub = this.#loadSubscriber(subscriberId);
-    if (!sub) { const e = new Error('subscriber not found'); e.code = 'ENOENT'; throw e; }
+    const sub = this.getSubscriber(subscriberId);
+    this.#assertPrincipal(sub, principalId);
     this.#assertOwner(sub, ownerRunId);
     this.sql.exec('DELETE FROM mailbox WHERE subscriber_id = ?', subscriberId);
     this.sql.exec('DELETE FROM subscribers WHERE subscriber_id = ?', subscriberId);
     return { subscriberId, unsubscribed: true };
   }
 
-  async route(rawEvent) {
+  async route(rawEvent, { requirePrincipalOwner = false } = {}) {
     const id = await deriveEventId(rawEvent, sha256Hex);
     const routed = sanitizeCallbackEvent({ ...rawEvent, eventId: id });
     if (!validTimestamp(routed.at)) throw new Error('invalid callback event timestamp');
     if (!TERMINAL_EVENT_TYPES.includes(routed.type) || typeof routed.runId !== 'string') {
       throw new Error('invalid callback event');
     }
+    // Round 5C2: production Cloud routing REQUIRES a well-formed event.ownerId
+    // (the principal that owns the run). Internal DO-only test paths can opt
+    // out via requirePrincipalOwner=false, but the worker always passes true.
+    if (requirePrincipalOwner) {
+      if (typeof routed.ownerId !== 'string' || !PRINCIPAL_ID_RE.test(routed.ownerId)) {
+        throw new Error('invalid callback event');
+      }
+    }
     // Journal write is the dedup gate (event_id PRIMARY KEY).
-    const already = this.sql.exec('SELECT 1 FROM journal WHERE event_id = ?', id).toArray();
-    if (already.length) return { eventId: id, duplicate: true, delivered: 0 };
+    const already = this.sql.exec('SELECT payload FROM journal WHERE event_id = ?', id).toArray();
+    if (already.length) {
+      let prior;
+      try { prior = JSON.parse(already[0].payload); } catch { throw new Error('invalid callback journal record'); }
+      // A stable eventId may only be retried by the same principal. Otherwise
+      // the global dedup key becomes a cross-principal existence oracle.
+      if ((prior.ownerId ?? null) !== (routed.ownerId ?? null)) throw notFoundError('event not found');
+      return { eventId: id, duplicate: true, delivered: 0 };
+    }
     this.sql.exec('INSERT INTO journal (event_id, payload, at) VALUES (?, ?, ?)', id, JSON.stringify(routed), routed.at);
 
-    // ownerRunId / matches() isolation decision (conscious, mirrors fs router):
-    //
-    // matches() (src/pulse/shared.js) intentionally has NO ownerRunId dimension.
-    // Delivery fan-out is purely filter-based (channels/workflowIds/eventTypes/
-    // runIds + the pi-*/pi_* wildcard guard). Owner isolation is enforced ONLY at
-    // claim/ack/status/requeue/unsubscribe via #assertOwner. This is host-trust:
-    // the journal+mailbox live inside one trusted DO and an event may legitimately
-    // fan out to multiple subscribers owned by different runs; what an owner must
-    // NOT do is read or settle ANOTHER owner's mailbox. Pushing ownerRunId into
-    // matches() would wrongly suppress legitimate multi-owner fan-out and diverge
-    // from src/router.js, which also isolates only at the mailbox boundary.
+    // Round 5C2: fan-out isolation. matches() still fans purely by filter
+    // (channels/workflowIds/eventTypes/runIds + pi-* wildcard guard), but on
+    // the Cloud production path we additionally enforce cross-principal
+    // isolation: an event may only enqueue into subscriber mailboxes whose
+    // principalId is EXACTLY event.ownerId. Same-principal wildcard
+    // subscribers receive all that principal's runs; subscribers owned by a
+    // different principal are skipped even if their filters would match.
+    // Subscribers with a null principal_id are legacy internal-only rows that
+    // never receive owner-tagged events.
     let delivered = 0;
     for (const row of this.sql.exec('SELECT * FROM subscribers').toArray()) {
       const sub = this.#rowToSubscriber(row);
       if (!matches(sub, routed)) continue;
+      const subPrincipal = sub.principalId ?? null;
+      const eventOwner = routed.ownerId ?? null;
+      // Owner-tagged events only fan to same-principal subscribers.
+      if (eventOwner !== null && subPrincipal !== eventOwner) continue;
+      // Non-owner-tagged events (internal DO path) only fan to null-principal
+      // subscribers (also internal-only). This prevents a principal-owned
+      // subscriber from receiving an untagged event.
+      if (eventOwner === null && subPrincipal !== null) continue;
       if (this.#enqueue(sub.subscriberId, routed)) delivered++;
     }
     return { eventId: id, duplicate: false, delivered };
   }
 
-  claim({ subscriberId, limit = 20, maxDeliveryAttempts, ownerRunId } = {}) {
+  claim({ subscriberId, limit = 20, maxDeliveryAttempts, ownerRunId, principalId } = {}) {
     const sub = this.getSubscriber(subscriberId);
+    this.#assertPrincipal(sub, principalId);
     this.#assertOwner(sub, ownerRunId);
     const bounded = Math.min(Math.max(Number(limit) || 20, 1), 100);
     // maxDeliveryAttempts caps poison-event redelivery, mirroring the fs router:
@@ -289,15 +378,16 @@ export class PulseRouter {
     return { subscriberId, events, quarantined };
   }
 
-  ack({ subscriberId, eventId: id, ownerRunId } = {}) {
+  ack({ subscriberId, eventId: id, ownerRunId, principalId } = {}) {
     const sub = this.getSubscriber(subscriberId);
+    this.#assertPrincipal(sub, principalId);
     this.#assertOwner(sub, ownerRunId);
     assertId(id, 'event id');
     const rows = this.sql.exec('SELECT state, payload FROM mailbox WHERE subscriber_id = ? AND event_id = ?', subscriberId, id).toArray();
     const row = rows[0];
-    if (!row) throw new Error(`event is not inflight: ${id}`);
+    if (!row) throw notFoundError(`event is not inflight: ${id}`);
     if (row.state === 'acked') return { subscriberId, eventId: id, acknowledged: true, duplicate: true };
-    if (row.state !== 'inflight') throw new Error(`event is not inflight: ${id}`);
+    if (row.state !== 'inflight') throw notFoundError(`event is not inflight: ${id}`);
     let event;
     try { event = JSON.parse(row.payload); } catch { throw new Error(`event is not inflight: ${id}`); }
     if (!isValidCallbackEvent(event, id, { state: 'claimed' })) throw new Error(`event is not inflight: ${id}`);
@@ -305,8 +395,9 @@ export class PulseRouter {
     return { subscriberId, eventId: id, acknowledged: true };
   }
 
-  status(subscriberId, ownerRunId) {
+  status(subscriberId, ownerRunId, principalId) {
     const sub = this.getSubscriber(subscriberId);
+    this.#assertPrincipal(sub, principalId);
     this.#assertOwner(sub, ownerRunId);
     const count = (state, validState) => {
       let n = 0;
@@ -345,8 +436,10 @@ export class PulseRouter {
     subscriberIds,
     eventIds,
     ownerRunId,
+    principalId,
   } = {}) {
     const owner = ownerRunId ?? null;
+    const principal = principalId ?? null;
     const now = Date.now();
     const ackCutoff = Math.max(0, Number(acknowledgedOlderThanMs) || 0);
     const callbackCutoff = Math.max(0, Number(callbackOlderThanMs) || 0);
@@ -368,8 +461,10 @@ export class PulseRouter {
       if (subscriberFilter && !subscriberFilter.includes(subscriberId)) continue;
       let subscription; try { subscription = this.getSubscriber(subscriberId); } catch { continue; }
       // Owner isolation: a top-level prune maintains only its own mailboxes and
-      // must never abort early or reach another owner's data.
+      // must never abort early or reach another owner's data. Round 5C2: the
+      // principal dimension is required for the public worker path.
       if ((subscription.ownerRunId ?? null) !== owner) continue;
+      if (principal !== null && (subscription.principalId ?? null) !== principal) continue;
       for (const [state, validState, cutoff] of [
         ['acked', 'claimed', ackCutoff],
         ['pending', 'pending', callbackCutoff],
@@ -396,6 +491,9 @@ export class PulseRouter {
       if (eventFilter && !eventFilter.includes(jrow.event_id)) continue;
       let event; try { event = JSON.parse(jrow.payload); } catch { continue; }
       if (!isValidCallbackEvent(event, jrow.event_id, { state: 'pending' })) continue;
+      // Round 5C2: journal is shared; a principal-scoped prune must only
+      // touch journal entries whose event.ownerId matches this principal.
+      if (principal !== null && (event.ownerId ?? null) !== principal) continue;
       const age = now - Date.parse(event.at || '');
       if (!Number.isFinite(age) || age < journalCutoff) continue;
       this.sql.exec('DELETE FROM journal WHERE event_id = ?', jrow.event_id);
@@ -407,9 +505,10 @@ export class PulseRouter {
       if (subscriberFilter && !subscriberFilter.includes(subscriberId)) continue;
       let subscription; try { subscription = this.getSubscriber(subscriberId); } catch { continue; }
       if ((subscription.ownerRunId ?? null) !== owner) continue;
+      if (principal !== null && (subscription.principalId ?? null) !== principal) continue;
       const age = now - Date.parse(subscription.createdAt || '');
       if (!Number.isFinite(age) || age < subscriberCutoff) continue;
-      const st = this.status(subscriberId, subscription.ownerRunId);
+      const st = this.status(subscriberId, subscription.ownerRunId, subscription.principalId ?? null);
       // Keep a subscriber alive while it still holds quarantined poison events.
       if (st.pending || st.inflight || st.dead) continue;
       this.sql.exec('DELETE FROM mailbox WHERE subscriber_id = ?', subscriberId);
@@ -420,8 +519,9 @@ export class PulseRouter {
     return { acknowledgedRemoved, pendingRemoved, inflightRemoved, deadRemoved, journalRemoved, subscribersRemoved };
   }
 
-  requeue({ subscriberId, olderThanMs = 300000, ownerRunId } = {}) {
+  requeue({ subscriberId, olderThanMs = 300000, ownerRunId, principalId } = {}) {
     const sub = this.getSubscriber(subscriberId);
+    this.#assertPrincipal(sub, principalId);
     this.#assertOwner(sub, ownerRunId);
     const now = Date.now();
     const cutoff = Math.max(0, Number(olderThanMs) || 0);
@@ -451,17 +551,29 @@ export class PulseRouter {
   async fetch(request) {
     let body = {};
     try { body = await request.json(); } catch { body = {}; }
-    const { op, args = {} } = body;
+    const { op, args = {}, requirePrincipalOwner } = body;
     try {
+      // Every mailbox/subscriber operation reaching the production DO fetch
+      // surface requires a bounded principal. Direct method calls remain only
+      // for legacy parity tests. Internal RunControl uses only `route`.
+      if (op !== 'route' && principalOrNull(args.principalId) === null) {
+        throw new Error('principal is required');
+      }
       let result;
       switch (op) {
         case 'subscribe': result = await this.subscribe(args); break;
-        case 'getSubscriber': result = this.getSubscriber(args.subscriberId); break;
-        case 'unsubscribe': result = this.unsubscribe(args.subscriberId, args.ownerRunId); break;
-        case 'route': result = await this.route(args.event ?? args); break;
+        case 'getSubscriber': {
+          const sub = this.getSubscriber(args.subscriberId);
+          this.#assertPrincipal(sub, args.principalId ?? null);
+          this.#assertOwner(sub, args.ownerRunId);
+          result = sub;
+          break;
+        }
+        case 'unsubscribe': result = this.unsubscribe(args.subscriberId, args.ownerRunId, args.principalId ?? null); break;
+        case 'route': result = await this.route(args.event ?? args, { requirePrincipalOwner: !!requirePrincipalOwner }); break;
         case 'claim': result = this.claim(args); break;
         case 'ack': result = this.ack(args); break;
-        case 'status': result = this.status(args.subscriberId, args.ownerRunId); break;
+        case 'status': result = this.status(args.subscriberId, args.ownerRunId, args.principalId ?? null); break;
         case 'requeue': result = this.requeue(args); break;
         case 'prune': result = this.prune(args); break;
         default: return Response.json({ ok: false, error: 'unknown op' }, { status: 400 });

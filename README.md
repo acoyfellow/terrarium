@@ -62,9 +62,38 @@ emitter ──POST /pulse──► Worker (token gate) ──► PulseRouter DO 
 consumer ◄─claim/ack/status─ Worker ◄──────────────────┘  to matching mailboxes
 ```
 
-It is **at-least-once with dedup** (`eventId = sha256[runId,type,at,status,exitCode]`), replays the journal for concrete `runIds` subscribed after a run finished, makes claim→ack idempotent, and isolates mailboxes by `ownerRunId`. Auth is fail-closed (`401` when the bearer token or `PULSE_TOKEN` is missing). Honest limits: owner isolation is enforced at claim/ack/status — not at delivery/match (a conscious host-trust choice) — production e2e against the live Access URL is still pending, and existing consumers are not yet rewired to read from the cloud router.
+It is **at-least-once with dedup** (`eventId = sha256[runId,type,at,status,exitCode]`), replays the journal for concrete `runIds` subscribed after a run finished, makes claim→ack idempotent, and isolates mailboxes by `ownerRunId`. Auth is fail-closed (`401` when the bearer token or the pulse token is missing). Production e2e is now verified live on `terrarium.coey.dev`: a real cloud run's terminal event was subscribed, claimed once, acknowledged, and confirmed principal-scoped (an unacked inflight event is not re-served). Honest limits: owner isolation is enforced at claim/ack/status — not at delivery/match (a conscious host-trust choice); the standalone Pulse consumer library is not yet rewired to read from the cloud router by default.
 
 Full quick start (curl emit/claim/ack/status), the proof-to-test mapping, and where to edit behavior live in **[docs/PULSE.md](./docs/PULSE.md)**.
+
+## Cloud execution service (`/api/runs`)
+
+Beyond the local CLI/MCP, Terrarium runs a cloud execution service, live on `terrarium.coey.dev`. A principal submits one bounded task over an authenticated Worker API and the task runs entirely on Cloudflare-managed infrastructure — no local machine is required for correctness, liveness, logs, or delivery.
+
+```text
+authenticated POST /api/runs (Bearer + Idempotency-Key)
+→ ordered admission + per-principal budget
+→ durable RunControl Durable Object
+→ Cloudflare-managed Pi execution cell (Dockerfile.pi, linux/amd64)
+→ credentialless server-owned Workers AI route (intercepted by ContainerProxy)
+→ durable integrity-checked logs (DO SQL inline + R2 overflow, byte count + SHA-256)
+→ verified correlated TERRARIUM_RESULT (runId + taskFingerprint + nonce)
+→ durable principal-scoped terminal callback (Pulse)
+```
+
+API surface (all `/api/runs*` require `Authorization: Bearer <control token>`; `POST /api/runs` also requires an `Idempotency-Key`):
+
+| Method + path | Purpose | Notes |
+| --- | --- | --- |
+| `POST /api/runs` | Admit one bounded task | Body `{ task, spec? }`. Returns `202 { runId, contract, executionRef }`. Missing key `400`; over budget `429`; task > 64 KiB `413`. |
+| `GET /api/runs/:id/status` | Terminal + contract status | Owner-scoped; cross-principal `401`; unknown `404`; malformed id `400`. |
+| `GET /api/runs/:id/logs` | Durable logs + overflow refs | Inline logs plus R2 `logRefs`. |
+| `GET /api/runs/:id/logs/ref?seq=N` | Fetch an R2 overflow chunk | Integrity-checked (byte count + SHA-256); fails closed on corrupt/missing. |
+| `POST /api/runs/:id/cancel` | Request cancellation | Idempotent; intent wins over a late receipt. |
+
+Authority is invariant: `exit 0`, a callback, backend `ok`, or model prose are **not** success. Only a `TERRARIUM_RESULT` whose server-minted `runId`, `taskFingerprint`, and `nonce` match the run's contract establishes task success. The `summary` field is advisory. The `nonce` is always server-minted; a client-supplied `spec.nonce` is ignored. A prompt-injection task cannot forge a receipt for another run.
+
+Honest scope: this is C0 — bounded per-principal concurrency matched to container capacity. Broad simultaneous cold starts beyond warm capacity degrade gracefully (excess runs are deadline-killed, fail-closed, never a fabricated receipt). Intermittent upstream model 5xx is mitigated by bounded retry; residual failures fail closed.
 
 ## Quick start: ordinary delegation
 

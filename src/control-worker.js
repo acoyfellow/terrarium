@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { WorkflowEntrypoint } from "cloudflare:workers";
+export { ContainerProxy } from "@cloudflare/containers";
 import { DEFAULT_LAB_POLICY } from "./lab.js";
 import { runHostileLabScenario } from "./hostile.js";
 import { requireAuthorization } from "./controller-auth.js";
@@ -8,8 +9,12 @@ import { appendPublicTurn, EMPTY_PUBLIC_CAMPAIGN, publicTurnFromReceipt } from "
 import { publicSummary } from "./public-summary.js";
 import { publicTraceEvent } from "./trace-events.js";
 import pulseWorker, { PulseRouter } from "./pulse/worker.js";
+import { RunControlDO } from "./cloud/run-control-do.js";
+import { handleApiRuns } from "./cloud/api-runs.js";
+import { TerrariumSandbox } from "./cloud/terrarium-sandbox.js";
+import { PrincipalBudgetDO } from "./cloud/principal-budget-do.js";
 
-export { PulseRouter };
+export { PulseRouter, RunControlDO, TerrariumSandbox, PrincipalBudgetDO };
 
 const DEFAULT_POLICY = {
   paused: false,
@@ -184,6 +189,11 @@ const legacyWorker = {
     // routes are capability-token gated inside pulseWorker (fail-closed 401).
     if (["/pulse", "/claim", "/ack", "/status"].includes(url.pathname)) {
       return pulseWorker.fetch(request, env);
+    }
+    // Cloud Terrarium production /api/runs surface.
+    if (url.pathname.startsWith("/api/runs")) {
+      const routed = await handleApiRuns(request, env);
+      if (routed) return routed;
     }
     if (url.pathname === "/health") return Response.json({ ok: true, mode: env.TERRARIUM_MODE || "fixture" });
     if (url.pathname === "/api/demo") {
