@@ -83,6 +83,8 @@ regression, no invariant weakened, and a reversible deploy + rollback target.
 | id | chaos class | expected | first result | status | probe location |
 |----|-------------|----------|--------------|--------|----------------|
 | C1 | mid-boot cancel (cancel ~0.5s post-admit, container not warm) | cancelled/not-applicable/cancel-requested, no receipt | PASS (cancelled, intent precedence held pre-warm) | survived (retain) | live qual/prod /api/runs cancel |
+| C2 | same idempotency-key, different task body | 409 idempotency-conflict, no admit/reuse | PASS (409, no corruption) | survived (retain) | live /api/runs idempotency |
+| C3 | callback requeue of abandoned inflight | inflight->pending only past olderThanMs, then reclaimable with bumped deliveryAttempts | PASS (default 5min anti-thrash correct; olderThanMs=0 requeued 3, attempts bumped) | survived (retain) | /pulse requeue + /claim |
 
 ## State
 
@@ -90,6 +92,11 @@ regression, no invariant weakened, and a reversible deploy + rollback target.
 - Status: started.
 - Baselines captured: warm single ~13.5s; 10-wide 10/10 ~91s (post grace).
 - Housekeeping done: pruned ~15k stale run records (159M→102M), workspaces preserved.
+
+### Round 5 (2026-07-06) — chaos corpus growth (dogfooded)
+- C2 (PROVEN): same idempotency-key + different task -> 409 idempotency-conflict, no silent reuse. First run ter_mrcep71x admitted 202; conflicting POST 409. Retained corpus C2.
+- C3 (PROVEN): callback requeue. Immediate requeue is intentionally a no-op (olderThanMs default 300000ms anti-thrash); with olderThanMs=0 it moved 3 inflight->pending and re-claim re-served with deliveryAttempts bumped. NOT a bug — confirmed the 5-min stale threshold is by design. Retained corpus C3.
+- No tooling bug found this round; the apparent requeue "no-op" was correct anti-thrash behavior, verified against src/pulse/do.js:522.
 
 ### Round 4 (2026-07-06) — smaller-model A/B REJECTED
 - Made the Workers AI model deployment-config-owned (env.TERRARIUM_WORKERS_AI_MODEL), allowlisted, never client-chosen (test added; 9 egress tests pass, full suite 556 pass). Deployed llama-3.1-8b-instruct-fast to QUAL (version d1d10a9c), 70b untouched on prod.
