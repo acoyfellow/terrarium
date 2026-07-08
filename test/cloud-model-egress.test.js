@@ -23,7 +23,10 @@ async function json(res) { return await res.json(); }
 
 test('5D image/config wiring uses the Pi Dockerfile and an AI binding without credential vars', () => {
   const dockerfile = readFileSync(join(root, 'Dockerfile.pi'), 'utf8');
-  const wrangler = JSON.parse(readFileSync(join(root, 'wrangler.jsonc'), 'utf8'));
+  // wrangler.jsonc may contain // comments; strip them before parsing.
+  const wrangler = JSON.parse(
+    readFileSync(join(root, 'wrangler.jsonc'), 'utf8').replace(/^\s*\/\/.*$/gm, '').replace(/,(\s*[}\]])/g, '$1'),
+  );
   const provider = readFileSync(join(root, 'scripts/pi-runtime/terrarium-provider.mjs'), 'utf8');
   const runner = readFileSync(join(root, 'scripts/terrarium-runner-pi'), 'utf8');
   const worker = readFileSync(join(root, 'src/control-worker.js'), 'utf8');

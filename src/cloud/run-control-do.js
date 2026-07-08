@@ -36,6 +36,13 @@ const RUN_ID_RE = /^ter_[A-Za-z0-9_]+$/;
 const MAX_LOG_SQL_BYTES = 128 * 1024;       // per-run SQL log budget
 const MAX_TASK_BYTES = 64 * 1024;           // admission gate for task text
 const DEFAULT_TIMEOUT_MS = 15 * 60 * 1000;  // 15 min default deadline
+// Cold-start grace: a run may wait for a container to cold-boot (loading the
+// pinned runtime) before its process is even launched. The task deadline is
+// meant to bound EXECUTION, not queueing/boot, so we extend the durable
+// deadline by a bounded startup grace. Overridable via env for capacity tuning.
+// Without this, a burst of simultaneous cold boots consumes each run's deadline
+// while it waits for a slot, deadline-killing healthy runs before they start.
+const DEFAULT_STARTUP_GRACE_MS = 90 * 1000;
 const CALLBACK_RETRY_MS = 30 * 1000;        // alarm retry cadence
 const CALLBACK_MAX_ATTEMPTS = 10;
 const SOFT_POLL_MS = 5 * 1000;              // alarm soft-poll cadence pre-deadline
@@ -897,7 +904,15 @@ export class RunControlDO {
 
     const capabilityEnvelope = normalizeCapabilityEnvelope(spec.capabilityEnvelope);
     const deadlineMs = Number.isFinite(spec.deadlineMs) ? Number(spec.deadlineMs) : DEFAULT_TIMEOUT_MS;
-    const deadlineAt = Date.now() + Math.max(1000, Math.min(deadlineMs, 60 * 60 * 1000));
+    // Add a bounded startup grace so container cold-boot/queue time does not eat
+    // the caller's execution budget. The grace is a server knob, never client
+    // controlled, and is clamped so it cannot extend a run indefinitely.
+    const graceEnv = Number(this.#env?.TERRARIUM_STARTUP_GRACE_MS);
+    const startupGraceMs = Number.isFinite(graceEnv) && graceEnv >= 0
+      ? Math.min(graceEnv, 10 * 60 * 1000)
+      : DEFAULT_STARTUP_GRACE_MS;
+    const boundedDeadlineMs = Math.max(1000, Math.min(deadlineMs, 60 * 60 * 1000));
+    const deadlineAt = Date.now() + boundedDeadlineMs + startupGraceMs;
     const launched = cell.launch({
       task,
       ownerId,
