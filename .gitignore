@@ -26,3 +26,6 @@ artifacts/accuracy-bench/
 artifacts/cloud-scale-eval/raw-*.jsonl
 artifacts/cloud-scale-eval/summary-*.json
 artifacts/cloud-scale-eval/vote-*
+
+# Rust/WASM build artifacts
+wasm-verifier/target/
