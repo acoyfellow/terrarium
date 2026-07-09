@@ -169,8 +169,18 @@ export async function handleApiRuns(request, env) {
     return res;
   }
 
+  // GET /api/runs/budget/snapshot — read-only budget posture for the caller's
+  // OWN principal (owner-scoped, never mutating). Used to verify reservation
+  // release behavior in production without exposing another principal's state.
+  if (path === "/api/runs/budget/snapshot" && method === "GET") {
+    const budgetStub = budgetStubForPrincipal(env, ownerId);
+    if (!budgetStub) return Response.json({ ok: false, error: "budget binding missing" }, { status: 500 });
+    const snapRes = await budgetStub.fetch(`https://do/snapshot?principalId=${encodeURIComponent(ownerId)}`, { method: "GET" });
+    return snapRes;
+  }
+
   // /api/runs/:runId/...
-  const m = path.match(/^\/api\/runs\/([^/]+)(?:\/(status|logs\/ref|logs|cancel))?$/);
+  const m = path.match(/^\/api\/runs\/([^/]+)(?:\/(status|logs\/ref|logs|cancel|graded))?$/);
   if (!m) return Response.json({ ok: false, error: "not found" }, { status: 404 });
   const [, runId, verb] = m;
   if (!RUN_ID_RE.test(runId)) {
@@ -182,6 +192,12 @@ export async function handleApiRuns(request, env) {
     // First drive finalization if terminal has landed on backend.
     // The DO handles idempotency; a status GET should not block on running work.
     const res = await proxy(request, stub, `status?ownerId=${encodeURIComponent(ownerId)}`, "GET");
+    return normalizeNotFound(res);
+  }
+  if (verb === "graded" && method === "GET") {
+    // Read-only advisory graded view (provenance grade + content-addressed
+    // artifact). Never mutates the run; authority is unchanged.
+    const res = await proxy(request, stub, `graded?ownerId=${encodeURIComponent(ownerId)}`, "GET");
     return normalizeNotFound(res);
   }
   if (verb === "logs" && method === "GET") {
