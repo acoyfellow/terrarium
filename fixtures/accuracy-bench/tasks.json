@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "note": "Bounded tasks with machine-checkable ground truth. 'check' defines how to score the model's answer text: exact (normalized substring of the expected token) or regex. Provenance (receipt correlation) is scored separately by the runner; THIS file scores CORRECTNESS.",
+  "tasks": [
+    { "id": "mul-1", "class": "arithmetic", "prompt": "What is 17 multiplied by 23? Reply with only the number.", "check": "exact", "expected": "391" },
+    { "id": "mul-2", "class": "arithmetic", "prompt": "What is 144 divided by 12? Reply with only the number.", "check": "exact", "expected": "12" },
+    { "id": "mul-3", "class": "arithmetic", "prompt": "What is 2 to the power of 10? Reply with only the number.", "check": "exact", "expected": "1024" },
+    { "id": "add-1", "class": "arithmetic", "prompt": "What is 4096 plus 4096? Reply with only the number.", "check": "exact", "expected": "8192" },
+    { "id": "fact-1", "class": "factual", "prompt": "What is the chemical symbol for gold? Reply with only the symbol.", "check": "exact", "expected": "Au" },
+    { "id": "fact-2", "class": "factual", "prompt": "How many sides does a hexagon have? Reply with only the number.", "check": "exact", "expected": "6" },
+    { "id": "fact-3", "class": "factual", "prompt": "What is the capital of Japan? Reply with only the city name.", "check": "exact", "expected": "Tokyo" },
+    { "id": "logic-1", "class": "logic", "prompt": "If all cats are mammals and Felix is a cat, is Felix a mammal? Reply with only yes or no.", "check": "exact", "expected": "yes" },
+    { "id": "string-1", "class": "string", "prompt": "How many letter r's are in the word strawberry? Reply with only the number.", "check": "exact", "expected": "3" },
+    { "id": "seq-1", "class": "logic", "prompt": "What is the next number in the sequence 2, 4, 8, 16? Reply with only the number.", "check": "exact", "expected": "32" }
+  ]
+}

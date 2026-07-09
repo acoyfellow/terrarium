@@ -9,3 +9,20 @@ app/dist/
 .wake-dogfood/
 # Local research scratch; curate deliberately before publishing.
 experiments/
+
+# Guardrail deploy receipts are local tool output, not repo content.
+.guardrail/
+
+# Untracked local research notes that reference internal-only hostnames/links.
+# These are operational scratch, not curated public docs; keep them local until
+# deliberately sanitized and committed.
+docs/DRIFT_RESEARCH_INTERNAL.md
+docs/DRIFT_RESEARCH_EXTERNAL.md
+docs/DRIFT_RESEARCH_PORTFOLIO.md
+docs/CLOUD_NORTHSTAR_RESEARCH.md
+
+# Operational eval run outputs (internal model names / hostnames) — keep local.
+artifacts/accuracy-bench/
+artifacts/cloud-scale-eval/raw-*.jsonl
+artifacts/cloud-scale-eval/summary-*.json
+artifacts/cloud-scale-eval/vote-*
