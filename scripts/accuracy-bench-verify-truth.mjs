@@ -50,6 +50,15 @@ const COMPUTED = {
   'h-count-3': () => Array.from({ length: 20 }, (_, i) => i + 1).reduce((a, b) => a + b, 0),
   'h-logic-4': () => Math.abs((3 * 30 + (15 / 60) * 30) - ((15 / 60) * 360)),
   'h-seq-2': () => 21,
+  "h-mul-7": () => 923 * 641,
+  "h-mul-8": () => 7777 * 3,
+  "h-chain-5": () => 15 * 15 - 15 + 15 / 15,
+  "h-mod-2": () => 2025 % 12,
+  "h-count-4": () => { let n=0; for(let i=1;i<=100;i++){const r=Math.sqrt(i); if(Number.isInteger(r))n++;} return n; },
+  "h-str-8": () => [..."banana"].filter((c)=>c==="a").length,
+  "h-str-9": () => [..."receipt"].reverse().join(""),
+  "h-logic-5": () => 3,
+  "h-date-3": () => 31 + 28 + 31,
 };
 
 const files = process.argv.slice(2);
