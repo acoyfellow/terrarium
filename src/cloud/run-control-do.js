@@ -851,6 +851,7 @@ export class RunControlDO {
     try {
       if (path === "/admit" && method === "POST") return await this.#handleAdmit(body);
       if (path === "/status" && method === "GET") return await this.#handleStatus(url.searchParams.get("ownerId"));
+      if (path === "/graded" && method === "GET") return await this.#handleGraded(url.searchParams.get("ownerId"));
       if (path === "/logs" && method === "GET") return await this.#handleLogs(url.searchParams.get("ownerId"));
       if (path === "/logs/ref" && method === "GET") return await this.#handleLogsRef(url.searchParams.get("ownerId"), url.searchParams.get("seq"));
       if (path === "/cancel" && method === "POST") return await this.#handleCancel(body);
@@ -1005,6 +1006,35 @@ export class RunControlDO {
     try {
       const st = this.#cell.status(this.#runId, ownerId);
       return Response.json({ ok: true, status: st });
+    } catch (err) {
+      const code = err?.code === "EACCES" ? 403 : (err?.code === "ENOENT" ? 404 : 500);
+      return Response.json({ ok: false, error: err.message }, { status: code });
+    }
+  }
+
+  // Read-only graded view: composes the authoritative terminal with an ADVISORY
+  // trust grade + content-addressed artifact. Never mutates the run. The nonce
+  // stays inside the DO trust boundary; only the content-addressed artifact
+  // (whose id is the hash of a body that includes the triple) leaves. No
+  // correctness annotation is attached here (single-run cell has one attempt);
+  // callers compose cross-model correctness above this layer.
+  async #handleGraded(ownerId) {
+    if (!ownerId) return Response.json({ ok: false, error: "missing-owner" }, { status: 401 });
+    await this.#ensureCell();
+    if (!this.#runId) return Response.json({ ok: false, error: "no-run" }, { status: 404 });
+    try {
+      const st = this.#cell.status(this.#runId, ownerId);
+      if (!st.terminal) return Response.json({ ok: true, runId: this.#runId, graded: null, reason: "not-terminal" });
+      const row = this.#runState.get(this.#runId);
+      const contract = row?.contract;
+      if (!contract?.runId || !contract?.taskFingerprint || !contract?.nonce) {
+        return Response.json({ ok: false, error: "contract-unavailable" }, { status: 500 });
+      }
+      const { buildGradedReceipt } = await import("./graded-receipt.js");
+      const built = await buildGradedReceipt({ contract, terminal: st.terminal, correctness: null });
+      // Do not echo the nonce in the response envelope; it is embedded only in
+      // the content-addressed artifact body (already public-by-design there).
+      return Response.json({ ok: true, runId: this.#runId, grade: built.grade, artifact: built.artifact });
     } catch (err) {
       const code = err?.code === "EACCES" ? 403 : (err?.code === "ENOENT" ? 404 : 500);
       return Response.json({ ok: false, error: err.message }, { status: code });

@@ -22,12 +22,18 @@
       "label": "Receipt integrity",
       "value": "100%",
       "detail": "Every failure mode (cancel, deadline, bad auth, transient model, prompt-injection) fails closed. No fabricated receipt has ever passed."
+    },
+    {
+      "label": "Cross-check false-trust",
+      "value": "0 observed",
+      "detail": "A verified receipt proves the task ran, not that the answer is right (~16.7% single-run wrong-but-verified on a hard bench). Cross-model agreement drove confidently-wrong answers to 0 observed across 100+ hard-task evaluations at ~90% coverage — a small-sample upper bound, not a proven zero."
     }
   ],
   "invariants": [
     "Only a TERRARIUM_RESULT matching server-minted runId + taskFingerprint + nonce is success.",
     "The execution cell holds no reusable model credential; model access is intercepted server-side.",
     "A prompt-injection task cannot forge a receipt for another run \u2014 correlation is server-controlled.",
-    "Cold-boot time is bounded by a startup grace so it never consumes the task's execution budget."
+    "Cold-boot time is bounded by a startup grace so it never consumes the task's execution budget.",
+    "Correctness is an advisory, fail-closed signal from cross-model agreement — it annotates but never upgrades the provenance receipt (weakest-wins)."
   ]
 }
