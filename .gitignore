@@ -8,7 +8,9 @@ app/dist/
 .wake/
 .wake-dogfood/
 # Local research scratch; curate deliberately before publishing.
-experiments/
+experiments/*
+# ...except intentionally-published spikes:
+!experiments/terrarium-airlock/
 
 # Guardrail deploy receipts are local tool output, not repo content.
 .guardrail/
@@ -29,3 +31,6 @@ artifacts/cloud-scale-eval/vote-*
 
 # Rust/WASM build artifacts
 wasm-verifier/target/
+
+# terrarium-airlock spike run output
+experiments/terrarium-airlock/out/
