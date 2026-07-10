@@ -89,7 +89,12 @@ API surface (all `/api/runs*` require `Authorization: Bearer <control token>`; `
 | `GET /api/runs/:id/status` | Terminal + contract status | Owner-scoped; cross-principal `401`; unknown `404`; malformed id `400`. |
 | `GET /api/runs/:id/logs` | Durable logs + overflow refs | Inline logs plus R2 `logRefs`. |
 | `GET /api/runs/:id/logs/ref?seq=N` | Fetch an R2 overflow chunk | Integrity-checked (byte count + SHA-256); fails closed on corrupt/missing. |
+| `GET /api/runs/:id/graded` | Advisory graded view of a terminal | Read-only, owner-scoped. Returns a weakest-wins trust grade plus a content-addressed, third-party re-verifiable receipt artifact. Never mutates the run; advisory correctness can never upgrade provenance authority. |
 | `POST /api/runs/:id/cancel` | Request cancellation | Idempotent; intent wins over a late receipt. |
+
+### Provenance vs. correctness (the trust layer)
+
+A verified receipt proves a task **ran and correlated** (server-minted `runId + taskFingerprint + nonce`) — it does **not** prove the answer is **correct**. On a hard bench even a frontier model is wrong-but-verified ~16.7% of the time single-run. Terrarium adds an **advisory, fail-closed correctness layer** (`src/cloud/correctness-annotation.js`, `trust-grade.js`, `trust-calibration.js`, `receipt-artifact.js`): cross-model agreement yields `trusted | unknown` (never a guess), composed **weakest-wins** with provenance so correctness can annotate but never upgrade a receipt. Measured locally on a hard bench: cross-model 2-of-3 majority drove confidently-wrong answers to **0 observed across 100+ hard-task evaluations at ~90% coverage** — a small-sample upper bound, not a proven zero. The graded receipt is content-addressed and re-verifiable by a third party with only the artifact (a ~1.5 KB portable WASM verifier is included under `wasm-verifier/`).
 
 Authority is invariant: `exit 0`, a callback, backend `ok`, or model prose are **not** success. Only a `TERRARIUM_RESULT` whose server-minted `runId`, `taskFingerprint`, and `nonce` match the run's contract establishes task success. The `summary` field is advisory. The `nonce` is always server-minted; a client-supplied `spec.nonce` is ignored. A prompt-injection task cannot forge a receipt for another run.
 
