@@ -399,6 +399,31 @@ test("background runs finish after the launcher exits", async () => {
   assert.match(log.text, /supervised child complete/);
 });
 
+test("background no-output startup hang terminalizes and journals callback", async () => {
+  const previous = process.env.TERRARIUM_STARTUP_WATCHDOG_MS;
+  try {
+    process.env.TERRARIUM_STARTUP_WATCHDOG_MS = "200";
+    const agent = `${process.execPath} -e "setInterval(() => {}, 1000)"`;
+    const started = await spawnTerrariumBackground({ task: "hang before output", agent, timeoutMs: 5000 });
+    let status;
+    for (let i = 0; i < 120; i++) {
+      status = await getRunStatus({ runId: started.runId, staleMs: 5000 });
+      if (status.status !== "running" && status.terminalCallback?.eventId) break;
+      await new Promise((resolve) => setTimeout(resolve, 25));
+    }
+    assert.equal(status.status, "error");
+    assert.equal(status.ok, false);
+    assert.equal(status.exitCode, 124);
+    assert.match(status.error, /startup-timeout/);
+    assert.equal(status.terminalCallback?.eventId, `evt_${started.runId}_Failed`);
+    const log = await readRun({ runId: started.runId });
+    assert.match(log.text, /startup-timeout/);
+  } finally {
+    if (previous === undefined) delete process.env.TERRARIUM_STARTUP_WATCHDOG_MS;
+    else process.env.TERRARIUM_STARTUP_WATCHDOG_MS = previous;
+  }
+});
+
 test("reconcileRun reports factual needs-attention after output inactivity", async () => {
   const logDir = mkdtempSync(join(tmpdir(), "terra-attention-"));
   const logPath = join(logDir, "run.log");

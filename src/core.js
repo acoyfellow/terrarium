@@ -289,11 +289,13 @@ function buildRun(opts, config) {
   const taskContract = requireTaskContract ? { runId, taskFingerprint: taskFingerprint(task), nonce: randomUUID() } : null;
   const needsAttentionAfterMs = Number(opts.needsAttentionAfterMs ?? config.needsAttentionAfterMs ?? 60000);
   if (!Number.isFinite(needsAttentionAfterMs) || needsAttentionAfterMs < 5000 || needsAttentionAfterMs > 3600000) throw new Error("needsAttentionAfterMs must be between 5000 and 3600000");
+  const startupWatchdogMs = Number(process.env.TERRARIUM_STARTUP_WATCHDOG_MS ?? config.startupWatchdogMs ?? 60000);
+  if (!Number.isFinite(startupWatchdogMs) || startupWatchdogMs < 0 || startupWatchdogMs > 3600000) throw new Error("startupWatchdogMs must be between 0 and 3600000");
   const callerChannel = basename(process.cwd()).replace(/[^A-Za-z0-9_.-]/g, "_").slice(0, 120) || "default";
   const channel = correlationValue(opts.channel ?? process.env.TERRARIUM_EVENT_CHANNEL ?? callerChannel, "channel");
   const workflowId = correlationValue(opts.workflowId ?? parentRunId ?? runId, "workflow id");
   const sessionId = correlationValue(opts.sessionId ?? process.env.TERRARIUM_SESSION_ID ?? null, "session id");
-  return { runId, parentRunId, depth, maxDepth, agent, model, profile, readOnly, timeoutMs, task, dryRun, cwd, originalCwd: cwd, stream, logPath, mreLogPath, isolation, keepWorkspace, callerSpawnAllowed, allowSpawn, statusScope, readScope, requireTaskContract, taskContract, needsAttentionAfterMs, channel, workflowId, sessionId };
+  return { runId, parentRunId, depth, maxDepth, agent, model, profile, readOnly, timeoutMs, task, dryRun, cwd, originalCwd: cwd, stream, logPath, mreLogPath, isolation, keepWorkspace, callerSpawnAllowed, allowSpawn, statusScope, readScope, requireTaskContract, taskContract, needsAttentionAfterMs, startupWatchdogMs, channel, workflowId, sessionId };
 }
 
 async function workspaceExcludes() {
@@ -802,12 +804,21 @@ export async function superviseTerrariumBackground({ run, parts, prompt, base, w
       if (lines.length) await emitProgressEvent(run, lines.slice(-3).join("\n"));
     };
     let finalResult = null;
+    let childOutputSeen = false;
+    const startupWatchdog = run.startupWatchdogMs > 0 ? setTimeout(() => {
+      if (!childOutputSeen && !finishing) {
+        signalProcessGroup(child.pid, "SIGTERM");
+        void log(run.logPath, `\nstartup-timeout: child produced no output within ${run.startupWatchdogMs}ms\n`);
+        void observe({ type: "RuntimeError", exitCode: 124, error: `startup-timeout: child produced no output within ${run.startupWatchdogMs}ms` });
+      }
+    }, run.startupWatchdogMs) : null;
     const execute = async (decisions) => {
       for (const decision of decisions) {
         if (decision.type === "TerminateChild") signalProcessGroup(child.pid, "SIGTERM");
         if (decision.type === "Finalize" && !finishing) {
           finishing = true;
           if (timer) clearTimeout(timer);
+          if (startupWatchdog) clearTimeout(startupWatchdog);
           clearInterval(heartbeat);
           clearInterval(cancelWatcher);
           const ws = await finalizeWorkspace(workspace, base);
@@ -833,8 +844,8 @@ export async function superviseTerrariumBackground({ run, parts, prompt, base, w
       await execute(step.decisions);
     };
     const timer = run.timeoutMs > 0 ? setTimeout(() => { void observe({ type: "DeadlineReached" }); }, run.timeoutMs) : null;
-    child.stdout.on("data", async (d) => { const s = String(d); stdout += s; await log(run.logPath, s); await progress(s); });
-    child.stderr.on("data", async (d) => { const s = String(d); stderr += s; await log(run.logPath, s); await progress(s); });
+    child.stdout.on("data", async (d) => { childOutputSeen = true; if (startupWatchdog) clearTimeout(startupWatchdog); const s = String(d); stdout += s; await log(run.logPath, s); await progress(s); });
+    child.stderr.on("data", async (d) => { childOutputSeen = true; if (startupWatchdog) clearTimeout(startupWatchdog); const s = String(d); stderr += s; await log(run.logPath, s); await progress(s); });
     child.on("error", async (e) => {
       await log(run.logPath, `\nerror: ${e.message}\n`);
       const receipt = validateTaskContractOutput(stdout, base.taskContract);
