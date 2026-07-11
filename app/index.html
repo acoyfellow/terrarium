@@ -64,7 +64,15 @@
   <noscript>Terrarium runs bounded delegated tasks with inspectable status, correlated receipts, cancellation, and run-scoped terminal callbacks. Source: https://github.com/acoyfellow/terrarium</noscript>
   <script>
     if ("serviceWorker" in navigator) {
-      window.addEventListener("load", () => navigator.serviceWorker.register("/sw.js").catch(() => {}));
+      var isLocal = /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname);
+      if (isLocal) {
+        // Never run the SW on local dev: an old cached shell would shadow Vite.
+        // Also actively unregister any stale worker + drop its caches.
+        navigator.serviceWorker.getRegistrations().then(function (rs) { rs.forEach(function (r) { r.unregister(); }); }).catch(function () {});
+        if (window.caches) { caches.keys().then(function (ks) { ks.forEach(function (k) { caches.delete(k); }); }).catch(function () {}); }
+      } else {
+        window.addEventListener("load", function () { navigator.serviceWorker.register("/sw.js").catch(function () {}); });
+      }
     }
   </script>
 </body>

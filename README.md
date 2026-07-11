@@ -4,17 +4,19 @@
 
 ![A cozy glass terrarium on a wooden desk. Inside, a single small robot tends a tiny garden of even smaller robots, each working in their own pot.](./assets/social-card.jpg)
 
-**Durable, runner-independent execution and callbacks for bounded delegated work.**
+**Delegate a task. Get back proof it happened.**
 
-Terrarium gives each delegated job a durable run ID, correlated result receipt, progress/status surface, cancellation, and a deterministic callback queue with atomic claim/ack/requeue semantics. It can launch one job or an explicitly requested batch while preserving one independent child process and receipt per run.
-
-The public site is now a compact run ledger plus changelog for real hardening work. Older campaign/story material is archived as historical evidence, not the current product direction. See the [core product decision](./docs/CORE_PRODUCT_DECISION.md) and [CHANGELOG.md](./CHANGELOG.md).
+Terrarium runs one bounded task as one isolated job and hands back a **verified receipt** — not a "done" you have to believe. Works from the CLI, from an MCP tool, or over an authenticated API in the cloud. Each run gets a durable run ID, a correlated result receipt, an inspectable status surface, cancellation, and a durable terminal callback that reaches you even after you disconnect.
 
 Terrarium is built around one stable primitive:
 
 ```text
-one bounded task → one child run → one inspectable result
+one bounded task → one isolated run → one correlated receipt
 ```
+
+Success is not `exit 0`, not a callback firing, not model prose. Success is a `TERRARIUM_RESULT` whose server-minted **runId, taskFingerprint, and nonce all correlate** with the task Terrarium handed out. Everything else is a signal, not proof.
+
+See the [core product decision](./docs/CORE_PRODUCT_DECISION.md) and [CHANGELOG.md](./CHANGELOG.md). Older campaign/story material is archived as historical evidence, not the current product direction.
 
 | If you want to… | Use… | Status |
 | --- | --- | --- |
@@ -33,18 +35,16 @@ one bounded task → one child run → one inspectable result
 
 Ordinary children inherit host authority and environment; use them for cooperative work, not as a security boundary. `secure-v1` is the opt-in Docker profile with explicit [guarantees and non-guarantees](./docs/SECURE_V1.md).
 
-## Public run ledger and changelog
+## Website and docs
 
-[`terrarium.coey.dev`](https://terrarium.coey.dev) shows a boring spreadsheet-style ledger of hardening runs against the runner, callbacks, receipts, batches, groups, and boundary behavior. It also exposes the same concise product changelog kept in [CHANGELOG.md](./CHANGELOG.md). The site is a public/dev presentation layer over safe manifest and receipt files; it is not authoritative proof by itself. Receipts, run IDs, tests, and commits are the evidence.
+[`terrarium.coey.dev`](https://terrarium.coey.dev) is the product site: what Terrarium is, how it works, structured docs (Tutorial / How-to / Reference / Explanation), and a clean changelog rendered from [CHANGELOG.md](./CHANGELOG.md). It is a Svelte SPA served by the Hono control worker. The site is a presentation layer; receipts, run IDs, tests, and commits are the evidence.
 
 ```sh
-npm run demo:dev      # local public site
-npm run demo:build    # static build
+npm run demo:dev      # local site with hot reload (Vite)
+npm run demo:build    # static build -> app/dist
 npm run demo:smoke    # local smoke check
-npm run deploy        # personal Cloudflare account + custom domain
+npm run deploy        # build + deploy to a personal Cloudflare account
 ```
-
-`demo:smoke` prints which data source it checked. Local Vite should report `source: "/campaign/manifest.json"` for the active run ledger.
 
 Documentation rule: when behavior, public surfaces, safety semantics, or CLI/MCP outputs change, update this README if the getting-started or product description changes, and update [CHANGELOG.md](./CHANGELOG.md) with a concise entry. The product-hardening loop should include this documentation check before committing.
 
@@ -105,11 +105,13 @@ Honest scope: this is C0 — bounded per-principal concurrency matched to contai
 Use this when you want the original Terrarium behavior: move noisy work into one child agent and keep the parent context small.
 
 ```sh
-npm install -g .
-terra --dry-run "summarize this repo"
-terra --read-only --profile minimal "find every place we handle auth"
-terra --agent "pi -p --no-session" --model <model-id> "inspect the failing parser test"
-terra --isolation worktree "fix the failing parser test"
+git clone https://github.com/acoyfellow/terrarium
+cd terrarium && npm install -g .
+
+terra --dry-run "summarize this repo"                       # plans the run; needs no agent installed
+terra --agent "pi -p --no-session" "inspect the failing parser test"
+terra --read-only --profile minimal --agent "pi -p --no-session" "find every place we handle auth"
+terra --isolation worktree --agent "pi -p --no-session" "fix the failing parser test"
 ```
 
 ```text
@@ -118,7 +120,7 @@ top context ──spawns──> child context
    clean                 returns concise result
 ```
 
-Terrarium defaults to `opencode run` for compatibility. Runner, read-only runner, and model can now be configured independently; Pi one-shot children should use `pi -p --no-session` so the child does not leave its own persistent conversation file.
+`terra` drives a coding agent you already have — pass it with `--agent` (e.g. `pi -p --no-session`, or `opencode run`). `--dry-run` plans a run without invoking any agent, so it always works first. Runner, read-only runner, and model are configured independently; Pi one-shot children should use `pi -p --no-session` so the child does not leave its own persistent conversation file. Install is from source (`npm install -g .`); the `terrarium` name on npm is unrelated.
 
 Good uses:
 
