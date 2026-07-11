@@ -2,6 +2,8 @@
 // Local declarations/tests are not proof that Cloudflare's live container
 // substrate applies interception; deployment requires an explicit runtime probe.
 
+import { resolveUpstreamForBroker, routeOpenAICompatible } from "./model-catalog.js";
+
 const MODEL_HOST = "terrarium.coey.dev";
 const MODEL_PATH = "/_terrarium_model/v1/chat/completions";
 const WORKERS_AI_MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
@@ -30,6 +32,15 @@ const MODEL_DEADLINE_MS = 30_000;
 const MODEL_MAX_ATTEMPTS = 3;
 const MODEL_RETRY_BASE_MS = 400;
 const encoder = new TextEncoder();
+
+// Workers AI 3021 backpressure detector. Matches the code/message shapes a
+// capacity error can take; deliberately conservative so a genuine 3021 is never
+// retried or fanned out. Distinct from generic transient 5xx.
+function isBackpressureError(error) {
+  const code = error?.code != null ? String(error.code) : "";
+  const msg = String(error?.message || "");
+  return code === "3021" || /\b3021\b/.test(msg);
+}
 
 function isTransientModelError(error) {
   // AiError and generic upstream 5xx are transient; explicit <500 status is not.
@@ -222,7 +233,13 @@ export async function handleWorkersAiEgress(request, env) {
   try {
     const body = await readBoundedJson(request);
     const input = boundedAiInput(body);
-    const serverModel = resolveServerModel(env);
+    // Enforcement: the cell may forward an OPAQUE alias in body.model. It is
+    // re-validated server-side against the source registry; an unknown,
+    // ambiguous, or absent alias falls back to the deployment default. A raw
+    // upstream model string is NOT an alias and is therefore never honored as a
+    // pin. The cell/client can never supply a URL/credential/upstream string.
+    const resolved = resolveUpstreamForBroker(typeof body.model === "string" ? body.model : "", env);
+    const serverModel = resolved.upstreamModel;
     let timer;
     const timeout = new Promise((_, reject) => {
       timer = setTimeout(() => reject(Object.assign(new Error("model deadline exceeded"), { status: 504 })), MODEL_DEADLINE_MS);
@@ -235,11 +252,17 @@ export async function handleWorkersAiEgress(request, env) {
       let lastError;
       for (let attempt = 1; attempt <= MODEL_MAX_ATTEMPTS; attempt++) {
         try {
-          result = await Promise.race([env.AI.run(serverModel, input), timeout]);
+          const modelCall = resolved.adapter === "openai-compatible"
+            ? routeOpenAICompatible(resolved, input, env, { deadlineMs: MODEL_DEADLINE_MS })
+            : env.AI.run(serverModel, input);
+          result = await Promise.race([modelCall, timeout]);
           lastError = null;
           break;
         } catch (err) {
           lastError = err;
+          // Workers AI 3021 = capacity/backpressure. First-class, non-retryable,
+          // no fan-out: surface immediately as 429 so callers back off truthfully.
+          if (isBackpressureError(err)) throw Object.assign(new Error("model backpressure"), { status: 429 });
           if (attempt >= MODEL_MAX_ATTEMPTS || !isTransientModelError(err)) throw err;
           try { console.error(`[terrarium:model] transient attempt ${attempt}/${MODEL_MAX_ATTEMPTS} name=${err?.name || ""} msg=${String(err?.message || err).slice(0, 200)}`); } catch { /* ignore */ }
           await Promise.race([sleep(MODEL_RETRY_BASE_MS * attempt), timeout]);

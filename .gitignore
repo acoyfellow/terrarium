@@ -7,6 +7,9 @@ app/dist/
 .wrangler/
 .wake/
 .wake-dogfood/
+# Internal strategy/loop notes — private operational context, never published.
+.context/
+
 # Local research scratch; curate deliberately before publishing.
 experiments/*
 # ...except intentionally-published spikes:

@@ -24,6 +24,7 @@
 // The worker does NOT execute any task itself; it is a thin auth+router.
 
 import { authenticatePrincipal } from "./principal-auth.js";
+import { buildSourceRegistry, effectiveCatalog } from "./model-catalog.js";
 import {
   canonicalRequestHash,
   estimateBudgetFromTask,
@@ -96,7 +97,7 @@ export async function handleApiRuns(request, env) {
   const path = url.pathname;
   const method = request.method;
 
-  if (!path.startsWith("/api/runs")) return null;
+  if (!path.startsWith("/api/runs") && path !== "/api/models") return null;
 
   // Round 5C1: explicit principal-auth gate. Fail closed on any missing or
   // wrong credential; never derive owner from the token; never accept an
@@ -104,6 +105,17 @@ export async function handleApiRuns(request, env) {
   const auth = authenticatePrincipal(request, env);
   if (!auth.ok) return Response.json({ ok: false, error: auth.error }, { status: auth.status });
   const ownerId = auth.principalId;
+
+  // GET /api/models — read-only, owner-scoped effective model catalog. Returns
+  // only opaque aliases + capability metadata + status for the caller's
+  // policy-intersected sources. Never returns upstream model strings,
+  // endpoints, or credentials. Additive; does not affect run admission or the
+  // server-owned egress model selection.
+  if (path === "/api/models" && method === "GET") {
+    const { sources, defaultAlias } = buildSourceRegistry(env);
+    const catalog = effectiveCatalog(sources, { principal: ownerId });
+    return Response.json({ ok: true, defaultModel: defaultAlias, sources: catalog });
+  }
 
   // POST /api/runs
   if (path === "/api/runs" && method === "POST") {

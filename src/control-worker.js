@@ -190,8 +190,8 @@ const legacyWorker = {
     if (["/pulse", "/claim", "/ack", "/status"].includes(url.pathname)) {
       return pulseWorker.fetch(request, env);
     }
-    // Cloud Terrarium production /api/runs surface.
-    if (url.pathname.startsWith("/api/runs")) {
+    // Cloud Terrarium production /api/runs + /api/models surface.
+    if (url.pathname.startsWith("/api/runs") || url.pathname === "/api/models") {
       const routed = await handleApiRuns(request, env);
       if (routed) return routed;
     }
