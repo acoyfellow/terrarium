@@ -81,7 +81,7 @@ authenticated POST /api/runs (Bearer + Idempotency-Key)
 → durable principal-scoped terminal callback (Pulse)
 ```
 
-API surface (all `/api/runs*` require `Authorization: Bearer <control token>`; `POST /api/runs` also requires an `Idempotency-Key`):
+API surface (all `/api/runs*` require an `Authorization` header derived from the `TERRARIUM_CONTROL_TOKEN` environment variable; `POST /api/runs` also requires an `Idempotency-Key`):
 
 | Method + path | Purpose | Notes |
 | --- | --- | --- |
@@ -430,7 +430,7 @@ Config at `~/.terrarium/config.json`:
   "defaultModel": "<model-id>",
   "maxDepth": 3,
   "timeoutMs": 900000,
-  "startupWatchdogMs": 60000
+  "startupWatchdogMs": 300000
 }
 ```
 
@@ -462,7 +462,7 @@ Tools:
 
 Terrarium does not auto-load its Pi host extension. The durable callback queue remains available through `terrarium_callbacks` for hosts that want to subscribe, claim, acknowledge, requeue, recover, and prune terminal events explicitly. By default, Pi users should use the normal MCP tools or CLI (`terrarium_status`, `terrarium_read`, `terrarium_cancel`, `terra status`, `terra read`, `terra cancel`). Hosts may explicitly install `src/pi-extension.js` to get a run widget and callback-triggered follow-ups; the extension subscribes only to concrete runs spawned by that Pi session. This keeps Terrarium out of unrelated Pi sessions by default.
 
-Pi children default to ephemeral `--no-session` runs unless the caller supplies an explicit `--session`/`--session-id` or sets `ephemeral: false`. `needsAttentionAfterMs` controls when an active run with no observed output is marked for attention; this is an inactivity signal, not a claim that the child is stuck. Background supervisors separately use `startupWatchdogMs` (default 60000, or `TERRARIUM_STARTUP_WATCHDOG_MS`) to terminate a child that produces no stdout or stderr during startup. Set it to `0` to disable the startup watchdog; task deadlines still apply.
+Pi children default to ephemeral `--no-session` runs unless the caller supplies an explicit `--session`/`--session-id` or sets `ephemeral: false`. `needsAttentionAfterMs` controls when an active run with no observed output is marked for attention; this is an inactivity signal, not a claim that the child is stuck. Background supervisors separately use `startupWatchdogMs` (default 300000, or `TERRARIUM_STARTUP_WATCHDOG_MS`) to terminate a child that produces no stdout or stderr during startup. Set it to `0` to disable the startup watchdog; task deadlines still apply. The higher default is intentional: `pi -p` may buffer all stdout until a nontrivial task completes, so silence alone is not proof of a hung child.
 
 CLI equivalents:
 
