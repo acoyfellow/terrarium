@@ -289,7 +289,9 @@ function buildRun(opts, config) {
   const taskContract = requireTaskContract ? { runId, taskFingerprint: taskFingerprint(task), nonce: randomUUID() } : null;
   const needsAttentionAfterMs = Number(opts.needsAttentionAfterMs ?? config.needsAttentionAfterMs ?? 60000);
   if (!Number.isFinite(needsAttentionAfterMs) || needsAttentionAfterMs < 5000 || needsAttentionAfterMs > 3600000) throw new Error("needsAttentionAfterMs must be between 5000 and 3600000");
-  const startupWatchdogMs = Number(process.env.TERRARIUM_STARTUP_WATCHDOG_MS ?? config.startupWatchdogMs ?? 60000);
+  // pi -p buffers its first stdout until task completion. Five minutes leaves room for
+  // a real cold start while the caller's task deadline remains the hard upper bound.
+  const startupWatchdogMs = Number(process.env.TERRARIUM_STARTUP_WATCHDOG_MS ?? config.startupWatchdogMs ?? 300000);
   if (!Number.isFinite(startupWatchdogMs) || startupWatchdogMs < 0 || startupWatchdogMs > 3600000) throw new Error("startupWatchdogMs must be between 0 and 3600000");
   const callerChannel = basename(process.cwd()).replace(/[^A-Za-z0-9_.-]/g, "_").slice(0, 120) || "default";
   const channel = correlationValue(opts.channel ?? process.env.TERRARIUM_EVENT_CHANNEL ?? callerChannel, "channel");
