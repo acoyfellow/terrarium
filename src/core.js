@@ -36,6 +36,8 @@ export const DEFAULT_PROMPT_PROFILE = "default";
 
 export const READ_ONLY_AGENT = "opencode run --agent explore";
 export const ACCESS_SCOPES = ["self", "descendants", "all"];
+// Keep prompts below conservative argv limits; larger prompts move through a private file.
+export const PROMPT_ARG_MAX_BYTES = 24 * 1024;
 
 function envBoolean(value) {
   if (value == null || value === "") return null;
@@ -262,6 +264,8 @@ function buildRun(opts, config) {
   const agentParts = splitCommand(agent);
   if (basename(agentParts[0] || "") === "pi" && !agentParts.includes("--no-session") && !agentParts.includes("--session") && !agentParts.includes("--session-id") && opts.ephemeral !== false) {
     agent = [...agentParts, "--no-session"].map(shellToken).join(" ");
+  } else if (basename(agentParts[0] || "") === "pi" && (agentParts.includes("--session") || agentParts.includes("--session-id")) && !agentParts.includes("--print") && !agentParts.includes("-p")) {
+    agent = [...agentParts, "--print"].map(shellToken).join(" ");
   }
   const readOnly = requestedReadOnly && !opts.agent;
   const profile = resolvePromptProfile(opts.profile ?? config.profile);
@@ -748,7 +752,14 @@ export async function cancelRun({ runId, requesterRunId, scope } = {}) {
   return { runId, status: "cancel-requested", cancelled: true, requestedAt: new Date().toISOString() };
 }
 
-function childEnvironment(run) {
+export async function materializePromptTransport(run, prompt) {
+  if (Buffer.byteLength(prompt, "utf8") <= PROMPT_ARG_MAX_BYTES) return { promptTransport: "argv", promptArg: prompt, promptPath: null };
+  const promptPath = join(LOG_DIR, `${assertRunId(run.runId)}.prompt`);
+  await writeFile(promptPath, prompt, { encoding: "utf8", mode: 0o600, flag: "wx" });
+  return { promptTransport: "file", promptArg: "Read the complete task from TERRARIUM_PROMPT_FILE.", promptPath };
+}
+
+function childEnvironment(run, transport = null) {
   return {
     ...process.env,
     TERRARIUM_RUN_ID: run.runId,
@@ -760,11 +771,13 @@ function childEnvironment(run) {
     TERRARIUM_STATUS_SCOPE: run.statusScope,
     TERRARIUM_READ_SCOPE: run.readScope,
     TERRARIUM_MRE_LOG_PATH: run.mreLogPath,
+    ...(transport?.promptPath ? { TERRARIUM_PROMPT_TRANSPORT: transport.promptTransport, TERRARIUM_PROMPT_FILE: transport.promptPath } : {}),
   };
 }
 
 export async function superviseTerrariumBackground({ run, parts, prompt, base, workspace, specPath } = {}) {
-  const env = childEnvironment(run);
+  const transport = await materializePromptTransport(run, prompt);
+  const env = childEnvironment(run, transport);
   if (existsSync(cancelMarkerPath(run.runId))) {
     const step = transition(initialRunState({ requireReceipt: run.requireTaskContract }), { type: "CancelRequested" });
     const terminal = step.decisions.find((decision) => decision.type === "Finalize");
@@ -776,7 +789,7 @@ export async function superviseTerrariumBackground({ run, parts, prompt, base, w
     try { await emitCompletionEvent(finalResult); } catch {}
     return finalResult;
   }
-  const child = spawn(parts[0], [...parts.slice(1), prompt], { stdio: ["ignore", "pipe", "pipe"], env, cwd: run.cwd, detached: true });
+  const child = spawn(parts[0], [...parts.slice(1), transport.promptArg], { stdio: ["ignore", "pipe", "pipe"], env, cwd: run.cwd, detached: true });
   const started = { ok: true, ...base, status: "running", background: true, pid: child.pid, childPid: child.pid, supervisorPid: process.pid, lastSeenAt: new Date().toISOString() };
   await writeMetadata(started);
 
@@ -894,12 +907,13 @@ export async function runTerrarium(opts = {}) {
     return finishRun(base, { ok: true, dryRun: true, status: "done", invocation, exitCode: 0, stdoutTail: invocation, stderrTail: "", ...ws });
   }
 
+  const transport = await materializePromptTransport(run, prompt);
   return await new Promise((resolve) => {
     let stdout = "";
     let stderr = "";
     let settled = false;
-    const env = childEnvironment(run);
-    const child = spawn(parts[0], [...parts.slice(1), prompt], { stdio: ["inherit", "pipe", "pipe"], env, cwd: run.cwd, detached: true });
+    const env = childEnvironment(run, transport);
+    const child = spawn(parts[0], [...parts.slice(1), transport.promptArg], { stdio: ["inherit", "pipe", "pipe"], env, cwd: run.cwd, detached: true });
     void writeMetadata({ ...base, status: "running", pid: child.pid, childPid: child.pid, lastSeenAt: new Date().toISOString() });
     const timer = run.timeoutMs > 0 ? setTimeout(() => signalProcessGroup(child.pid, "SIGTERM"), run.timeoutMs) : null;
 

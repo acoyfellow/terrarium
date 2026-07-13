@@ -4,7 +4,7 @@ import { execFileSync, execSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
-import { applyModelToAgent, assertRunId, capturePatch, childPrompt, classifyRunnerFailure, defaultMreLogPath, finalizeWorkspace, getRunStatus, isPidAlive, prepareWorkspace, readRun, reconcileRun, resolveAgent, resolveModel, resolvePromptProfile, runTerrarium, spawnTerrariumBackground, splitCommand, validateTaskContractOutput, READ_ONLY_AGENT } from "../src/core.js";
+import { applyModelToAgent, assertRunId, capturePatch, childPrompt, classifyRunnerFailure, defaultMreLogPath, finalizeWorkspace, getRunStatus, isPidAlive, materializePromptTransport, prepareWorkspace, PROMPT_ARG_MAX_BYTES, readRun, reconcileRun, resolveAgent, resolveModel, resolvePromptProfile, runTerrarium, spawnTerrariumBackground, splitCommand, validateTaskContractOutput, READ_ONLY_AGENT } from "../src/core.js";
 import { clearInheritedTerrariumEnv } from "./helpers/terrarium-env.js";
 
 clearInheritedTerrariumEnv();
@@ -12,6 +12,19 @@ clearInheritedTerrariumEnv();
 test("builds a constrained child prompt", () => {
   assert.match(childPrompt("ship it", { depth: 1, maxDepth: 3 }), /Do not fan out/);
   assert.deepEqual(splitCommand('node -e "console.log(1)"'), ["node", "-e", "console.log(1)"]);
+});
+
+test("large child prompts are materialized to a file instead of argv", async () => {
+  const run = { runId: `ter_prompt_${Date.now()}_${Math.random().toString(36).slice(2, 7)}` };
+  const prompt = "x".repeat(PROMPT_ARG_MAX_BYTES + 100);
+  const transport = await materializePromptTransport(run, prompt);
+  try {
+    assert.equal(transport.promptTransport, "file");
+    assert.ok(transport.promptArg.length < 512);
+    assert.equal(readFileSync(transport.promptPath, "utf8"), prompt);
+  } finally {
+    if (transport.promptPath) rmSync(transport.promptPath, { force: true });
+  }
 });
 
 test("task receipt validation classifies non-object JSON as malformed", () => {
@@ -181,6 +194,12 @@ test("Pi children default ephemeral but explicit session behavior is preserved",
   assert.doesNotMatch(persistent.agent, /--no-session/);
   const optedOut = await runTerrarium({ task: "dig", agent: "pi -p", ephemeral: false, dryRun: true, stream: false, config: {} });
   assert.doesNotMatch(optedOut.agent, /--no-session/);
+});
+
+test("Pi session agents are forced into print mode before Terrarium appends the prompt", async () => {
+  const session = await runTerrarium({ task: "dig", agent: "pi --session 019ee47d-bfe9-7287-8c12-5400c71240b", dryRun: true, stream: false, config: {} });
+  assert.equal(session.agent, "pi --session 019ee47d-bfe9-7287-8c12-5400c71240b --print");
+  assert.doesNotMatch(session.agent, /--no-session/);
 });
 
 test("runTerrarium dry-run records and pins a Pi model", async () => {
@@ -380,23 +399,41 @@ test("rejects pre-existing custom MRE side logs", async () => {
   }
 });
 
+async function waitForTerminal(runId, { staleMs = 5000, attempts = 100, delayMs = 50, requireTerminalCallback = false } = {}) {
+  let status;
+  for (let i = 0; i < attempts; i++) {
+    status = await getRunStatus({ runId, staleMs });
+    if (status.status !== "running" && (!requireTerminalCallback || status.terminalCallback)) return status;
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
+  }
+  return status;
+}
+
 test("background runs finish after the launcher exits", async () => {
   const coreUrl = new URL("../src/core.js", import.meta.url).href;
   const agent = `${process.execPath} -e "setTimeout(() => console.log('supervised child complete'), 80)"`;
   const launcher = `import { spawnTerrariumBackground } from ${JSON.stringify(coreUrl)};\nconst result = await spawnTerrariumBackground(${JSON.stringify({ task: "finish independently", agent })});\nconsole.log(JSON.stringify({ runId: result.runId }));`;
   const output = execFileSync(process.execPath, ["--input-type=module", "--eval", launcher], { encoding: "utf8" });
   const { runId } = JSON.parse(output.trim());
-  let status;
-  for (let i = 0; i < 100; i++) {
-    status = await getRunStatus({ runId, staleMs: 5000 });
-    if (status.status !== "running") break;
-    await new Promise((resolve) => setTimeout(resolve, 50));
-  }
+  const status = await waitForTerminal(runId);
   assert.equal(status.status, "done");
   assert.equal(status.exitCode, 0);
   assert.match(status.stdoutTail, /supervised child complete/);
   const log = await readRun({ runId });
   assert.match(log.text, /supervised child complete/);
+});
+
+test("background large prompt uses prompt file transport and still verifies receipt", async () => {
+  const script = "const fs=require('fs');const arg=process.argv.at(-1);if(arg.length>512)throw new Error('prompt argv was too large');if(process.env.TERRARIUM_PROMPT_TRANSPORT!=='file')throw new Error('expected file transport');const prompt=fs.readFileSync(process.env.TERRARIUM_PROMPT_FILE,'utf8');if(!prompt.includes('LARGE_PROMPT_SENTINEL'))throw new Error('missing large prompt content');const line=prompt.split('\n').find((value)=>value.includes('TERRARIUM_RESULT='));const receipt=JSON.parse(line.slice(line.indexOf('TERRARIUM_RESULT=')+'TERRARIUM_RESULT='.length));receipt.summary='large prompt received';console.log('PROMPT_FILE_BYTES='+Buffer.byteLength(prompt));console.log('TERRARIUM_RESULT='+JSON.stringify(receipt));";
+  const agent = `${process.execPath} -e ${JSON.stringify(script)}`;
+  const task = `LARGE_PROMPT_SENTINEL\n${"x".repeat(PROMPT_ARG_MAX_BYTES + 3000)}`;
+  const started = await spawnTerrariumBackground({ task, agent, timeoutMs: 5000, requireTaskContract: true });
+  const status = await waitForTerminal(started.runId, { attempts: 120 });
+  assert.equal(status.status, "done");
+  assert.equal(status.taskContractStatus, "verified");
+  assert.equal(status.taskResultSummary, "large prompt received");
+  assert.equal(status.terminalCallback?.eventId, `evt_${started.runId}_Completed`);
+  assert.match(status.stdoutTail, /PROMPT_FILE_BYTES=/);
 });
 
 test("background no-output startup hang terminalizes and journals callback", async () => {
@@ -405,12 +442,7 @@ test("background no-output startup hang terminalizes and journals callback", asy
     process.env.TERRARIUM_STARTUP_WATCHDOG_MS = "200";
     const agent = `${process.execPath} -e "setInterval(() => {}, 1000)"`;
     const started = await spawnTerrariumBackground({ task: "hang before output", agent, timeoutMs: 5000 });
-    let status;
-    for (let i = 0; i < 120; i++) {
-      status = await getRunStatus({ runId: started.runId, staleMs: 5000 });
-      if (status.status !== "running" && status.terminalCallback?.eventId) break;
-      await new Promise((resolve) => setTimeout(resolve, 25));
-    }
+    const status = await waitForTerminal(started.runId, { attempts: 120, delayMs: 25, requireTerminalCallback: true });
     assert.equal(status.status, "error");
     assert.equal(status.ok, false);
     assert.equal(status.exitCode, 124);
@@ -422,6 +454,17 @@ test("background no-output startup hang terminalizes and journals callback", asy
     if (previous === undefined) delete process.env.TERRARIUM_STARTUP_WATCHDOG_MS;
     else process.env.TERRARIUM_STARTUP_WATCHDOG_MS = previous;
   }
+});
+
+test("background deadline timeout terminalizes and journals callback", async () => {
+  const agent = `${process.execPath} -e "console.log('child started'); setInterval(() => {}, 1000)"`;
+  const started = await spawnTerrariumBackground({ task: "timeout after output", agent, timeoutMs: 250 });
+  const status = await waitForTerminal(started.runId, { attempts: 120, delayMs: 25, requireTerminalCallback: true });
+  assert.equal(status.status, "failed");
+  assert.equal(status.ok, false);
+  assert.equal(status.taskContractStatus, "not-applicable");
+  assert.equal(status.terminalCallback?.eventId, `evt_${started.runId}_Failed`);
+  assert.match(status.stdoutTail, /child started/);
 });
 
 test("reconcileRun reports factual needs-attention after output inactivity", async () => {
