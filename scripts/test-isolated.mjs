@@ -17,7 +17,7 @@ const home = await mkdtemp(join(tmpdir(), "terrarium-test-home-"));
 const env = { ...process.env, TERRARIUM_HOME: home };
 for (const key of ["TERRARIUM_RUN_ID", "TERRARIUM_PARENT_RUN_ID", "TERRARIUM_STATUS_SCOPE", "TERRARIUM_READ_SCOPE", "TERRARIUM_DEPTH", "TERRARIUM_MAX_DEPTH", "TERRARIUM_ALLOW_SPAWN", "TERRARIUM_CHILD_BUDGET", "TERRARIUM_EVENT_CHANNEL", "TERRARIUM_MRE_LOG_PATH"]) delete env[key];
 try {
-  const child = spawn(process.execPath, ["--test", ...tests], {
+  const child = spawn(process.execPath, ["--import", "./test/setup-home.mjs", "--test", ...tests], {
     cwd: root,
     env,
     stdio: "inherit",

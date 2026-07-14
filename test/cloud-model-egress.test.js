@@ -7,6 +7,7 @@ import {
   SANDBOX_RUNTIME_CONFIG,
   TerrariumSandbox,
   handleWorkersAiEgress,
+  aiGatewayOptions,
   denyAllEgress,
   _testables,
 } from '../src/cloud/terrarium-sandbox.js';
@@ -185,4 +186,36 @@ test('5D unsupported Workers AI output never becomes a completion', async () => 
   );
   assert.equal(res.status, 502);
   assert.equal((await json(res)).error.type, 'terrarium_model_error');
+});
+
+test('AI Gateway dogfood: no configured gateway id behaves exactly as today', () => {
+  // Fail-open: unset, empty, or whitespace id => undefined third arg, so
+  // env.AI.run is called with the same arity/behavior as before.
+  assert.equal(aiGatewayOptions({}), undefined);
+  assert.equal(aiGatewayOptions({ TERRARIUM_AI_GATEWAY_ID: '' }), undefined);
+  assert.equal(aiGatewayOptions({ TERRARIUM_AI_GATEWAY_ID: '   ' }), undefined);
+});
+
+test('AI Gateway dogfood: configured gateway id is passed as the server-owned third arg', async () => {
+  const calls = [];
+  const env = {
+    AI: { run: async (...args) => { calls.push(args); return { response: 'ok' }; } },
+    TERRARIUM_AI_GATEWAY_ID: 'terrarium-prod',
+  };
+  // A client cannot supply the gateway; it comes only from server env.
+  const res = await handleWorkersAiEgress(request({ model: 'attacker/model', messages: [{ role: 'user', content: 'x' }] }), env);
+  assert.equal(res.status, 200);
+  assert.deepEqual(calls[0][2], { gateway: { id: 'terrarium-prod' } });
+});
+
+test('AI Gateway dogfood: opt-in skipCache flag is honored', () => {
+  assert.deepEqual(
+    aiGatewayOptions({ TERRARIUM_AI_GATEWAY_ID: 'g1', TERRARIUM_AI_GATEWAY_SKIP_CACHE: '1' }),
+    { gateway: { id: 'g1', skipCache: true } },
+  );
+  // Any non-"1" value does not skip cache.
+  assert.deepEqual(
+    aiGatewayOptions({ TERRARIUM_AI_GATEWAY_ID: 'g1', TERRARIUM_AI_GATEWAY_SKIP_CACHE: 'true' }),
+    { gateway: { id: 'g1' } },
+  );
 });

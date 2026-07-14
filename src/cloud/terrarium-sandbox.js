@@ -225,6 +225,20 @@ function boundedSseResponse(completion) {
   return new Response(text, { status: 200, headers: { "content-type": "text/event-stream", "cache-control": "no-store" } });
 }
 
+// AI Gateway dogfood: route the server-owned Workers AI call through an AI
+// Gateway when one is configured, so every run gains cached/rate-limited/
+// observable inference and per-run usage evidence. Strictly opt-in and
+// fail-open to today's behavior: with no TERRARIUM_AI_GATEWAY_ID set, this
+// returns undefined and env.AI.run is called exactly as before. The gateway id
+// is server-owned config, never client- or cell-supplied.
+export function aiGatewayOptions(env) {
+  const id = typeof env?.TERRARIUM_AI_GATEWAY_ID === "string" ? env.TERRARIUM_AI_GATEWAY_ID.trim() : "";
+  if (!id) return undefined;
+  const gateway = { id };
+  if (env?.TERRARIUM_AI_GATEWAY_SKIP_CACHE === "1") gateway.skipCache = true;
+  return { gateway };
+}
+
 export async function handleWorkersAiEgress(request, env) {
   const url = new URL(request.url);
   if (url.hostname !== MODEL_HOST || url.pathname !== MODEL_PATH) return jsonError(404, "not found");
@@ -254,7 +268,7 @@ export async function handleWorkersAiEgress(request, env) {
         try {
           const modelCall = resolved.adapter === "openai-compatible"
             ? routeOpenAICompatible(resolved, input, env, { deadlineMs: MODEL_DEADLINE_MS })
-            : env.AI.run(serverModel, input);
+            : env.AI.run(serverModel, input, aiGatewayOptions(env));
           result = await Promise.race([modelCall, timeout]);
           lastError = null;
           break;

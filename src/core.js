@@ -754,6 +754,7 @@ export async function cancelRun({ runId, requesterRunId, scope } = {}) {
 
 export async function materializePromptTransport(run, prompt) {
   if (Buffer.byteLength(prompt, "utf8") <= PROMPT_ARG_MAX_BYTES) return { promptTransport: "argv", promptArg: prompt, promptPath: null };
+  await mkdir(LOG_DIR, { recursive: true });
   const promptPath = join(LOG_DIR, `${assertRunId(run.runId)}.prompt`);
   await writeFile(promptPath, prompt, { encoding: "utf8", mode: 0o600, flag: "wx" });
   return { promptTransport: "file", promptArg: "Read the complete task from TERRARIUM_PROMPT_FILE.", promptPath };
