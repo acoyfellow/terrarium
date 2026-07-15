@@ -435,6 +435,26 @@ async function prepareRun(opts = {}) {
   if (run.parentRunId && !run.callerSpawnAllowed) throw new Error("Terrarium spawn capability denied for this child");
   const parts = splitCommand(run.agent);
   if (parts.length === 0) throw new Error("empty agent command");
+  // Durable accept-receipt BEFORE any slow launch work (workspace copy, git info).
+  // The runId is already minted; persisting a minimal `accepted` record here means
+  // that even if the caller's spawn RPC later times out during a slow handshake
+  // (large --isolation copy, slow git, load), the run is still discoverable via
+  // listRuns/terrarium_status (incl. the channel/workflowId/sinceMs recovery
+  // filters) instead of being lost. A background run overwrites this with full
+  // metadata once launched; a synchronous run does the same. Best-effort: never
+  // let receipt persistence failure block the run.
+  if (!run.dryRun) {
+    try {
+      run.logPath ??= await defaultLogPath(run.runId);
+      await writeMetadata({
+        runId: run.runId, parentRunId: run.parentRunId, version: VERSION, agent: run.agent,
+        model: run.model, task: run.task, cwd: run.cwd, originalCwd: run.originalCwd,
+        isolation: run.isolation, logPath: run.logPath, startedAt: new Date().toISOString(),
+        status: "accepted", channel: run.channel, workflowId: run.workflowId, sessionId: run.sessionId,
+        taskFingerprint: run.taskContract?.taskFingerprint ?? taskFingerprint(run.task),
+      });
+    } catch { /* best effort; full metadata is written below */ }
+  }
   const workspace = await prepareWorkspace(run);
   const prompt = childPrompt(run.task, run);
   run.logPath ??= await defaultLogPath(run.runId);
@@ -596,6 +616,19 @@ export async function readMetadata(runId) {
 }
 
 export async function reconcileRun(meta, { staleMs = 30000 } = {}) {
+  // An `accepted` record is a durable pre-launch receipt (runId persisted before
+  // the slow launch handshake, so a timed-out spawn RPC is still recoverable). If
+  // a spawn crashed between accept and launch, the record would otherwise linger
+  // as `accepted` forever. Reconcile a stale accepted (no live process, older than
+  // staleMs) to `orphaned` so status does not report perpetual pending work. A
+  // fresh accepted (still mid-launch) is left as-is.
+  if (meta && meta.status === "accepted") {
+    const startedTs = Date.parse(meta.startedAt ?? "");
+    const stale = !Number.isFinite(startedTs) || (Date.now() - startedTs) >= staleMs;
+    const anyAlive = isPidAlive(meta.supervisorPid) || [meta.pid, meta.childPid, meta.runnerPid].filter(Boolean).some(isPidAlive);
+    if (stale && !anyAlive) return { ...meta, status: "orphaned", ok: false, alive: false, orphanedAt: new Date().toISOString(), note: "Accepted run never reached launch (spawn likely failed before starting the child)." };
+    return { ...meta, alive: anyAlive };
+  }
   if (!meta || meta.status !== "running") return meta;
   const now = Date.now();
   const cancelled = existsSync(cancelMarkerPath(meta.runId));

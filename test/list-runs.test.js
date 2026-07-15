@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
-import { listRuns, LOG_DIR } from "../src/core.js";
+import { listRuns, reconcileRun, LOG_DIR } from "../src/core.js";
 
 const runsDir = LOG_DIR;
 
@@ -28,6 +28,18 @@ test("listRuns ignores background specs and reports active runs independently of
   } finally {
     await Promise.all(paths.map((path) => rm(path, { force: true })));
   }
+});
+
+test("accepted pre-launch receipt: fresh stays accepted, stale reconciles to orphaned", async () => {
+  // Durable accept-receipt written before the slow launch handshake. A fresh one
+  // (still mid-launch) must not be falsely settled; a stale one whose spawn never
+  // reached launch must not linger as perpetual pending work.
+  const fresh = await reconcileRun({ runId: "ter_accept_fresh", status: "accepted", startedAt: new Date().toISOString(), supervisorPid: 999999999 });
+  assert.equal(fresh.status, "accepted");
+  assert.equal(fresh.alive, false);
+  const stale = await reconcileRun({ runId: "ter_accept_stale", status: "accepted", startedAt: new Date(Date.now() - 120000).toISOString(), supervisorPid: 999999999 }, { staleMs: 30000 });
+  assert.equal(stale.status, "orphaned");
+  assert.equal(stale.ok, false);
 });
 
 test("listRuns filters by channel/workflowId/sinceMs for post-timeout recovery", async () => {

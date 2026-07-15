@@ -1,6 +1,13 @@
 # BUGREPORT 2026-07-15 — spawn/batch RPC timeout loses the runId (fail-closed orchestration gap)
 
-Status: **logged, root-cause verified, immediate cause mitigated; durable-accept-receipt hardening proposed.**
+Status: **root-cause verified; immediate cause mitigated; status-availability hardening SHIPPED; durable-accept-receipt still open.**
+
+## Progress
+
+- ✅ **Immediate cause mitigated** — 24k-file/1.8GB home archived; test-home isolation guard (`d94d647`) stops recurrence.
+- ✅ **Bounded status scan** (`59c9659`) — `listRuns` reads at most a recent-file window (`TERRARIUM_LIST_SCAN_WINDOW`), so status list-mode no longer scales with home size and can't be starved past the MCP deadline.
+- ✅ **Post-timeout recovery filters** (`3f4ec73`) — `listRuns`/`terrarium_status` accept `channel`/`workflowId`/`sinceMs`, so a caller that lost its runId to a timeout re-associates the started run instead of relaunching.
+- ⬜ **OPEN — durable accept-receipt before RPC wait** (hardening item 1 below): return `{ runId, status: "accepted" }` at the earliest durable point so the caller *always* leaves the spawn call with a runId, even if the launch handshake later exceeds the deadline. Not yet built.
 
 ## Symptom (from live dogfood)
 
