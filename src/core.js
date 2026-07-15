@@ -965,7 +965,11 @@ export async function spawnTerrariumBackground(opts = {}) {
 
   const specPath = join(LOG_DIR, `${run.runId}.background.json`);
   await writeFile(specPath, JSON.stringify({ run, parts, prompt, base, workspace, specPath }, null, 2) + "\n", { flag: "wx" });
-  const supervisor = spawn(process.execPath, [fileURLToPath(new URL("./supervisor.js", import.meta.url)), specPath], { stdio: "ignore", detached: true });
+  // Pin TERRARIUM_HOME for the detached supervisor so it always resolves the same
+  // home as this parent, regardless of how the parent resolved it (env vs config).
+  // Without this, a test/context that set the home by a non-env mechanism would
+  // let the detached process fall back to ~/.terrarium.
+  const supervisor = spawn(process.execPath, [fileURLToPath(new URL("./supervisor.js", import.meta.url)), specPath], { stdio: "ignore", detached: true, env: { ...process.env, TERRARIUM_HOME: HOME } });
   supervisor.unref();
   const started = { ok: true, ...base, status: "running", background: true, supervisorPid: supervisor.pid, lastSeenAt: new Date().toISOString() };
   await writeMetadata(started);
