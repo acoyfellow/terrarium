@@ -30,6 +30,38 @@ test("listRuns ignores background specs and reports active runs independently of
   }
 });
 
+test("listRuns filters by channel/workflowId/sinceMs for post-timeout recovery", async () => {
+  const suffix = `${process.pid}_${Date.now()}`;
+  const now = Date.now();
+  const mine = `ter_test_recov_mine_${suffix}`;
+  const other = `ter_test_recov_other_${suffix}`;
+  const oldOne = `ter_test_recov_old_${suffix}`;
+  const paths = [
+    [join(runsDir, `${mine}.json`), { runId: mine, status: "running", pid: process.pid, channel: "lane-A", workflowId: "wf-1", startedAt: new Date(now).toISOString() }],
+    [join(runsDir, `${other}.json`), { runId: other, status: "running", pid: process.pid, channel: "lane-B", workflowId: "wf-2", startedAt: new Date(now).toISOString() }],
+    [join(runsDir, `${oldOne}.json`), { runId: oldOne, status: "done", ok: true, exitCode: 0, channel: "lane-A", workflowId: "wf-1", startedAt: new Date(now - 3600000).toISOString(), finishedAt: new Date(now - 3600000).toISOString() }],
+  ];
+  await mkdir(runsDir, { recursive: true });
+  await Promise.all(paths.map(([p, m]) => writeFile(p, JSON.stringify(m))));
+  try {
+    // Channel filter: only lane-A runs (mine + oldOne), not lane-B.
+    const byChannel = await listRuns({ channel: "lane-A" });
+    const ids = byChannel.runs.map((r) => r.runId);
+    assert.ok(ids.includes(mine) && ids.includes(oldOne), "lane-A runs present");
+    assert.ok(!ids.includes(other), "lane-B excluded");
+    assert.equal(byChannel.filtered.channel, "lane-A");
+    // Channel + recency: the hour-old lane-A run drops out with a 60s window.
+    const recent = await listRuns({ channel: "lane-A", sinceMs: 60000 });
+    const rids = recent.runs.map((r) => r.runId);
+    assert.ok(rids.includes(mine) && !rids.includes(oldOne), "only the recent lane-A run");
+    // Workflow filter narrows the same way.
+    const byWf = await listRuns({ workflowId: "wf-2" });
+    assert.deepEqual(byWf.runs.map((r) => r.runId), [other]);
+  } finally {
+    await Promise.all(paths.map(([p]) => rm(p, { force: true })));
+  }
+});
+
 test("listRuns scan is bounded by a recent-file window (does not scale with home size)", async () => {
   const prevWindow = process.env.TERRARIUM_LIST_SCAN_WINDOW;
   const suffix = `${process.pid}_${Date.now()}`;

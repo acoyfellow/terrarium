@@ -70,7 +70,10 @@ const tools = [
       type: "object",
       properties: {
         limit: { type: "number", description: "Max number of recent runs to return. Default: 20." },
-        runId: { type: "string", description: "If set, return status for this single run instead of listing." },
+        runId: { type: "string", description: "If set, return status for this single run instead of listing (single-file read; unaffected by home size)." },
+        channel: { type: "string", description: "List-mode recovery filter: only runs on this channel. Use to re-associate a run whose spawn RPC timed out (you still know the channel you launched on)." },
+        workflowId: { type: "string", description: "List-mode recovery filter: only runs with this workflowId." },
+        sinceMs: { type: "number", description: "List-mode recovery filter: only runs started within the last this-many ms." },
         verbose: { type: "boolean", description: "Return the full unprojected envelope per run. Default: false (concise projection)." }
       }
     }

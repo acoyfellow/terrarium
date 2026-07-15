@@ -983,7 +983,7 @@ export async function runTerrarium(opts = {}) {
   });
 }
 
-export async function listRuns({ limit = 20, requesterRunId, scope } = {}) {
+export async function listRuns({ limit = 20, requesterRunId, scope, channel, workflowId, sinceMs } = {}) {
   const access = effectiveAccess(requesterRunId, scope, "TERRARIUM_STATUS_SCOPE");
   await mkdir(LOG_DIR, { recursive: true });
   const wantLimit = Math.max(0, Number(limit) || 20);
@@ -1017,7 +1017,21 @@ export async function listRuns({ limit = 20, requesterRunId, scope } = {}) {
   }
   const visibleRuns = [];
   for (const run of allRuns) if (await isRunAccessible({ ...access, targetRunId: run.runId })) visibleRuns.push(run);
-  const active = visibleRuns.filter((run) => run.status === "running" && run.alive !== false);
+  // Recovery affordance: a caller whose spawn RPC timed out lost its runId but
+  // still knows the channel/workflow it launched on. Filtering by channel +
+  // workflowId + a recent time window lets it re-associate the started run(s)
+  // instead of relaunching (which would duplicate the child). Filters are
+  // applied AFTER access-scoping so they never widen visibility.
+  const matchChannel = channel != null ? String(channel) : null;
+  const matchWorkflow = workflowId != null ? String(workflowId) : null;
+  const sinceTs = Number.isFinite(Number(sinceMs)) && Number(sinceMs) > 0 ? Date.now() - Number(sinceMs) : null;
+  const filtered = visibleRuns.filter((run) => {
+    if (matchChannel != null && run.channel !== matchChannel) return false;
+    if (matchWorkflow != null && run.workflowId !== matchWorkflow) return false;
+    if (sinceTs != null) { const t = Date.parse(run.startedAt ?? ""); if (!Number.isFinite(t) || t < sinceTs) return false; }
+    return true;
+  });
+  const active = filtered.filter((run) => run.status === "running" && run.alive !== false);
   const scanTruncated = files.length >= activeScanWindow;
   return {
     version: VERSION,
@@ -1026,8 +1040,9 @@ export async function listRuns({ limit = 20, requesterRunId, scope } = {}) {
     activeRunIds: active.map((run) => run.runId),
     activeScanWindow,
     scanTruncated,
-    count: Math.min(visibleRuns.length, wantLimit),
-    runs: visibleRuns.slice(0, wantLimit),
+    ...(matchChannel != null || matchWorkflow != null || sinceTs != null ? { filtered: { channel: matchChannel, workflowId: matchWorkflow, sinceMs: sinceTs != null ? Number(sinceMs) : null } } : {}),
+    count: Math.min(filtered.length, wantLimit),
+    runs: filtered.slice(0, wantLimit),
   };
 }
 
