@@ -436,23 +436,52 @@ test("background large prompt uses prompt file transport and still verifies rece
   assert.match(status.stdoutTail, /PROMPT_FILE_BYTES=/);
 });
 
-test("background no-output startup hang terminalizes and journals callback", async () => {
-  const previous = process.env.TERRARIUM_STARTUP_WATCHDOG_MS;
+test("background wedged-but-alive child is killed at the startup hard ceiling", async () => {
+  const prevWin = process.env.TERRARIUM_STARTUP_WATCHDOG_MS;
+  const prevCeil = process.env.TERRARIUM_STARTUP_HARD_CEILING_MS;
   try {
+    // Alive but permanently silent (no stdout, no log growth). The base window no
+    // longer kills a live child; the hard ceiling does.
     process.env.TERRARIUM_STARTUP_WATCHDOG_MS = "200";
+    process.env.TERRARIUM_STARTUP_HARD_CEILING_MS = "800";
     const agent = `${process.execPath} -e "setInterval(() => {}, 1000)"`;
-    const started = await spawnTerrariumBackground({ task: "hang before output", agent, timeoutMs: 5000 });
-    const status = await waitForTerminal(started.runId, { attempts: 120, delayMs: 25, requireTerminalCallback: true });
+    const started = await spawnTerrariumBackground({ task: "hang before output", agent, timeoutMs: 10000 });
+    const status = await waitForTerminal(started.runId, { attempts: 200, delayMs: 25 });
     assert.equal(status.status, "error");
     assert.equal(status.ok, false);
     assert.equal(status.exitCode, 124);
-    assert.match(status.error, /startup-timeout/);
+    assert.match(status.error, /hard ceiling/);
     assert.equal(status.terminalCallback?.eventId, `evt_${started.runId}_Failed`);
     const log = await readRun({ runId: started.runId });
     assert.match(log.text, /startup-timeout/);
   } finally {
-    if (previous === undefined) delete process.env.TERRARIUM_STARTUP_WATCHDOG_MS;
-    else process.env.TERRARIUM_STARTUP_WATCHDOG_MS = previous;
+    if (prevWin === undefined) delete process.env.TERRARIUM_STARTUP_WATCHDOG_MS; else process.env.TERRARIUM_STARTUP_WATCHDOG_MS = prevWin;
+    if (prevCeil === undefined) delete process.env.TERRARIUM_STARTUP_HARD_CEILING_MS; else process.env.TERRARIUM_STARTUP_HARD_CEILING_MS = prevCeil;
+  }
+});
+
+test("background alive log-growing child survives the base startup window (no false kill)", async () => {
+  const prevWin = process.env.TERRARIUM_STARTUP_WATCHDOG_MS;
+  const prevCeil = process.env.TERRARIUM_STARTUP_HARD_CEILING_MS;
+  try {
+    // The reported false-kill scenario: alive and productive (growing its run log
+    // via stderr) but slow to first stdout. Must NOT be killed by the base window.
+    // It stays silent-on-stdout past the window, then completes successfully.
+    process.env.TERRARIUM_STARTUP_WATCHDOG_MS = "200";
+    process.env.TERRARIUM_STARTUP_HARD_CEILING_MS = "5000";
+    // Write to stderr (grows run.log) for 600ms (3x window), THEN emit the receipt on stdout.
+    const script = "let n=0;const t=setInterval(()=>{process.stderr.write('working '+(++n)+'\\n');if(n>=6){clearInterval(t);console.log('done');process.exit(0);}},100);";
+    const agent = `${process.execPath} -e "${script}"`;
+    const started = await spawnTerrariumBackground({ task: "slow first stdout", agent, timeoutMs: 10000 });
+    const status = await waitForTerminal(started.runId, { attempts: 400, delayMs: 25 });
+    // Survived the base window and finished on its own terms (not a startup kill).
+    assert.ok(!/startup-timeout/.test(String(status.error || "")), `should not be startup-killed, got: ${status.error}`);
+    const log = await readRun({ runId: started.runId });
+    assert.ok(!/startup-timeout/.test(log.text), "log must not record a startup-timeout");
+    assert.match(log.text, /working 6/);
+  } finally {
+    if (prevWin === undefined) delete process.env.TERRARIUM_STARTUP_WATCHDOG_MS; else process.env.TERRARIUM_STARTUP_WATCHDOG_MS = prevWin;
+    if (prevCeil === undefined) delete process.env.TERRARIUM_STARTUP_HARD_CEILING_MS; else process.env.TERRARIUM_STARTUP_HARD_CEILING_MS = prevCeil;
   }
 });
 

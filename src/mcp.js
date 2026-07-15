@@ -28,6 +28,7 @@ const tools = [
         keepWorkspace: { type: "boolean", description: "Retain an isolated copy/worktree for inspection instead of cleaning it up." },
         timeoutMs: { type: "number", description: "Kill the child after this many milliseconds. Default: none." },
         needsAttentionAfterMs: { type: "number", minimum: 5000, maximum: 3600000, description: "Mark a running child needs-attention after this much time without observed output. Default: 60000." },
+        startupWatchdogMs: { type: "number", minimum: 0, maximum: 3600000, description: "No-progress startup window in ms. The watchdog only kills a child that produced no stdout AND no log growth for this long (liveness-aware; a live, log-growing child is not killed). Default: 300000. 0 disables it." },
         maxDepth: { type: "number", description: "Maximum Terrarium recursion depth. Default: 3." },
         allowSpawn: { type: "boolean", description: "Grant the child one nested Terrarium spawn when depth permits. Minimal/maxDepth=1 runs default false." },
         statusScope: { type: "string", enum: ["self", "descendants", "all"], description: "Run-status visibility granted to the child. Default: descendants when spawn is allowed, otherwise self." },
@@ -49,7 +50,7 @@ const tools = [
     inputSchema: {
       type: "object",
       properties: {
-        jobs: { type: "array", minItems: 1, maxItems: 256, description: "Job option objects, each accepting the same fields as terrarium_spawn (task required). Over 32 jobs requires an explicit concurrency bound.", items: { type: "object", properties: { task: { type: "string" }, agent: { type: "string" }, model: { type: "string" }, readOnly: { type: "boolean" }, ephemeral: { type: "boolean" }, profile: { type: "string", enum: ["default", "minimal"] }, cwd: { type: "string" }, channel: { type: "string" }, workflowId: { type: "string" }, sessionId: { type: "string" }, isolation: { type: "string", enum: ["none", "copy", "worktree"] }, keepWorkspace: { type: "boolean" }, timeoutMs: { type: "number" }, needsAttentionAfterMs: { type: "number" }, maxDepth: { type: "number" }, allowSpawn: { type: "boolean" }, statusScope: { type: "string", enum: ["self", "descendants", "all"] }, readScope: { type: "string", enum: ["self", "descendants", "all"] }, logPath: { type: "string" }, mreLogPath: { type: "string" } }, required: ["task"] } },
+        jobs: { type: "array", minItems: 1, maxItems: 256, description: "Job option objects, each accepting the same fields as terrarium_spawn (task required). Over 32 jobs requires an explicit concurrency bound.", items: { type: "object", properties: { task: { type: "string" }, agent: { type: "string" }, model: { type: "string" }, readOnly: { type: "boolean" }, ephemeral: { type: "boolean" }, profile: { type: "string", enum: ["default", "minimal"] }, cwd: { type: "string" }, channel: { type: "string" }, workflowId: { type: "string" }, sessionId: { type: "string" }, isolation: { type: "string", enum: ["none", "copy", "worktree"] }, keepWorkspace: { type: "boolean" }, timeoutMs: { type: "number" }, needsAttentionAfterMs: { type: "number" }, startupWatchdogMs: { type: "number", minimum: 0, maximum: 3600000 }, maxDepth: { type: "number" }, allowSpawn: { type: "boolean" }, statusScope: { type: "string", enum: ["self", "descendants", "all"] }, readScope: { type: "string", enum: ["self", "descendants", "all"] }, logPath: { type: "string" }, mreLogPath: { type: "string" } }, required: ["task"] } },
         strategy: { type: "string", enum: BATCH_STRATEGIES, description: "Join strategy. Default: all." },
         quorum: { type: "number", description: "Required successes for the quorum strategy (1..jobs.length)." },
         concurrency: { type: "number", minimum: 1, description: "Max simultaneously active runs. Required when jobs.length > 32 (a missing bound is rejected at preflight with a suggested value). Default: launch all at once." },
@@ -160,7 +161,7 @@ function visibleTools(policy) {
     .map((tool) => (tool.schemaVersion ? tool : { ...tool, schemaVersion: MCP_SCHEMA_VERSION }));
 }
 
-const SPAWN_ARG_KEYS = new Set(["task", "agent", "model", "readOnly", "ephemeral", "profile", "cwd", "channel", "workflowId", "sessionId", "isolation", "keepWorkspace", "timeoutMs", "needsAttentionAfterMs", "maxDepth", "allowSpawn", "statusScope", "readScope", "dryRun", "background", "logPath", "mreLogPath", "verbose"]);
+const SPAWN_ARG_KEYS = new Set(["task", "agent", "model", "readOnly", "ephemeral", "profile", "cwd", "channel", "workflowId", "sessionId", "isolation", "keepWorkspace", "timeoutMs", "needsAttentionAfterMs", "startupWatchdogMs", "maxDepth", "allowSpawn", "statusScope", "readScope", "dryRun", "background", "logPath", "mreLogPath", "verbose"]);
 function sanitizeSpawnArgs(args) {
   const out = {};
   for (const [key, value] of Object.entries(args)) if (SPAWN_ARG_KEYS.has(key)) out[key] = value;

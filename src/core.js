@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import { createHash, randomUUID } from "node:crypto";
 import { appendFile, cp, mkdir, readFile, readdir, rename, rm, rmdir, stat, writeFile } from "node:fs/promises";
-import { existsSync } from "node:fs";
+import { existsSync, statSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -295,7 +295,7 @@ function buildRun(opts, config) {
   if (!Number.isFinite(needsAttentionAfterMs) || needsAttentionAfterMs < 5000 || needsAttentionAfterMs > 3600000) throw new Error("needsAttentionAfterMs must be between 5000 and 3600000");
   // pi -p buffers its first stdout until task completion. Five minutes leaves room for
   // a real cold start while the caller's task deadline remains the hard upper bound.
-  const startupWatchdogMs = Number(process.env.TERRARIUM_STARTUP_WATCHDOG_MS ?? config.startupWatchdogMs ?? 300000);
+  const startupWatchdogMs = Number(opts.startupWatchdogMs ?? process.env.TERRARIUM_STARTUP_WATCHDOG_MS ?? config.startupWatchdogMs ?? 300000);
   if (!Number.isFinite(startupWatchdogMs) || startupWatchdogMs < 0 || startupWatchdogMs > 3600000) throw new Error("startupWatchdogMs must be between 0 and 3600000");
   const callerChannel = basename(process.cwd()).replace(/[^A-Za-z0-9_.-]/g, "_").slice(0, 120) || "default";
   const channel = correlationValue(opts.channel ?? process.env.TERRARIUM_EVENT_CHANNEL ?? callerChannel, "channel");
@@ -821,20 +821,61 @@ export async function superviseTerrariumBackground({ run, parts, prompt, base, w
     };
     let finalResult = null;
     let childOutputSeen = false;
-    const startupWatchdog = run.startupWatchdogMs > 0 ? setTimeout(() => {
-      if (!childOutputSeen && !finishing) {
-        signalProcessGroup(child.pid, "SIGTERM");
-        void log(run.logPath, `\nstartup-timeout: child produced no output within ${run.startupWatchdogMs}ms\n`);
-        void observe({ type: "RuntimeError", exitCode: 124, error: `startup-timeout: child produced no output within ${run.startupWatchdogMs}ms` });
+    // Liveness-aware startup watchdog. The original hard deadline killed on "no
+    // stdout within N ms" even when the child was alive and productive. pi -p
+    // buffers its first stdout until the task completes and, under concurrent cold
+    // starts (extension discovery + provider resolution), that first byte can lag
+    // far past the window while the worker is healthy and writing workspace files.
+    // Those children were false-killed while terrarium_status still reported
+    // alive:true. Fix: a LIVE child is never killed by the base window; it only
+    // dies at an absolute hard ceiling (default 6x, so a genuinely wedged-but-alive
+    // child still dies). The base window only kills a child that produced no stdout
+    // AND is no longer alive (crashed/exec-failed before any output) — the fast,
+    // real failure the watchdog was meant to catch. Log growth (run or mre log) is
+    // an additional positive liveness signal that resets the observation.
+    const startupWindowMs = run.startupWatchdogMs;
+    const startupHardCeilingMs = startupWindowMs > 0
+      ? Math.min(3600000, Number(process.env.TERRARIUM_STARTUP_HARD_CEILING_MS) || startupWindowMs * 6)
+      : 0;
+    const startupBeganAt = Date.now();
+    let lastLogSize = -1;
+    const logGrewSince = () => {
+      let grew = false;
+      for (const p of [run.logPath, run.mreLogPath]) {
+        try { const sz = statSync(p).size; if (sz > lastLogSize) { lastLogSize = sz; grew = true; } } catch { /* not yet created */ }
       }
-    }, run.startupWatchdogMs) : null;
+      return grew;
+    };
+    const startupWatchdog = startupWindowMs > 0 ? setInterval(() => {
+      if (childOutputSeen || finishing) { clearInterval(startupWatchdog); return; }
+      const now = Date.now();
+      const elapsed = now - startupBeganAt;
+      const alive = isPidAlive(child.pid);
+      const grew = logGrewSince();
+      // Alive (optionally also logging) and under the hard ceiling: keep waiting.
+      // Do not kill a productive child just because stdout has not flushed yet.
+      if ((alive || grew) && elapsed < startupHardCeilingMs) return;
+      // Kill only when: past the base window with a DEAD, silent child (fast fail),
+      // or the absolute hard ceiling is exceeded (wedged-but-alive).
+      const hitCeiling = elapsed >= startupHardCeilingMs;
+      const deadAndSilent = !alive && !grew && elapsed >= startupWindowMs;
+      if (hitCeiling || deadAndSilent) {
+        clearInterval(startupWatchdog);
+        const why = hitCeiling
+          ? `startup-timeout: child produced no stdout and hit the ${startupHardCeilingMs}ms hard ceiling`
+          : `startup-timeout: child exited before producing output within ${startupWindowMs}ms`;
+        signalProcessGroup(child.pid, "SIGTERM");
+        void log(run.logPath, `\n${why}\n`);
+        void observe({ type: "RuntimeError", exitCode: 124, error: why });
+      }
+    }, Math.max(1000, Math.min(startupWindowMs, 5000))) : null;
     const execute = async (decisions) => {
       for (const decision of decisions) {
         if (decision.type === "TerminateChild") signalProcessGroup(child.pid, "SIGTERM");
         if (decision.type === "Finalize" && !finishing) {
           finishing = true;
           if (timer) clearTimeout(timer);
-          if (startupWatchdog) clearTimeout(startupWatchdog);
+          if (startupWatchdog) clearInterval(startupWatchdog);
           clearInterval(heartbeat);
           clearInterval(cancelWatcher);
           const ws = await finalizeWorkspace(workspace, base);
@@ -860,8 +901,8 @@ export async function superviseTerrariumBackground({ run, parts, prompt, base, w
       await execute(step.decisions);
     };
     const timer = run.timeoutMs > 0 ? setTimeout(() => { void observe({ type: "DeadlineReached" }); }, run.timeoutMs) : null;
-    child.stdout.on("data", async (d) => { childOutputSeen = true; if (startupWatchdog) clearTimeout(startupWatchdog); const s = String(d); stdout += s; await log(run.logPath, s); await progress(s); });
-    child.stderr.on("data", async (d) => { childOutputSeen = true; if (startupWatchdog) clearTimeout(startupWatchdog); const s = String(d); stderr += s; await log(run.logPath, s); await progress(s); });
+    child.stdout.on("data", async (d) => { childOutputSeen = true; if (startupWatchdog) clearInterval(startupWatchdog); const s = String(d); stdout += s; await log(run.logPath, s); await progress(s); });
+    child.stderr.on("data", async (d) => { childOutputSeen = true; if (startupWatchdog) clearInterval(startupWatchdog); const s = String(d); stderr += s; await log(run.logPath, s); await progress(s); });
     child.on("error", async (e) => {
       await log(run.logPath, `\nerror: ${e.message}\n`);
       const receipt = validateTaskContractOutput(stdout, base.taskContract);
