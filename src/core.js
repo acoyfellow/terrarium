@@ -986,11 +986,28 @@ export async function runTerrarium(opts = {}) {
 export async function listRuns({ limit = 20, requesterRunId, scope } = {}) {
   const access = effectiveAccess(requesterRunId, scope, "TERRARIUM_STATUS_SCOPE");
   await mkdir(LOG_DIR, { recursive: true });
+  const wantLimit = Math.max(0, Number(limit) || 20);
+  // Bounded scan: run metadata filenames embed a sortable timestamp, so newest
+  // files sort last. Reading the ENTIRE runs dir made list-mode status scale with
+  // home size (O(all runs) work to return `limit`), which under a bloated home
+  // pushed terrarium_status past the MCP deadline — exactly the recovery call a
+  // caller makes after a spawn RPC timed out. We now read at most a bounded window
+  // of the most-recent files. activeCount/activeRunIds are honest WITHIN that
+  // window (documented as `activeScanWindow`); a running run older than the window
+  // is not counted, which is acceptable for a status list and keeps the call O(1)
+  // in home size. Callers needing a specific run use status-by-id (single read).
+  // Env override is authoritative when set (>=1); otherwise a sane default floor
+  // that never scans fewer than the page or 200 recent files.
+  const envWindow = Number(process.env.TERRARIUM_LIST_SCAN_WINDOW);
+  const activeScanWindow = Number.isInteger(envWindow) && envWindow >= 1
+    ? Math.max(envWindow, wantLimit)
+    : Math.max(200, wantLimit * 4);
   // Background supervisor specs also end in .json but are not run metadata.
   // Read only canonical run files and ignore malformed/non-run records.
   const files = (await readdir(LOG_DIR))
     .filter((f) => f.endsWith(".json") && !f.endsWith(".background.json"))
-    .sort().reverse();
+    .sort().reverse()
+    .slice(0, activeScanWindow);
   const allRuns = [];
   for (const file of files) {
     try {
@@ -1001,13 +1018,16 @@ export async function listRuns({ limit = 20, requesterRunId, scope } = {}) {
   const visibleRuns = [];
   for (const run of allRuns) if (await isRunAccessible({ ...access, targetRunId: run.runId })) visibleRuns.push(run);
   const active = visibleRuns.filter((run) => run.status === "running" && run.alive !== false);
+  const scanTruncated = files.length >= activeScanWindow;
   return {
     version: VERSION,
     logDir: LOG_DIR,
     activeCount: active.length,
     activeRunIds: active.map((run) => run.runId),
-    count: Math.min(visibleRuns.length, Math.max(0, Number(limit) || 20)),
-    runs: visibleRuns.slice(0, Math.max(0, Number(limit) || 20)),
+    activeScanWindow,
+    scanTruncated,
+    count: Math.min(visibleRuns.length, wantLimit),
+    runs: visibleRuns.slice(0, wantLimit),
   };
 }
 

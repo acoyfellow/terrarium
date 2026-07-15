@@ -7,7 +7,7 @@ import { listRuns, LOG_DIR } from "../src/core.js";
 const runsDir = LOG_DIR;
 
 test("listRuns ignores background specs and reports active runs independently of page limit", async () => {
-  const suffix = `${process.pid}-${Date.now()}`;
+  const suffix = `${process.pid}_${Date.now()}`;
   const activeId = `ter_test_active_${suffix}`;
   const doneId = `ter_test_done_${suffix}`;
   const paths = [
@@ -27,5 +27,41 @@ test("listRuns ignores background specs and reports active runs independently of
     assert.ok(result.activeCount >= 1);
   } finally {
     await Promise.all(paths.map((path) => rm(path, { force: true })));
+  }
+});
+
+test("listRuns scan is bounded by a recent-file window (does not scale with home size)", async () => {
+  const prevWindow = process.env.TERRARIUM_LIST_SCAN_WINDOW;
+  const suffix = `${process.pid}_${Date.now()}`;
+  const window = 50;
+  process.env.TERRARIUM_LIST_SCAN_WINDOW = String(window);
+  await mkdir(runsDir, { recursive: true });
+  // Write far more run files than the window. Filenames embed an increasing
+  // counter so sort()/reverse() yields newest-first deterministically.
+  const total = window * 3;
+  const made = [];
+  for (let i = 0; i < total; i++) {
+    const id = `ter_test_bound_${suffix}_${String(i).padStart(6, "0")}`;
+    const p = join(runsDir, `${id}.json`);
+    await writeFile(p, JSON.stringify({ runId: id, status: "done", ok: true, exitCode: 0, startedAt: new Date().toISOString(), finishedAt: new Date().toISOString() }));
+    made.push({ id, p });
+  }
+  try {
+    const t = Date.now();
+    const result = await listRuns({ limit: 10 });
+    const ms = Date.now() - t;
+    // Only the bounded window was scanned, and it flags truncation.
+    assert.equal(result.activeScanWindow, window);
+    assert.equal(result.scanTruncated, true);
+    assert.equal(result.runs.length, 10);
+    // The newest files win: the returned runs are from the high end of the counter.
+    const lowestReturned = result.runs.map((r) => r.runId).sort().at(0);
+    const cutoff = `ter_test_bound_${suffix}_${String(total - window).padStart(6, "0")}`;
+    assert.ok(lowestReturned >= cutoff, `returned runs must be from the newest window (got ${lowestReturned}, cutoff ${cutoff})`);
+    // Sanity: bounded work stays quick even with 3x window files present.
+    assert.ok(ms < 5000, `bounded listRuns should be fast, took ${ms}ms`);
+  } finally {
+    await Promise.all(made.map(({ p }) => rm(p, { force: true })));
+    if (prevWindow === undefined) delete process.env.TERRARIUM_LIST_SCAN_WINDOW; else process.env.TERRARIUM_LIST_SCAN_WINDOW = prevWindow;
   }
 });
