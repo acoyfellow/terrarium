@@ -42,6 +42,29 @@ test("accepted pre-launch receipt: fresh stays accepted, stale reconciles to orp
   assert.equal(stale.ok, false);
 });
 
+test("stale accepted run that never launched EMITS a terminal callback (caller must not hang)", async () => {
+  // Regression for the callback-death incident: a spawn that died between the
+  // accept-receipt and launch became `accepted` -> reconciled `orphaned` but
+  // never emitted a terminal callback, so a caller waiting on the callback hung
+  // forever. reconcileRun must PERSIST the terminal state AND journal the event.
+  const { LOG_DIR } = await import("../src/core.js");
+  const { JOURNAL_DIR } = await import("../src/router.js");
+  const { existsSync } = await import("node:fs");
+  const runId = `ter_accepthang_${process.pid}_${Date.now()}`;
+  await mkdir(LOG_DIR, { recursive: true });
+  await writeFile(`${LOG_DIR}/${runId}.json`, JSON.stringify({ runId, status: "accepted", startedAt: new Date(Date.now() - 120000).toISOString(), channel: "t", workflowId: runId, logPath: `${LOG_DIR}/${runId}.log` }));
+  try {
+    const st = await reconcileRun(JSON.parse(await (await import("node:fs/promises")).readFile(`${LOG_DIR}/${runId}.json`, "utf8")), { staleMs: 30000 });
+    assert.equal(st.status, "orphaned");
+    assert.equal(st.ok, false);
+    // The terminal callback event MUST be journaled so the waiting caller wakes.
+    assert.ok(existsSync(`${JOURNAL_DIR}/evt_${runId}_Failed.json`), "terminal callback event must be journaled for a never-launched accepted run");
+  } finally {
+    await rm(`${LOG_DIR}/${runId}.json`, { force: true });
+    await rm(`${JOURNAL_DIR}/evt_${runId}_Failed.json`, { force: true });
+  }
+});
+
 test("listRuns filters by channel/workflowId/sinceMs for post-timeout recovery", async () => {
   const suffix = `${process.pid}_${Date.now()}`;
   const now = Date.now();

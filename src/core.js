@@ -626,7 +626,28 @@ export async function reconcileRun(meta, { staleMs = 30000 } = {}) {
     const startedTs = Date.parse(meta.startedAt ?? "");
     const stale = !Number.isFinite(startedTs) || (Date.now() - startedTs) >= staleMs;
     const anyAlive = isPidAlive(meta.supervisorPid) || [meta.pid, meta.childPid, meta.runnerPid].filter(Boolean).some(isPidAlive);
-    if (stale && !anyAlive) return { ...meta, status: "orphaned", ok: false, alive: false, orphanedAt: new Date().toISOString(), note: "Accepted run never reached launch (spawn likely failed before starting the child)." };
+    if (stale && !anyAlive) {
+      // The spawn died between the accept-receipt and launch (no supervisor/child
+      // ever came up). This IS terminal, so it must PERSIST and EMIT a terminal
+      // callback — otherwise a caller waiting on the callback hangs forever (the
+      // "callbacks not working" symptom). Mirror the running->orphaned path:
+      // write the durable terminal record + fire the completion event exactly
+      // once (emitCompletionEvent/routeEvent is idempotent via the wx flag).
+      const next = {
+        ...meta,
+        ok: false,
+        status: "orphaned",
+        alive: false,
+        taskContractStatus: "not-applicable",
+        orphanedAt: new Date().toISOString(),
+        finishedAt: new Date().toISOString(),
+        note: "Accepted run never reached launch (spawn failed before starting the child).",
+      };
+      delete next.taskContract;
+      await writeMetadata(next);
+      try { await emitCompletionEvent(next); } catch {}
+      return next;
+    }
     return { ...meta, alive: anyAlive };
   }
   if (!meta || meta.status !== "running") return meta;
