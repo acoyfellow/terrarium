@@ -2,6 +2,15 @@
 
 Succinct, product-facing changes to Terrarium. This is not a full commit log; it records notable behavior, API, safety, and public-site changes.
 
+## 2026-07-17 — Callback reliability + spawn-timeout hardening + doctor observability
+
+- **Fixed a callback-death class**: a spawn that died between the durable accept-receipt and launch (no supervisor/child ever started) settled to `orphaned` but never emitted its terminal callback, so a caller waiting on that callback hung indefinitely. The reconcile path now persists the terminal state **and** emits the terminal callback (idempotent), so a never-launched run always wakes its waiting caller. Regression-tested.
+- **Durable accept-receipt before launch**: `POST`/spawn persists a `status:"accepted"` record (runId, logPath, channel, workflowId, fingerprint) *before* slow launch work (workspace copy, git), so a spawn RPC that times out during a slow handshake never loses the runId — it stays discoverable via `terrarium_status`/`listRuns`. Stale `accepted` runs that never launched reconcile to a terminal `orphaned` with a callback.
+- **Status stays fast + recoverable under a large store**: `terrarium_status` list-mode bounds its scan to a recent-file window (`TERRARIUM_LIST_SCAN_WINDOW`) instead of reading the whole run store, and accepts `channel`/`workflowId`/`sinceMs` recovery filters so a caller that lost a runId to a timeout re-associates the run instead of relaunching a duplicate.
+- **Liveness-aware startup watchdog**: a live, log-growing child is no longer false-killed for being slow to first stdout under concurrent cold starts; it dies only at an absolute hard ceiling (`TERRARIUM_STARTUP_HARD_CEILING_MS`), and the base window only fast-fails a dead-and-silent child. Per-spawn/per-job `startupWatchdogMs` is exposed over MCP.
+- **`doctor` workspace observability**: reports `workspaceDirs`/`workspaceBytes`/`leakedWorkspaces` and warns when an isolation workspace survived a terminal run without `keepWorkspace`, making the earlier monorepo-copy leak class visible instead of silent.
+- **Detached supervisor home isolation**: the background supervisor process is pinned to the parent's `TERRARIUM_HOME`, so tests and scoped homes never leak runs into the default store; the test runner also self-isolates a temp home.
+
 ## 2026-07-06 — Deploy CI + cold-start backpressure
 
 - Added a manual, reversible deploy workflow (`.github/workflows/deploy.yml`): a human dispatches it, choosing qualification or production; it runs the full suite as a gate, captures the pre-deploy version as a rollback target, deploys, and health-checks `/health` (200) and unauthenticated `/api/runs` (401 fail-closed) before reporting rollback instructions. Nothing deploys on push.
