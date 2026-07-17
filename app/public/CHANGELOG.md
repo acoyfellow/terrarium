@@ -2,6 +2,13 @@
 
 Succinct, product-facing changes to Terrarium. This is not a full commit log; it records notable behavior, API, safety, and public-site changes.
 
+## 2026-07-17 — Cloud-default execution (terrarium_spawn runs on Cloudflare)
+
+- **`terrarium_spawn` now executes on the Cloudflare-managed cell by default.** With `TERRARIUM_URL` + `TERRARIUM_CONTROL_TOKEN` (or `TERRARIUM_TOKEN_FILE`) set, a spawn submits `POST /api/runs`, runs in the cloud, and returns a verified correlated receipt — no local process, no host authority. New `src/cloud-client.js`.
+- **Local execution is opt-in and fails closed otherwise.** With no cloud configured and no `TERRARIUM_ALLOW_LOCAL=1`, a real spawn errors with an actionable message rather than silently spawning a local child (which was the accidental default — the cloud service shipped live on 07-06 but the MCP had no client for it, so operator sessions ran locally). `dryRun` always plans locally (exempt).
+- **`terrarium_spawn_batch` fails closed under cloud mode** (cloud group/status/cancel fan-out is not built yet): it directs to individual cloud `terrarium_spawn` calls, or `TERRARIUM_ALLOW_LOCAL=1` for a local batch — never a silent half-wired local batch.
+- Verified end-to-end against the live cell: cloud spawns return `done`/`verified`/`verified-receipt` with server-minted nonces.
+
 ## 2026-07-17 — Callback reliability + spawn-timeout hardening + doctor observability
 
 - **Fixed a callback-death class**: a spawn that died between the durable accept-receipt and launch (no supervisor/child ever started) settled to `orphaned` but never emitted its terminal callback, so a caller waiting on that callback hung indefinitely. The reconcile path now persists the terminal state **and** emits the terminal callback (idempotent), so a never-launched run always wakes its waiting caller. Regression-tested.
