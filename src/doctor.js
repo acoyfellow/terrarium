@@ -10,6 +10,33 @@ async function writable(path) {
   try { await mkdir(path, { recursive: true }); await access(path, constants.R_OK | constants.W_OK); return true; } catch { return false; }
 }
 async function count(path, filter = () => true) { try { return (await readdir(path)).filter(filter).length; } catch { return 0; } }
+// Workspace footprint: isolation copy|worktree workspaces should be GC'd at
+// terminal unless keepWorkspace. A large or growing WORKSPACE_DIR is the 31GB
+// monorepo-copy leak from BUGREPORT-2026-07-01; surfacing bytes + a leaked count
+// (workspaces whose run is already terminal) makes silent recurrence visible.
+async function workspaceFootprint() {
+  let dirs = 0, bytes = 0, leaked = 0;
+  const { stat } = await import("node:fs/promises");
+  let entries = [];
+  try { entries = await readdir(WORKSPACE_DIR, { withFileTypes: true }); } catch { return { workspaceDirs: 0, workspaceBytes: 0, leakedWorkspaces: 0 }; }
+  for (const e of entries) {
+    if (!e.isDirectory()) continue;
+    dirs++;
+    const full = `${WORKSPACE_DIR}/${e.name}`;
+    // Bounded byte sum: one level of du to keep doctor O(dirs), not O(all files).
+    try { const s = await stat(full); bytes += s.size; } catch {}
+    // A workspace dir named <runId>-<name> whose run metadata is terminal is a
+    // leak candidate: cleanup should have removed it unless keepWorkspace.
+    const runId = e.name.replace(/-[^-]*$/, "");
+    if (/^ter_[A-Za-z0-9_]+$/.test(runId)) {
+      try {
+        const meta = JSON.parse(await readFile(`${LOG_DIR}/${runId}.json`, "utf8"));
+        if (meta.status && !["running", "accepted"].includes(meta.status) && meta.keepWorkspace !== true) leaked++;
+      } catch { /* no metadata: orphan workspace, also a leak candidate */ leaked++; }
+    }
+  }
+  return { workspaceDirs: dirs, workspaceBytes: bytes, leakedWorkspaces: leaked };
+}
 async function jsonHealth(path, validate = () => true) {
   let valid = 0, malformed = 0;
   try {
@@ -61,6 +88,7 @@ export async function diagnoseTerrarium() {
   };
   const subscriberHealth = await jsonHealth(SUBSCRIBERS_DIR, validSubscriber);
   const journalHealth = await jsonHealth(JOURNAL_DIR, validEvent);
+  const workspace = await workspaceFootprint();
   const checks = {
     homeWritable: await writable(HOME),
     logsWritable: await writable(LOG_DIR),
@@ -86,6 +114,9 @@ export async function diagnoseTerrarium() {
     routerRepairCandidates: subscriberHealth.malformed + journalHealth.malformed,
     missingTerminalCallbacks: 0,
     staleChildClaims: 0,
+    workspaceDirs: workspace.workspaceDirs,
+    workspaceBytes: workspace.workspaceBytes,
+    leakedWorkspaces: workspace.leakedWorkspaces,
   };
   for (const run of runs.runs) {
     if (["running", "orphaned"].includes(run.status)) continue;
@@ -154,6 +185,7 @@ export async function diagnoseTerrarium() {
   if (checks.staleInflightCallbacks) warnings.push(`${checks.staleInflightCallbacks} stale inflight callback(s) are repair candidates for requeue`);
   if (checks.missingTerminalCallbacks) warnings.push(`${checks.missingTerminalCallbacks} terminal run(s) are missing durable callback events; recover those run IDs`);
   if (checks.staleChildClaims) warnings.push(`${checks.staleChildClaims} stale child-slot claim(s) exist from older runs`);
+  if (checks.leakedWorkspaces) warnings.push(`${checks.leakedWorkspaces} isolation workspace(s) survived a terminal run without keepWorkspace (possible workspace leak); inspect ${WORKSPACE_DIR}`);
   const repairPlan = buildRepairPlan(checks, details);
   const repairPlanSummary = summarizeRepairPlan(repairPlan);
   return { ok: warnings.length === 0, version: VERSION, apiVersion: TERRARIUM_API_VERSION, schemaVersion: MCP_SCHEMA_VERSION, batchApiVersion: BATCH_API_VERSION, batchSupportedOptions: BATCH_SUPPORTED_OPTIONS, checks, details, warnings, repairPlan, repairPlanSummary, paths: { home: HOME, logs: LOG_DIR, workspaces: WORKSPACE_DIR, events: EVENT_DIR, router: ROUTER_DIR } };

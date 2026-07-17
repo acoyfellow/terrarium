@@ -3,8 +3,32 @@ import assert from 'node:assert/strict';
 import { mkdir, rm, writeFile } from 'node:fs/promises';
 import { diagnoseTerrarium } from '../src/doctor.js';
 import { BATCH_API_VERSION, MCP_SCHEMA_VERSION, TERRARIUM_API_VERSION } from '../src/versions.js';
-import { LOG_DIR } from '../src/core.js';
+import { LOG_DIR, WORKSPACE_DIR } from '../src/core.js';
 import { JOURNAL_DIR, MAILBOXES_DIR, SUBSCRIBERS_DIR } from '../src/router.js';
+
+test('doctor reports workspace footprint and flags a leaked terminal-run workspace', async () => {
+  const suffix = `${process.pid}_${Date.now()}`;
+  const leakedRun = `ter_wsleak_${suffix}`;   // terminal run, workspace survived, no keepWorkspace => leak
+  const keptRun = `ter_wskeep_${suffix}`;      // terminal run but keepWorkspace:true => NOT a leak
+  const liveRun = `ter_wslive_${suffix}`;      // still running => NOT a leak
+  const wsPaths = [`${WORKSPACE_DIR}/${leakedRun}-repo`, `${WORKSPACE_DIR}/${keptRun}-repo`, `${WORKSPACE_DIR}/${liveRun}-repo`];
+  await mkdir(WORKSPACE_DIR, { recursive: true });
+  await Promise.all(wsPaths.map((p) => mkdir(p, { recursive: true })));
+  await mkdir(LOG_DIR, { recursive: true });
+  await writeFile(`${LOG_DIR}/${leakedRun}.json`, JSON.stringify({ runId: leakedRun, status: 'done', ok: true }));
+  await writeFile(`${LOG_DIR}/${keptRun}.json`, JSON.stringify({ runId: keptRun, status: 'done', ok: true, keepWorkspace: true }));
+  await writeFile(`${LOG_DIR}/${liveRun}.json`, JSON.stringify({ runId: liveRun, status: 'running' }));
+  try {
+    const r = await diagnoseTerrarium();
+    assert.ok(r.checks.workspaceDirs >= 3, `workspaceDirs counts dirs (got ${r.checks.workspaceDirs})`);
+    assert.equal(typeof r.checks.workspaceBytes, 'number');
+    assert.ok(r.checks.leakedWorkspaces >= 1, `at least the leaked terminal workspace is flagged (got ${r.checks.leakedWorkspaces})`);
+    assert.ok(r.warnings.some((w) => /workspace\(s\) survived a terminal run/.test(w)), 'emits a leaked-workspace warning');
+  } finally {
+    await Promise.all([...wsPaths.map((p) => rm(p, { recursive: true, force: true })),
+      rm(`${LOG_DIR}/${leakedRun}.json`, { force: true }), rm(`${LOG_DIR}/${keptRun}.json`, { force: true }), rm(`${LOG_DIR}/${liveRun}.json`, { force: true })]);
+  }
+});
 
 test('doctor reports bounded operational diagnostics without process environments', async () => {
   const result = await diagnoseTerrarium();

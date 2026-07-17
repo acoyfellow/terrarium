@@ -1,13 +1,21 @@
 # BUGREPORT 2026-07-15 — detached supervisor may not inherit TERRARIUM_HOME under test isolation
 
-Status: **FIXED (env pin shipped); test audit still recommended. Low severity.**
+Status: **RESOLVED — env pin shipped and test coverage verified. Low severity.**
 
 ## Fix applied
 
 `spawnTerrariumBackground` now passes `env: { ...process.env, TERRARIUM_HOME: HOME }`
 to the detached supervisor spawn, so the detached process always resolves the
-same home as its parent. Remaining follow-up: audit tests that set the home via
-in-process `config` rather than env (recommended, not blocking).
+same home as its parent.
+
+## Test audit — verified covered
+The 5 test files that spawn real background runs (`basic`, `batch`, `run-machine`,
+`pi-extension`, `concurrency-isolation`) do not set `TERRARIUM_HOME` themselves,
+but they inherit the isolated home from `test/setup-home.mjs` (preloaded via the
+runner's `--import`), and the supervisor env-pin propagates it to detached
+children. Verified: running `concurrency-isolation` + `run-machine` under the
+guard leaves the real `~/.terrarium/runs` file count unchanged (CLEAN). No
+per-test change needed; the guard + env-pin cover the path.
 
 ## Symptom
 
