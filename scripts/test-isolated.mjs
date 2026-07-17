@@ -1,6 +1,6 @@
 import { spawn } from "node:child_process";
 import { mkdtemp, readdir, rm } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { availableParallelism, tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -17,7 +17,17 @@ const home = await mkdtemp(join(tmpdir(), "terrarium-test-home-"));
 const env = { ...process.env, TERRARIUM_HOME: home };
 for (const key of ["TERRARIUM_RUN_ID", "TERRARIUM_PARENT_RUN_ID", "TERRARIUM_STATUS_SCOPE", "TERRARIUM_READ_SCOPE", "TERRARIUM_DEPTH", "TERRARIUM_MAX_DEPTH", "TERRARIUM_ALLOW_SPAWN", "TERRARIUM_CHILD_BUDGET", "TERRARIUM_EVENT_CHANNEL", "TERRARIUM_MRE_LOG_PATH"]) delete env[key];
 try {
-  const child = spawn(process.execPath, ["--import", "./test/setup-home.mjs", "--test", ...tests], {
+  // Cap file-level test concurrency. Many suites spawn REAL background children
+  // (agents, supervisors, Docker probes); node --test defaults to one worker per
+  // core, which oversubscribes the machine and makes deadline/poll-based tests
+  // flake intermittently (empty stdoutTail, batch 'all' timeouts, doctor/router
+  // races) even though each passes in isolation. A modest cap trades a little
+  // wall time for a deterministic suite. Override with TERRARIUM_TEST_CONCURRENCY.
+  const envConc = Number(process.env.TERRARIUM_TEST_CONCURRENCY);
+  const concurrency = Number.isInteger(envConc) && envConc >= 1
+    ? envConc
+    : Math.max(2, Math.min(4, availableParallelism()));
+  const child = spawn(process.execPath, ["--import", "./test/setup-home.mjs", `--test-concurrency=${concurrency}`, "--test", ...tests], {
     cwd: root,
     env,
     stdio: "inherit",

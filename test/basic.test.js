@@ -486,9 +486,14 @@ test("background alive log-growing child survives the base startup window (no fa
 });
 
 test("background deadline timeout terminalizes and journals callback", async () => {
+  // The child prints, waits long enough that its stdout reliably flushes to
+  // stdoutTail even under concurrent test load, THEN the deadline kills it. A
+  // too-tight deadline (was 250ms) raced the async stdout handler and
+  // intermittently asserted an empty stdoutTail. 2000ms keeps the SAME assertions
+  // (output captured, then deadline-killed) without the flush race.
   const agent = `${process.execPath} -e "console.log('child started'); setInterval(() => {}, 1000)"`;
-  const started = await spawnTerrariumBackground({ task: "timeout after output", agent, timeoutMs: 250 });
-  const status = await waitForTerminal(started.runId, { attempts: 120, delayMs: 25, requireTerminalCallback: true });
+  const started = await spawnTerrariumBackground({ task: "timeout after output", agent, timeoutMs: 2000 });
+  const status = await waitForTerminal(started.runId, { attempts: 400, delayMs: 25, requireTerminalCallback: true });
   assert.equal(status.status, "failed");
   assert.equal(status.ok, false);
   assert.equal(status.taskContractStatus, "not-applicable");
