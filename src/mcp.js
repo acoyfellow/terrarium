@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { createInterface } from "node:readline";
 import { cancelRun, ensureTerminalCallback, getRunStatus, isRunAccessible, listRuns, pruneStaleChildClaims, readRun, runTerrarium, spawnTerrariumBackground, VERSION } from "./core.js";
+import { cloudSpawn, cloudEnabled } from "./cloud-client.js";
 import { createRunGroup, getRunGroupStatus, readRunGroupLogs } from "./groups.js";
 import { spawnBatch, BATCH_STRATEGIES, validateBatchShape } from "./batch.js";
 import { acknowledgeMailboxEvent, claimMailboxEvents, getMailboxStatus, getSubscriber, pruneRouter, registerSubscriber, requeueInflightEvents, unregisterSubscriber } from "./router.js";
@@ -349,6 +350,24 @@ async function handle(msg) {
         const background = args.background ?? (backgroundDefault && !args.dryRun && maxRetries === 0);
         if (background && maxRetries > 0) throw new Error("background Terrarium runs do not support retries");
         if (policy.requesterRunId && maxRetries > 0) throw new Error("nested Terrarium runs do not support retries; the parent owns retry policy");
+        // Cloud-default execution. A spawn runs on the Cloudflare-managed cell
+        // (TERRARIUM_URL + token) unless the operator explicitly opts into local
+        // execution with TERRARIUM_ALLOW_LOCAL=1. If neither cloud is configured
+        // nor local is allowed, fail closed with an actionable error rather than
+        // silently spawning a local process (which was never the intended default).
+        const allowLocal = process.env.TERRARIUM_ALLOW_LOCAL === "1";
+        // Cloud-default: a real (non-dry-run) spawn executes on the Cloudflare
+        // cell when configured. dryRun always plans locally (no execution, no
+        // host authority), so it is exempt from the gate.
+        if (cloudEnabled() && !args.dryRun) {
+          const safeArgs = sanitizeSpawnArgs({ ...args, background });
+          const result = await cloudSpawn(safeArgs);
+          const projected = verbose ? result : conciseSpawn(result);
+          return send(msg.id, content(projected, !result.ok));
+        }
+        if (!cloudEnabled() && !allowLocal && !args.dryRun) {
+          throw new Error("Terrarium runs on Cloudflare by default: set TERRARIUM_URL and TERRARIUM_CONTROL_TOKEN (or TERRARIUM_TOKEN_FILE) to run in the cloud. To run locally on this machine, set TERRARIUM_ALLOW_LOCAL=1 (not recommended; local children inherit host authority and are not the production path).");
+        }
         const safeArgs = sanitizeSpawnArgs({ ...args, background });
         const result = background ? await spawnTerrariumBackground(safeArgs) : await runWithBoundedRetries(safeArgs, maxRetries);
         const projected = verbose ? result : conciseSpawn(result);

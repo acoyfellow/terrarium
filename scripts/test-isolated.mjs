@@ -14,7 +14,11 @@ const home = await mkdtemp(join(tmpdir(), "terrarium-test-home-"));
 // the tests themselves run inside a Terrarium child (CI delegation, local agent
 // runs). Otherwise inherited TERRARIUM_RUN_ID/scopes silently constrain
 // effectiveAccess and access-control assertions become environment-dependent.
-const env = { ...process.env, TERRARIUM_HOME: home };
+// The suite exercises the LOCAL runtime (spawn/supervisor/reconcile), so it must
+// run with local execution allowed regardless of any ambient cloud config. The
+// cloud-default gate is a production wiring concern verified separately.
+const env = { ...process.env, TERRARIUM_HOME: home, TERRARIUM_ALLOW_LOCAL: "1" };
+delete env.TERRARIUM_URL; delete env.TERRARIUM_CONTROL_TOKEN; delete env.TERRARIUM_TOKEN_FILE;
 for (const key of ["TERRARIUM_RUN_ID", "TERRARIUM_PARENT_RUN_ID", "TERRARIUM_STATUS_SCOPE", "TERRARIUM_READ_SCOPE", "TERRARIUM_DEPTH", "TERRARIUM_MAX_DEPTH", "TERRARIUM_ALLOW_SPAWN", "TERRARIUM_CHILD_BUDGET", "TERRARIUM_EVENT_CHANNEL", "TERRARIUM_MRE_LOG_PATH"]) delete env[key];
 try {
   // Cap file-level test concurrency. Many suites spawn REAL background children
