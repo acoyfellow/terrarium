@@ -2,6 +2,12 @@
 
 Succinct, product-facing changes to Terrarium. This is not a full commit log; it records notable behavior, API, safety, and public-site changes.
 
+## 2026-07-18 — Cloud parity shipped to production + full callback verification
+
+- **Deployed the cloud-parity work to production** (`terrarium.coey.dev`). Prod had been running 2026-07-11 code; the callback-reliability fix and cloud status/read/cancel/batch/callback work are now live. Rollback target captured; health 200 + unauth `/api/runs` 401 verified post-deploy.
+- **Verified the full cloud callback chain on prod**: background spawn → Pulse mailbox → claim `Completed` → ack, ~10s. Cloud terminal callbacks wake a session on prod exactly as on qual.
+- Rotated control + pulse tokens on both qual and prod (solo-project reset); operator token files saved locally for the MCP/extension.
+
 ## 2026-07-17 — Cloud parity: status/read/cancel + cloud batch fan-out
 
 - **`terrarium_status` / `terrarium_read` / `terrarium_cancel` work on cloud runs.** A server-minted cloud runId (or any status-by-id while cloud is the default) is inspected/cancelled against the cloud instance; local runs stay local. Verified live: cloud status returns `done`/`verified`, read returns the real `TERRARIUM_RESULT` log.
