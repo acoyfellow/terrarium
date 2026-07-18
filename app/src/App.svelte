@@ -5,14 +5,16 @@
     {
       id: 'tutorial', label: 'Tutorial', kind: 'Learn',
       title: 'Run your first task',
-      lead: 'Clone, install, run one bounded task, read its receipt.',
+      lead: 'Install the CLI, run one bounded task on your machine, read its receipt.',
       blocks: [
+        ['Where does this run? Locally.', 'This tutorial is the local CLI. terra runs on YOUR machine — it spawns a coding agent you already have (Pi, OpenCode…) as a child process, in your filesystem, with your network and API keys. Nothing is sent to any cloud. "Running on the edge" is a separate, optional service you deploy yourself (step 5); the CLI never phones home.', 'text'],
         ['1. Install from source', 'git clone https://github.com/acoyfellow/terrarium\ncd terrarium && npm install -g .', 'code'],
         ['2. Dry-run one bounded task', 'terra --dry-run "summarize README.md and list any stale claims"', 'code'],
         ['3. Run it for real', 'terra --agent "pi -p --no-session" "summarize README.md"', 'code'],
         ['4. Read the receipt', 'terra status <runId>\nterra read <runId>', 'code'],
-        ['What you just got', 'One bounded task ran as one isolated child and returned one correlated receipt — the run ID, its status, and a verified result you can trust or reject. No guessing from prose.', 'text'],
-        ['Note', 'terra runs a coding agent you already have (pass it with --agent, e.g. "pi -p --no-session" or "opencode run"). --dry-run needs none, so it always works first.', 'text'],
+        ['What you just got', 'One bounded task ran as one isolated child ON YOUR MACHINE and returned one correlated receipt — the run ID, its status, and a verified result you can trust or reject. No guessing from prose. No cloud involved.', 'text'],
+        ['5. (optional) Run on your own Cloudflare edge instead', 'wrangler deploy   # deploys a Worker to YOUR Cloudflare account, at your own URL', 'code'],
+        ['When to use the cloud path', 'Deploy the cloud service when you want to submit a task over HTTP (POST /api/runs), close your laptop, and pull the proof back later — execution then runs on Cloudflare instead of your machine. It is fully self-hosted: your Worker, your account, your data. terrarium.coey.dev is just the maintainer\'s reference copy, not a shared backend the CLI calls.', 'text'],
       ],
     },
     {
@@ -24,13 +26,14 @@
         ['Fan out several tasks in parallel', 'terra batch --concurrency 8 --strategy allSettled \\\n  "lint src" "run test/router.test.js" "update CHANGELOG"', 'code'],
         ['Cancel a run', 'terra cancel <runId>', 'code'],
         ['Self-heal stuck durable state', 'terra doctor --repair --apply --verify', 'code'],
-        ['Run a task in the cloud', 'curl -X POST https://terrarium.coey.dev/api/runs \\\n  -H "authorization: Bearer $TOKEN" \\\n  -H "idempotency-key: $(uuidgen)" \\\n  -H "content-type: application/json" \\\n  -d \'{"task":"reply with: hello"}\'', 'code'],
+        ['Deploy your own cloud instance', '# runs on YOUR Cloudflare account — your Worker, your data\nwrangler deploy            # -> https://terrarium-control.<you>.workers.dev\nwrangler secret put TERRARIUM_CONTROL_TOKEN_CURRENT', 'code'],
+        ['Run a task on your instance', 'export TERRARIUM_URL=https://terrarium-control.<you>.workers.dev\ncurl -X POST $TERRARIUM_URL/api/runs \\\n  -H "authorization: Bearer $TOKEN" \\\n  -H "idempotency-key: $(uuidgen)" \\\n  -H "content-type: application/json" \\\n  -d \'{"task":"reply with: hello"}\'', 'code'],
       ],
     },
     {
       id: 'reference', label: 'Reference', kind: 'Look up',
       title: 'API and commands',
-      lead: 'The exact surface. Every cloud route is auth-gated and owner-scoped.',
+      lead: 'The exact surface. You deploy your own instance (wrangler deploy); every cloud route is auth-gated and owner-scoped to you.',
       blocks: [
         ['CLI', 'terra [--agent <cmd>] "task"   run one bounded task\nterra --dry-run "task"          plan only, no agent needed\nterra status <runId>           inspect status + receipt\nterra read <runId>             read logs\nterra cancel <runId>           cancel a run\nterra batch <tasks...>         fan out in parallel\nterra doctor --repair          heal durable state', 'code'],
         ['Cloud API', 'POST /api/runs               admit a task -> 202 { runId, contract }\nGET  /api/runs/:id/status    terminal + contract status\nGET  /api/runs/:id/logs      durable logs (+ R2 overflow refs)\nGET  /api/runs/:id/graded    trust grade + re-verifiable receipt\nPOST /api/runs/:id/cancel    cancel\nGET  /api/models             owner-scoped model catalog', 'code'],
@@ -40,14 +43,15 @@
     },
     {
       id: 'explain', label: 'Explanation', kind: 'Understand',
-      title: 'Why receipts, not vibes',
-      lead: 'The one idea Terrarium is built on.',
+      title: 'Why trust is the bottleneck',
+      lead: 'Parallel-first agents, on the edge — and why it only works when every run proves itself.',
       blocks: [
-        ['The problem', 'An agent that says "done" is not evidence. Exit code 0 is not evidence. A callback firing is not evidence. As you delegate more work in parallel, "trust me" does not scale.', 'text'],
+        ['The real bottleneck', 'Running agents in parallel is easy. Trusting the results is not. An agent that says "done" is not evidence; exit code 0 is not evidence; a callback firing is not evidence. So people run one agent, watch it, and never scale. The blocker was never compute — it was trust.', 'text'],
+        ['The unlock', 'Make each run prove itself, and fanning out stops being a leap of faith. Trust one run the same way you trust a thousand — individually, by proof.', 'text'],
         ['The primitive', 'one bounded task → one isolated run → one correlated receipt', 'code'],
-        ['What counts as success', 'Only a verified result whose run ID, task fingerprint, and nonce all match the task Terrarium handed out. Everything else — logs, callbacks, model prose — is a signal, not proof.', 'text'],
-        ['Provenance vs. correctness', 'A verified receipt proves the task ran and correlated. It does not prove the answer is right. Terrarium adds an advisory, fail-closed trust grade from cross-model agreement — it can annotate a receipt but never upgrade it.', 'text'],
-        ['In the cloud', 'Submit a task, close your laptop, and later pull the receipt, logs, and callback back from Cloudflare — no local machine in the loop.', 'text'],
+        ['What counts as success', 'Only a verified result whose run ID, task fingerprint, and nonce all match the task Terrarium handed out. Everything else — logs, callbacks, model prose — is a signal, not proof. The nonce is server-minted, so a run cannot forge its own success.', 'text'],
+        ['Provenance vs. correctness', 'A verified receipt proves the task ran and correlated. It does not prove the answer is right. Terrarium adds an advisory, fail-closed trust grade from cross-model agreement — and parallelism helps here too: more independent runs raise confidence. It can annotate a receipt, never upgrade it.', 'text'],
+        ['Why the edge', 'Every run lives on Cloudflare — admission, execution, logs, model route, and the wake callback. Submit a task, close your laptop, and pull the proof back later. Correctness and delivery never depend on a machine you own, which is what makes walking away from a thousand parallel runs safe.', 'text'],
       ],
     },
   ];
@@ -92,6 +96,38 @@
     selectedDoc = new URLSearchParams(location.search).get('page') || 'tutorial';
   });
   load();
+
+  // Scroll-reveal: sections assemble as they enter, like a loading screen
+  // booting into view. Re-runs on every route change (SPA nav does NOT re-fire
+  // onMount, so navigating home->docs->home must re-observe the fresh DOM, or
+  // reveal elements stay stuck at opacity:0). Progressive-enhancement only.
+  import { tick } from 'svelte';
+  let io;
+  if (typeof document !== 'undefined') document.documentElement.classList.add('reveal-js');
+  $effect(() => {
+    route(); // dependency: re-run whenever the route changes
+    if (typeof window === 'undefined') return;
+    tick().then(() => {
+      const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+      const els = document.querySelectorAll('[data-reveal]:not(.in)');
+      if (reduce || !('IntersectionObserver' in window)) {
+        els.forEach((el) => el.classList.add('in'));
+        return;
+      }
+      io ??= new IntersectionObserver((entries) => {
+        for (const e of entries) {
+          if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); }
+        }
+      }, { threshold: 0.18, rootMargin: '0px 0px -8% 0px' });
+      for (const el of els) {
+        // Reveal immediately if already in view (nav-back lands mid-page or top);
+        // otherwise observe for scroll. Never leaves in-view content hidden.
+        const r = el.getBoundingClientRect();
+        if (r.top < innerHeight * 0.92 && r.bottom > 0) el.classList.add('in');
+        else io.observe(el);
+      }
+    });
+  });
 </script>
 
 <div class="shell">
@@ -118,101 +154,123 @@
     <section class="hero">
       <div class="hero-glow" aria-hidden="true"></div>
       <div class="hero-grid" aria-hidden="true"></div>
-      <div class="hero-inner hero-split">
-        <div class="hero-copy">
-          <div class="eyebrow">Agent runs you can trust</div>
-          <h1>Delegate a task.<br />Get back <em>proof</em> it happened.</h1>
-          <p class="sub">Terrarium runs one bounded task as one isolated job and hands back a verified receipt — not a "done" you have to believe. From the CLI, from MCP, or over an API that runs entirely on <b>Cloudflare's edge</b>.</p>
-          <div class="hero-actions">
-            <a class="btn btn-primary" href="/docs?page=tutorial" onclick={(e) => navigate('/docs?page=tutorial', e)}>Get started</a>
-            <a class="btn" href="https://github.com/acoyfellow/terrarium">View source</a>
+      <div class="hero-inner" data-reveal>
+        <div class="hero-split">
+          <div class="hero-copy">
+            <div class="eyebrow">Parallel-first agents, on the edge</div>
+            <h1>Run agents in parallel.<br />Trust <em>every</em> result.</h1>
+            <p class="sub">The thing blocking agents at scale isn't compute — it's trust. Terrarium fans out bounded tasks that run <b>on Cloudflare by default</b> and hands each one back a verified receipt: proof it ran, correlated and yours to trust or reject. Submit, close your laptop, pull the proof later. No babysitting one agent at a time. No server. No local machine in the loop.</p>
+            <div class="hero-actions">
+              <a class="btn btn-primary" href="/docs?page=tutorial" onclick={(e) => navigate('/docs?page=tutorial', e)}>Get started</a>
+              <a class="btn" href="https://github.com/acoyfellow/terrarium">View source</a>
+            </div>
           </div>
-          <pre class="hero-code fx-shine"><span class="scan" aria-hidden="true"></span><code>{`# one bounded task -> one isolated run -> one verified receipt
-terra --agent "pi -p --no-session" "fix the failing test"
-
-# in the cloud: submit, close your laptop, pull the receipt later
-POST https://terrarium.coey.dev/api/runs  ->  202 { runId }`}</code></pre>
-        </div>
-        <div class="hero-art">
-          <img src="/campaign/v6/dome-hero.jpg" alt="A figure facing a glowing sealed terrarium dome" loading="eager" />
-          <div class="hero-art-veil" aria-hidden="true"></div>
-          <div class="receipt-chip fx-shine">
-            <span class="rc-dot"></span>
-            <div class="rc-body">
-              <span class="rc-status">verified receipt</span>
-              <span class="rc-id mono">ter_mrcb3k07_f606b3313eb8</span>
-              <span class="rc-meta mono">runId · fingerprint · nonce — all correlate</span>
+          <div class="hero-art hero-story">
+            <img class="hs-frame hs-1" src="/campaign/v6/parallel/fanout.jpg" alt="One bounded task fanned out into many isolated runs" loading="eager" />
+            <img class="hs-frame hs-2" src="/campaign/v6/parallel/grid-wall.jpg" alt="" aria-hidden="true" loading="eager" />
+            <img class="hs-frame hs-3" src="/campaign/v6/parallel/receipts-rising.jpg" alt="" aria-hidden="true" loading="lazy" />
+            <img class="hs-frame hs-4" src="/campaign/v6/parallel/all-verified.jpg" alt="" aria-hidden="true" loading="lazy" />
+            <div class="hero-art-veil" aria-hidden="true"></div>
+            <div class="hs-caption" aria-hidden="true">
+              <span class="hsc hsc-1"><b class="mono">01</b> one task, fanned out</span>
+              <span class="hsc hsc-2"><b class="mono">02</b> isolated runs, in parallel</span>
+              <span class="hsc hsc-3"><b class="mono">03</b> each returns its own receipt</span>
+              <span class="hsc hsc-4"><b class="mono">✓</b> many runs at once — each one proven</span>
+            </div>
+            <div class="receipt-chip fx-shine hs-receipt">
+              <span class="rc-dot"></span>
+              <div class="rc-body">
+                <span class="rc-status">verified receipt</span>
+                <span class="rc-id mono">ter_mrcb3k07_f606b3313eb8</span>
+                <span class="rc-meta mono">1 of many · runId · fingerprint · nonce correlate</span>
+              </div>
             </div>
           </div>
         </div>
+        <pre class="hero-code fx-shine"><span class="scan" aria-hidden="true"></span><code>{`# one bounded task -> one isolated run -> one verified receipt
+terra --agent "pi -p --no-session" "fix the failing test"
+
+# on your own edge deploy: submit, close your laptop, pull the receipt later
+POST https://terrarium-control.<you>.workers.dev/api/runs  ->  202 { runId }`}</code></pre>
       </div>
     </section>
 
     <section class="trust">
       <div class="trust-inner">
         <div class="trust-head">
-          <span class="trust-label mono">The cloud runs entirely on</span>
+          <span class="trust-label mono">Every run executes on</span>
           <img class="trust-logo" src="/cloudflare.svg" alt="Cloudflare" width="110" height="50" />
         </div>
-        <div class="trust-primitives">
-          <span class="tp"><img src="/cf/workers.svg" alt="" aria-hidden="true" /><b class="mono">Workers</b></span>
-          <span class="tp"><img src="/cf/durable-objects.svg" alt="" aria-hidden="true" /><b class="mono">Durable Objects</b></span>
-          <span class="tp"><img src="/cf/containers.svg" alt="" aria-hidden="true" /><b class="mono">Containers</b></span>
-          <span class="tp"><img src="/cf/r2.svg" alt="" aria-hidden="true" /><b class="mono">R2</b></span>
-          <span class="tp"><img src="/cf/workers-ai.svg" alt="" aria-hidden="true" /><b class="mono">Workers AI</b></span>
+        <div class="trust-primitives" data-reveal>
+          <span class="tp" style="--d:0"><img src="/cf/workers.svg" alt="" aria-hidden="true" /><b class="mono">Workers</b></span>
+          <span class="tp" style="--d:1"><img src="/cf/durable-objects.svg" alt="" aria-hidden="true" /><b class="mono">Durable Objects</b></span>
+          <span class="tp" style="--d:2"><img src="/cf/containers.svg" alt="" aria-hidden="true" /><b class="mono">Containers</b></span>
+          <span class="tp" style="--d:3"><img src="/cf/r2.svg" alt="" aria-hidden="true" /><b class="mono">R2</b></span>
+          <span class="tp" style="--d:4"><img src="/cf/workers-ai.svg" alt="" aria-hidden="true" /><b class="mono">Workers AI</b></span>
         </div>
       </div>
     </section>
 
     <section class="chapter">
       <div class="chapter-inner">
-        <div class="chapter-head">
-          <div><p class="eyebrow">01 / What you get</p><h2 class="section-title">One primitive.<br />Everywhere you work.</h2></div>
-          <p class="section-lede">The same bounded-run-with-a-receipt whether you call it from a terminal, an agent, or a cloud endpoint. No new mental model per surface.</p>
+        <div class="chapter-head" data-reveal>
+          <div><p class="eyebrow">01 / Why it changes things</p><h2 class="section-title">Trust one run.<br />Now run a thousand.</h2></div>
+          <p class="section-lede">When each run proves itself, fanning out stops being a leap of faith. That's the unlock: parallelism you can actually rely on — from the CLI, an agent, or a cloud endpoint, all the same primitive.</p>
         </div>
-        <div class="grid-cards">
-          <div class="cell fx-shine"><span class="idx">A</span><h3>Use it anywhere</h3><p>CLI, MCP tool, or an authenticated cloud API. Same primitive everywhere.</p></div>
-          <div class="cell fx-shine"><span class="idx">B</span><h3>Trust the result</h3><p>Success means a verified receipt — run ID, fingerprint, and nonce all match. Not exit codes, not prose.</p></div>
-          <div class="cell fx-shine"><span class="idx">C</span><h3>Scale in parallel</h3><p>Fan out bounded jobs with explicit concurrency and durable run IDs. Every run keeps its own receipt.</p></div>
+        <div class="grid-cards" data-reveal>
+          <div class="cell fx-shine" style="--d:0"><span class="idx">A</span><h3>Proof per run</h3><p>Success is a verified receipt — run ID, fingerprint, and nonce all correlate. Not exit codes, not prose, not "trust me."</p></div>
+          <div class="cell fx-shine" style="--d:1"><span class="idx">B</span><h3>Parallel without fear</h3><p>Fan out with explicit concurrency. Every run is isolated and keeps its own receipt, so more runs never means more guessing.</p></div>
+          <div class="cell fx-shine" style="--d:2"><span class="idx">C</span><h3>Nothing to babysit</h3><p>Submit and walk away. Runs live on the edge and wake you when they finish — even after you disconnect.</p></div>
         </div>
       </div>
     </section>
 
     <section class="chapter">
       <div class="chapter-inner">
-        <div class="chapter-head">
-          <div><p class="eyebrow">02 / How it works</p><h2 class="section-title">Task in.<br />Receipt out.</h2></div>
-          <p class="section-lede">Four steps, one direction. You hand off a bounded job and get back correlated proof it ran — even if you disconnect in the middle.</p>
+        <div class="chapter-head" data-reveal>
+          <div><p class="eyebrow">02 / How one run works</p><h2 class="section-title">Task in.<br />Receipt out.</h2></div>
+          <p class="section-lede">One run, four steps, one direction — then multiply it. Every task you fan out follows the same path and comes back with its own proof, even if you disconnect mid-flight.</p>
         </div>
-        <ol class="flow">
-          <li class="fx-shine"><span class="step">01</span><b>Task</b><span>Hand Terrarium one bounded job.</span></li>
-          <li class="fx-shine"><span class="step">02</span><b>Run</b><span>It executes as one isolated child — local or a Cloudflare cell.</span></li>
-          <li class="fx-shine"><span class="step">03</span><b>Receipt</b><span>You get a correlated, verifiable result back.</span></li>
-          <li class="fx-shine"><span class="step">04</span><b>Wake</b><span>A durable callback tells you it finished, even after you disconnect.</span></li>
+        <ol class="flow" data-reveal>
+          <li class="fx-shine" style="--d:0"><span class="step-art"><img src="/campaign/v6/steps/task.jpg" alt="" aria-hidden="true" loading="lazy" /></span><span class="step">01</span><b>Task</b><span>Hand Terrarium one bounded job.</span></li>
+          <li class="fx-shine" style="--d:1"><span class="step-art"><img src="/campaign/v6/steps/run.jpg" alt="" aria-hidden="true" loading="lazy" /></span><span class="step">02</span><b>Run</b><span>It executes as one isolated child — local or a Cloudflare cell.</span></li>
+          <li class="fx-shine" style="--d:2"><span class="step-art"><img src="/campaign/v6/steps/receipt.jpg" alt="" aria-hidden="true" loading="lazy" /></span><span class="step">03</span><b>Receipt</b><span>You get a correlated, verifiable result back.</span></li>
+          <li class="fx-shine" style="--d:3"><span class="step-art"><img src="/campaign/v6/steps/wake.jpg" alt="" aria-hidden="true" loading="lazy" /></span><span class="step">04</span><b>Wake</b><span>A durable callback tells you it finished, even after you disconnect.</span></li>
         </ol>
       </div>
     </section>
 
     <section class="chapter edge">
       <div class="chapter-inner">
-        <div class="chapter-head">
+        <div class="chapter-head" data-reveal>
           <div><p class="eyebrow">03 / Runs on the edge</p><h2 class="section-title">No origin server.<br />No local machine.</h2></div>
           <p class="section-lede">Submit a task, close your laptop. Admission, the run-control cell, execution, logs, the model route, and the wake callback all live on <b>Cloudflare's global network</b> — so correctness, liveness, logs, and delivery never depend on a machine you own.</p>
         </div>
-        <ol class="edge-flow">
-          <li><span class="ef-k mono">Worker API</span><span class="ef-v">Authenticated <code>POST /api/runs</code>, ordered admission, per-principal budget.</span></li>
-          <li><span class="ef-k mono">Durable Object</span><span class="ef-v">One run-control cell per run holds authoritative state — survives restarts and reconnects.</span></li>
-          <li><span class="ef-k mono">Container cell</span><span class="ef-v">The task runs in an isolated Cloudflare-managed execution cell. Egress is deny-by-default.</span></li>
-          <li><span class="ef-k mono">Workers AI</span><span class="ef-v">A credentialless, server-owned model route — the cell never holds a reusable key.</span></li>
-          <li><span class="ef-k mono">R2 logs</span><span class="ef-v">Durable, integrity-checked logs (byte count + SHA-256), inline then overflow to R2.</span></li>
-          <li><span class="ef-k mono">Pulse wake</span><span class="ef-v">A durable, principal-scoped terminal callback reaches you across closes, sessions, and machines.</span></li>
+        <div class="globe-wrap" data-reveal aria-hidden="true">
+          <div class="globe">
+            <span class="g-ring g-ring-1"></span>
+            <span class="g-ring g-ring-2"></span>
+            <span class="g-ring g-ring-3"></span>
+            <span class="g-core"></span>
+            {#each Array(11) as _, i}<span class="pop" style={`--p:${i}`}></span>{/each}
+          </div>
+          <span class="globe-cap mono">POPs firing — parallel runs across the edge</span>
+        </div>
+        <ol class="edge-flow" data-reveal>
+          <span class="edge-packet" aria-hidden="true"></span>
+          <li style="--d:0"><span class="ef-k mono">Worker API</span><span class="ef-v">Authenticated <code>POST /api/runs</code>, ordered admission, per-principal budget.</span></li>
+          <li style="--d:1"><span class="ef-k mono">Durable Object</span><span class="ef-v">One run-control cell per run holds authoritative state — survives restarts and reconnects.</span></li>
+          <li style="--d:2"><span class="ef-k mono">Container cell</span><span class="ef-v">The task runs in an isolated Cloudflare-managed execution cell. Egress is deny-by-default.</span></li>
+          <li style="--d:3"><span class="ef-k mono">Workers AI</span><span class="ef-v">A credentialless, server-owned model route — the cell never holds a reusable key.</span></li>
+          <li style="--d:4"><span class="ef-k mono">R2 logs</span><span class="ef-v">Durable, integrity-checked logs (byte count + SHA-256), inline then overflow to R2.</span></li>
+          <li style="--d:5"><span class="ef-k mono">Pulse wake</span><span class="ef-v">A durable, principal-scoped terminal callback reaches you across closes, sessions, and machines.</span></li>
         </ol>
       </div>
     </section>
 
     <section class="closing">
-      <div class="closing-inner">
-        <p>Built on one idea: <strong>a verified receipt, not a promise.</strong></p>
+      <div class="closing-inner" data-reveal>
+        <p><strong>Parallel-first agents, on the edge</strong> — where every run proves itself.</p>
         <div class="hero-actions">
           <a class="btn btn-primary" href="/docs?page=tutorial" onclick={(e) => navigate('/docs?page=tutorial', e)}>Run your first task</a>
           <a class="btn" href="/docs?page=explain" onclick={(e) => navigate('/docs?page=explain', e)}>Why receipts?</a>
