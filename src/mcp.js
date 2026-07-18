@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { createInterface } from "node:readline";
 import { cancelRun, ensureTerminalCallback, getRunStatus, isRunAccessible, listRuns, pruneStaleChildClaims, readRun, runTerrarium, spawnTerrariumBackground, VERSION } from "./core.js";
-import { cloudSpawn, cloudEnabled, cloudStatus, cloudRead, cloudCancel, isCloudRunId } from "./cloud-client.js";
+import { cloudSpawn, cloudSpawnBatch, cloudEnabled, cloudStatus, cloudRead, cloudCancel, isCloudRunId } from "./cloud-client.js";
 import { createRunGroup, getRunGroupStatus, readRunGroupLogs } from "./groups.js";
 import { spawnBatch, BATCH_STRATEGIES, validateBatchShape } from "./batch.js";
 import { acknowledgeMailboxEvent, claimMailboxEvents, getMailboxStatus, getSubscriber, pruneRouter, registerSubscriber, requeueInflightEvents, unregisterSubscriber } from "./router.js";
@@ -376,16 +376,17 @@ async function handle(msg) {
       if (name === "terrarium_spawn_batch") {
         if (!policy.allowSpawn) throw new Error("Terrarium spawn capability denied for this run");
         if (policy.requesterRunId) throw new Error("nested Terrarium runs cannot fan out a batch; the top-level owner fans out");
-        // Cloud-default honesty: batch fan-out still runs on the LOCAL group/
-        // status/cancel machinery, which has no cloud equivalent yet. Rather than
-        // silently run a batch locally while single spawns go to the cloud (the
-        // exact half-wired trap we are removing), fail closed with a clear path:
-        // submit cloud jobs as individual terrarium_spawn calls for now.
+        // Cloud-default: fan out onto the Cloudflare cell using cloud-native
+        // batch (independent cloud runs + the shared pure decide() for join
+        // semantics + cloud cancel for losers). Local batch requires opt-in.
         if (cloudEnabled()) {
-          throw new Error("terrarium_spawn_batch is not yet supported in cloud mode (TERRARIUM_URL is set). Cloud batch fan-out (group roll-up + cloud status/cancel) is not built. Use individual terrarium_spawn calls, which run on the cloud cell, or set TERRARIUM_ALLOW_LOCAL=1 to run the batch locally on this machine.");
+          const cloudJobs = Array.isArray(args.jobs) ? args.jobs.map((job) => sanitizeSpawnArgs(job)) : args.jobs;
+          const result = await cloudSpawnBatch({ jobs: cloudJobs, strategy: args.strategy, quorum: args.quorum, concurrency: args.concurrency, label: args.label, timeoutMs: args.timeoutMs });
+          const projected = verbose ? result : conciseBatch(result);
+          return send(msg.id, content(projected, !result.ok));
         }
         if (process.env.TERRARIUM_ALLOW_LOCAL !== "1") {
-          throw new Error("Terrarium runs on Cloudflare by default and cloud batch is not yet supported: run individual terrarium_spawn calls (cloud), or set TERRARIUM_ALLOW_LOCAL=1 to run this batch locally.");
+          throw new Error("Terrarium runs on Cloudflare by default: set TERRARIUM_URL + token to fan out in the cloud, or TERRARIUM_ALLOW_LOCAL=1 to run this batch locally on this machine.");
         }
         const jobs = Array.isArray(args.jobs) ? args.jobs.map((job) => ({ ...sanitizeSpawnArgs(job), background: true, dryRun: false })) : args.jobs;
         // Preflight the batch shape before launching anything so a misshapen

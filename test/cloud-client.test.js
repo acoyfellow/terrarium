@@ -38,6 +38,20 @@ test("cloudConfig normalizes the URL and reads token inline or from file", async
   }
 });
 
+test("cloud batch reuses the shared decide() so join semantics match local", async () => {
+  // cloudSpawnBatch imports decide from batch.js — the same pure function the
+  // local batch uses — so all/allSettled/race/any/quorum can never drift.
+  const { decide } = await import("../src/batch.js");
+  const runs = [
+    { runId: "ter_a", status: "done", ok: true, finishedAt: "2026-01-01T00:00:01Z" },
+    { runId: "ter_b", status: "running" },
+  ];
+  assert.equal(decide({ runs }, "all").settled, false, "all waits for every run");
+  assert.equal(decide({ runs }, "any").settled, true, "any settles on first success");
+  assert.equal(decide({ runs }, "any").winner, "ter_a");
+  assert.equal(decide({ runs }, "any").cancelLosers, true, "any cancels losers");
+});
+
 test("cloud-default gate: MCP refuses local execution unless explicitly allowed", async () => {
   // Mirror the terrarium_spawn gate logic: with no cloud config and no
   // TERRARIUM_ALLOW_LOCAL, a real (non-dry-run) spawn must fail closed rather

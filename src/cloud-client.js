@@ -14,6 +14,7 @@
 
 import { readFileSync } from "node:fs";
 import { randomUUID } from "node:crypto";
+import { decide, validateBatchShape, BATCH_STRATEGIES } from "./batch.js";
 
 export function cloudConfig(env = process.env) {
   const url = typeof env.TERRARIUM_URL === "string" ? env.TERRARIUM_URL.replace(/\/$/, "") : "";
@@ -136,3 +137,56 @@ export async function cloudCancel(runId, { env = process.env } = {}) {
   const s = await api(`/api/runs/${runId}/cancel`, { method: "POST", body: {}, config });
   return { runId, cloud: true, cancelled: s.code === 200 || s.code === 202, httpCode: s.code, ...(s.json || {}) };
 }
+
+/**
+ * Cloud batch fan-out. Submits each job as an independent cloud run, then polls
+ * the SAME pure `decide()` used by the local batch so join semantics (all /
+ * allSettled / race / any / quorum) are identical. Winner-picking strategies
+ * cancel losing cloud runs via cloudCancel. No local group/status/cancel
+ * machinery is involved — this is cloud-native fan-out.
+ */
+export async function cloudSpawnBatch(opts = {}, { env = process.env, pollMs = 3000, maxPolls = 200 } = {}) {
+  const { jobs, strategy = "all", quorum, label = "Terrarium cloud batch", timeoutMs } = opts;
+  const config = cloudConfig(env);
+  if (!config.configured) throw new Error("cloud batch requires TERRARIUM_URL and a token");
+  // Reuse the single-source batch-shape validation (job count, concurrency,
+  // quorum bounds) so cloud and local batches can never drift.
+  const verdict = validateBatchShape(opts);
+  if (!verdict.ok) return { ok: false, phase: "preflight", code: verdict.code, error: verdict.error, cloud: true };
+  const quorumTarget = strategy === "quorum" ? Number(quorum) : null;
+
+  // Submit all jobs (background: return runId at admission). A job that fails
+  // admission is recorded as a terminal failed run so conservation holds.
+  const submitted = await Promise.all(jobs.map(async (job) => {
+    try {
+      const r = await cloudSpawn({ ...job, background: true }, { env });
+      return r.runId ? { runId: r.runId, status: "running" } : { runId: null, status: "failed", ok: false, error: r.error };
+    } catch (e) { return { runId: null, status: "failed", ok: false, error: e.message }; }
+  }));
+  const runIds = submitted.filter((s) => s.runId).map((s) => s.runId);
+  if (runIds.length === 0) {
+    return { ok: false, cloud: true, strategy, reason: "launch-failed", runIds: [], group: { runs: submitted } };
+  }
+
+  const deadline = timeoutMs > 0 ? Date.now() + Number(timeoutMs) : null;
+  for (let i = 0; i < maxPolls; i++) {
+    const runs = await Promise.all(runIds.map((id) => cloudStatus(id, { env }).catch((e) => ({ runId: id, status: "error", ok: false, error: e.message }))));
+    const status = { runs };
+    const d = decide(status, strategy, quorumTarget);
+    if (d.settled) {
+      if (d.cancelLosers) {
+        const keep = new Set([d.winner, ...(d.winners || [])].filter(Boolean));
+        await Promise.all(runs.filter((r) => !keep.has(r.runId) && !isTerminalStatus(r.status)).map((r) => cloudCancel(r.runId, { env }).catch(() => {})));
+      }
+      return { ok: d.ok, cloud: true, strategy, reason: d.reason, runIds, winner: d.winner, winners: d.winners, successCount: d.successCount, failureCount: d.failureCount, group: { complete: true, ok: d.ok, runs } };
+    }
+    if (deadline && Date.now() >= deadline) {
+      await Promise.all(runs.filter((r) => !isTerminalStatus(r.status)).map((r) => cloudCancel(r.runId, { env }).catch(() => {})));
+      return { ok: false, cloud: true, strategy, reason: "timeout", timedOut: true, runIds, group: { complete: false, runs } };
+    }
+    await new Promise((r) => setTimeout(r, pollMs));
+  }
+  return { ok: false, cloud: true, strategy, reason: "poll-timeout", runIds, group: { complete: false } };
+}
+
+function isTerminalStatus(s) { return ["done", "failed", "cancelled", "inconclusive", "error"].includes(s); }
