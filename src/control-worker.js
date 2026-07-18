@@ -195,7 +195,19 @@ const legacyWorker = {
       const routed = await handleApiRuns(request, env);
       if (routed) return routed;
     }
-    if (url.pathname === "/health") return Response.json({ ok: true, mode: env.TERRARIUM_MODE || "fixture" });
+    if (url.pathname === "/health") return Response.json({
+      ok: true,
+      // The live /api/runs execution runtime: real @cloudflare/sandbox container
+      // (Dockerfile.pi) reaching the model via the credentialless server-owned
+      // Workers AI route. This path does NOT branch on TERRARIUM_MODE.
+      executionMode: "workers-ai-container",
+      // Legacy campaign/hardening LAB only (loadPolicy, /campaigns, /policy).
+      // Frozen; unrelated to /api/runs. Kept for back-compat display.
+      campaignLabMode: env.TERRARIUM_MODE || "fixture",
+      // Deprecated alias — some old probes read `mode`. Points at the runtime,
+      // not the lab, so nobody misreads a live runtime as a fixture again.
+      mode: "workers-ai-container",
+    });
     if (url.pathname === "/api/demo") {
       const ledger = await loadLedger(env);
       const live = ledger.publicCampaign || EMPTY_PUBLIC_CAMPAIGN;
