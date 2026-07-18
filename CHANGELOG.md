@@ -6,7 +6,7 @@ Succinct, product-facing changes to Terrarium. This is not a full commit log; it
 
 - **`terrarium_status` / `terrarium_read` / `terrarium_cancel` work on cloud runs.** A server-minted cloud runId (or any status-by-id while cloud is the default) is inspected/cancelled against the cloud instance; local runs stay local. Verified live: cloud status returns `done`/`verified`, read returns the real `TERRARIUM_RESULT` log.
 - **`terrarium_spawn_batch` fans out on the cloud cell.** Cloud-native batch submits independent cloud runs and resolves via the *same* pure join logic as the local batch (`all`/`allSettled`/`race`/`any`/`quorum`), cancelling losing cloud runs. Verified live: `all` → both runs done; `any` → first success wins, running loser cancelled.
-- Known gap: background cloud-run **terminal callbacks** into the Pi session (via Pulse) are not yet wired in the extension — foreground cloud spawns and `terrarium_status` polling work; the push-callback path is pending a pulse credential to verify end-to-end.
+- **Cloud terminal callbacks now push into the Pi session.** The extension registers a cloud Pulse subscriber and pulls/acks terminal callbacks over HTTP (`TERRARIUM_URL` + pulse token), the cloud analogue of the local FS router. Verified live end-to-end: subscribe → background cloud spawn → claim `Completed` → ack. Background cloud runs wake the session exactly like local runs did.
 
 ## 2026-07-17 — Cloud-default execution (terrarium_spawn runs on Cloudflare)
 

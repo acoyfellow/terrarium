@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { cancelRun, getRunStatus, listRuns } from "./core.js";
 import { getRunGroupStatus, listRunGroups } from "./groups.js";
 import { acknowledgeMailboxEvent, claimMailboxEvents, registerSubscriber, requeueInflightEvents } from "./router.js";
+import { pulseEnabled, cloudPulseSubscribe, cloudPulseClaim, cloudPulseAck, cloudStatus } from "./cloud-client.js";
 
 const WIDGET = "terrarium-runs";
 const TERMINAL_TYPES = ["Completed", "Failed", "TimedOut", "Cancelled"];
@@ -46,6 +47,11 @@ export default function terrariumPiExtension(pi) {
 
   async function subscribeRun(runId, ctx) {
     if (!currentSubscriber) return;
+    // Cloud runs deliver terminal callbacks through the cloud Pulse mailbox, not
+    // the local FS router. Register the cloud subscriber too when pulse is wired.
+    if (pulseEnabled()) {
+      try { await cloudPulseSubscribe(currentSubscriber, { runIds: ["*"] }); } catch { /* best effort; refresh retries */ }
+    }
     const existing = await registerSubscriber({ subscriberId: currentSubscriber, runIds: [runId], channels: ["*"], workflowIds: ["*"], eventTypes: TERMINAL_TYPES, narrowWildcardRunIds: true });
     // The host observer is durable. A concrete run filter also replays a finish
     // that won the spawn/subscribe race; the normal refresh claims it.
@@ -92,6 +98,21 @@ export default function terrariumPiExtension(pi) {
           } catch {
             await requeueInflightEvents({ subscriberId: currentSubscriber, eventIds: [event.eventId], olderThanMs: 0 }).catch(() => {});
           }
+        }
+        // Cloud terminal callbacks: pull from the cloud Pulse mailbox over HTTP
+        // and deliver into this session, mirroring the local path. Ack only after
+        // Pi accepts the message so a throw is replayable on the next refresh.
+        if (pulseEnabled()) {
+          try {
+            const cloud = await cloudPulseClaim(currentSubscriber, { limit: 20 });
+            for (const event of cloud.events) {
+              let run; try { run = await cloudStatus(event.runId); } catch { run = { runId: event.runId, status: event.status || event.type }; }
+              try {
+                pi.sendMessage(callbackMessage(run), { deliverAs: "followUp", triggerTurn: true });
+                await cloudPulseAck(currentSubscriber, event.eventId);
+              } catch { /* leave unacked; cloud redelivers on next claim */ }
+            }
+          } catch { /* pulse unreachable this tick; retried next refresh */ }
         }
       }
     } finally { busy = false; }

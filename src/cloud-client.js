@@ -190,3 +190,56 @@ export async function cloudSpawnBatch(opts = {}, { env = process.env, pollMs = 3
 }
 
 function isTerminalStatus(s) { return ["done", "failed", "cancelled", "inconclusive", "error"].includes(s); }
+
+// ---- Cloud Pulse (terminal-callback) client -------------------------------
+// The cloud cell routes each run's terminal event into a Pulse mailbox. These
+// helpers let the Pi extension register a subscriber and pull/ack terminal
+// callbacks over HTTP (TERRARIUM_URL + a pulse token), the cloud analogue of
+// the local FS router the extension uses today.
+
+export function pulseConfig(env = process.env) {
+  const { url } = cloudConfig(env);
+  let token = typeof env.TERRARIUM_PULSE_TOKEN === "string" ? env.TERRARIUM_PULSE_TOKEN : "";
+  if (!token && env.TERRARIUM_PULSE_TOKEN_FILE) {
+    try { token = readFileSync(env.TERRARIUM_PULSE_TOKEN_FILE, "utf8").trim(); } catch { /* empty */ }
+  }
+  return { url, token, configured: Boolean(url && token) };
+}
+export function pulseEnabled(env = process.env) { return pulseConfig(env).configured; }
+
+async function pulseApi(path, body, config) {
+  const res = await fetch(`${config.url}${path}`, {
+    method: "POST",
+    headers: { authorization: `Bearer ${config.token}`, "content-type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const text = await res.text();
+  let json; try { json = text ? JSON.parse(text) : {}; } catch { json = { raw: text }; }
+  return { code: res.status, json };
+}
+
+const PULSE_TERMINAL_TYPES = ["Completed", "Failed", "TimedOut", "Cancelled"];
+
+/** Register (or extend) a cloud Pulse subscriber for terminal events. */
+export async function cloudPulseSubscribe(subscriberId, { env = process.env, runIds = ["*"] } = {}) {
+  const config = pulseConfig(env);
+  if (!config.configured) throw new Error("cloud pulse requires TERRARIUM_URL and a pulse token (TERRARIUM_PULSE_TOKEN / TERRARIUM_PULSE_TOKEN_FILE)");
+  const r = await pulseApi("/pulse", { action: "subscribe", args: { subscriberId, runIds, channels: ["*"], workflowIds: ["*"], eventTypes: PULSE_TERMINAL_TYPES } }, config);
+  return { ok: r.code === 200 && r.json?.ok !== false, ...(r.json?.result || {}), httpCode: r.code };
+}
+
+/** Claim pending terminal callbacks for a cloud subscriber. */
+export async function cloudPulseClaim(subscriberId, { env = process.env, limit = 20 } = {}) {
+  const config = pulseConfig(env);
+  if (!config.configured) throw new Error("cloud pulse requires TERRARIUM_URL and a pulse token");
+  const r = await pulseApi("/claim", { args: { subscriberId, limit } }, config);
+  return { ok: r.code === 200, events: r.json?.result?.events || [], quarantined: r.json?.result?.quarantined || 0, httpCode: r.code };
+}
+
+/** Acknowledge a delivered cloud callback so it is not redelivered. */
+export async function cloudPulseAck(subscriberId, eventId, { env = process.env } = {}) {
+  const config = pulseConfig(env);
+  if (!config.configured) throw new Error("cloud pulse requires TERRARIUM_URL and a pulse token");
+  const r = await pulseApi("/ack", { args: { subscriberId, eventId } }, config);
+  return { ok: r.code === 200, httpCode: r.code };
+}
