@@ -2,6 +2,12 @@
 
 Succinct, product-facing changes to Terrarium. This is not a full commit log; it records notable behavior, API, safety, and public-site changes.
 
+## 2026-07-17 — Cloud parity: status/read/cancel + cloud batch fan-out
+
+- **`terrarium_status` / `terrarium_read` / `terrarium_cancel` work on cloud runs.** A server-minted cloud runId (or any status-by-id while cloud is the default) is inspected/cancelled against the cloud instance; local runs stay local. Verified live: cloud status returns `done`/`verified`, read returns the real `TERRARIUM_RESULT` log.
+- **`terrarium_spawn_batch` fans out on the cloud cell.** Cloud-native batch submits independent cloud runs and resolves via the *same* pure join logic as the local batch (`all`/`allSettled`/`race`/`any`/`quorum`), cancelling losing cloud runs. Verified live: `all` → both runs done; `any` → first success wins, running loser cancelled.
+- Known gap: background cloud-run **terminal callbacks** into the Pi session (via Pulse) are not yet wired in the extension — foreground cloud spawns and `terrarium_status` polling work; the push-callback path is pending a pulse credential to verify end-to-end.
+
 ## 2026-07-17 — Cloud-default execution (terrarium_spawn runs on Cloudflare)
 
 - **`terrarium_spawn` now executes on the Cloudflare-managed cell by default.** With `TERRARIUM_URL` + `TERRARIUM_CONTROL_TOKEN` (or `TERRARIUM_TOKEN_FILE`) set, a spawn submits `POST /api/runs`, runs in the cloud, and returns a verified correlated receipt — no local process, no host authority. New `src/cloud-client.js`.
