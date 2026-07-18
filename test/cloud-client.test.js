@@ -1,6 +1,14 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { cloudConfig, cloudEnabled } from "../src/cloud-client.js";
+import { cloudConfig, cloudEnabled, isCloudRunId } from "../src/cloud-client.js";
+
+test("isCloudRunId distinguishes server-minted cloud ids from local ids", () => {
+  assert.equal(isCloudRunId("ter_mrq8uwyp_cb0da25c6c4f"), true);
+  assert.equal(isCloudRunId("ter_mrp6rl3b_2737a625ab0c"), true);
+  assert.equal(isCloudRunId("ter_20260717200024787_d0ell9"), false); // local epoch id
+  assert.equal(isCloudRunId(""), false);
+  assert.equal(isCloudRunId(undefined), false);
+});
 
 test("cloudEnabled requires both a URL and a token", () => {
   assert.equal(cloudEnabled({}), false);

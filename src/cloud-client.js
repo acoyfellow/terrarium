@@ -29,6 +29,14 @@ export function cloudEnabled(env = process.env) {
   return cloudConfig(env).configured;
 }
 
+// Cloud runIds are minted server-side as `ter_<base36ish>_<hex>` (e.g.
+// ter_mrq8uwyp_cb0da25c6c4f), distinct from local `ter_<epoch>_<rand>` ids.
+// Used to route status/read/cancel for a specific run to the right backend even
+// if cloud is not the default, so a caller can always inspect a cloud run.
+export function isCloudRunId(runId) {
+  return typeof runId === "string" && /^ter_[a-z0-9]{6,10}_[a-f0-9]{8,}$/.test(runId);
+}
+
 async function api(path, { method = "GET", body, config } = {}) {
   const headers = { authorization: `Bearer ${config.token}` };
   if (body !== undefined) { headers["content-type"] = "application/json"; headers["idempotency-key"] = randomUUID(); }
@@ -85,4 +93,46 @@ export async function cloudSpawn(args = {}, { env = process.env, pollMs = 4000, 
     await new Promise((r) => setTimeout(r, pollMs));
   }
   return { ok: false, runId, status: "poll-timeout", cloud: true, contract, executionRef, error: "cloud run did not reach terminal within the poll window (still running; query status by runId)" };
+}
+
+/** Cloud run status, shaped like getRunStatus so conciseStatus works unchanged. */
+export async function cloudStatus(runId, { env = process.env } = {}) {
+  const config = cloudConfig(env);
+  if (!config.configured) throw new Error("cloud status requires TERRARIUM_URL and a token");
+  const s = await api(`/api/runs/${runId}/status`, { config });
+  if (s.code === 404) return { runId, status: "not-found", ok: false, cloud: true };
+  const st = s.json?.status ?? s.json;
+  const terminal = st?.terminal ?? {};
+  return {
+    runId, cloud: true,
+    status: st?.status,
+    ok: terminal.ok ?? (st?.status === "done"),
+    exitCode: terminal.exitCode ?? null,
+    taskContractStatus: terminal.taskContractStatus,
+    taskResultSummary: terminal.taskResultSummary,
+    reason: terminal.reason,
+    terminal,
+  };
+}
+
+/** Cloud run logs, shaped like readRun ({ runId, text }). */
+export async function cloudRead(runId, { env = process.env } = {}) {
+  const config = cloudConfig(env);
+  if (!config.configured) throw new Error("cloud read requires TERRARIUM_URL and a token");
+  const s = await api(`/api/runs/${runId}/logs`, { config });
+  if (s.code === 404) return { runId, cloud: true, text: "", error: "run not found on cloud instance" };
+  const body = s.json ?? {};
+  const text = typeof body.logs === "string" ? body.logs
+    : Array.isArray(body.lines) ? body.lines.join("\n")
+    : typeof body.text === "string" ? body.text
+    : JSON.stringify(body);
+  return { runId, cloud: true, text, logRefs: body.logRefs };
+}
+
+/** Cancel a cloud run (idempotent server-side). */
+export async function cloudCancel(runId, { env = process.env } = {}) {
+  const config = cloudConfig(env);
+  if (!config.configured) throw new Error("cloud cancel requires TERRARIUM_URL and a token");
+  const s = await api(`/api/runs/${runId}/cancel`, { method: "POST", body: {}, config });
+  return { runId, cloud: true, cancelled: s.code === 200 || s.code === 202, httpCode: s.code, ...(s.json || {}) };
 }

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { createInterface } from "node:readline";
 import { cancelRun, ensureTerminalCallback, getRunStatus, isRunAccessible, listRuns, pruneStaleChildClaims, readRun, runTerrarium, spawnTerrariumBackground, VERSION } from "./core.js";
-import { cloudSpawn, cloudEnabled } from "./cloud-client.js";
+import { cloudSpawn, cloudEnabled, cloudStatus, cloudRead, cloudCancel, isCloudRunId } from "./cloud-client.js";
 import { createRunGroup, getRunGroupStatus, readRunGroupLogs } from "./groups.js";
 import { spawnBatch, BATCH_STRATEGIES, validateBatchShape } from "./batch.js";
 import { acknowledgeMailboxEvent, claimMailboxEvents, getMailboxStatus, getSubscriber, pruneRouter, registerSubscriber, requeueInflightEvents, unregisterSubscriber } from "./router.js";
@@ -409,6 +409,13 @@ async function handle(msg) {
         return send(msg.id, content(projected, !result.ok));
       }
       if (name === "terrarium_status") {
+        // A cloud runId (or any status-by-id while cloud is the default backend)
+        // is inspected against the cloud instance; local runs stay local. This
+        // keeps cloud runs queryable without a separate tool.
+        if (args.runId && (isCloudRunId(args.runId) || cloudEnabled())) {
+          const result = await cloudStatus(args.runId);
+          return send(msg.id, content(verbose ? result : conciseStatus(result)));
+        }
         if (args.runId || policy.statusScope !== "all") {
           const result = await getRunStatus({ ...args, runId: args.runId || policy.requesterRunId, requesterRunId: policy.requesterRunId, scope: policy.statusScope });
           return send(msg.id, content(verbose ? result : conciseStatus(result)));
@@ -416,8 +423,18 @@ async function handle(msg) {
         const result = await listRuns({ ...args, requesterRunId: policy.requesterRunId, scope: policy.statusScope });
         return send(msg.id, content(verbose ? result : conciseListing(result)));
       }
-      if (name === "terrarium_read") return send(msg.id, content(await readRun({ ...args, requesterRunId: policy.requesterRunId, scope: policy.readScope })));
-      if (name === "terrarium_cancel") return send(msg.id, content(await cancelRun({ ...args, requesterRunId: policy.requesterRunId, scope: policy.statusScope })));
+      if (name === "terrarium_read") {
+        if (args.runId && (isCloudRunId(args.runId) || cloudEnabled())) {
+          return send(msg.id, content(await cloudRead(args.runId)));
+        }
+        return send(msg.id, content(await readRun({ ...args, requesterRunId: policy.requesterRunId, scope: policy.readScope })));
+      }
+      if (name === "terrarium_cancel") {
+        if (args.runId && (isCloudRunId(args.runId) || cloudEnabled())) {
+          return send(msg.id, content(await cloudCancel(args.runId)));
+        }
+        return send(msg.id, content(await cancelRun({ ...args, requesterRunId: policy.requesterRunId, scope: policy.statusScope })));
+      }
       if (name === "terrarium_group") {
         const groupAccess = { requesterRunId: policy.requesterRunId, scope: policy.statusScope };
         if (args.action === "create") return send(msg.id, content(await createRunGroup({ ...args, ...groupAccess })));
