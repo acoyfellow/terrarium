@@ -890,3 +890,104 @@ test("DO logs endpoint fails closed on cross-owner", async () => {
   const res = await doInst.fetch(new Request("https://do/logs?ownerId=owner-B", { method: "GET" }));
   assert.equal(res.status, 403);
 });
+
+// ---------------- control-plane index projection ----------------
+
+/** Fake Workers KV matching the surface run-index uses. */
+function makeIndexKV() {
+  const store = new Map();
+  return {
+    store,
+    async put(k, v) { store.set(k, v); },
+    async get(k, opts) { const raw = store.get(k); return raw == null ? null : (opts?.type === "json" ? JSON.parse(raw) : raw); },
+    async list({ prefix = "" } = {}) { return { keys: [...store.keys()].filter((k) => k.startsWith(prefix)).map((name) => ({ name })), list_complete: true }; },
+  };
+}
+
+test("index projection: admit writes a running record; collect marks it terminal (channel grouping key)", async () => {
+  const state = makeState();
+  const backend = new DetachedProcessBackend();
+  const kv = makeIndexKV();
+  const env = { __TERRARIUM_TEST_BACKEND__: backend, TERRARIUM_LEDGER: kv };
+  const doInst = new RunControlDO(state, env);
+
+  const res = await doInst.fetch(new Request("https://do/admit", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ task: "indexed run", ownerId: "owner-IDX", spec: { channel: "loop-97", workflowId: "loop-97" } }),
+  }));
+  assert.equal(res.status, 202);
+  await state.drain();
+
+  // Admit projection landed, grouped by channel. NOTE: DetachedProcessBackend
+  // finalizes synchronously, so driveToTerminal (also waitUntil-anchored) may
+  // already have flipped the record to terminal by drain() time. Assert the
+  // record exists with the admit-time fields; status is checked after collect.
+  const keys = [...kv.store.keys()];
+  assert.equal(keys.length, 1, "exactly one index record after admit");
+  const rec = JSON.parse(kv.store.get(keys[0]));
+  assert.ok(["running", "done"].includes(rec.status), `admit record status is running or done (was ${rec.status})`);
+  assert.equal(rec.channel, "loop-97");
+  assert.equal(rec.grounding, "cloud");
+  assert.equal(rec.ownerId, "owner-IDX");
+
+  const collect = await doInst.fetch(new Request("https://do/collect", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ ownerId: "owner-IDX" }),
+  }));
+  assert.equal((await collect.json()).ok, true);
+  await state.drain();
+
+  const after = JSON.parse(kv.store.get(keys[0]));
+  assert.equal(after.status, "done", "terminal hook updated the same record");
+  assert.equal(after.ok, true);
+  assert.equal(after.channel, "loop-97", "channel preserved across terminal update");
+  assert.ok(Number.isFinite(after.terminalAt));
+});
+
+test("index projection: workflowId trap default (== runId) is dropped", async () => {
+  const state = makeState();
+  const backend = new DetachedProcessBackend();
+  const kv = makeIndexKV();
+  const env = { __TERRARIUM_TEST_BACKEND__: backend, TERRARIUM_LEDGER: kv };
+  const doInst = new RunControlDO(state, env);
+
+  const res = await doInst.fetch(new Request("https://do/admit", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ task: "trap wf", ownerId: "owner-T" }),
+  }));
+  await res.json();
+  await state.drain();
+  const runId = (await (await doInst.fetch(new Request("https://do/status?ownerId=owner-T"))).json()).status.runId;
+  const rec = JSON.parse([...kv.store.values()][0]);
+  // No explicit workflowId was passed, so it must be null (never the runId trap).
+  assert.equal(rec.workflowId, null);
+  assert.notEqual(rec.workflowId, runId);
+});
+
+test("index projection is fail-soft: a broken KV never fails admission or finalize", async () => {
+  const state = makeState();
+  const backend = new DetachedProcessBackend();
+  const brokenKV = { put: async () => { throw new Error("KV down"); }, get: async () => { throw new Error("KV down"); }, list: async () => { throw new Error("KV down"); } };
+  const env = { __TERRARIUM_TEST_BACKEND__: backend, TERRARIUM_LEDGER: brokenKV };
+  const doInst = new RunControlDO(state, env);
+
+  const res = await doInst.fetch(new Request("https://do/admit", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ task: "resilient", ownerId: "owner-R", spec: { channel: "c" } }),
+  }));
+  assert.equal(res.status, 202, "admission succeeds despite a broken index KV");
+  await state.drain();
+
+  const collect = await doInst.fetch(new Request("https://do/collect", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ ownerId: "owner-R" }),
+  }));
+  const cb = await collect.json();
+  assert.equal(cb.ok, true, "finalize succeeds despite a broken index KV");
+  assert.equal(cb.terminal.status, "done");
+});

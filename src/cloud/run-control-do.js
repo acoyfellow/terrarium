@@ -31,6 +31,7 @@ import {
 } from "./local-run-cell.js";
 import { evaluateAdmission, DEFAULT_ADMISSION_POLICY, normalizeCapabilityEnvelope } from "./admission.js";
 import { tryCreateSandboxBackend } from "./sandbox-backend.js";
+import { indexRunAdmitted, indexRunTerminal } from "./run-index.js";
 
 const RUN_ID_RE = /^ter_[A-Za-z0-9_]+$/;
 const MAX_LOG_SQL_BYTES = 128 * 1024;       // per-run SQL log budget
@@ -783,6 +784,17 @@ export class RunControlDO {
       reservationReleased = await this.#releasePrincipalReservation(event);
     } catch { /* combined result remains uncommitted; callback alarm retries */ }
 
+    // Control-plane projection: mark this run terminal in the per-principal
+    // index. FAIL-SOFT and anchored via waitUntil so it can neither block nor
+    // fail the canonical terminal callback (the run's authority). Fired here,
+    // before the PULSE_ROUTER early-return, so the index reflects terminal state
+    // even in deployments where the pulse router is not bound.
+    {
+      const trow = this.#runState?.get?.(event.runId) || null;
+      const towner = trow?.ownerId ?? event.ownerId ?? null;
+      if (towner) this.#state.waitUntil?.(this.#indexTerminal(event, towner));
+    }
+
     const routerBinding = this.#env.PULSE_ROUTER;
     if (!routerBinding || typeof routerBinding.get !== "function") return false;
     try {
@@ -982,6 +994,13 @@ export class RunControlDO {
     // Schedule soft finalization inline.
     this.#state.waitUntil?.(this.#driveToTerminal(launched.runId, ownerId));
 
+    // Control-plane projection: index this run so it is discoverable across the
+    // one-DO-per-run boundary. FAIL-SOFT — the index is observability, never the
+    // source of truth, so a projection error MUST NOT fail this admission. The
+    // grouping key is channel; workflowId is opt-in (run-index drops the trap
+    // default). anchored via waitUntil so it does not block the 202.
+    this.#state.waitUntil?.(this.#indexAdmitted(launched.runId, ownerId, spec));
+
     return Response.json({
       admitted: true,
       runId: launched.runId,
@@ -997,6 +1016,37 @@ export class RunControlDO {
     } catch {
       /* persisted-state driven recovery is available via /collect and alarm() */
     }
+  }
+
+  // FAIL-SOFT control-plane projection writes. The DO's receipt/callback
+  // authority is unaffected if TERRARIUM_LEDGER is missing or a KV write fails;
+  // run-index itself swallows errors, and this wrapper adds a second guard.
+  async #indexAdmitted(runId, ownerId, spec) {
+    try {
+      const row = this.#runState?.get?.(runId) || null;
+      await indexRunAdmitted(this.#env?.TERRARIUM_LEDGER, {
+        ownerId,
+        runId,
+        channel: spec?.channel ?? null,
+        workflowId: spec?.workflowId ?? null,
+        taskFingerprint: row?.taskFingerprint ?? null,
+        grounding: "cloud",
+        createdAt: Number.isFinite(row?.createdAt) ? row.createdAt : Date.now(),
+      });
+    } catch { /* projection is best-effort */ }
+  }
+
+  async #indexTerminal(event, ownerId) {
+    try {
+      await indexRunTerminal(this.#env?.TERRARIUM_LEDGER, {
+        ownerId,
+        runId: event?.runId,
+        status: event?.status,
+        ok: !!event?.ok,
+        grounding: "cloud",
+        terminalAt: Date.now(),
+      });
+    } catch { /* projection is best-effort */ }
   }
 
   async #handleStatus(ownerId) {
