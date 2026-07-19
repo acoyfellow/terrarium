@@ -157,6 +157,33 @@ export async function cloudStatus(runId, { env = process.env } = {}) {
   };
 }
 
+/**
+ * List the caller's own cloud runs from the control-plane index, most-recent
+ * first, with optional { channel, status, since, limit } filters. Returns
+ * { ok, runs, channels } where channels is the per-channel rollup. Fail-soft:
+ * a server without the index binding returns { ok:true, runs:[], indexUnavailable:true }.
+ */
+export async function cloudList({ channel, status, since, limit } = {}, { env = process.env } = {}) {
+  const config = cloudConfig(env);
+  if (!config.configured) throw new Error("cloud list requires TERRARIUM_URL and a token");
+  const qs = new URLSearchParams();
+  if (channel) qs.set("channel", String(channel));
+  if (status) qs.set("status", String(status));
+  if (since != null && Number.isFinite(Number(since))) qs.set("since", String(Number(since)));
+  if (limit != null && Number.isFinite(Number(limit))) qs.set("limit", String(Number(limit)));
+  const suffix = qs.toString() ? `?${qs.toString()}` : "";
+  const s = await api(`/api/runs${suffix}`, { config });
+  const body = s.json ?? {};
+  return {
+    cloud: true,
+    ok: body.ok !== false,
+    runs: Array.isArray(body.runs) ? body.runs : [],
+    channels: body.channels && typeof body.channels === "object" ? body.channels : {},
+    indexUnavailable: Boolean(body.indexUnavailable),
+    httpCode: s.code,
+  };
+}
+
 /** Cloud run logs, shaped like readRun ({ runId, text }). */
 export async function cloudRead(runId, { env = process.env } = {}) {
   const config = cloudConfig(env);

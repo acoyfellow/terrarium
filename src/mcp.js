@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { createInterface } from "node:readline";
 import { cancelRun, ensureTerminalCallback, getRunStatus, isRunAccessible, listRuns, pruneStaleChildClaims, readRun, runTerrarium, spawnTerrariumBackground, VERSION } from "./core.js";
-import { cloudSpawn, cloudSpawnBatch, cloudEnabled, cloudStatus, cloudRead, cloudCancel, isCloudRunId } from "./cloud-client.js";
+import { cloudSpawn, cloudSpawnBatch, cloudEnabled, cloudStatus, cloudList, cloudRead, cloudCancel, isCloudRunId } from "./cloud-client.js";
 import { createRunGroup, getRunGroupStatus, readRunGroupLogs } from "./groups.js";
 import { spawnBatch, BATCH_STRATEGIES, validateBatchShape } from "./batch.js";
 import { acknowledgeMailboxEvent, claimMailboxEvents, getMailboxStatus, getSubscriber, pruneRouter, registerSubscriber, requeueInflightEvents, unregisterSubscriber } from "./router.js";
@@ -72,8 +72,9 @@ const tools = [
       properties: {
         limit: { type: "number", description: "Max number of recent runs to return. Default: 20." },
         runId: { type: "string", description: "If set, return status for this single run instead of listing (single-file read; unaffected by home size)." },
-        channel: { type: "string", description: "List-mode recovery filter: only runs on this channel. Use to re-associate a run whose spawn RPC timed out (you still know the channel you launched on)." },
-        workflowId: { type: "string", description: "List-mode recovery filter: only runs with this workflowId." },
+        channel: { type: "string", description: "List-mode filter: only runs on this channel. In cloud list-mode this is the primary grouping key. Also used to re-associate a run whose spawn RPC timed out (you still know the channel you launched on)." },
+        status: { type: "string", description: "List-mode filter (cloud): only runs in this status (running|done|failed|cancelled)." },
+        workflowId: { type: "string", description: "List-mode recovery filter: only runs with this workflowId (opt-in tag; not a grouping key)." },
         sinceMs: { type: "number", description: "List-mode recovery filter: only runs started within the last this-many ms." },
         verbose: { type: "boolean", description: "Return the full unprojected envelope per run. Default: false (concise projection)." }
       }
@@ -420,6 +421,15 @@ async function handle(msg) {
         if (args.runId || policy.statusScope !== "all") {
           const result = await getRunStatus({ ...args, runId: args.runId || policy.requesterRunId, requesterRunId: policy.requesterRunId, scope: policy.statusScope });
           return send(msg.id, content(verbose ? result : conciseStatus(result)));
+        }
+        // Cloud list-mode: when a cloud instance is the default backend and this
+        // is a listing (no runId), route to the per-principal control-plane index
+        // so terraloops running in the cloud are trackable. Grouping key is
+        // channel (workflowId is an opt-in tag, never the grouping key).
+        if (cloudEnabled()) {
+          const since = Number.isFinite(args.sinceMs) ? Date.now() - Number(args.sinceMs) : undefined;
+          const result = await cloudList({ channel: args.channel, status: args.status, since, limit: args.limit });
+          return send(msg.id, content(result));
         }
         const result = await listRuns({ ...args, requesterRunId: policy.requesterRunId, scope: policy.statusScope });
         return send(msg.id, content(verbose ? result : conciseListing(result)));

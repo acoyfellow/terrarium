@@ -121,3 +121,63 @@ test("cloud-default gate: MCP refuses local execution unless explicitly allowed"
   assert.equal(gate({ cloud: true, allowLocal: false, dryRun: false }), "cloud");
   assert.equal(gate({ cloud: true, allowLocal: false, dryRun: true }), "local"); // dry-run plans locally even when cloud set
 });
+
+// ---------------- cloudList: control-plane run index read path ----------------
+
+import { cloudList } from "../src/cloud-client.js";
+
+test("cloudList builds channel/status/since/limit query and shapes the response", async () => {
+  const env = { TERRARIUM_URL: "https://x", TERRARIUM_CONTROL_TOKEN: "t" };
+  const seen = {};
+  const origFetch = globalThis.fetch;
+  globalThis.fetch = async (url, init) => {
+    seen.url = url; seen.method = init?.method || "GET";
+    seen.auth = init?.headers?.authorization;
+    return { ok: true, status: 200, text: async () => JSON.stringify({
+      ok: true,
+      runs: [{ runId: "ter_a_1", channel: "loop-A", status: "running", ownerId: "p" }],
+      channels: { "loop-A": { channel: "loop-A", total: 1, running: 1, done: 0, failed: 0, other: 0 } },
+    }) };
+  };
+  try {
+    const res = await cloudList({ channel: "loop-A", status: "running", since: 1000, limit: 5 }, { env });
+    assert.equal(seen.method, "GET");
+    assert.equal(seen.auth, "Bearer t");
+    const u = new URL(seen.url);
+    assert.equal(u.pathname, "/api/runs");
+    assert.equal(u.searchParams.get("channel"), "loop-A");
+    assert.equal(u.searchParams.get("status"), "running");
+    assert.equal(u.searchParams.get("since"), "1000");
+    assert.equal(u.searchParams.get("limit"), "5");
+    assert.equal(res.ok, true);
+    assert.equal(res.runs.length, 1);
+    assert.equal(res.channels["loop-A"].total, 1);
+  } finally { globalThis.fetch = origFetch; }
+});
+
+test("cloudList is fail-soft: a server without the index reports indexUnavailable", async () => {
+  const env = { TERRARIUM_URL: "https://x", TERRARIUM_CONTROL_TOKEN: "t" };
+  const origFetch = globalThis.fetch;
+  globalThis.fetch = async () => ({ ok: true, status: 200, text: async () => JSON.stringify({ ok: true, runs: [], channels: {}, indexUnavailable: true }) });
+  try {
+    const res = await cloudList({}, { env });
+    assert.equal(res.ok, true);
+    assert.equal(res.indexUnavailable, true);
+    assert.deepEqual(res.runs, []);
+  } finally { globalThis.fetch = origFetch; }
+});
+
+test("cloudList omits empty filters from the query string", async () => {
+  const env = { TERRARIUM_URL: "https://x", TERRARIUM_CONTROL_TOKEN: "t" };
+  let capturedUrl;
+  const origFetch = globalThis.fetch;
+  globalThis.fetch = async (url) => { capturedUrl = url; return { ok: true, status: 200, text: async () => JSON.stringify({ ok: true, runs: [], channels: {} }) }; };
+  try {
+    await cloudList({}, { env });
+    assert.equal(new URL(capturedUrl).search, "", "no query string when no filters");
+  } finally { globalThis.fetch = origFetch; }
+});
+
+test("cloudList requires a configured cloud instance", async () => {
+  await assert.rejects(() => cloudList({}, { env: {} }), /requires TERRARIUM_URL/);
+});
