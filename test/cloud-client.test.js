@@ -61,6 +61,37 @@ test("cloudSpawn fails closed on a filesystem-dependent task unless override set
   );
 });
 
+test("cloudbox delegation: config gating + response shaping into a terrarium envelope", async () => {
+  const { cloudboxEnabled, cloudboxRun } = await import("../src/cloudbox-client.js");
+  assert.equal(cloudboxEnabled({}), false);
+  assert.equal(cloudboxEnabled({ CLOUDBOX_URL: "https://cb" }), true);
+  const origFetch = globalThis.fetch;
+  globalThis.fetch = async () => ({ ok: true, status: 200, text: async () => JSON.stringify({ id: "cbx_1", status: "passed", repo: { commit: "abc" }, receipts: [{ type: "clone" }], artifact: { path: "o", content: "x" }, proof: { grade: { score: 1, max: 1 } } }) });
+  try {
+    const r = await cloudboxRun({ repo: "https://github.com/x/y", commands: ["pnpm test"], verify: ["test -f o"] }, { env: { CLOUDBOX_URL: "https://cb" } });
+    assert.equal(r.ok, true);
+    assert.equal(r.status, "done");
+    assert.equal(r.cloudbox, true);
+    assert.equal(r.runId, "cbx_1");
+    assert.equal(r.commit, "abc");
+    // a failed cloudbox run maps to ok:false / status:failed
+    globalThis.fetch = async () => ({ ok: true, status: 200, text: async () => JSON.stringify({ id: "cbx_2", status: "failed" }) });
+    const f = await cloudboxRun({ repo: "https://github.com/x/y" }, { env: { CLOUDBOX_URL: "https://cb" } });
+    assert.equal(f.ok, false);
+    assert.equal(f.status, "failed");
+  } finally { globalThis.fetch = origFetch; }
+});
+
+test("cloud fsdep steers WIP review to local --isolation copy, cloudbox for committed repo", async () => {
+  const { cloudSpawn } = await import("../src/cloud-client.js");
+  const env = { TERRARIUM_URL: "https://x", TERRARIUM_CONTROL_TOKEN: "t" }; // no cloudbox, no repo
+  await assert.rejects(
+    () => cloudSpawn({ task: "review the repo at /Users/x/t2t for issues" }, { env }),
+    /--isolation copy|committed AND uncommitted/,
+    "fail-closed message must steer local-WIP review to --isolation copy",
+  );
+});
+
 test("cloud batch reuses the shared decide() so join semantics match local", async () => {
   // cloudSpawnBatch imports decide from batch.js — the same pure function the
   // local batch uses — so all/allSettled/race/any/quorum can never drift.

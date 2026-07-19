@@ -15,6 +15,7 @@
 import { readFileSync } from "node:fs";
 import { randomUUID } from "node:crypto";
 import { decide, validateBatchShape, BATCH_STRATEGIES } from "./batch.js";
+import { cloudboxEnabled, cloudboxRun } from "./cloudbox-client.js";
 
 export function cloudConfig(env = process.env) {
   const url = typeof env.TERRARIUM_URL === "string" ? env.TERRARIUM_URL.replace(/\/$/, "") : "";
@@ -79,11 +80,18 @@ export async function cloudSpawn(args = {}, { env = process.env, pollMs = 4000, 
   if (!config.configured) throw new Error("cloud spawn requires TERRARIUM_URL and TERRARIUM_CONTROL_TOKEN (or TERRARIUM_TOKEN_FILE)");
   const task = String(args.task ?? "");
   if (!task.trim()) throw new Error("missing task");
-  // Fail closed on filesystem-dependent tasks unless the caller explicitly
-  // accepts an ungrounded cloud run (TERRARIUM_CLOUD_ALLOW_UNGROUNDED=1).
+  // Filesystem-dependent task handling. The Cloudflare cell has no operator
+  // filesystem, so a grounded result is impossible here. Preference order:
+  //   1. If a repo is provided AND Cloudbox is wired -> DELEGATE to Cloudbox
+  //      (the sibling grounded cloud computer: real Git checkout + evidence).
+  //   2. Else fail closed (never let the model fabricate a repo it can't read).
   const fsdep = detectFilesystemDependency(args);
   if (fsdep.dependent && env.TERRARIUM_CLOUD_ALLOW_UNGROUNDED !== "1") {
-    throw new Error(`cloud spawn refused: ${fsdep.reason}. The Cloudflare cell has no access to your local files, so a grounded result is impossible and the model would fabricate one. Run locally (TERRARIUM_ALLOW_LOCAL=1, which copies your cwd into the child) or inline the file contents into the task. To override anyway, set TERRARIUM_CLOUD_ALLOW_UNGROUNDED=1.`);
+    const repo = args.repo ?? args.spec?.repo;
+    if (repo && cloudboxEnabled(env)) {
+      return await cloudboxRun(args, { env });
+    }
+    throw new Error(`cloud spawn refused: ${fsdep.reason}. The Cloudflare cell has no access to your local files, so a grounded result is impossible and the model would fabricate one (the t2t review incident). Choose grounding by what you're reviewing:\n  • LOCAL WORKING TREE incl. uncommitted edits (the usual case for reviewing work in progress) -> run LOCAL with --isolation copy (TERRARIUM_ALLOW_LOCAL=1). This copies your actual cwd — committed AND uncommitted — into the child. A cloud/cloudbox git-clone would only see committed HEAD and MISS your local changes.\n  • A COMMITTED public repo at HEAD -> delegate to Cloudbox: pass a \`repo\` (github URL) and set CLOUDBOX_URL (+ CLOUDBOX_TOKEN); Terrarium routes it to a real Git checkout with reproduce/verify receipts.\n  • Small inputs -> inline the file contents into the task text.\nTo force an ungrounded cloud run anyway, set TERRARIUM_CLOUD_ALLOW_UNGROUNDED=1.`);
   }
   const spec = {};
   if (Number.isFinite(args.timeoutMs)) spec.deadlineMs = Number(args.timeoutMs);
