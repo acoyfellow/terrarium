@@ -38,6 +38,29 @@ test("cloudConfig normalizes the URL and reads token inline or from file", async
   }
 });
 
+test("detectFilesystemDependency flags repo/path tasks, not self-contained ones", async () => {
+  const { detectFilesystemDependency } = await import("../src/cloud-client.js");
+  // filesystem-dependent (cloud cell can't ground these -> must fail closed)
+  assert.equal(detectFilesystemDependency({ task: "review the repo at /Users/x/proj" }).dependent, true);
+  assert.equal(detectFilesystemDependency({ task: "Read-only review of src/auth.js" }).dependent, true);
+  assert.equal(detectFilesystemDependency({ task: "inspect the codebase for issues" }).dependent, true);
+  assert.equal(detectFilesystemDependency({ task: "do it", cwd: "/Users/x/repo" }).dependent, true);
+  assert.equal(detectFilesystemDependency({ task: "do it", isolation: "copy" }).dependent, true);
+  // self-contained (safe in cloud)
+  assert.equal(detectFilesystemDependency({ task: "Compute 17*23 and reply with the number" }).dependent, false);
+  assert.equal(detectFilesystemDependency({ task: "reply with exactly: OK" }).dependent, false);
+});
+
+test("cloudSpawn fails closed on a filesystem-dependent task unless override set", async () => {
+  const { cloudSpawn } = await import("../src/cloud-client.js");
+  const env = { TERRARIUM_URL: "https://x", TERRARIUM_CONTROL_TOKEN: "t" };
+  await assert.rejects(
+    () => cloudSpawn({ task: "review /Users/x/repo and list files" }, { env }),
+    /cloud spawn refused/,
+    "must refuse a filesystem-dependent task before creating a run",
+  );
+});
+
 test("cloud batch reuses the shared decide() so join semantics match local", async () => {
   // cloudSpawnBatch imports decide from batch.js — the same pure function the
   // local batch uses — so all/allSettled/race/any/quorum can never drift.
