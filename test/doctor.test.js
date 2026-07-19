@@ -3,7 +3,8 @@ import assert from 'node:assert/strict';
 import { mkdir, rm, writeFile } from 'node:fs/promises';
 import { diagnoseTerrarium } from '../src/doctor.js';
 import { BATCH_API_VERSION, MCP_SCHEMA_VERSION, TERRARIUM_API_VERSION } from '../src/versions.js';
-import { LOG_DIR, WORKSPACE_DIR } from '../src/core.js';
+import { readFile } from 'node:fs/promises';
+import { LOG_DIR, WORKSPACE_DIR, CONFIG_PATH } from '../src/core.js';
 import { JOURNAL_DIR, MAILBOXES_DIR, SUBSCRIBERS_DIR } from '../src/router.js';
 
 test('doctor reports workspace footprint and flags a leaked terminal-run workspace', async () => {
@@ -107,6 +108,44 @@ test('doctor flags stale-cloud-env: cloud configured but no pulse token (undeliv
     for (const [k, v] of [['TERRARIUM_URL', saved.url], ['TERRARIUM_CONTROL_TOKEN', saved.tok], ['TERRARIUM_TOKEN_FILE', saved.tokFile], ['TERRARIUM_PULSE_TOKEN', saved.pulse], ['TERRARIUM_PULSE_TOKEN_FILE', saved.pulseFile]]) {
       if (v === undefined) delete process.env[k]; else process.env[k] = v;
     }
+  }
+});
+
+test('doctor flags stale-MCP-process-env: config records cloudUrl but process env is stale (/reload)', async () => {
+  const savedUrl = process.env.TERRARIUM_URL;
+  let savedConfig; try { savedConfig = await readFile(CONFIG_PATH, 'utf8'); } catch { savedConfig = null; }
+  try {
+    // Persist a cloud URL into config.json (operator configured cloud)...
+    await writeFile(CONFIG_PATH, JSON.stringify({ cloudUrl: 'https://terrarium.example.dev' }));
+    // ...but the running MCP process env does NOT reflect it (stale process).
+    delete process.env.TERRARIUM_URL;
+    const stale = await diagnoseTerrarium();
+    assert.equal(stale.checks.staleCloudEnv, true);
+    assert.equal(stale.checks.configuredCloudUrl, 'https://terrarium.example.dev');
+    assert.equal(stale.checks.processCloudUrl, null);
+    assert.ok(stale.warnings.some((w) => /stale mcp process env/i.test(w) && /reload/i.test(w)));
+
+    // Process env now matches the persisted config: the warning clears.
+    process.env.TERRARIUM_URL = 'https://terrarium.example.dev/';
+    const fresh = await diagnoseTerrarium();
+    assert.equal(fresh.checks.staleCloudEnv, false, 'trailing slash normalized, env matches config');
+    assert.equal(fresh.warnings.some((w) => /stale mcp process env/i.test(w)), false);
+
+    // Process env points at a DIFFERENT cloud than config: still stale.
+    process.env.TERRARIUM_URL = 'https://other.example.dev';
+    const drift = await diagnoseTerrarium();
+    assert.equal(drift.checks.staleCloudEnv, true);
+    assert.equal(drift.checks.processCloudUrl, 'https://other.example.dev');
+
+    // No cloudUrl persisted: never flagged (env-only cloud is fine).
+    await writeFile(CONFIG_PATH, JSON.stringify({ defaultModel: 'x' }));
+    process.env.TERRARIUM_URL = 'https://terrarium.example.dev';
+    const noConfig = await diagnoseTerrarium();
+    assert.equal(noConfig.checks.staleCloudEnv, false);
+    assert.equal(noConfig.checks.configuredCloudUrl, null);
+  } finally {
+    if (savedConfig === null) { try { await rm(CONFIG_PATH); } catch {} } else { await writeFile(CONFIG_PATH, savedConfig); }
+    if (savedUrl === undefined) delete process.env.TERRARIUM_URL; else process.env.TERRARIUM_URL = savedUrl;
   }
 });
 

@@ -26,6 +26,31 @@ function diagnoseCloudEnv(env = process.env) {
   };
 }
 
+// Stale-MCP-process-env: the long-lived MCP process caches process.env from the
+// moment it was spawned. If the operator later configures cloud execution (writes
+// a cloudUrl into config.json, or exports TERRARIUM_URL in a fresh shell) WITHOUT
+// restarting the MCP process, this running process still has the OLD env — it will
+// silently execute locally while the session believes it is on cloud. The fix is
+// always `/reload`. We detect it structurally: the persisted config on disk
+// records a cloudUrl, but this process's TERRARIUM_URL is absent or different.
+// Read from disk fresh (not the cached load) so the comparison reflects reality.
+async function diagnoseStaleCloudEnv(env = process.env) {
+  let configuredUrl = "";
+  try {
+    const cfg = JSON.parse(await readFile(CONFIG_PATH, "utf8"));
+    configuredUrl = typeof cfg.cloudUrl === "string" ? cfg.cloudUrl.replace(/\/$/, "") : "";
+  } catch { /* no config or unreadable: nothing persisted to compare against */ }
+  if (!configuredUrl) return { staleCloudEnv: false, configuredCloudUrl: null, processCloudUrl: null };
+  const processUrl = typeof env.TERRARIUM_URL === "string" ? env.TERRARIUM_URL.replace(/\/$/, "") : "";
+  return {
+    // Persisted config wants cloud, but the running process env disagrees
+    // (missing or pointing elsewhere): this MCP process is stale, /reload it.
+    staleCloudEnv: processUrl !== configuredUrl,
+    configuredCloudUrl: configuredUrl,
+    processCloudUrl: processUrl || null,
+  };
+}
+
 async function writable(path) {
   try { await mkdir(path, { recursive: true }); await access(path, constants.R_OK | constants.W_OK); return true; } catch { return false; }
 }
@@ -138,6 +163,7 @@ export async function diagnoseTerrarium() {
     workspaceBytes: workspace.workspaceBytes,
     leakedWorkspaces: workspace.leakedWorkspaces,
     ...diagnoseCloudEnv(),
+    ...(await diagnoseStaleCloudEnv()),
   };
   for (const run of runs.runs) {
     if (["running", "orphaned"].includes(run.status)) continue;
@@ -208,6 +234,7 @@ export async function diagnoseTerrarium() {
   if (checks.staleChildClaims) warnings.push(`${checks.staleChildClaims} stale child-slot claim(s) exist from older runs`);
   if (checks.leakedWorkspaces) warnings.push(`${checks.leakedWorkspaces} isolation workspace(s) survived a terminal run without keepWorkspace (possible workspace leak); inspect ${WORKSPACE_DIR}`);
   if (checks.cloudCallbacksUndeliverable) warnings.push("Cloud execution is configured (TERRARIUM_URL + control token) but no pulse token is set, so background cloud runs' terminal callbacks cannot reach this session; set TERRARIUM_PULSE_TOKEN(_FILE) and /reload the MCP process");
+  if (checks.staleCloudEnv) warnings.push(`Stale MCP process env: config.json records cloudUrl=${checks.configuredCloudUrl} but this process's TERRARIUM_URL is ${checks.processCloudUrl ? checks.processCloudUrl : "unset"}; the running MCP process was started before cloud was configured and will execute locally — /reload the MCP process to pick up the cloud env`);
   const repairPlan = buildRepairPlan(checks, details);
   const repairPlanSummary = summarizeRepairPlan(repairPlan);
   return { ok: warnings.length === 0, version: VERSION, apiVersion: TERRARIUM_API_VERSION, schemaVersion: MCP_SCHEMA_VERSION, batchApiVersion: BATCH_API_VERSION, batchSupportedOptions: BATCH_SUPPORTED_OPTIONS, checks, details, warnings, repairPlan, repairPlanSummary, paths: { home: HOME, logs: LOG_DIR, workspaces: WORKSPACE_DIR, events: EVENT_DIR, router: ROUTER_DIR } };
