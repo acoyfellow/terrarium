@@ -2,6 +2,7 @@
 //
 // Routes:
 //   POST /api/runs                        -> admit one run
+//   GET  /api/runs?channel=&status=&since=&limit=  -> list caller's runs
 //   GET  /api/runs/:runId/status
 //   GET  /api/runs/:runId/logs
 //   POST /api/runs/:runId/cancel
@@ -24,6 +25,7 @@
 // The worker does NOT execute any task itself; it is a thin auth+router.
 
 import { authenticatePrincipal } from "./principal-auth.js";
+import { listPrincipalRuns } from "./run-index.js";
 import { buildSourceRegistry, effectiveCatalog } from "./model-catalog.js";
 import {
   canonicalRequestHash,
@@ -179,6 +181,26 @@ export async function handleApiRuns(request, env) {
       return res;
     }
     return res;
+  }
+
+  // GET /api/runs — read-only per-principal run list from the control-plane
+  // index. Owner-scoped (never accepts an ownerId from the client), supports
+  // channel/status/since/limit filters, and returns a channel rollup. Fail-soft:
+  // if the index binding is missing this returns an empty list rather than 500,
+  // since the index is observability, not the run authority.
+  if (path === "/api/runs" && method === "GET") {
+    const channel = url.searchParams.get("channel") || undefined;
+    const status = url.searchParams.get("status") || undefined;
+    const sinceRaw = url.searchParams.get("since");
+    const limitRaw = url.searchParams.get("limit");
+    const since = sinceRaw != null && /^\d+$/.test(sinceRaw) ? Number(sinceRaw) : undefined;
+    const limit = limitRaw != null && /^\d+$/.test(limitRaw) ? Number(limitRaw) : undefined;
+    const kv = env.TERRARIUM_LEDGER;
+    if (!kv || typeof kv.list !== "function") {
+      return Response.json({ ok: true, runs: [], channels: {}, indexUnavailable: true });
+    }
+    const result = await listPrincipalRuns(kv, ownerId, { channel, status, since, limit });
+    return Response.json({ ok: true, ...result });
   }
 
   // GET /api/runs/budget/snapshot — read-only budget posture for the caller's

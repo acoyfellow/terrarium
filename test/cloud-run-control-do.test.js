@@ -65,7 +65,7 @@ function makeState() {
 }
 
 /** Namespace mock that maps `idFromName -> get` onto one DO per runId. */
-function makeRunNamespace() {
+function makeRunNamespace(ledger) {
   const instances = new Map();
   return {
     idFromName(name) { return { toString: () => `id_${name}`, __name: name }; },
@@ -74,7 +74,7 @@ function makeRunNamespace() {
       if (!instances.has(name)) {
         const state = makeState();
         const backend = new DetachedProcessBackend();
-        const env = { __TERRARIUM_TEST_BACKEND__: backend };
+        const env = { __TERRARIUM_TEST_BACKEND__: backend, ...(ledger ? { TERRARIUM_LEDGER: ledger } : {}) };
         const doInstance = new RunControlDO(state, env);
         instances.set(name, { doInstance, state, backend });
       }
@@ -118,12 +118,14 @@ function makeEnv({
   principalId = "principal-test",
   currentToken = "test-token-current",
   previousToken,
+  ledger,
 } = {}) {
   const env = {
     TERRARIUM_PRINCIPAL_ID: principalId,
     TERRARIUM_CONTROL_TOKEN_CURRENT: currentToken,
-    TERRARIUM_RUN: makeRunNamespace(),
+    TERRARIUM_RUN: makeRunNamespace(ledger),
     TERRARIUM_PRINCIPAL_BUDGET: makePrincipalBudgetNamespace(),
+    ...(ledger ? { TERRARIUM_LEDGER: ledger } : {}),
   };
   if (previousToken) env.TERRARIUM_CONTROL_TOKEN_PREVIOUS = previousToken;
   return env;
@@ -368,6 +370,68 @@ test("POST /api/runs requires bearer auth (fail-closed)", async () => {
   const env = makeEnv();
   const res = await handleApiRuns(new Request("https://x/api/runs", { method: "POST" }), env);
   assert.equal(res.status, 401);
+});
+
+test("GET /api/runs requires bearer auth (fail-closed)", async () => {
+  const env = makeEnv({ ledger: makeIndexKV() });
+  const res = await handleApiRuns(new Request("https://x/api/runs", { method: "GET" }), env);
+  assert.equal(res.status, 401);
+});
+
+test("GET /api/runs lists the caller's own runs with channel rollup", async () => {
+  const ledger = makeIndexKV();
+  const env = makeEnv({ ledger });
+  // Admit two runs on the same channel via the real API path.
+  for (let i = 0; i < 2; i++) {
+    const admit = await handleApiRuns(
+      bearerRequest("https://x/api/runs", { method: "POST", body: { task: `t${i}`, spec: { channel: "loop-A" } } }),
+      env,
+    );
+    assert.equal(admit.status, 202);
+  }
+  const res = await handleApiRuns(bearerRequest("https://x/api/runs", { method: "GET" }), env);
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.equal(body.ok, true);
+  assert.equal(body.runs.length, 2, "both admitted runs are indexed and listed");
+  assert.ok(body.channels["loop-A"], "channel rollup present");
+  assert.equal(body.channels["loop-A"].total, 2);
+  for (const r of body.runs) assert.equal(r.ownerId, "principal-test");
+});
+
+test("GET /api/runs is owner-scoped: principal B never sees principal A's runs", async () => {
+  const ledger = makeIndexKV();
+  const envA = makeEnv({ principalId: "principal-A", currentToken: "tok-A", ledger });
+  const envB = makeEnv({ principalId: "principal-B", currentToken: "tok-B", ledger });
+  await handleApiRuns(
+    bearerRequest("https://x/api/runs", { method: "POST", token: "tok-A", body: { task: "a-run", spec: { channel: "c" } } }),
+    envA,
+  );
+  const resB = await handleApiRuns(bearerRequest("https://x/api/runs", { method: "GET", token: "tok-B" }), envB);
+  assert.equal(resB.status, 200);
+  const bodyB = await resB.json();
+  assert.equal(bodyB.runs.length, 0, "cross-principal runs are invisible");
+});
+
+test("GET /api/runs filters by channel and status", async () => {
+  const ledger = makeIndexKV();
+  const env = makeEnv({ ledger });
+  await handleApiRuns(bearerRequest("https://x/api/runs", { method: "POST", body: { task: "x", spec: { channel: "keep" } } }), env);
+  await handleApiRuns(bearerRequest("https://x/api/runs", { method: "POST", body: { task: "y", spec: { channel: "drop" } } }), env);
+  const res = await handleApiRuns(bearerRequest("https://x/api/runs?channel=keep", { method: "GET" }), env);
+  const body = await res.json();
+  assert.equal(body.runs.length, 1);
+  assert.equal(body.runs[0].channel, "keep");
+});
+
+test("GET /api/runs is fail-soft when the index binding is absent", async () => {
+  const env = makeEnv(); // no ledger
+  const res = await handleApiRuns(bearerRequest("https://x/api/runs", { method: "GET" }), env);
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.equal(body.ok, true);
+  assert.equal(body.indexUnavailable, true);
+  assert.deepEqual(body.runs, []);
 });
 
 test("POST /api/runs admits and returns 202 + runId + contract", async () => {
