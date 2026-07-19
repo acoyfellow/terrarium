@@ -1096,8 +1096,9 @@ export class RunControlDO {
     if (!ownerId) return Response.json({ ok: false, error: "missing-owner" }, { status: 401 });
     await this.#ensureCell();
     if (!this.#runId) return Response.json({ ok: false, error: "no-run" }, { status: 404 });
+    let runStatus;
     try {
-      this.#cell.status(this.#runId, ownerId);
+      runStatus = this.#cell.status(this.#runId, ownerId);
     } catch (err) {
       const code = err?.code === "EACCES" ? 403 : 404;
       return Response.json({ ok: false, error: err.message }, { status: code });
@@ -1105,7 +1106,14 @@ export class RunControlDO {
     // Round 5B.1: anchor the kill promise with waitUntil so the DO cannot be
     // evicted before killProcess confirms. Failed kill leaves waitExit
     // unsettled; alarm() retries via poll + timeout/cancel.
+    // Cancel is idempotent. If the run already reached terminal (its execution
+    // was evicted from the cell), cancel() returns { alreadyTerminal } instead of
+    // throwing `unknown executionRef` — return an already-terminal result, not a
+    // 500 (issue #18).
     const killResult = this.#cell.cancel(this.#runId);
+    if (killResult && killResult.alreadyTerminal) {
+      return Response.json({ ok: true, cancelled: false, alreadyTerminal: true, status: runStatus?.status ?? "terminal" });
+    }
     this.#state.waitUntil?.(Promise.resolve(killResult).catch(() => {}));
     // Only drive to terminal after we have some proof of settlement.
     this.#state.waitUntil?.(this.#driveToTerminal(this.#runId, ownerId));

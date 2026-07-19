@@ -394,7 +394,19 @@ export class TerrariumRunCell {
   cancel(runId) {
     const run = this.#requireRun(runId);
     this.#state.patch(runId, { intent: "cancel" });
-    return this.#backend.cancel(run.executionRef);
+    // Idempotent cancel (issue #18): after a DO restart a finalized run's
+    // execution is gone from the backend, so backend.cancel throws
+    // `unknown executionRef` (HTTP 500). Only that specific missing-execution
+    // case is converted to an already-terminal result; every other cancel path
+    // (including cancelling a still-live or just-finalized run) is unchanged.
+    try {
+      return this.#backend.cancel(run.executionRef);
+    } catch (err) {
+      if (String(err?.message || "").includes("unknown executionRef")) {
+        return { alreadyTerminal: true, runId, status: run.terminal?.status ?? run.status ?? "terminal" };
+      }
+      throw err;
+    }
   }
 
   /** Persist deadline intent durably, then signal the detached execution by ref.

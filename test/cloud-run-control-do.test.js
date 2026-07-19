@@ -676,6 +676,38 @@ test("DO idempotent collect: two collects yield the same terminal", async () => 
   assert.equal(a.terminal.status, "done");
 });
 
+test("DO idempotent cancel of an already-terminal run: no 500, returns alreadyTerminal (issue #18)", async () => {
+  const state = makeState();
+  const backend = new DetachedProcessBackend();
+  const env = { __TERRARIUM_TEST_BACKEND__: backend };
+  const doInst = new RunControlDO(state, env);
+
+  await doInst.fetch(new Request("https://do/admit", {
+    method: "POST", headers: { "content-type": "application/json" },
+    body: JSON.stringify({ task: "finishes then cancelled", ownerId: "owner-A" }),
+  }));
+  await state.drain(); // drive to terminal (done)
+  const collect = await (await doInst.fetch(new Request("https://do/collect", {
+    method: "POST", headers: { "content-type": "application/json" },
+    body: JSON.stringify({ ownerId: "owner-A" }),
+  }))).json();
+  assert.equal(collect.terminal.status, "done");
+  // Simulate DO restart / handle loss: a FRESH RunControlDO over the SAME durable
+  // state but with a FRESH backend (empty in-memory execution map), so the
+  // terminal run's execution is gone — the exact 'unknown executionRef'
+  // condition from issue #18 that produced HTTP 500.
+  const restartedEnv = { __TERRARIUM_TEST_BACKEND__: new DetachedProcessBackend() };
+  const restarted = new RunControlDO(state, restartedEnv);
+  const res = await restarted.fetch(new Request("https://do/cancel", {
+    method: "POST", headers: { "content-type": "application/json" },
+    body: JSON.stringify({ ownerId: "owner-A" }),
+  }));
+  assert.equal(res.status, 200, "cancel of an already-terminal run after restart must be 200, not 500");
+  const body = await res.json();
+  assert.equal(body.ok, true);
+  assert.equal(body.alreadyTerminal, true);
+});
+
 test("Round 5B.1: alarm cannot finalize a run whose process still reports running after a failed kill", async () => {
   // A backend whose poll() only reports terminal after cancel/timeout is
   // actually acknowledged by killProcess. Model a first-kill failure by
