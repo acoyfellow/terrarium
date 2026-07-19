@@ -5,6 +5,26 @@ import { requeueInflightEvents } from "./router.js";
 import { BATCH_API_VERSION, BATCH_SUPPORTED_OPTIONS, MCP_SCHEMA_VERSION, TERRARIUM_API_VERSION } from "./versions.js";
 import { GROUP_DIR } from "./groups.js";
 import { JOURNAL_DIR, MAILBOXES_DIR, ROUTER_DIR, SUBSCRIBERS_DIR } from "./router.js";
+import { cloudEnabled, pulseEnabled } from "./cloud-client.js";
+
+// Stale-cloud-env: a session configured for cloud execution (TERRARIUM_URL +
+// control token) but WITHOUT a pulse token cannot receive a background cloud
+// run's terminal callback — the DO emits it into the cloud Pulse mailbox, but
+// this session never subscribes/claims it, so the driver waits forever. This is
+// the delivery-path failure behind issue #18 (missing callback despite verified
+// receipt) and the looprunner/my.ax stale-MCP-env incidents. Detected from real
+// config, not a guess: cloud on + pulse off.
+function diagnoseCloudEnv(env = process.env) {
+  const cloud = cloudEnabled(env);
+  const pulse = pulseEnabled(env);
+  return {
+    cloudConfigured: cloud,
+    pulseConfigured: pulse,
+    // The dangerous combination: cloud runs will execute but their terminal
+    // callbacks cannot be delivered to this session.
+    cloudCallbacksUndeliverable: cloud && !pulse,
+  };
+}
 
 async function writable(path) {
   try { await mkdir(path, { recursive: true }); await access(path, constants.R_OK | constants.W_OK); return true; } catch { return false; }
@@ -117,6 +137,7 @@ export async function diagnoseTerrarium() {
     workspaceDirs: workspace.workspaceDirs,
     workspaceBytes: workspace.workspaceBytes,
     leakedWorkspaces: workspace.leakedWorkspaces,
+    ...diagnoseCloudEnv(),
   };
   for (const run of runs.runs) {
     if (["running", "orphaned"].includes(run.status)) continue;
@@ -186,6 +207,7 @@ export async function diagnoseTerrarium() {
   if (checks.missingTerminalCallbacks) warnings.push(`${checks.missingTerminalCallbacks} terminal run(s) are missing durable callback events; recover those run IDs`);
   if (checks.staleChildClaims) warnings.push(`${checks.staleChildClaims} stale child-slot claim(s) exist from older runs`);
   if (checks.leakedWorkspaces) warnings.push(`${checks.leakedWorkspaces} isolation workspace(s) survived a terminal run without keepWorkspace (possible workspace leak); inspect ${WORKSPACE_DIR}`);
+  if (checks.cloudCallbacksUndeliverable) warnings.push("Cloud execution is configured (TERRARIUM_URL + control token) but no pulse token is set, so background cloud runs' terminal callbacks cannot reach this session; set TERRARIUM_PULSE_TOKEN(_FILE) and /reload the MCP process");
   const repairPlan = buildRepairPlan(checks, details);
   const repairPlanSummary = summarizeRepairPlan(repairPlan);
   return { ok: warnings.length === 0, version: VERSION, apiVersion: TERRARIUM_API_VERSION, schemaVersion: MCP_SCHEMA_VERSION, batchApiVersion: BATCH_API_VERSION, batchSupportedOptions: BATCH_SUPPORTED_OPTIONS, checks, details, warnings, repairPlan, repairPlanSummary, paths: { home: HOME, logs: LOG_DIR, workspaces: WORKSPACE_DIR, events: EVENT_DIR, router: ROUTER_DIR } };

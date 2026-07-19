@@ -96,6 +96,11 @@ export async function cloudSpawn(args = {}, { env = process.env, pollMs = 4000, 
   const spec = {};
   if (Number.isFinite(args.timeoutMs)) spec.deadlineMs = Number(args.timeoutMs);
   if (args.model) spec.model = String(args.model);
+  // Control-plane index metadata: channel is the real grouping key (measured
+  // 100% clean clusters); workflowId is opt-in only (defaults to own runId, a
+  // grouping trap, so we forward it only when the caller sets it explicitly).
+  if (args.channel) spec.channel = String(args.channel);
+  if (args.workflowId) spec.workflowId = String(args.workflowId);
 
   const submit = await api("/api/runs", { method: "POST", body: { task, ...(Object.keys(spec).length ? { spec } : {}) }, config });
   if (submit.code !== 202 || !submit.json?.runId) {

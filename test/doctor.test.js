@@ -69,6 +69,47 @@ test('doctor reports bounded operational diagnostics without process environment
   assert.equal(result.repairPlan.filter((step) => step.tool).length, result.repairPlanSummary.actionable);
 });
 
+test('doctor flags stale-cloud-env: cloud configured but no pulse token (undeliverable background callbacks)', async () => {
+  const saved = {
+    url: process.env.TERRARIUM_URL, tok: process.env.TERRARIUM_CONTROL_TOKEN,
+    tokFile: process.env.TERRARIUM_TOKEN_FILE, pulse: process.env.TERRARIUM_PULSE_TOKEN,
+    pulseFile: process.env.TERRARIUM_PULSE_TOKEN_FILE,
+  };
+  try {
+    // Cloud on (url + control token), pulse OFF: the dangerous combination.
+    process.env.TERRARIUM_URL = 'https://terrarium.example.dev';
+    process.env.TERRARIUM_CONTROL_TOKEN = 'ctrl-token';
+    delete process.env.TERRARIUM_TOKEN_FILE;
+    delete process.env.TERRARIUM_PULSE_TOKEN;
+    delete process.env.TERRARIUM_PULSE_TOKEN_FILE;
+    const bad = await diagnoseTerrarium();
+    assert.equal(bad.checks.cloudConfigured, true);
+    assert.equal(bad.checks.pulseConfigured, false);
+    assert.equal(bad.checks.cloudCallbacksUndeliverable, true);
+    assert.ok(bad.warnings.some((w) => /pulse token/i.test(w) && /reload/i.test(w)));
+
+    // Add the pulse token: the warning clears.
+    process.env.TERRARIUM_PULSE_TOKEN = 'pulse-token';
+    const good = await diagnoseTerrarium();
+    assert.equal(good.checks.cloudConfigured, true);
+    assert.equal(good.checks.pulseConfigured, true);
+    assert.equal(good.checks.cloudCallbacksUndeliverable, false);
+    assert.equal(good.warnings.some((w) => /pulse token/i.test(w)), false);
+
+    // Pure-local (no cloud): never flagged.
+    delete process.env.TERRARIUM_URL;
+    delete process.env.TERRARIUM_CONTROL_TOKEN;
+    delete process.env.TERRARIUM_PULSE_TOKEN;
+    const local = await diagnoseTerrarium();
+    assert.equal(local.checks.cloudConfigured, false);
+    assert.equal(local.checks.cloudCallbacksUndeliverable, false);
+  } finally {
+    for (const [k, v] of [['TERRARIUM_URL', saved.url], ['TERRARIUM_CONTROL_TOKEN', saved.tok], ['TERRARIUM_TOKEN_FILE', saved.tokFile], ['TERRARIUM_PULSE_TOKEN', saved.pulse], ['TERRARIUM_PULSE_TOKEN_FILE', saved.pulseFile]]) {
+      if (v === undefined) delete process.env[k]; else process.env[k] = v;
+    }
+  }
+});
+
 test('doctor derives a recover-oriented repair plan from detected reconstruction signals', async () => {
   const suffix = `${process.pid}_${Date.now()}_repairplan`;
   const subscriberId = `doctor_repair_${suffix}`;
