@@ -1,0 +1,89 @@
+{
+  "receipt": "c2-batch-happy-path",
+  "mode": "fixture (in-process, no live token, no network)",
+  "generatedAt": "2026-07-20T11:25:57.059Z",
+  "scenarioA": {
+    "tasks": 6,
+    "maxConcurrency": 3,
+    "batchId": "bat_mrt52a9s_f1c32b008ddf",
+    "admitted": 6,
+    "peakLive": 3,
+    "finalStatus": "done"
+  },
+  "scenarioB_failureTruth": {
+    "batchId": "bat_mrt52aaq_0fe7644039f2",
+    "finalStatus": "failed",
+    "done": 2,
+    "failed": 1
+  },
+  "checks": [
+    {
+      "name": "1. admit N through admitOneRun (POST 202)",
+      "pass": true,
+      "detail": {
+        "status": 202,
+        "admitted": 6,
+        "requested": 6
+      }
+    },
+    {
+      "name": "1b. child runIds minted (ter_ prefix, no receipts inlined)",
+      "pass": true,
+      "detail": {
+        "childRunIds": [
+          "ter_mrt52a9t_15a1ca32b013",
+          "ter_mrt52a9t_b42736360d7d",
+          "ter_mrt52a9t_3f078f4f9fcf",
+          "ter_mrt52aa9_bef3ede5a234",
+          "ter_mrt52aa9_66b23222232a",
+          "ter_mrt52aaa_b2fe1060d8f6"
+        ]
+      }
+    },
+    {
+      "name": "2. peakLive <= maxConcurrency (window respected)",
+      "pass": true,
+      "detail": {
+        "reportedPeak": 3,
+        "doObservedPeak": 3,
+        "maxConcurrency": 3
+      }
+    },
+    {
+      "name": "3a. aggregate is 'running' while children non-terminal",
+      "pass": true,
+      "detail": {
+        "status": "running",
+        "running": 6,
+        "done": 0
+      }
+    },
+    {
+      "name": "3b. aggregate transitions running -> done when all terminal+ok",
+      "pass": true,
+      "detail": {
+        "status": "done",
+        "done": 6,
+        "failed": 0
+      }
+    },
+    {
+      "name": "4. failure-truth: one failed child forces 'failed', never 'done'",
+      "pass": true,
+      "detail": {
+        "status": "failed",
+        "done": 2,
+        "failed": 1
+      }
+    },
+    {
+      "name": "4b. done-but-ok:false counted as failure, not done",
+      "pass": true,
+      "detail": {
+        "status": "failed",
+        "failed": 1
+      }
+    }
+  ],
+  "verdict": "PASS"
+}
