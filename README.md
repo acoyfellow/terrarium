@@ -108,7 +108,7 @@ authenticated POST /api/runs (Bearer + Idempotency-Key)
 → durable principal-scoped terminal callback (Pulse)
 ```
 
-All `/api/runs*` and `/api/batches*` routes require an `Authorization` header of the form `Bearer $TERRARIUM_CONTROL_TOKEN` (your control token, supplied via env — never hardcoded); `POST /api/runs` and `POST /api/batches` also require an `Idempotency-Key`. Your deployed instance also serves owner-authenticated web consoles at `/runs` (run index) and `/batches` (batch fan-out), which keep the token in the browser tab only.
+All `/api/runs*` and `/api/batches*` routes require an `Authorization` header of the form `Bearer $TERRARIUM_CONTROL_TOKEN` (your control token, supplied via env — never hardcoded); `POST /api/runs` and `POST /api/batches` also require an `Idempotency-Key`. Your deployed instance also serves owner-authenticated web consoles at `/runs` (run index) and `/batches` (batch fan-out). Those pages sign in with GitHub (`/auth/login` sets an HttpOnly session cookie); only the configured owner login may enter, and the page never holds a token. Requires `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `SESSION_SECRET`, and `GITHUB_ALLOWED_LOGIN`; without them `/auth/*` fails closed and the API still requires a bearer.
 
 | Method + path | Purpose | Notes |
 | --- | --- | --- |

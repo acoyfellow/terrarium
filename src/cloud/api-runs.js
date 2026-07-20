@@ -25,6 +25,7 @@
 // The worker does NOT execute any task itself; it is a thin auth+router.
 
 import { authenticatePrincipal } from "./principal-auth.js";
+import { authenticateOwner } from "./web-session.js";
 import { listPrincipalRuns } from "./run-index.js";
 import { buildSourceRegistry, effectiveCatalog } from "./model-catalog.js";
 import {
@@ -163,7 +164,7 @@ export async function handleApiRuns(request, env) {
   // Round 5C1: explicit principal-auth gate. Fail closed on any missing or
   // wrong credential; never derive owner from the token; never accept an
   // ownerId from the client body.
-  const auth = authenticatePrincipal(request, env);
+  const auth = await authenticateOwner(request, env);
   if (!auth.ok) return Response.json({ ok: false, error: auth.error }, { status: auth.status });
   const ownerId = auth.principalId;
 

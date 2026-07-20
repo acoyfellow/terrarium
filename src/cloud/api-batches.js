@@ -23,7 +23,7 @@
 // never from the client. Cross-owner or unknown batchId reads normalize to 404
 // so a probing caller cannot enumerate the batchId space.
 
-import { authenticatePrincipal } from "./principal-auth.js";
+import { authenticateOwner } from "./web-session.js";
 import { admitOneRun } from "./api-runs.js";
 import { putBatchRecord, getBatchRecord, aggregateBatch } from "./run-index.js";
 
@@ -100,7 +100,7 @@ export async function handleApiBatches(request, env) {
 
   if (!path.startsWith("/api/batches")) return null;
 
-  const auth = authenticatePrincipal(request, env);
+  const auth = await authenticateOwner(request, env);
   if (!auth.ok) return Response.json({ ok: false, error: auth.error }, { status: auth.status });
   const ownerId = auth.principalId;
 

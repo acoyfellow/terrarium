@@ -64,17 +64,28 @@
   const route = () => path === '/docs' ? 'docs' : path === '/runs' ? 'runs' : path === '/batches' ? 'batches' : (path === '/changelog' || hash === '#changelog') ? 'changelog' : 'home';
 
   // --- Run index (/runs) — owner-authenticated view of GET /api/runs. -------
-  // Token lives ONLY in sessionStorage (never localStorage, never committed,
-  // never on disk). Cleared on tab close. 401 -> auth prompt, never a broken
-  // page. This surface CONSUMES the existing endpoint; no backend changes.
-  let runsToken = $state(sessionStorage.getItem('terra_token') || '');
-  let runsAuthed = $state(!!sessionStorage.getItem('terra_token'));
+  // Auth is a GitHub sign-in: /auth/login sets an HttpOnly session cookie the
+  // browser sends automatically. The page never holds a token. API calls use
+  // credentials:'same-origin' so the cookie rides along; a 401 sends the user
+  // back to sign-in rather than showing a broken page. The Bearer path still
+  // exists for the CLI/MCP — it just isn't what a human uses here.
+  let runsAuthed = $state(false);
+  let authChecked = $state(false);
+  let authLogin = $state('');
   let runsData = $state({ runs: [], channels: {} });
   let runsError = $state('');
   let runsLoading = $state(false);
   let filterStatus = $state('');
   let filterSince = $state('');
-  let tokenDraft = $state('');
+
+  async function checkSession() {
+    try {
+      const res = await fetch('/auth/me', { credentials: 'same-origin' });
+      if (res.ok) { const b = await res.json(); runsAuthed = true; authLogin = b.login || ''; }
+      else { runsAuthed = false; }
+    } catch { runsAuthed = false; }
+    finally { authChecked = true; }
+  }
 
   function runsQuery() {
     const p = new URLSearchParams();
@@ -88,15 +99,12 @@
   }
 
   async function loadRuns() {
-    if (!runsToken) { runsAuthed = false; return; }
     runsLoading = true; runsError = '';
     try {
-      const res = await fetch(runsQuery(), { headers: { authorization: 'Bearer ' + runsToken } });
+      const res = await fetch(runsQuery(), { credentials: 'same-origin' });
       if (res.status === 401) {
         runsAuthed = false;
-        runsError = 'Authentication required — token missing, wrong, or expired.';
-        sessionStorage.removeItem('terra_token');
-        runsToken = '';
+        runsError = 'Session expired — sign in again.';
         return;
       }
       if (!res.ok) { runsError = 'Request failed (' + res.status + ').'; return; }
@@ -110,19 +118,12 @@
     }
   }
 
-  function submitToken(e) {
-    if (e) e.preventDefault();
-    if (!tokenDraft.trim()) return;
-    runsToken = tokenDraft.trim();
-    sessionStorage.setItem('terra_token', runsToken);
-    runsAuthed = true;
-    tokenDraft = '';
-    loadRuns();
+  function signIn(next) {
+    location.href = '/auth/login?next=' + encodeURIComponent(next || location.pathname);
   }
 
   function signOutRuns() {
-    sessionStorage.removeItem('terra_token');
-    runsToken = ''; runsAuthed = false; runsData = { runs: [], channels: {} }; runsError = '';
+    location.href = '/auth/logout?next=' + encodeURIComponent(location.pathname);
   }
 
   // Group runs by channel for display (channel is the grouping key).
@@ -136,10 +137,11 @@
   };
 
   // --- Batch console (/batches) — submit a bounded batch, poll the aggregate. -
-  // Reuses the SAME sessionStorage token as /runs (owner-scoped, this-tab-only,
-  // never committed). POST /api/batches -> poll GET /api/batches/:id. The
-  // rendered aggregate is the backend's FAILURE-TRUTH derivation verbatim; the
-  // UI never re-derives "done" — a non-success is shown as failed, not done.
+  // Uses the SAME GitHub session cookie as /runs (owner-scoped). POST
+  // /api/batches -> poll GET /api/batches/:id, both with credentials:
+  // 'same-origin'. The rendered aggregate is the backend's FAILURE-TRUTH
+  // derivation verbatim; the UI never re-derives "done" — a non-success is
+  // shown as failed, not done.
   let batchTasksText = $state('reply with: alpha\nreply with: bravo\nreply with: charlie');
   let batchConcurrency = $state(4);
   let batchSubmitting = $state(false);
@@ -154,23 +156,23 @@
 
   async function submitBatch(e) {
     if (e) e.preventDefault();
-    if (!runsToken) { runsAuthed = false; return; }
+    if (!runsAuthed) return;
     const tasks = parseBatchTasks();
     if (tasks.length === 0) { batchError = 'Enter at least one task (one per line).'; return; }
     batchSubmitting = true; batchError = ''; batchAgg = null; batchId = '';
     try {
       const res = await fetch('/api/batches', {
         method: 'POST',
+        credentials: 'same-origin',
         headers: {
-          authorization: 'Bearer ' + runsToken,
           'content-type': 'application/json',
           'idempotency-key': 'ui-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8),
         },
         body: JSON.stringify({ tasks, maxConcurrency: Number(batchConcurrency) || 4 }),
       });
       if (res.status === 401) {
-        runsAuthed = false; sessionStorage.removeItem('terra_token'); runsToken = '';
-        batchError = 'Authentication required — token missing, wrong, or expired.';
+        runsAuthed = false;
+        batchError = 'Session expired — sign in again.';
         return;
       }
       if (res.status !== 202) {
@@ -189,12 +191,12 @@
   }
 
   async function pollBatch() {
-    if (!batchId || !runsToken) return;
+    if (!batchId) return;
     try {
-      const res = await fetch('/api/batches/' + batchId, { headers: { authorization: 'Bearer ' + runsToken } });
+      const res = await fetch('/api/batches/' + batchId, { credentials: 'same-origin' });
       if (res.status === 401) {
-        runsAuthed = false; sessionStorage.removeItem('terra_token'); runsToken = '';
-        batchError = 'Authentication required — token missing, wrong, or expired.';
+        runsAuthed = false;
+        batchError = 'Session expired — sign in again.';
         return;
       }
       if (res.ok) {
@@ -251,8 +253,14 @@
   let io;
   if (typeof document !== 'undefined') document.documentElement.classList.add('reveal-js');
   $effect(() => {
-    // Auto-load the run index whenever we land on /runs with a stored token.
-    if (route() === 'runs' && runsToken && !runsLoading) loadRuns();
+    // On the console routes: verify the session once, then auto-load the run
+    // index if signed in. Session lives in an HttpOnly cookie the browser
+    // sends automatically — nothing to read from JS.
+    const r = route();
+    if ((r === 'runs' || r === 'batches')) {
+      if (!authChecked) checkSession();
+      else if (r === 'runs' && runsAuthed && !runsLoading && runsData.runs.length === 0) loadRuns();
+    }
   });
 
   $effect(() => {
@@ -460,17 +468,17 @@ POST https://terrarium-control.<you>.workers.dev/api/runs  ->  202 { runId }`}</
       <div class="runs-head">
         <div class="eyebrow">Run index</div>
         <h1>Your runs.</h1>
-        <p class="lead">Every admitted run on your instance, grouped by channel. Owner-scoped and auth-gated — the token stays in this tab only.</p>
+        <p class="lead">Every admitted run on your instance, grouped by channel. Owner-scoped. Sign in with GitHub — the session is a cookie, so the page never holds a token.</p>
       </div>
 
-      {#if !runsAuthed}
-        <form class="runs-auth" onsubmit={submitToken}>
-          <label for="tok">Control token</label>
-          <p class="runs-auth-note">Paste your control token to list runs. It is kept in <code>sessionStorage</code> for this tab only — never written to disk or sent anywhere but <code>/api/runs</code>.</p>
-          <input id="tok" type="password" autocomplete="off" bind:value={tokenDraft} placeholder="Bearer token…" />
-          <button class="btn btn-primary" type="submit">Load runs</button>
+      {#if !authChecked}
+        <p class="runs-empty">Checking session…</p>
+      {:else if !runsAuthed}
+        <div class="runs-auth">
+          <p class="runs-auth-note">Sign in with GitHub to list your runs. Only this instance's owner is allowed in; the session cookie is HttpOnly, so no token ever lives in the page.</p>
+          <button class="btn btn-primary" onclick={() => signIn('/runs')}>Sign in with GitHub</button>
           {#if runsError}<p class="runs-error">{runsError}</p>{/if}
-        </form>
+        </div>
       {:else}
         <div class="runs-controls">
           <div class="runs-filters">
@@ -522,17 +530,17 @@ POST https://terrarium-control.<you>.workers.dev/api/runs  ->  202 { runId }`}</
       <div class="runs-head">
         <div class="eyebrow">Batch console</div>
         <h1>Fan out a batch.</h1>
-        <p class="lead">Admit N bounded tasks as one batch under a concurrency window. The aggregate below is the backend's failure-truth verbatim — a non-success is never rolled up as done. Owner-scoped, auth-gated, token stays in this tab.</p>
+        <p class="lead">Admit N bounded tasks as one batch under a concurrency window. The aggregate below is the backend's failure-truth verbatim — a non-success is never rolled up as done. Owner-scoped; sign in with GitHub.</p>
       </div>
 
-      {#if !runsAuthed}
-        <form class="runs-auth" onsubmit={submitToken}>
-          <label for="btok">Control token</label>
-          <p class="runs-auth-note">Paste your control token to submit batches. Kept in <code>sessionStorage</code> for this tab only — never written to disk or sent anywhere but <code>/api/batches</code>.</p>
-          <input id="btok" type="password" autocomplete="off" bind:value={tokenDraft} placeholder="Bearer token…" />
-          <button class="btn btn-primary" type="submit">Authenticate</button>
+      {#if !authChecked}
+        <p class="runs-empty">Checking session…</p>
+      {:else if !runsAuthed}
+        <div class="runs-auth">
+          <p class="runs-auth-note">Sign in with GitHub to submit batches. Only this instance's owner is allowed in; the session cookie is HttpOnly, so no token ever lives in the page.</p>
+          <button class="btn btn-primary" onclick={() => signIn('/batches')}>Sign in with GitHub</button>
           {#if runsError}<p class="runs-error">{runsError}</p>{/if}
-        </form>
+        </div>
       {:else}
         <form class="batch-form" onsubmit={submitBatch}>
           <label class="batch-field">Tasks (one per line)
