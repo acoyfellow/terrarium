@@ -2,6 +2,19 @@
 
 Succinct, product-facing changes to Terrarium. This is not a full commit log; it records notable behavior, API, safety, and public-site changes.
 
+## 2026-07-20 — Batch fan-out API + web console for runs and batches
+
+- **New `POST /api/batches` fan-out surface.** One call admits N bounded tasks as a single batch, each task composed through the *same* `admitOneRun()` path as `POST /api/runs` (no forked admission logic), under a `maxConcurrency` window capped at the per-owner ceiling (8). Returns `202 { batchId, admitted, requested, maxConcurrency, peakLive, childRunIds, rejected }`. `GET /api/batches/:id` returns an aggregate that **references child runIds only** (never inlines a child receipt) and is derived with **failure-truth**: a batch is `done` only when every child is terminal *and* ok; any failed/cancelled/inconclusive child forces `failed`; any running child keeps it `running`. A non-success is never rolled up as success. Proof gates covered by `test/cloud-api-batches.test.js` and a re-runnable receipt (`scripts/c2-batch-happy-path.mjs`, 7/7).
+- **New web console pages, owner-authenticated.** `/runs` lists your runs grouped by channel, filterable by status and since. `/batches` submits a bounded batch and polls the failure-truth aggregate (running/done/failed counts + child run rows). Both keep the control token in `sessionStorage` for the tab only — never written to disk, never committed — and handle `401` cleanly rather than showing a broken page.
+- **Deployed to production** (`terrarium.coey.dev`) via serial-join: clean-HEAD build → single version upload → verify → capture rollback ref → promote → live-verify. Live-verified on one version: health `200`, `/runs` + `/batches` pages `200`, `GET /api/runs` / `POST /api/batches` / `GET /api/batches/:id` all `401` unauthenticated (route-wired, structured JSON), unknown route `404`. Rollback target captured.
+
+## 2026-07-19 — Owner-scoped run index (`GET /api/runs` list)
+
+- **New `GET /api/runs` list endpoint.** Owner-scoped, indexed listing of your runs, filterable by `channel`, `status`, and `since`, returning `{ runs, channels }`. Backed by a per-principal run-index projection (`src/cloud/run-index.js`, KV) written from `RunControlDO` admit/terminal hooks — so listing is a cheap index read, not a full store scan.
+- **`terrarium_status` list-mode now reads the cloud run index** for cloud runs, so status listing reflects real cloud state instead of only local records.
+- **`doctor` gained a stale-MCP-process-env check**: it flags when the configured `cloudUrl` disagrees with the live process environment, catching a class of “why is my MCP pointing at the wrong instance” misconfiguration.
+- **Cloud task steering hardened**: repo-grounded tasks delegate to Cloudbox; filesystem-dependent cloud tasks fail closed rather than emitting a hallucinated review receipt; cancel of an already-terminal cloud run is idempotent (issue #18).
+
 ## 2026-07-18 — Cloud is the default: spawns run on Cloudflare, end to end
 
 - **Milestone: Terrarium now runs on Cloudflare by default.** `terrarium_spawn` / `terrarium_spawn_batch` execute in a Cloudflare-managed cell against your deployed instance — verified receipts, status, logs, cancel, and terminal callbacks all work against cloud runs, with no process on your machine. Local execution is an explicit opt-in (`TERRARIUM_ALLOW_LOCAL=1`) for cooperative digs only; a real spawn with no cloud configured fails closed rather than silently running local. The README and site now describe cloud-first, matching the code.

@@ -46,9 +46,9 @@
       title: 'Why trust is the bottleneck',
       lead: 'Parallel-first agents, on the edge — and why it only works when every run proves itself.',
       blocks: [
-        ['The real bottleneck', 'Running agents in parallel is easy. Trusting the results is not. An agent that says "done" is not evidence; exit code 0 is not evidence; a callback firing is not evidence. So people run one agent, watch it, and never scale. The blocker was never compute — it was trust.', 'text'],
-        ['The unlock', 'Make each run prove itself, and fanning out stops being a leap of faith. Trust one run the same way you trust a thousand — individually, by proof.', 'text'],
-        ['The primitive', 'one bounded task → one isolated run → one correlated receipt', 'code'],
+        ['The real bottleneck', 'Running agents in parallel is easy. Trusting the results is not. An agent that says "done" is not evidence; exit code 0 is not evidence; a callback firing is not evidence. So people run one agent, watch it, and never scale.', 'text'],
+        ['What proof changes', 'When each run carries its own proof, one run and a thousand runs are checked the same way: individually, by receipt.', 'text'],
+        ['The primitive', 'one bounded task -> one isolated run -> one correlated receipt', 'code'],
         ['What counts as success', 'Only a verified result whose run ID, task fingerprint, and nonce all match the task Terrarium handed out. Everything else — logs, callbacks, model prose — is a signal, not proof. The nonce is server-minted, so a run cannot forge its own success.', 'text'],
         ['Provenance vs. correctness', 'A verified receipt proves the task ran and correlated. It does not prove the answer is right. Terrarium adds an advisory, fail-closed trust grade from cross-model agreement — and parallelism helps here too: more independent runs raise confidence. It can annotate a receipt, never upgrade it.', 'text'],
         ['Why the edge', 'Every run lives on Cloudflare — admission, execution, logs, model route, and the wake callback. Submit a task, close your laptop, and pull the proof back later. Correctness and delivery never depend on a machine you own, which is what makes walking away from a thousand parallel runs safe.', 'text'],
@@ -312,7 +312,7 @@
           <div class="hero-copy">
             <div class="eyebrow">Parallel-first agents, on the edge</div>
             <h1>Run agents in parallel.<br />Trust <em>every</em> result.</h1>
-            <p class="sub">The thing blocking agents at scale isn't compute — it's trust. Terrarium fans out bounded tasks that run <b>on Cloudflare by default</b> and hands each one back a verified receipt: proof it ran, correlated and yours to trust or reject. Submit, close your laptop, pull the proof later. No babysitting one agent at a time. No server. No local machine in the loop.</p>
+            <p class="sub">What blocks agents at scale is trust, not compute. Terrarium fans out bounded tasks that run <b>on Cloudflare by default</b> and hands each one back a verified receipt: proof it ran, correlated so you can check it. Submit, close your laptop, pull the proof later. No server, no local machine in the loop.</p>
             <div class="hero-actions">
               <a class="btn btn-primary" href="/docs?page=tutorial" onclick={(e) => navigate('/docs?page=tutorial', e)}>Get started</a>
               <a class="btn" href="https://github.com/acoyfellow/terrarium">View source</a>
@@ -368,7 +368,7 @@ POST https://terrarium-control.<you>.workers.dev/api/runs  ->  202 { runId }`}</
       <div class="chapter-inner">
         <div class="chapter-head" data-reveal>
           <div><p class="eyebrow">01 / Why it changes things</p><h2 class="section-title">Trust one run.<br />Now run a thousand.</h2></div>
-          <p class="section-lede">When each run proves itself, fanning out stops being a leap of faith. That's the unlock: parallelism you can actually rely on — from the CLI, an agent, or a cloud endpoint, all the same primitive.</p>
+          <p class="section-lede">When each run carries its own receipt, you check a thousand runs the same way you check one. The same primitive runs from the CLI, an agent, or a cloud endpoint.</p>
         </div>
         <div class="grid-cards" data-reveal>
           <div class="cell fx-shine" style="--d:0"><span class="idx">A</span><h3>Proof per run</h3><p>Success is a verified receipt — run ID, fingerprint, and nonce all correlate. Not exit codes, not prose, not "trust me."</p></div>
