@@ -156,4 +156,100 @@ export async function listPrincipalRuns(kv, ownerId, {
   return { runs, channels };
 }
 
-export const __test__ = { keyFor, KEY_PREFIX, sanitizeChannel, sanitizeGrounding };
+// ---------------------------------------------------------------------------
+// Batch index (control-plane projection for /api/batches).
+//
+// A batch is N ordinary runs admitted through the SAME single-run admit path
+// under a maxConcurrency window. The batch record REFERENCES child runIds only
+// — each child's receipt stays authoritative in its own RunControlDO. This
+// projection never inlines a receipt and is never the source of truth.
+//
+// KEY SCHEME: `batchidx:<ownerId>:<batchId>`. Aggregate status is DERIVED at
+// read time from the children's own run-index records, so a batch can never
+// report a child as "done" unless that child's record says so (failure-truth).
+// ---------------------------------------------------------------------------
+
+const BATCH_PREFIX = "batchidx:";
+
+function batchKeyFor(ownerId, batchId) {
+  return `${BATCH_PREFIX}${ownerId}:${batchId}`;
+}
+
+// Persist a batch record. Stores ONLY child runIds + window metadata — never a
+// child receipt. Best-effort; returns false on invalid input or no binding.
+export async function putBatchRecord(kv, {
+  ownerId, batchId, childRunIds, maxConcurrency, createdAt,
+} = {}) {
+  if (!kv || typeof kv.put !== "function") return false;
+  if (!VALID_ID.test(String(ownerId ?? "")) || !VALID_ID.test(String(batchId ?? ""))) return false;
+  const ids = Array.isArray(childRunIds)
+    ? childRunIds.filter((r) => VALID_ID.test(String(r ?? ""))).map(String).slice(0, 1000)
+    : [];
+  const record = {
+    batchId,
+    ownerId,
+    childRunIds: ids,
+    maxConcurrency: Number.isFinite(maxConcurrency) ? Number(maxConcurrency) : null,
+    createdAt: Number.isFinite(createdAt) ? Number(createdAt) : Date.now(),
+  };
+  try {
+    await kv.put(batchKeyFor(ownerId, batchId), JSON.stringify(record));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// Fetch a batch record by owner+batchId. Returns null when absent or on any
+// read error (caller normalizes to 404 to avoid a batchId-enumeration oracle).
+export async function getBatchRecord(kv, ownerId, batchId) {
+  if (!kv || typeof kv.get !== "function") return null;
+  if (!VALID_ID.test(String(ownerId ?? "")) || !VALID_ID.test(String(batchId ?? ""))) return null;
+  try { return await kv.get(batchKeyFor(ownerId, batchId), { type: "json" }); } catch { return null; }
+}
+
+// Derive aggregate batch status from the CHILDREN's own run-index records.
+// FAILURE-TRUTH: the batch is "done" only when every child is terminal AND ok
+// is not false; any running child keeps it "running"; any failed/cancelled/
+// error/inconclusive child forces "failed". Never rolls a non-success up as
+// success. Returns { batchId, total, running, done, failed, status, children }
+// where children reference runId + status only (receipts stay in their DOs).
+export async function aggregateBatch(kv, ownerId, record) {
+  const childRunIds = Array.isArray(record?.childRunIds) ? record.childRunIds : [];
+  const children = [];
+  for (const runId of childRunIds) {
+    let rec = null;
+    try { rec = await kv.get(keyFor(ownerId, runId), { type: "json" }); } catch { rec = null; }
+    children.push({
+      runId,
+      status: rec?.status ?? "unknown",
+      ok: typeof rec?.ok === "boolean" ? rec.ok : null,
+      channel: rec?.channel ?? null,
+      createdAt: rec?.createdAt ?? null,
+      terminalAt: rec?.terminalAt ?? null,
+    });
+  }
+  let running = 0, done = 0, failed = 0;
+  for (const c of children) {
+    if (c.status === "running" || c.status === "unknown") running++;
+    else if (c.status === "done" && c.ok !== false) done++;
+    else failed++; // failed | cancelled | error | done-but-not-ok | anything else
+  }
+  const total = children.length;
+  // Status precedence: any failure => failed; else any still-running => running;
+  // else all done => done. A non-success is NEVER surfaced as done.
+  let status;
+  if (failed > 0) status = "failed";
+  else if (running > 0) status = "running";
+  else if (total > 0 && done === total) status = "done";
+  else status = "running";
+  return {
+    batchId: record.batchId,
+    ownerId,
+    maxConcurrency: record.maxConcurrency ?? null,
+    createdAt: record.createdAt ?? null,
+    total, running, done, failed, status, children,
+  };
+}
+
+export const __test__ = { keyFor, KEY_PREFIX, sanitizeChannel, sanitizeGrounding, batchKeyFor, BATCH_PREFIX };

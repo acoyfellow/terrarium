@@ -93,6 +93,65 @@ async function releaseBudget(env, principalId, runId) {
   }
 }
 
+/**
+ * Admit exactly one bounded run for an already-authenticated principal.
+ * This is the SINGLE canonical admit path: budget reserve -> RunControl admit
+ * -> rollback on non-202. Both POST /api/runs and POST /api/batches compose
+ * runs through this exact helper so there is NO forked admission logic.
+ *
+ * `request` is passed only so the DO proxy can forward headers; the task/spec
+ * come from the explicit arguments. Returns the raw RunControl Response
+ * (202 on success, or the verbatim budget/admission error response).
+ */
+export async function admitOneRun(request, env, ownerId, { task, spec }, idempotencyKey) {
+  const budgetStub = budgetStubForPrincipal(env, ownerId);
+  if (!budgetStub) {
+    return Response.json({ ok: false, error: "budget binding missing" }, { status: 500 });
+  }
+  // Server-computed request hash (client cannot forge idempotency identity).
+  const requestHash = await canonicalRequestHash({ task, spec });
+  const limits = resolveBudgetLimits(env);
+  const { estimatedTokens, estimatedCostMicros } = estimateBudgetFromTask(task, {
+    maxOutputBytes: limits.maxOutputBytes,
+  });
+  const runId = mintRunId();
+
+  // Reserve budget BEFORE calling RunControl admission. The budget DO returns
+  // the CANONICAL runId — on idempotent retry that is the runId of the
+  // original successful admission, not the freshly-minted one.
+  const reserveRes = await budgetStub.fetch("https://do/reserve", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      principalId: ownerId,
+      runId,
+      idempotencyKey,
+      requestHash,
+      estimatedTokens,
+      estimatedCostMicros,
+      limits,
+    }),
+  });
+  if (!reserveRes.ok) return reserveRes; // bubble up conflict / limit verbatim
+  const reserveBody = await reserveRes.json();
+  const admitRunId = reserveBody.runId;
+
+  // Call RunControl with the mapped runId. Roll the reservation back
+  // idempotently if admission does not return 202.
+  const stub = doStubForRun(env, admitRunId);
+  let res;
+  try {
+    res = await proxy(request, stub, "admit", "POST", { task, ownerId, spec, runId: admitRunId });
+  } catch (err) {
+    await releaseBudget(env, ownerId, admitRunId);
+    throw err;
+  }
+  if (res.status !== 202) {
+    await releaseBudget(env, ownerId, admitRunId);
+  }
+  return res;
+}
+
 /** Route matcher. Returns null when no route matches — caller should return 404. */
 export async function handleApiRuns(request, env) {
   const url = new URL(request.url);
@@ -119,7 +178,7 @@ export async function handleApiRuns(request, env) {
     return Response.json({ ok: true, defaultModel: defaultAlias, sources: catalog });
   }
 
-  // POST /api/runs
+  // POST /api/runs — admit one bounded run via the canonical admitOneRun path.
   if (path === "/api/runs" && method === "POST") {
     const idempotencyKey = request.headers.get("idempotency-key") || "";
     if (!IDEMPOTENCY_KEY_RE.test(idempotencyKey)) {
@@ -128,59 +187,7 @@ export async function handleApiRuns(request, env) {
     const body = await readJson(request);
     const task = typeof body?.task === "string" ? body.task : "";
     const spec = body?.spec && typeof body.spec === "object" ? body.spec : {};
-
-    // Budget binding is required in production. Fail closed if missing.
-    const budgetStub = budgetStubForPrincipal(env, ownerId);
-    if (!budgetStub) {
-      return Response.json({ ok: false, error: "budget binding missing" }, { status: 500 });
-    }
-
-    // Server-computed request hash (client cannot forge idempotency identity).
-    const requestHash = await canonicalRequestHash({ task, spec });
-    const limits = resolveBudgetLimits(env);
-    const { estimatedTokens, estimatedCostMicros } = estimateBudgetFromTask(task, {
-      maxOutputBytes: limits.maxOutputBytes,
-    });
-    const runId = mintRunId();
-
-    // Reserve budget BEFORE calling RunControl admission. The budget DO
-    // returns the CANONICAL runId — on idempotent retry that is the runId of
-    // the original successful admission, not the freshly-minted one.
-    const reserveRes = await budgetStub.fetch("https://do/reserve", {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({
-        principalId: ownerId,
-        runId,
-        idempotencyKey,
-        requestHash,
-        estimatedTokens,
-        estimatedCostMicros,
-        limits,
-      }),
-    });
-    if (!reserveRes.ok) {
-      // Bubble up conflict / limit errors verbatim.
-      return reserveRes;
-    }
-    const reserveBody = await reserveRes.json();
-    const admitRunId = reserveBody.runId;
-
-    // Call RunControl with the mapped runId. If admission does not return
-    // 202 we roll the active reservation back idempotently.
-    const stub = doStubForRun(env, admitRunId);
-    let res;
-    try {
-      res = await proxy(request, stub, "admit", "POST", { task, ownerId, spec, runId: admitRunId });
-    } catch (err) {
-      await releaseBudget(env, ownerId, admitRunId);
-      throw err;
-    }
-    if (res.status !== 202) {
-      await releaseBudget(env, ownerId, admitRunId);
-      return res;
-    }
-    return res;
+    return admitOneRun(request, env, ownerId, { task, spec }, idempotencyKey);
   }
 
   // GET /api/runs — read-only per-principal run list from the control-plane

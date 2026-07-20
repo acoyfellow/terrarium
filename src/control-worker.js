@@ -11,6 +11,7 @@ import { publicTraceEvent } from "./trace-events.js";
 import pulseWorker, { PulseRouter } from "./pulse/worker.js";
 import { RunControlDO } from "./cloud/run-control-do.js";
 import { handleApiRuns } from "./cloud/api-runs.js";
+import { handleApiBatches } from "./cloud/api-batches.js";
 import { TerrariumSandbox } from "./cloud/terrarium-sandbox.js";
 import { PrincipalBudgetDO } from "./cloud/principal-budget-do.js";
 
@@ -193,6 +194,10 @@ const legacyWorker = {
     // Cloud Terrarium production /api/runs + /api/models surface.
     if (url.pathname.startsWith("/api/runs") || url.pathname === "/api/models") {
       const routed = await handleApiRuns(request, env);
+      if (routed) return routed;
+    }
+    if (url.pathname.startsWith("/api/batches")) {
+      const routed = await handleApiBatches(request, env);
       if (routed) return routed;
     }
     if (url.pathname === "/health") return Response.json({
