@@ -7,22 +7,50 @@
 //   TERRARIUM_CONTROL_TOKEN          Bearer token for that instance's principal
 //   TERRARIUM_TOKEN_FILE             alternative: path to a file containing the token
 //
+// FALLBACK: when the env vars are absent (e.g. an in-process `directTools`
+// instance that inherited a Pi session started before cloud was configured, so
+// mcp.json's `env` block never reached process.env), config resolves from
+// ~/.terrarium/config.json keys `cloudUrl` + `controlToken`/`tokenFile`. Env
+// always wins; the file only fills gaps. This makes the cloud path self-heal
+// regardless of how the host process was launched
+// (BUGREPORT-2026-07-20-directtools-mcp-drops-cloud-env).
+//
 // Request/response shape verified against the live cloud API (limits-probe.mjs,
 // cloud-scale-eval.mjs): POST /api/runs {task, spec?} + Bearer + Idempotency-Key
 // -> 202 {runId, contract:{runId,taskFingerprint,nonce}}; GET /api/runs/:id/status
 // -> {status:{status, terminal:{...}}}.
 
-import { readFileSync } from "node:fs";
+import { readFileSync, existsSync } from "node:fs";
+import { homedir } from "node:os";
+import { join, resolve } from "node:path";
 import { randomUUID } from "node:crypto";
 import { decide, validateBatchShape, BATCH_STRATEGIES } from "./batch.js";
 import { cloudboxEnabled, cloudboxRun } from "./cloudbox-client.js";
 
+// Read ~/.terrarium/config.json (or $TERRARIUM_HOME/config.json) synchronously.
+// Returns {} on any absence/parse error so config resolution never throws.
+function readHomeConfig(env = process.env) {
+  try {
+    const home = env.TERRARIUM_HOME ? resolve(env.TERRARIUM_HOME) : join(homedir(), ".terrarium");
+    const path = join(home, "config.json");
+    if (!existsSync(path)) return {};
+    return JSON.parse(readFileSync(path, "utf8")) || {};
+  } catch { return {}; }
+}
+
 export function cloudConfig(env = process.env) {
-  const url = typeof env.TERRARIUM_URL === "string" ? env.TERRARIUM_URL.replace(/\/$/, "") : "";
+  // Env wins. Fall back to config.json only for values env does not provide, so
+  // an in-process instance with a bare process.env still resolves the cloud.
+  const file = readHomeConfig(env);
+  const url = (typeof env.TERRARIUM_URL === "string" && env.TERRARIUM_URL)
+    ? env.TERRARIUM_URL.replace(/\/$/, "")
+    : (typeof file.cloudUrl === "string" ? file.cloudUrl.replace(/\/$/, "") : "");
   let token = typeof env.TERRARIUM_CONTROL_TOKEN === "string" ? env.TERRARIUM_CONTROL_TOKEN : "";
-  if (!token && env.TERRARIUM_TOKEN_FILE) {
-    try { token = readFileSync(env.TERRARIUM_TOKEN_FILE, "utf8").trim(); } catch { /* leave empty */ }
+  const tokenFile = env.TERRARIUM_TOKEN_FILE || (typeof file.tokenFile === "string" ? file.tokenFile : "");
+  if (!token && tokenFile) {
+    try { token = readFileSync(tokenFile, "utf8").trim(); } catch { /* leave empty */ }
   }
+  if (!token && typeof file.controlToken === "string") token = file.controlToken;
   return { url, token, configured: Boolean(url && token) };
 }
 

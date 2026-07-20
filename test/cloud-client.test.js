@@ -1,6 +1,15 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { cloudConfig, cloudEnabled, isCloudRunId } from "../src/cloud-client.js";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join as pjoin } from "node:path";
+
+// Hermetic empty home so cloudConfig()'s config.json fallback finds nothing;
+// unit tests here assert PURE env resolution. Spread into every env literal.
+const EMPTY_HOME = mkdtempSync(pjoin(tmpdir(), "terra-empty-home-"));
+const H = { TERRARIUM_HOME: EMPTY_HOME };
+process.on("exit", () => { try { rmSync(EMPTY_HOME, { recursive: true, force: true }); } catch {} });
 
 test("isCloudRunId distinguishes server-minted cloud ids from local ids", () => {
   assert.equal(isCloudRunId("ter_mrq8uwyp_cb0da25c6c4f"), true);
@@ -11,10 +20,10 @@ test("isCloudRunId distinguishes server-minted cloud ids from local ids", () => 
 });
 
 test("cloudEnabled requires both a URL and a token", () => {
-  assert.equal(cloudEnabled({}), false);
-  assert.equal(cloudEnabled({ TERRARIUM_URL: "https://x" }), false);
-  assert.equal(cloudEnabled({ TERRARIUM_CONTROL_TOKEN: "t" }), false);
-  assert.equal(cloudEnabled({ TERRARIUM_URL: "https://x", TERRARIUM_CONTROL_TOKEN: "t" }), true);
+  assert.equal(cloudEnabled({ ...H }), false);
+  assert.equal(cloudEnabled({ ...H, TERRARIUM_URL: "https://x" }), false);
+  assert.equal(cloudEnabled({ ...H, TERRARIUM_CONTROL_TOKEN: "t" }), false);
+  assert.equal(cloudEnabled({ ...H, TERRARIUM_URL: "https://x", TERRARIUM_CONTROL_TOKEN: "t" }), true);
 });
 
 test("cloudConfig normalizes the URL and reads token inline or from file", async () => {
@@ -179,5 +188,16 @@ test("cloudList omits empty filters from the query string", async () => {
 });
 
 test("cloudList requires a configured cloud instance", async () => {
-  await assert.rejects(() => cloudList({}, { env: {} }), /requires TERRARIUM_URL/);
+  // Point at an isolated empty home so the config.json fallback finds nothing
+  // (a bare `env: {}` otherwise defaults TERRARIUM_HOME to the real ~/.terrarium,
+  // which may legitimately carry a cloudUrl on the operator's machine).
+  const { mkdtemp, rm } = await import("node:fs/promises");
+  const { tmpdir } = await import("node:os");
+  const { join } = await import("node:path");
+  const home = await mkdtemp(join(tmpdir(), "terra-nohome-"));
+  try {
+    await assert.rejects(() => cloudList({}, { env: { TERRARIUM_HOME: home } }), /requires TERRARIUM_URL/);
+  } finally {
+    await rm(home, { recursive: true, force: true });
+  }
 });

@@ -42,10 +42,13 @@ async function diagnoseStaleCloudEnv(env = process.env) {
   } catch { /* no config or unreadable: nothing persisted to compare against */ }
   if (!configuredUrl) return { staleCloudEnv: false, configuredCloudUrl: null, processCloudUrl: null };
   const processUrl = typeof env.TERRARIUM_URL === "string" ? env.TERRARIUM_URL.replace(/\/$/, "") : "";
+  // Since cloudConfig() now falls back to config.json when the env var is
+  // absent, an EMPTY process TERRARIUM_URL is no longer stale — the file
+  // resolves the same cloudUrl in-process. Only a process env that points at a
+  // DIFFERENT url is genuinely stale (it overrides the file and disagrees).
+  const staleCloudEnv = processUrl !== "" && processUrl !== configuredUrl;
   return {
-    // Persisted config wants cloud, but the running process env disagrees
-    // (missing or pointing elsewhere): this MCP process is stale, /reload it.
-    staleCloudEnv: processUrl !== configuredUrl,
+    staleCloudEnv,
     configuredCloudUrl: configuredUrl,
     processCloudUrl: processUrl || null,
   };

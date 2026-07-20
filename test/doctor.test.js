@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdir, rm, writeFile } from 'node:fs/promises';
+import { mkdir, rm, writeFile, mkdtemp } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { diagnoseTerrarium } from '../src/doctor.js';
 import { BATCH_API_VERSION, MCP_SCHEMA_VERSION, TERRARIUM_API_VERSION } from '../src/versions.js';
 import { readFile } from 'node:fs/promises';
@@ -74,8 +76,12 @@ test('doctor flags stale-cloud-env: cloud configured but no pulse token (undeliv
   const saved = {
     url: process.env.TERRARIUM_URL, tok: process.env.TERRARIUM_CONTROL_TOKEN,
     tokFile: process.env.TERRARIUM_TOKEN_FILE, pulse: process.env.TERRARIUM_PULSE_TOKEN,
-    pulseFile: process.env.TERRARIUM_PULSE_TOKEN_FILE,
+    pulseFile: process.env.TERRARIUM_PULSE_TOKEN_FILE, home: process.env.TERRARIUM_HOME,
   };
+  // Isolate home so cloudConfig()'s config.json fallback cannot read the real
+  // operator config (which legitimately points at a cloud instance).
+  const isolatedHome = await mkdtemp(join(tmpdir(), 'doctor-cloudenv-'));
+  process.env.TERRARIUM_HOME = isolatedHome;
   try {
     // Cloud on (url + control token), pulse OFF: the dangerous combination.
     process.env.TERRARIUM_URL = 'https://terrarium.example.dev';
@@ -105,47 +111,55 @@ test('doctor flags stale-cloud-env: cloud configured but no pulse token (undeliv
     assert.equal(local.checks.cloudConfigured, false);
     assert.equal(local.checks.cloudCallbacksUndeliverable, false);
   } finally {
-    for (const [k, v] of [['TERRARIUM_URL', saved.url], ['TERRARIUM_CONTROL_TOKEN', saved.tok], ['TERRARIUM_TOKEN_FILE', saved.tokFile], ['TERRARIUM_PULSE_TOKEN', saved.pulse], ['TERRARIUM_PULSE_TOKEN_FILE', saved.pulseFile]]) {
+    for (const [k, v] of [['TERRARIUM_URL', saved.url], ['TERRARIUM_CONTROL_TOKEN', saved.tok], ['TERRARIUM_TOKEN_FILE', saved.tokFile], ['TERRARIUM_PULSE_TOKEN', saved.pulse], ['TERRARIUM_PULSE_TOKEN_FILE', saved.pulseFile], ['TERRARIUM_HOME', saved.home]]) {
       if (v === undefined) delete process.env[k]; else process.env[k] = v;
     }
+    await rm(isolatedHome, { recursive: true, force: true });
   }
 });
 
-test('doctor flags stale-MCP-process-env: config records cloudUrl but process env is stale (/reload)', async () => {
-  const savedUrl = process.env.TERRARIUM_URL;
+test('doctor stale-MCP-process-env: empty env + config cloudUrl is NOT stale (config.json fallback resolves it); a DIFFERENT env url is stale', async () => {
+  // diagnoseStaleCloudEnv reads the module-level CONFIG_PATH (bound to HOME at
+  // import), so isolate by backing up + rewriting the real config, and restore
+  // it in finally. Env vars are also saved/restored.
+  const saved = { url: process.env.TERRARIUM_URL };
   let savedConfig; try { savedConfig = await readFile(CONFIG_PATH, 'utf8'); } catch { savedConfig = null; }
+  const cfgPath = CONFIG_PATH;
   try {
-    // Persist a cloud URL into config.json (operator configured cloud)...
-    await writeFile(CONFIG_PATH, JSON.stringify({ cloudUrl: 'https://terrarium.example.dev' }));
-    // ...but the running MCP process env does NOT reflect it (stale process).
-    delete process.env.TERRARIUM_URL;
-    const stale = await diagnoseTerrarium();
-    assert.equal(stale.checks.staleCloudEnv, true);
-    assert.equal(stale.checks.configuredCloudUrl, 'https://terrarium.example.dev');
-    assert.equal(stale.checks.processCloudUrl, null);
-    assert.ok(stale.warnings.some((w) => /stale mcp process env/i.test(w) && /reload/i.test(w)));
+    // Operator persisted a cloud URL into config.json.
+    await writeFile(cfgPath, JSON.stringify({ cloudUrl: 'https://terrarium.example.dev' }));
 
-    // Process env now matches the persisted config: the warning clears.
+    // Empty process env: since cloudConfig() now falls back to config.json,
+    // the in-process tool resolves this cloud WITHOUT a reload. NOT stale.
+    delete process.env.TERRARIUM_URL;
+    const viaFile = await diagnoseTerrarium();
+    assert.equal(viaFile.checks.staleCloudEnv, false, 'empty env is resolved by the config.json fallback, not stale');
+    assert.equal(viaFile.checks.configuredCloudUrl, 'https://terrarium.example.dev');
+    assert.equal(viaFile.checks.processCloudUrl, null);
+    assert.equal(viaFile.warnings.some((w) => /stale mcp process env/i.test(w)), false);
+
+    // Process env matches the persisted config: also fine.
     process.env.TERRARIUM_URL = 'https://terrarium.example.dev/';
     const fresh = await diagnoseTerrarium();
     assert.equal(fresh.checks.staleCloudEnv, false, 'trailing slash normalized, env matches config');
-    assert.equal(fresh.warnings.some((w) => /stale mcp process env/i.test(w)), false);
 
-    // Process env points at a DIFFERENT cloud than config: still stale.
+    // Process env points at a DIFFERENT cloud than config: genuinely stale
+    // (the env overrides the file and disagrees) — /reload.
     process.env.TERRARIUM_URL = 'https://other.example.dev';
     const drift = await diagnoseTerrarium();
     assert.equal(drift.checks.staleCloudEnv, true);
     assert.equal(drift.checks.processCloudUrl, 'https://other.example.dev');
+    assert.ok(drift.warnings.some((w) => /stale mcp process env/i.test(w) && /reload/i.test(w)));
 
     // No cloudUrl persisted: never flagged (env-only cloud is fine).
-    await writeFile(CONFIG_PATH, JSON.stringify({ defaultModel: 'x' }));
+    await writeFile(cfgPath, JSON.stringify({ defaultModel: 'x' }));
     process.env.TERRARIUM_URL = 'https://terrarium.example.dev';
     const noConfig = await diagnoseTerrarium();
     assert.equal(noConfig.checks.staleCloudEnv, false);
     assert.equal(noConfig.checks.configuredCloudUrl, null);
   } finally {
-    if (savedConfig === null) { try { await rm(CONFIG_PATH); } catch {} } else { await writeFile(CONFIG_PATH, savedConfig); }
-    if (savedUrl === undefined) delete process.env.TERRARIUM_URL; else process.env.TERRARIUM_URL = savedUrl;
+    if (saved.url === undefined) delete process.env.TERRARIUM_URL; else process.env.TERRARIUM_URL = saved.url;
+    if (savedConfig === null) { try { await rm(cfgPath); } catch {} } else { await writeFile(cfgPath, savedConfig); }
   }
 });
 
