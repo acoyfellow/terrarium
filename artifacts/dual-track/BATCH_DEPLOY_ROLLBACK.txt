@@ -1,0 +1,18 @@
+TERRALOOP batch-surface — SERIAL JOIN deploy
+new_version:   99e5e9ff-74f5-40a4-bd20-0f19d434f3b9  (HEAD 6d13f83)
+rollback_ref:  50e60337-ad3e-47f2-9c7e-4d89cc424e46  (previous live @100%)
+promote_cmd:   wrangler versions deploy 99e5e9ff-74f5-40a4-bd20-0f19d434f3b9@100%
+rollback_cmd:  wrangler versions deploy 50e60337-ad3e-47f2-9c7e-4d89cc424e46@100%
+captured_at:   2026-07-20T11:27:03Z
+
+=== LIVE VERIFICATION (version 99e5e9ff @100%) ===
+health /                 : 200
+/batches page            : 200
+/runs page               : 200
+live bundle              : assets/index-D_we7wyf.js (batches 2 hits, runs 3 hits)
+POST /api/batches no-tok : 401 {"ok":false,"error":"unauthorized"}
+GET /api/batches/:id     : 401
+GET /api/runs no-token   : 401
+/api/nonexistent         : 404 (proves batches route real, not fallthrough)
+authed happy-path        : C2 receipt 7/7 PASS (artifacts/dual-track/C2_BATCH_RECEIPT.json)
+verified_at             : 2026-07-20T11:27:32Z
