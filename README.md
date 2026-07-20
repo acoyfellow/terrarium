@@ -108,11 +108,14 @@ authenticated POST /api/runs (Bearer + Idempotency-Key)
 → durable principal-scoped terminal callback (Pulse)
 ```
 
-All `/api/runs*` require an `Authorization` header of the form `Bearer $TERRARIUM_CONTROL_TOKEN` (your control token, supplied via env — never hardcoded); `POST /api/runs` also requires an `Idempotency-Key`.
+All `/api/runs*` and `/api/batches*` routes require an `Authorization` header of the form `Bearer $TERRARIUM_CONTROL_TOKEN` (your control token, supplied via env — never hardcoded); `POST /api/runs` and `POST /api/batches` also require an `Idempotency-Key`. Your deployed instance also serves owner-authenticated web consoles at `/runs` (run index) and `/batches` (batch fan-out), which keep the token in the browser tab only.
 
 | Method + path | Purpose | Notes |
 | --- | --- | --- |
 | `POST /api/runs` | Admit one bounded task | Body `{ task, spec? }` → `202 { runId, contract, executionRef }`. Missing key `400`; over budget `429`; task > 64 KiB `413`. |
+| `GET /api/runs` | List your runs | Owner-scoped, indexed. Filter by `channel`, `status`, `since` → `{ runs, channels }`. |
+| `POST /api/batches` | Admit N bounded tasks as one batch | Also requires an `Idempotency-Key`. Body `{ tasks[], maxConcurrency? }` → `202 { batchId, admitted, childRunIds, peakLive, rejected }`. Each task composes through the *same* single-run admit path; `maxConcurrency` is capped at the per-owner ceiling (8). |
+| `GET /api/batches/:id` | Batch aggregate | References child runIds only; **failure-truth** status (`done` only when all children terminal + ok; any failure → `failed`). Unknown/cross-owner `404`. |
 | `GET /api/runs/:id/status` | Terminal + contract status | Owner-scoped; cross-principal `401`; unknown `404`. |
 | `GET /api/runs/:id/logs` | Durable logs + R2 overflow refs | Inline logs plus `logRefs`. |
 | `GET /api/runs/:id/logs/ref?seq=N` | Fetch an R2 overflow chunk | Integrity-checked; fails closed on corrupt/missing. |
