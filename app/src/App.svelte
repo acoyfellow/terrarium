@@ -61,7 +61,7 @@
   let hash = $state(location.hash);
   let selectedDoc = $state(new URLSearchParams(location.search).get('page') || 'tutorial');
 
-  const route = () => path === '/docs' ? 'docs' : path === '/runs' ? 'runs' : (path === '/changelog' || hash === '#changelog') ? 'changelog' : 'home';
+  const route = () => path === '/docs' ? 'docs' : path === '/runs' ? 'runs' : path === '/batches' ? 'batches' : (path === '/changelog' || hash === '#changelog') ? 'changelog' : 'home';
 
   // --- Run index (/runs) — owner-authenticated view of GET /api/runs. -------
   // Token lives ONLY in sessionStorage (never localStorage, never committed,
@@ -134,6 +134,80 @@
     }
     return Object.entries(groups).sort((a, b) => a[0].localeCompare(b[0]));
   };
+
+  // --- Batch console (/batches) — submit a bounded batch, poll the aggregate. -
+  // Reuses the SAME sessionStorage token as /runs (owner-scoped, this-tab-only,
+  // never committed). POST /api/batches -> poll GET /api/batches/:id. The
+  // rendered aggregate is the backend's FAILURE-TRUTH derivation verbatim; the
+  // UI never re-derives "done" — a non-success is shown as failed, not done.
+  let batchTasksText = $state('reply with: alpha\nreply with: bravo\nreply with: charlie');
+  let batchConcurrency = $state(4);
+  let batchSubmitting = $state(false);
+  let batchError = $state('');
+  let batchId = $state('');
+  let batchAgg = $state(null);
+  let batchPollTimer = null;
+
+  function parseBatchTasks() {
+    return batchTasksText.split('\n').map((l) => l.trim()).filter(Boolean);
+  }
+
+  async function submitBatch(e) {
+    if (e) e.preventDefault();
+    if (!runsToken) { runsAuthed = false; return; }
+    const tasks = parseBatchTasks();
+    if (tasks.length === 0) { batchError = 'Enter at least one task (one per line).'; return; }
+    batchSubmitting = true; batchError = ''; batchAgg = null; batchId = '';
+    try {
+      const res = await fetch('/api/batches', {
+        method: 'POST',
+        headers: {
+          authorization: 'Bearer ' + runsToken,
+          'content-type': 'application/json',
+          'idempotency-key': 'ui-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 8),
+        },
+        body: JSON.stringify({ tasks, maxConcurrency: Number(batchConcurrency) || 4 }),
+      });
+      if (res.status === 401) {
+        runsAuthed = false; sessionStorage.removeItem('terra_token'); runsToken = '';
+        batchError = 'Authentication required — token missing, wrong, or expired.';
+        return;
+      }
+      if (res.status !== 202) {
+        let b = {}; try { b = await res.json(); } catch {}
+        batchError = 'Submit failed (' + res.status + ')' + (b?.error ? ': ' + b.error : '') + '.';
+        return;
+      }
+      const body = await res.json();
+      batchId = body.batchId;
+      pollBatch();
+    } catch {
+      batchError = 'Network error — could not reach /api/batches.';
+    } finally {
+      batchSubmitting = false;
+    }
+  }
+
+  async function pollBatch() {
+    if (!batchId || !runsToken) return;
+    try {
+      const res = await fetch('/api/batches/' + batchId, { headers: { authorization: 'Bearer ' + runsToken } });
+      if (res.status === 401) {
+        runsAuthed = false; sessionStorage.removeItem('terra_token'); runsToken = '';
+        batchError = 'Authentication required — token missing, wrong, or expired.';
+        return;
+      }
+      if (res.ok) {
+        const body = await res.json();
+        batchAgg = body;
+        // Keep polling while any child is still running; stop once terminal.
+        if (batchPollTimer) clearTimeout(batchPollTimer);
+        if (body.status === 'running') batchPollTimer = setTimeout(pollBatch, 2000);
+      }
+    } catch {
+      batchError = 'Network error while polling the batch.';
+    }
+  }
   const currentDoc = () => docs.find((d) => d.id === selectedDoc) || docs[0];
 
   function navigate(to, event) {
@@ -222,6 +296,7 @@
     <nav class="topbar-nav">
       <a href="/docs" onclick={(e) => navigate('/docs', e)}>Docs</a>
       <a href="/runs" onclick={(e) => navigate('/runs', e)}>Runs</a>
+      <a href="/batches" onclick={(e) => navigate('/batches', e)}>Batches</a>
       <a href="/changelog" onclick={(e) => navigate('/changelog', e)}>Changelog</a>
       <a href="https://github.com/acoyfellow/terrarium">GitHub</a>
       <a class="cta" href="/docs?page=tutorial" onclick={(e) => navigate('/docs?page=tutorial', e)}>Get started</a>
@@ -438,6 +513,72 @@ POST https://terrarium-control.<you>.workers.dev/api/runs  ->  202 { runId }`}</
               </table>
             </div>
           {/each}
+        {/if}
+      {/if}
+    </section>
+
+  {:else if route() === 'batches'}
+    <section class="runs-shell">
+      <div class="runs-head">
+        <div class="eyebrow">Batch console</div>
+        <h1>Fan out a batch.</h1>
+        <p class="lead">Admit N bounded tasks as one batch under a concurrency window. The aggregate below is the backend's failure-truth verbatim — a non-success is never rolled up as done. Owner-scoped, auth-gated, token stays in this tab.</p>
+      </div>
+
+      {#if !runsAuthed}
+        <form class="runs-auth" onsubmit={submitToken}>
+          <label for="btok">Control token</label>
+          <p class="runs-auth-note">Paste your control token to submit batches. Kept in <code>sessionStorage</code> for this tab only — never written to disk or sent anywhere but <code>/api/batches</code>.</p>
+          <input id="btok" type="password" autocomplete="off" bind:value={tokenDraft} placeholder="Bearer token…" />
+          <button class="btn btn-primary" type="submit">Authenticate</button>
+          {#if runsError}<p class="runs-error">{runsError}</p>{/if}
+        </form>
+      {:else}
+        <form class="batch-form" onsubmit={submitBatch}>
+          <label class="batch-field">Tasks (one per line)
+            <textarea rows="5" bind:value={batchTasksText} placeholder="reply with: alpha&#10;reply with: bravo"></textarea>
+          </label>
+          <div class="batch-row">
+            <label class="batch-field batch-conc">Max concurrency
+              <input type="number" min="1" max="8" bind:value={batchConcurrency} />
+            </label>
+            <button class="btn btn-primary" type="submit" disabled={batchSubmitting}>{batchSubmitting ? 'Submitting…' : 'Submit batch'}</button>
+            <button class="btn runs-signout" type="button" onclick={signOutRuns}>Sign out</button>
+          </div>
+          {#if batchError}<p class="runs-error">{batchError}</p>{/if}
+        </form>
+
+        {#if batchId}
+          <div class="batch-result">
+            <div class="batch-result-head">
+              <span class="mono batch-id">{batchId}</span>
+              {#if batchAgg}<span class="runs-badge runs-{batchAgg.status}">{batchAgg.status}</span>{/if}
+            </div>
+            {#if batchAgg}
+              <div class="batch-stats">
+                <span class="batch-stat">total <b>{batchAgg.total}</b></span>
+                <span class="batch-stat batch-stat-run">running <b>{batchAgg.running}</b></span>
+                <span class="batch-stat batch-stat-done">done <b>{batchAgg.done}</b></span>
+                <span class="batch-stat batch-stat-fail">failed <b>{batchAgg.failed}</b></span>
+                <span class="batch-stat">window <b>{batchAgg.maxConcurrency}</b></span>
+              </div>
+              <table class="runs-table">
+                <thead><tr><th>Child run</th><th>Status</th><th>Created</th><th>Terminal</th></tr></thead>
+                <tbody>
+                  {#each batchAgg.children as c}
+                    <tr>
+                      <td class="mono">{c.runId}</td>
+                      <td><span class="runs-badge runs-{c.status === 'done' && c.ok !== false ? 'done' : (c.status === 'running' || c.status === 'unknown' ? 'running' : 'failed')}">{c.status}{#if c.status === 'done' && c.ok === false} · !ok{/if}</span></td>
+                      <td>{c.createdAt ? new Date(c.createdAt).toLocaleString() : '—'}</td>
+                      <td>{c.terminalAt ? new Date(c.terminalAt).toLocaleString() : '—'}</td>
+                    </tr>
+                  {/each}
+                </tbody>
+              </table>
+            {:else}
+              <p class="runs-empty">Admitted — polling aggregate…</p>
+            {/if}
+          </div>
         {/if}
       {/if}
     </section>

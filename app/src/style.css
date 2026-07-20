@@ -517,3 +517,21 @@ img { max-width: 100%; display: block; }
 .runs-running { color: var(--mint); background: var(--mint-soft); }
 .runs-done { color: #9fe6c0; }
 .runs-failed { color: #ff9b9b; border-color: rgba(255,155,155,.3); }
+
+/* --- Batch console (/batches) -------------------------------------------- */
+.batch-form { margin: 2rem 0 0; max-width: 46rem; display: grid; gap: 1rem; padding: 1.4rem; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--layer); }
+.batch-field { display: grid; gap: .4rem; font: 600 .64rem/1 var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.batch-field textarea { padding: .6rem .7rem; border-radius: var(--radius-sm); border: 1px solid var(--border-strong); background: var(--code); color: var(--text); font: .84rem/1.5 var(--font-mono); resize: vertical; }
+.batch-row { display: flex; flex-wrap: wrap; align-items: end; gap: .8rem; }
+.batch-conc { max-width: 9rem; }
+.batch-conc input { padding: .5rem .6rem; border-radius: var(--radius-sm); border: 1px solid var(--border-strong); background: var(--code); color: var(--text); font: .84rem/1 var(--font-mono); width: 100%; }
+.batch-row .btn-primary { margin-left: auto; }
+
+.batch-result { margin: 2rem 0 0; padding: 1.4rem; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--layer-2); }
+.batch-result-head { display: flex; align-items: center; gap: .8rem; margin: 0 0 1rem; }
+.batch-id { font-size: .82rem; color: var(--subtle); }
+.batch-stats { display: flex; flex-wrap: wrap; gap: 1.2rem; margin: 0 0 1.2rem; font: 600 .68rem/1 var(--font-mono); letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.batch-stat b { color: var(--text); font-size: .9rem; margin-left: .3rem; }
+.batch-stat-run b { color: var(--mint); }
+.batch-stat-done b { color: #9fe6c0; }
+.batch-stat-fail b { color: #ff9b9b; }
