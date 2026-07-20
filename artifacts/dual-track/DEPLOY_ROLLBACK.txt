@@ -1,0 +1,17 @@
+TERRALOOP 03e298ae — SERIAL JOIN deploy
+new_version:      50e60337-ad3e-47f2-9c7e-4d89cc424e46  (HEAD c1a39f9)
+rollback_ref:     3e9d9441-2fd4-4437-9258-6d9444afe45a  (previous live @100%)
+promote_cmd:      wrangler versions deploy 50e60337-ad3e-47f2-9c7e-4d89cc424e46@100%
+rollback_cmd:     wrangler versions deploy 3e9d9441-2fd4-4437-9258-6d9444afe45a@100%
+captured_at:      2026-07-20T11:05:05Z
+
+=== LIVE VERIFICATION (version 50e60337 @100%) ===
+health /                : 200
+/runs page              : 200 (bundle index-BWwMWomv.js, 10 hits runs-shell/api-runs/terra_token)
+GET /api/runs no-token  : 401 {"ok":false,"error":"unauthorized"}
+GET /api/runs bad-token : 401
+POST /api/batches no-tok: 401 {"ok":false,"error":"unauthorized"} (route wired)
+GET /api/batches/:id    : 401
+/api/nonexistent        : 404 (proves batches route is real, not fallthrough)
+authed happy-path       : 299/299 cloud tests green vs real admit path (token not committed)
+verified_at            : 2026-07-20T11:06:03Z
