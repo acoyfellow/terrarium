@@ -61,7 +61,79 @@
   let hash = $state(location.hash);
   let selectedDoc = $state(new URLSearchParams(location.search).get('page') || 'tutorial');
 
-  const route = () => path === '/docs' ? 'docs' : (path === '/changelog' || hash === '#changelog') ? 'changelog' : 'home';
+  const route = () => path === '/docs' ? 'docs' : path === '/runs' ? 'runs' : (path === '/changelog' || hash === '#changelog') ? 'changelog' : 'home';
+
+  // --- Run index (/runs) — owner-authenticated view of GET /api/runs. -------
+  // Token lives ONLY in sessionStorage (never localStorage, never committed,
+  // never on disk). Cleared on tab close. 401 -> auth prompt, never a broken
+  // page. This surface CONSUMES the existing endpoint; no backend changes.
+  let runsToken = $state(sessionStorage.getItem('terra_token') || '');
+  let runsAuthed = $state(!!sessionStorage.getItem('terra_token'));
+  let runsData = $state({ runs: [], channels: {} });
+  let runsError = $state('');
+  let runsLoading = $state(false);
+  let filterStatus = $state('');
+  let filterSince = $state('');
+  let tokenDraft = $state('');
+
+  function runsQuery() {
+    const p = new URLSearchParams();
+    if (filterStatus) p.set('status', filterStatus);
+    if (filterSince) {
+      const ms = Date.parse(filterSince);
+      if (!Number.isNaN(ms)) p.set('since', String(ms));
+    }
+    const qs = p.toString();
+    return '/api/runs' + (qs ? '?' + qs : '');
+  }
+
+  async function loadRuns() {
+    if (!runsToken) { runsAuthed = false; return; }
+    runsLoading = true; runsError = '';
+    try {
+      const res = await fetch(runsQuery(), { headers: { authorization: 'Bearer ' + runsToken } });
+      if (res.status === 401) {
+        runsAuthed = false;
+        runsError = 'Authentication required — token missing, wrong, or expired.';
+        sessionStorage.removeItem('terra_token');
+        runsToken = '';
+        return;
+      }
+      if (!res.ok) { runsError = 'Request failed (' + res.status + ').'; return; }
+      const body = await res.json();
+      runsData = { runs: body.runs || [], channels: body.channels || {} };
+      runsAuthed = true;
+    } catch (e) {
+      runsError = 'Network error — could not reach /api/runs.';
+    } finally {
+      runsLoading = false;
+    }
+  }
+
+  function submitToken(e) {
+    if (e) e.preventDefault();
+    if (!tokenDraft.trim()) return;
+    runsToken = tokenDraft.trim();
+    sessionStorage.setItem('terra_token', runsToken);
+    runsAuthed = true;
+    tokenDraft = '';
+    loadRuns();
+  }
+
+  function signOutRuns() {
+    sessionStorage.removeItem('terra_token');
+    runsToken = ''; runsAuthed = false; runsData = { runs: [], channels: {} }; runsError = '';
+  }
+
+  // Group runs by channel for display (channel is the grouping key).
+  const runsByChannel = () => {
+    const groups = {};
+    for (const r of runsData.runs) {
+      const ch = r.channel || '(none)';
+      (groups[ch] ??= []).push(r);
+    }
+    return Object.entries(groups).sort((a, b) => a[0].localeCompare(b[0]));
+  };
   const currentDoc = () => docs.find((d) => d.id === selectedDoc) || docs[0];
 
   function navigate(to, event) {
@@ -105,6 +177,11 @@
   let io;
   if (typeof document !== 'undefined') document.documentElement.classList.add('reveal-js');
   $effect(() => {
+    // Auto-load the run index whenever we land on /runs with a stored token.
+    if (route() === 'runs' && runsToken && !runsLoading) loadRuns();
+  });
+
+  $effect(() => {
     route(); // dependency: re-run whenever the route changes
     if (typeof window === 'undefined') return;
     tick().then(() => {
@@ -144,6 +221,7 @@
     <a class="brand" href="/" onclick={(e) => navigate('/', e)}><span class="mark"></span>Terrarium</a>
     <nav class="topbar-nav">
       <a href="/docs" onclick={(e) => navigate('/docs', e)}>Docs</a>
+      <a href="/runs" onclick={(e) => navigate('/runs', e)}>Runs</a>
       <a href="/changelog" onclick={(e) => navigate('/changelog', e)}>Changelog</a>
       <a href="https://github.com/acoyfellow/terrarium">GitHub</a>
       <a class="cta" href="/docs?page=tutorial" onclick={(e) => navigate('/docs?page=tutorial', e)}>Get started</a>
@@ -300,6 +378,68 @@ POST https://terrarium-control.<you>.workers.dev/api/runs  ->  202 { runId }`}</
           {/each}
         </article>
       </div>
+    </section>
+
+  {:else if route() === 'runs'}
+    <section class="runs-shell">
+      <div class="runs-head">
+        <div class="eyebrow">Run index</div>
+        <h1>Your runs.</h1>
+        <p class="lead">Every admitted run on your instance, grouped by channel. Owner-scoped and auth-gated — the token stays in this tab only.</p>
+      </div>
+
+      {#if !runsAuthed}
+        <form class="runs-auth" onsubmit={submitToken}>
+          <label for="tok">Control token</label>
+          <p class="runs-auth-note">Paste your control token to list runs. It is kept in <code>sessionStorage</code> for this tab only — never written to disk or sent anywhere but <code>/api/runs</code>.</p>
+          <input id="tok" type="password" autocomplete="off" bind:value={tokenDraft} placeholder="Bearer token…" />
+          <button class="btn btn-primary" type="submit">Load runs</button>
+          {#if runsError}<p class="runs-error">{runsError}</p>{/if}
+        </form>
+      {:else}
+        <div class="runs-controls">
+          <div class="runs-filters">
+            <label>Status
+              <select bind:value={filterStatus} onchange={loadRuns}>
+                <option value="">all</option>
+                <option value="running">running</option>
+                <option value="done">done</option>
+                <option value="failed">failed</option>
+              </select>
+            </label>
+            <label>Since
+              <input type="datetime-local" bind:value={filterSince} onchange={loadRuns} />
+            </label>
+            <button class="btn" onclick={loadRuns}>Refresh</button>
+          </div>
+          <button class="btn runs-signout" onclick={signOutRuns}>Sign out</button>
+        </div>
+
+        {#if runsError}<p class="runs-error">{runsError}</p>{/if}
+        {#if runsLoading}<p class="runs-empty">Loading…</p>
+        {:else if runsData.runs.length === 0}<p class="runs-empty">No runs match.</p>
+        {:else}
+          {#each runsByChannel() as [channel, rows]}
+            <div class="runs-group">
+              <h2 class="runs-channel">{channel} <span class="runs-count">{rows.length}</span></h2>
+              <table class="runs-table">
+                <thead><tr><th>Run</th><th>Status</th><th>Grounding</th><th>Created</th><th>Terminal</th></tr></thead>
+                <tbody>
+                  {#each rows as r}
+                    <tr>
+                      <td class="mono">{r.runId}</td>
+                      <td><span class="runs-badge runs-{r.status}">{r.status}{#if r.status === 'done' && r.ok === false} · !ok{/if}</span></td>
+                      <td class="mono">{r.grounding || '—'}</td>
+                      <td>{r.createdAt ? new Date(r.createdAt).toLocaleString() : '—'}</td>
+                      <td>{r.terminalAt ? new Date(r.terminalAt).toLocaleString() : '—'}</td>
+                    </tr>
+                  {/each}
+                </tbody>
+              </table>
+            </div>
+          {/each}
+        {/if}
+      {/if}
     </section>
 
   {:else}

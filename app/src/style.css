@@ -117,8 +117,8 @@ img { max-width: 100%; display: block; }
 .hero h1 em { color: var(--mint); font-style: normal; }
 .hero .sub { max-width: 40rem; margin: 0; color: var(--subtle); font-size: clamp(.98rem, 1.5vw, 1.2rem); line-height: 1.6; }
 .hero-actions { display: flex; flex-wrap: wrap; gap: .7rem; margin-top: 2rem; }
-.hero-code { margin: 2.75rem 0 0; max-width: 46rem; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--code); padding: 1.1rem 1.25rem; overflow-x: auto; }
-.hero-code code { font: 500 .82rem/1.7 var(--font-mono); color: var(--subtle); white-space: pre; }
+.hero-code { margin: clamp(2rem,4vw,3rem) 0 0; width: 100%; max-width: none; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--code); padding: 1.1rem 1.25rem; }
+.hero-code code { display: block; font: 500 clamp(.72rem,1.4vw,.85rem)/1.7 var(--font-mono); color: var(--subtle); white-space: pre; }
 .hero-code .cm { color: var(--muted); }
 
 /* ============================================================ chapters */
@@ -241,7 +241,7 @@ img { max-width: 100%; display: block; }
 .shell { position: relative; z-index: 1; }
 
 /* ---- hero: image + copy split, cinematic ---- */
-.hero-split { display: grid; grid-template-columns: minmax(0,1.05fr) minmax(0,.95fr); gap: clamp(1.5rem,4vw,3.5rem); align-items: center; }
+.hero-split { display: grid; grid-template-columns: minmax(0,1.05fr) minmax(0,.9fr); gap: clamp(1.5rem,4vw,3.5rem); align-items: center; }
 .hero-art { position: relative; border-radius: var(--radius-lg); overflow: hidden; border: 1px solid var(--border-strong);
   box-shadow: var(--shadow-lg), 0 0 90px rgba(63,191,114,.14); aspect-ratio: 5 / 4; }
 .hero-art img { width: 100%; height: 100%; object-fit: cover; object-position: center; transform: scale(1.02); }
@@ -263,7 +263,8 @@ img { max-width: 100%; display: block; }
 .rc-meta { font-size: .62rem; color: var(--muted); }
 
 /* scanline sweeping the hero code block */
-.hero-code { position: relative; overflow: hidden; }
+/* horizontal scroll for the code, but clip the scanline via an inner mask so it never forces overflow:hidden on the scroller */
+.hero-code { position: relative; overflow-x: auto; overflow-y: hidden; -webkit-overflow-scrolling: touch; }
 .hero-code .scan { position: absolute; left: 0; right: 0; top: 0; height: 40%; pointer-events: none; z-index: 2;
   background: linear-gradient(180deg, rgba(143,240,173,.14), transparent); animation: sweep 5.5s ease-in-out infinite; }
 @keyframes sweep { 0%{ transform: translateY(-120%);} 60%,100%{ transform: translateY(320%);} }
@@ -304,9 +305,11 @@ img { max-width: 100%; display: block; }
   linear-gradient(color-mix(in srgb, var(--ink) 88%, transparent), color-mix(in srgb, var(--ink) 88%, transparent)),
   radial-gradient(var(--grid) 1px, transparent 1px) 0 0 / 1.25rem 1.25rem; }
 
+@media (max-width: 1024px) {
+  .hero-split { grid-template-columns: 1fr; gap: 1.75rem; }
+  .hero-art { aspect-ratio: 16 / 10; max-height: 56vh; }
+}
 @media (max-width: 900px) {
-  .hero-split { grid-template-columns: 1fr; }
-  .hero-art { aspect-ratio: 16 / 11; order: -1; }
 }
 @media (prefers-reduced-motion: reduce) {
   .aurora, .spores i, .rc-dot, .hero-code .scan, .brand .mark { animation: none !important; }
@@ -355,3 +358,162 @@ img { max-width: 100%; display: block; }
 }
 
 .hero .sub b { color: var(--mint); font-weight: 600; }
+
+/* ===== POLISH II: scroll-reveal boot-in ===== */
+/* Elements are ALWAYS visible by default. Only when JS confirms it is actively
+   managing reveals (html.reveal-js) do we hide-then-animate. This makes reveal
+   pure enhancement — a missed observer can never leave content invisible. */
+.reveal-js [data-reveal]:not(.in){opacity:0;transform:translateY(18px);filter:blur(6px)}
+.reveal-js [data-reveal]{transition:opacity .7s ease,transform .7s cubic-bezier(.2,.7,.2,1),filter .7s ease}
+.reveal-js [data-reveal].in{opacity:1!important;transform:none!important;filter:none!important}
+.reveal-js [data-reveal]:not(.in) > *{opacity:0;transform:translateY(14px)}
+.reveal-js [data-reveal] > *{transition:opacity .55s ease,transform .55s cubic-bezier(.2,.7,.2,1);transition-delay:calc(var(--d,0)*90ms + 120ms)}
+.reveal-js [data-reveal].in > *{opacity:1!important;transform:none!important}
+@media (prefers-reduced-motion: reduce){[data-reveal],[data-reveal] > *{opacity:1!important;transform:none!important;filter:none!important}}
+
+/* ===== POLISH II: flow "boot bar" fill ===== */
+.flow{position:relative}
+.flow.in::before{content:"";position:absolute;left:0;top:-1px;height:2px;background:linear-gradient(90deg,transparent,var(--mint),var(--mint-bright));box-shadow:0 0 12px var(--mint);z-index:3;animation:bootbar 1.6s cubic-bezier(.4,0,.1,1) .2s both}
+@keyframes bootbar{from{width:0;opacity:1}to{width:100%;opacity:.85}}
+.flow li{position:relative;overflow:hidden}
+.flow li::before{content:"";position:absolute;left:0;top:0;bottom:0;width:2px;background:var(--mint);box-shadow:0 0 10px var(--mint);opacity:0;transform:scaleY(0);transform-origin:top}
+.flow.in li::before{animation:tick .5s ease both;animation-delay:calc(var(--d)*.16s + .5s)}
+@keyframes tick{from{opacity:0;transform:scaleY(0)}to{opacity:.9;transform:scaleY(1)}}
+
+/* ===== POLISH II: edge rail data packet ===== */
+.edge-flow{position:relative}
+.edge-packet{position:absolute;left:calc(6rem - 3px);width:9px;height:9px;border-radius:50%;background:var(--mint);box-shadow:0 0 10px 3px var(--mint-glow),0 0 20px var(--mint);z-index:4;opacity:0}
+.edge-flow.in .edge-packet{animation:packet 3.4s cubic-bezier(.5,0,.5,1) .6s infinite}
+@keyframes packet{0%{top:1.4rem;opacity:0}6%{opacity:1}94%{opacity:1}100%{top:calc(100% - 1.4rem);opacity:0}}
+.edge-flow li{position:relative}
+.edge-flow li::after{content:"";position:absolute;left:0;right:0;bottom:0;height:1px;background:linear-gradient(90deg,var(--mint-soft),transparent);opacity:0;transition:opacity .3s}
+.edge-flow.in li:hover::after{opacity:1}
+
+/* ===== POLISH II: hero headline word-boot + receipt stamp ===== */
+.hero-inner.in h1 em{animation:emboot 1s ease .5s both}
+@keyframes emboot{0%{opacity:.3;text-shadow:0 0 0 var(--mint-glow)}50%{opacity:1;text-shadow:0 0 40px var(--mint)}100%{opacity:1;text-shadow:0 0 30px var(--mint-glow)}}
+.hero-inner.in .receipt-chip{animation:stamp .6s cubic-bezier(.34,1.56,.64,1) 1.1s both}
+@keyframes stamp{0%{opacity:0;transform:translateY(8px) scale(.94)}60%{transform:translateY(0) scale(1.02)}100%{opacity:1;transform:none}}
+.hero-inner.in .rc-status{animation:blink 1.4s steps(2) 1.5s 2}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.35}}
+
+/* ===== POLISH II: trust-strip icon boot glow + button shimmer ===== */
+.trust-primitives.in .tp img{animation:iconpop .5s ease both;animation-delay:calc(var(--d)*.08s + .2s)}
+@keyframes iconpop{from{opacity:0;transform:scale(.6) rotate(-8deg)}to{opacity:.92;transform:none}}
+.btn-primary{position:relative;overflow:hidden}
+.btn-primary::after{content:"";position:absolute;top:0;left:-60%;width:40%;height:100%;background:linear-gradient(105deg,transparent,rgba(255,255,255,.5),transparent);transform:skewX(-18deg);animation:shimmer 4.5s ease-in-out infinite}
+@keyframes shimmer{0%,72%{left:-60%}86%,100%{left:130%}}
+@media (prefers-reduced-motion: reduce){.flow.in::before,.flow.in li::before,.edge-flow.in .edge-packet,.hero-inner.in h1 em,.hero-inner.in .receipt-chip,.hero-inner.in .rc-status,.trust-primitives.in .tp img,.btn-primary::after{animation:none!important}}
+
+/* ===== 02 flow: brand image header per step ===== */
+.flow li{padding:0!important;display:flex;flex-direction:column}
+.step-art{position:relative;display:block;width:100%;aspect-ratio:1/1;overflow:hidden;background:var(--code)}
+.step-art img{width:100%;height:100%;object-fit:cover;transform:scale(1.02);transition:transform .5s ease;filter:saturate(1.05)}
+.flow li:hover .step-art img{transform:scale(1.08)}
+.step-art::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,transparent 55%,var(--layer) 100%)}
+.flow li .step{margin:1.1rem 1.3rem .2rem!important}
+.flow li b{margin:0 1.3rem .35rem}
+.flow li > span:last-child{margin:0 1.3rem 1.3rem}
+
+/* ===== edge globe: rotating orb + POPs firing like fireworks ===== */
+.globe-wrap{display:flex;flex-direction:column;align-items:center;gap:1rem;margin:clamp(1.5rem,3vw,2.5rem) auto 0;padding:1rem 0}
+.globe{position:relative;width:clamp(200px,34vw,320px);aspect-ratio:1;border-radius:50%;transform-style:preserve-3d}
+.g-core{position:absolute;inset:0;border-radius:50%;background:radial-gradient(circle at 50% 40%,rgba(143,240,173,.16),rgba(63,191,114,.05) 55%,transparent 70%);box-shadow:inset 0 0 60px rgba(143,240,173,.18),0 0 80px rgba(63,191,114,.14)}
+.g-ring{position:absolute;inset:0;border-radius:50%;border:1px solid var(--border-strong)}
+.g-ring-1{transform:rotateX(72deg);animation:spin 14s linear infinite}
+.g-ring-2{transform:rotateX(72deg) rotateY(60deg);animation:spin 20s linear infinite reverse}
+.g-ring-3{transform:rotateY(80deg);border-color:var(--mint-soft);animation:spin 26s linear infinite}
+@keyframes spin{to{transform:rotateX(72deg) rotateZ(360deg)}}
+.g-ring-2{animation-name:spin2}@keyframes spin2{to{transform:rotateX(72deg) rotateY(60deg) rotateZ(-360deg)}}
+.g-ring-3{animation-name:spin3}@keyframes spin3{to{transform:rotateY(80deg) rotateZ(360deg)}}
+/* POPs: scattered on the orb, each flares on its own clock */
+.pop{position:absolute;width:7px;height:7px;border-radius:50%;background:var(--mint);opacity:0;margin:-3.5px;
+  left:calc(50% + cos(var(--p)*33deg) * clamp(48px,8vw,86px));
+  top:calc(50% + sin(var(--p)*51deg) * clamp(40px,6.5vw,72px));
+  animation:fire 3.6s ease-out infinite;animation-delay:calc(var(--p)*-0.42s)}
+@keyframes fire{0%{opacity:0;transform:scale(.2);box-shadow:0 0 0 0 var(--mint)}
+  10%{opacity:1;transform:scale(1);box-shadow:0 0 12px 3px var(--mint-glow)}
+  30%{opacity:.9;box-shadow:0 0 8px 1px var(--mint-glow)}
+  60%{opacity:0;transform:scale(2.4);box-shadow:0 0 0 8px transparent}
+  100%{opacity:0}}
+.globe-cap{color:var(--muted);font-size:.62rem;letter-spacing:.14em;text-transform:uppercase}
+@media (prefers-reduced-motion: reduce){.g-ring,.pop{animation:none!important}.pop{opacity:.7}}
+
+/* ===== hero story loop: task -> run -> receipt -> a thousand ===== */
+.hero-story{position:relative}
+.hs-frame{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transform:scale(1.08);will-change:opacity,transform}
+/* 12s loop, 4 beats. each frame: fade+ken-burns in on its window, out after. */
+.hs-1{animation:hsFrame 12s ease-in-out infinite;animation-delay:0s}
+.hs-2{animation:hsFrame 12s ease-in-out infinite;animation-delay:-9s}
+.hs-3{animation:hsFrame 12s ease-in-out infinite;animation-delay:-6s}
+.hs-4{animation:hsFrameLast 12s ease-in-out infinite;animation-delay:-3s}
+@keyframes hsFrame{
+  0%{opacity:0;transform:scale(1.12)}
+  4%{opacity:1;transform:scale(1.06)}
+  25%{opacity:1;transform:scale(1.0)}
+  30%{opacity:0;transform:scale(.98)}
+  100%{opacity:0}}
+/* last frame (the shelf) lingers + pushes back before the seed re-drops */
+@keyframes hsFrameLast{
+  0%{opacity:0;transform:scale(1.14)}
+  4%{opacity:1;transform:scale(1.08)}
+  22%{opacity:1;transform:scale(1.0)}
+  30%{opacity:0;transform:scale(1.0)}
+  100%{opacity:0}}
+/* captions: one per beat, bottom-left kicker above the receipt chip */
+.hs-caption{position:absolute;left:1rem;bottom:6rem;right:1rem;height:1.4rem;pointer-events:none;z-index:2;text-shadow:0 1px 6px rgba(6,16,11,.9)}
+.hsc{position:absolute;left:0;bottom:0;display:inline-flex;align-items:center;gap:.5rem;
+  font-size:.74rem;color:var(--text);opacity:0;transform:translateY(6px);letter-spacing:.02em}
+.hsc b{color:var(--mint);font-size:.66rem}
+.hsc-1{animation:hsCap 12s ease-in-out infinite;animation-delay:0s}
+.hsc-2{animation:hsCap 12s ease-in-out infinite;animation-delay:-9s}
+.hsc-3{animation:hsCap 12s ease-in-out infinite;animation-delay:-6s}
+.hsc-4{animation:hsCap 12s ease-in-out infinite;animation-delay:-3s}
+@keyframes hsCap{0%{opacity:0;transform:translateY(6px)}6%{opacity:1;transform:translateY(0)}25%{opacity:1;transform:translateY(0)}30%{opacity:0;transform:translateY(-4px)}100%{opacity:0}}
+/* the receipt chip only locks in during the RECEIPT beat, then rides through the shelf beat */
+.hs-receipt{opacity:0;animation:hsReceipt 12s ease-in-out infinite;animation-delay:0s}
+@keyframes hsReceipt{
+  0%,42%{opacity:0;transform:translateY(14px) scale(.96)}
+  50%{opacity:1;transform:translateY(0) scale(1.02)}   /* snap-lock at receipt beat */
+  54%{transform:translateY(0) scale(1)}
+  92%{opacity:1;transform:translateY(0) scale(1)}
+  100%{opacity:0;transform:translateY(10px) scale(.98)}}
+.hs-receipt .rc-dot{animation:blink 1s steps(2) infinite}
+@media (prefers-reduced-motion: reduce){
+  .hs-frame,.hsc,.hs-receipt,.hs-receipt .rc-dot{animation:none!important}
+  .hs-4{opacity:1!important;transform:scale(1)!important}   /* rest on the "thousand" frame */
+  .hsc-4{opacity:1!important;transform:none!important}
+  .hs-receipt{opacity:1!important;transform:none!important}}
+
+/* --- Run index (/runs) ---------------------------------------------------- */
+.runs-shell { max-width: var(--page-max); margin: 0 auto; padding: clamp(2rem, 4vw, 3.5rem) clamp(1.25rem, 5vw, 5rem); }
+.runs-head { max-width: 46rem; }
+.runs-head h1 { margin: .5rem 0 .8rem; font-size: clamp(1.8rem, 4vw, 2.8rem); letter-spacing: -.04em; font-weight: 800; }
+.runs-head .lead { color: var(--muted); font-size: 1rem; line-height: 1.65; margin: 0; }
+
+.runs-auth { margin: 2rem 0 0; max-width: 30rem; display: grid; gap: .55rem; padding: 1.4rem; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--layer); }
+.runs-auth label { font: 600 .7rem/1 var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.runs-auth-note { margin: 0; color: var(--muted); font-size: .82rem; line-height: 1.55; }
+.runs-auth input { padding: .6rem .7rem; border-radius: var(--radius-sm); border: 1px solid var(--border-strong); background: var(--code); color: var(--text); font: .9rem/1 var(--font-mono); }
+.runs-auth button { justify-self: start; margin-top: .3rem; }
+
+.runs-controls { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: end; gap: 1rem; margin: 2rem 0 1.2rem; }
+.runs-filters { display: flex; flex-wrap: wrap; align-items: end; gap: .8rem; }
+.runs-filters label { display: grid; gap: .3rem; font: 600 .64rem/1 var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.runs-filters select, .runs-filters input { padding: .45rem .55rem; border-radius: var(--radius-sm); border: 1px solid var(--border-strong); background: var(--code); color: var(--text); font: .82rem/1 var(--font-mono); }
+.runs-signout { color: var(--muted); }
+
+.runs-error { color: #ff9b9b; font-size: .85rem; margin: .4rem 0 0; }
+.runs-empty { color: var(--muted); font-size: .9rem; margin: 1.5rem 0; }
+
+.runs-group { margin: 0 0 2rem; }
+.runs-channel { display: flex; align-items: center; gap: .6rem; margin: 0 0 .6rem; font-size: 1.05rem; font-weight: 700; letter-spacing: -.02em; }
+.runs-count { font: 600 .7rem/1 var(--font-mono); color: var(--mint); background: var(--mint-soft); padding: .25rem .45rem; border-radius: 999px; }
+.runs-table { width: 100%; border-collapse: collapse; font-size: .84rem; }
+.runs-table th { text-align: left; font: 600 .6rem/1 var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); padding: .5rem .6rem; border-bottom: 1px solid var(--border-strong); }
+.runs-table td { padding: .5rem .6rem; border-bottom: 1px solid var(--border); color: var(--subtle); vertical-align: top; }
+.runs-table td.mono { font-family: var(--font-mono); font-size: .78rem; }
+.runs-badge { display: inline-block; font: 600 .68rem/1 var(--font-mono); padding: .28rem .5rem; border-radius: 999px; border: 1px solid var(--border-strong); }
+.runs-running { color: var(--mint); background: var(--mint-soft); }
+.runs-done { color: #9fe6c0; }
+.runs-failed { color: #ff9b9b; border-color: rgba(255,155,155,.3); }
