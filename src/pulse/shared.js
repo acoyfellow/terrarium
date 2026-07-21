@@ -13,6 +13,13 @@ export const TERMINAL_EVENT_TYPES = ['Completed', 'Failed', 'TimedOut', 'Cancell
 export const ALLOWED_EVENT_FIELDS = [
   'type', 'eventId', 'runId', 'parentRunId', 'taskFingerprint', 'workflowId',
   'sessionId', 'channel', 'at', 'status', 'ok', 'exitCode', 'signal', 'dryRun',
+  // Round 5C2: optional owner identity attached to a routed event so the
+  // Cloud Pulse DO can enforce cross-principal isolation on fan-out. Never
+  // part of the eventId/dedup hash (which only hashes runId/type/at/status/
+  // exitCode), so adding it preserves dedup parity across backends. The fs
+  // router treats it as an opaque allowlisted field; only the Cloud
+  // production surface interprets it.
+  'ownerId',
   // Decide-payload: a bounded receipt an emitter attaches so a downstream
   // decider can choose reuse / log-learning / fire-next from the event alone.
   // Not part of the eventId/dedup hash (which only hashes runId/type/at/status/exitCode),
@@ -72,6 +79,16 @@ export function validDeliveryAttempts(value) {
   return Number.isInteger(value) && value >= 0 && value <= 1_000_000;
 }
 
+// Round 5C2: an optional principal owner attached to a routed event. When
+// present it must be a bounded printable identifier (mirrors PRINCIPAL_ID_RE
+// from cloud principal-auth). fs-router only preserves the field; the Cloud
+// PulseRouter interprets it for cross-principal isolation.
+const OWNER_ID_RE = /^[A-Za-z0-9._:-]{1,128}$/;
+export function validOwnerId(value) {
+  if (value === undefined) return true;
+  return typeof value === 'string' && OWNER_ID_RE.test(value);
+}
+
 export function isValidCallbackEvent(event, expectedEventId, { state = 'any' } = {}) {
   if (!event || typeof event !== 'object' || Array.isArray(event)) return false;
   if (event.eventId !== expectedEventId || !TERMINAL_EVENT_TYPES.includes(event.type) || typeof event.runId !== 'string') return false;
@@ -81,7 +98,8 @@ export function isValidCallbackEvent(event, expectedEventId, { state = 'any' } =
   const allowed = claimed ? CLAIMED_CALLBACK_EVENT_KEYS : CALLBACK_EVENT_KEYS;
   return Object.keys(event).every((key) => allowed.has(key)) &&
     validTimestamp(event.at) && (!claimed || validTimestamp(event.claimedAt)) &&
-    validDeliveryAttempts(event.deliveryAttempts);
+    validDeliveryAttempts(event.deliveryAttempts) &&
+    validOwnerId(event.ownerId);
 }
 
 // Subscription <-> event matching, identical to the fs router including the

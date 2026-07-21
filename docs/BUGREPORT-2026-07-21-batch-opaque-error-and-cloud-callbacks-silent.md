@@ -51,9 +51,23 @@ now"), then had to manually `terrarium_status` + `terrarium_read` all four runId
 spawn tool description explicitly promises "The Pi extension will surface each terminal
 callback here as they finish" — that promise silently failed for cloud runs.
 
-### Root cause
+### Root cause (THREE layers — all three must be fixed)
+
+#### Layer A — server-side: `ownerId` stripped from the routed event (the primary cause)
+The live worker's `RunControlDO.#emitToPulse` attaches `event.ownerId` (the run's
+principal) and calls the Pulse DO `route` with `requirePrincipalOwner: true`. But
+`ALLOWED_EVENT_FIELDS` in src/pulse/shared.js did NOT include `ownerId`, so
+`route()`'s `sanitizeCallbackEvent()` STRIPPED it, then the
+`PRINCIPAL_ID_RE.test(routed.ownerId)` gate threw `invalid callback event`. The emit
+fails soft, nothing is journaled, and NO subscriber (wildcard OR concrete) ever
+receives the terminal event. Proven by simulation: with the live allowlist,
+`ownerId` sanitizes to `undefined` and the gate throws; with `ownerId` added it
+survives and the gate passes. FIX: add `ownerId` to `ALLOWED_EVENT_FIELDS` +
+`validOwnerId` (Round 5C2). REQUIRES A CLOUD DEPLOY.
+
+#### Layer B — extension: wildcard `pi-*` subscription is refused by design
 The autocontinue extension's cloud-pulse feed
-(~/.pi/agent/extensions/terrarium-autocontinue.ts:54) is gated on the `PULSE_TOKEN`
+(~/.pi/agent/extensions/terrarium-autocontinue.ts) is gated on the `PULSE_TOKEN`
 env var:
 
 ```ts
@@ -73,16 +87,29 @@ This is the same class as the earlier directTools/config bug: the credential is 
 box but the running process never inherited it, and nothing falls back to the config
 file / secret file.
 
-### Fix
-The extension now resolves the pulse token with a fallback chain mirroring the MCP
-client's `cloudConfig`/`pulseConfig`:
-1. `process.env.PULSE_TOKEN` (unchanged, highest priority)
-2. `process.env.TERRARIUM_PULSE_TOKEN`
-3. `~/.terrarium/config.json` `pulseTokenFile`
-4. `~/.terrarium/secrets/prod-pulse-token.secret` (conventional default)
+Even with the token, the cloud subscriber id is `pi-cloud-<hash>` and it subscribed
+with `runIds: ["*"]`. The Pulse matcher (src/pulse/shared.js `matches()`) has a guard:
+`if (/^pi[-_]/.test(subscriberId) && runs.includes('*')) return false;` — a wildcard
+`pi-*` subscriber is denied ALL delivery by design (so a session can't wildcard-claim
+every principal's runs). So even after Layer A, the extension's wildcard cloud
+subscribe receives nothing. A dedicated test asserts this exact behavior.
 
-With any of these present, the cloud feed subscribes and cloud terminal callbacks wake
-the session, matching the documented behavior.
+#### Layer C — extension: pulse token not resolved from disk
+`PULSE_TOKEN` env is unset in the session, so `cloudEnabled()` was false and the feed
+never ran — even though the credential is on disk and mcp.json already sets
+`TERRARIUM_PULSE_TOKEN_FILE`.
+
+### Fixes
+1. **Server (deploy):** `ownerId` added to `ALLOWED_EVENT_FIELDS` + `validOwnerId`
+   validator in src/pulse/shared.js so the routed event keeps its owner and the
+   `requirePrincipalOwner` gate passes. Terminal events are journaled and fan out.
+2. **Extension (token):** resolve the pulse token via a fallback chain mirroring the
+   MCP client — env `PULSE_TOKEN` -> env `TERRARIUM_PULSE_TOKEN` ->
+   `~/.terrarium/config.json` `pulseTokenFile` -> `~/.terrarium/secrets/prod-pulse-token.secret`.
+3. **Extension (concrete runIds):** `cloudSubscribe` now subscribes to the CONCRETE
+   spawned run IDs (the same set the local fs path tracks), never `["*"]`, dodging the
+   `pi-*` wildcard guard; re-fired on each spawn as the runId set grows, with an
+   immediate poll (replay covers finish-before-subscribe).
 
 ## Verification
 - Bug 1: unit assert that a filesystem-dependent cloud batch refusal survives
