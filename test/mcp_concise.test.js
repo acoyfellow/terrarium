@@ -229,6 +229,25 @@ test("conciseBatch preserves partial-launch, cleanup, and group correlation diag
   assert.equal(projected.runs[0].runId, projected.runIds[0]);
 });
 
+// Regression (2026-07-21): a refused cloud batch returned a bare {ok:false}
+// because conciseBatch dropped phase/code/error, misdirecting the caller to the
+// tool schema. The refusal must be self-describing.
+test("conciseBatch preserves preflight-refusal diagnostics (filesystem-dependent)", () => {
+  const projected = conciseBatch({
+    ok: false,
+    phase: "preflight",
+    code: "filesystem-dependent",
+    cloud: true,
+    error: "cloud batch refused: 4 job(s) need the local filesystem the cloud cell lacks (job 0: reads /tmp/scan/ARTIFACT.md).",
+    filesystemDependentJobs: [0, 1, 2, 3],
+  });
+  assert.equal(projected.ok, false);
+  assert.equal(projected.phase, "preflight");
+  assert.equal(projected.code, "filesystem-dependent");
+  assert.match(projected.error, /filesystem/);
+  assert.deepEqual(projected.filesystemDependentJobs, [0, 1, 2, 3]);
+});
+
 function rpcCall(args, { extraInit = false } = {}) {
   return new Promise((resolve, reject) => {
     const child = spawn(process.execPath, [MCP_PATH], { stdio: ["pipe", "pipe", "pipe"] });

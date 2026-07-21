@@ -300,6 +300,14 @@ export function conciseBatch(full) {
     strategy: full.strategy,
     groupId: full.groupId,
     reason: full.reason,
+    // Preflight/refusal diagnostics. Without these a refused cloud batch
+    // (e.g. filesystem-dependent jobs) projects to a bare {ok:false}, which
+    // reads as an unexplained failure and misdirects the caller to the tool
+    // schema. Keep them so a refusal is self-describing.
+    phase: full.phase,
+    code: full.code,
+    error: full.error,
+    filesystemDependentJobs: full.filesystemDependentJobs,
     winner: full.winner,
     winners: full.winners,
     timedOut: full.timedOut ? true : undefined,
