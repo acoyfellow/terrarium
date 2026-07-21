@@ -43,15 +43,15 @@
     },
     {
       id: 'explain', label: 'Explanation', kind: 'Understand',
-      title: 'Why trust is the bottleneck',
-      lead: 'Parallel-first agents, on the edge — and why it only works when every run proves itself.',
+      title: 'Why checking results is the bottleneck',
+      lead: 'Bounded agent tasks run in parallel on Cloudflare. Each run returns a receipt you can check.',
       blocks: [
-        ['The real bottleneck', 'Running agents in parallel is easy. Trusting the results is not. An agent that says "done" is not evidence; exit code 0 is not evidence; a callback firing is not evidence. So people run one agent, watch it, and never scale.', 'text'],
-        ['What proof changes', 'When each run carries its own proof, one run and a thousand runs are checked the same way: individually, by receipt.', 'text'],
+        ['The bottleneck', 'Running agents in parallel is easy. Checking the results is the slow part. An agent that says "done" does not prove the task ran. An exit code of 0 does not prove it. A callback firing does not prove it. So people run one agent, watch it by hand, and stop there.', 'text'],
+        ['What a receipt changes', 'Each run carries its own receipt. One run and a thousand runs check the same way: one receipt at a time.', 'text'],
         ['The primitive', 'one bounded task -> one isolated run -> one correlated receipt', 'code'],
-        ['What counts as success', 'Only a verified result whose run ID, task fingerprint, and nonce all match the task Terrarium handed out. Everything else — logs, callbacks, model prose — is a signal, not proof. The nonce is server-minted, so a run cannot forge its own success.', 'text'],
-        ['Provenance vs. correctness', 'A verified receipt proves the task ran and correlated. It does not prove the answer is right. Terrarium adds an advisory, fail-closed trust grade from cross-model agreement — and parallelism helps here too: more independent runs raise confidence. It can annotate a receipt, never upgrade it.', 'text'],
-        ['Why the edge', 'Every run lives on Cloudflare — admission, execution, logs, model route, and the wake callback. Submit a task, close your laptop, and pull the proof back later. Correctness and delivery never depend on a machine you own, which is what makes walking away from a thousand parallel runs safe.', 'text'],
+        ['What counts as success', 'A run succeeds when its run ID, task fingerprint, and nonce match the task Terrarium handed out. Logs, callbacks, and model prose are signals, not the status. The nonce is server-minted, so a run cannot forge its own success.', 'text'],
+        ['Provenance and correctness are separate', 'A verified receipt proves the task ran and correlated. It does not prove the answer is correct. Terrarium adds an advisory trust grade from cross-model agreement; more independent runs raise the grade. The grade annotates a receipt. It never changes a receipt from failed to verified.', 'text'],
+        ['Why Cloudflare', 'Admission, execution, logs, the model route, and the wake callback all run on Cloudflare. Submit a task, close your laptop, and read the receipt later. State and delivery do not depend on a machine you own, so you can leave a thousand parallel runs and come back to their receipts.', 'text'],
       ],
     },
   ];
@@ -318,9 +318,9 @@
       <div class="hero-inner" data-reveal>
         <div class="hero-split">
           <div class="hero-copy">
-            <div class="eyebrow">Parallel-first agents, on the edge</div>
-            <h1>Run agents in parallel.<br />Trust <em>every</em> result.</h1>
-            <p class="sub">What blocks agents at scale is trust, not compute. Terrarium fans out bounded tasks that run <b>on Cloudflare by default</b> and hands each one back a verified receipt: proof it ran, correlated so you can check it. Submit, close your laptop, pull the proof later. No server, no local machine in the loop.</p>
+            <div class="eyebrow">Parallel agents on Cloudflare</div>
+            <h1>Run agents in parallel.<br />Check <em>every</em> result.</h1>
+            <p class="sub">You can run a hundred agents at once. Checking a hundred results by hand is the part that stops you. Terrarium runs each bounded task <b>on Cloudflare by default</b> and returns a receipt: the run ID, a task fingerprint, and a server-minted nonce that must all correlate. Submit a task, close your laptop, and read the receipt later. No origin server. No machine you own in the loop.</p>
             <div class="hero-actions">
               <a class="btn btn-primary" href="/docs?page=tutorial" onclick={(e) => navigate('/docs?page=tutorial', e)}>Get started</a>
               <a class="btn" href="https://github.com/acoyfellow/terrarium">View source</a>
@@ -375,13 +375,13 @@ POST https://terrarium-control.<you>.workers.dev/api/runs  ->  202 { runId }`}</
     <section class="chapter">
       <div class="chapter-inner">
         <div class="chapter-head" data-reveal>
-          <div><p class="eyebrow">01 / Why it changes things</p><h2 class="section-title">Trust one run.<br />Now run a thousand.</h2></div>
-          <p class="section-lede">When each run carries its own receipt, you check a thousand runs the same way you check one. The same primitive runs from the CLI, an agent, or a cloud endpoint.</p>
+          <div><p class="eyebrow">01 / What a receipt buys you</p><h2 class="section-title">Check one run.<br />Then check a thousand the same way.</h2></div>
+          <p class="section-lede">Each run carries its own receipt, so a thousand runs check the same way as one: read the receipt. The same command runs from the CLI, an agent, or a cloud endpoint.</p>
         </div>
         <div class="grid-cards" data-reveal>
-          <div class="cell fx-shine" style="--d:0"><span class="idx">A</span><h3>Proof per run</h3><p>Success is a verified receipt — run ID, fingerprint, and nonce all correlate. Not exit codes, not prose, not "trust me."</p></div>
-          <div class="cell fx-shine" style="--d:1"><span class="idx">B</span><h3>Parallel without fear</h3><p>Fan out with explicit concurrency. Every run is isolated and keeps its own receipt, so more runs never means more guessing.</p></div>
-          <div class="cell fx-shine" style="--d:2"><span class="idx">C</span><h3>Nothing to babysit</h3><p>Submit and walk away. Runs live on the edge and wake you when they finish — even after you disconnect.</p></div>
+          <div class="cell fx-shine" style="--d:0"><span class="idx">A</span><h3>A receipt per run</h3><p>A run succeeds when its run ID, task fingerprint, and nonce correlate. An exit code of 0 or a line of agent prose does not set the status.</p></div>
+          <div class="cell fx-shine" style="--d:1"><span class="idx">B</span><h3>Bounded parallelism</h3><p>Fan out with an explicit concurrency limit. Each run is isolated and keeps its own receipt, so the check per run stays the same as the count grows.</p></div>
+          <div class="cell fx-shine" style="--d:2"><span class="idx">C</span><h3>No process to watch</h3><p>Submit a task and disconnect. The run lives on Cloudflare and sends a durable callback when it finishes.</p></div>
         </div>
       </div>
     </section>
@@ -390,7 +390,7 @@ POST https://terrarium-control.<you>.workers.dev/api/runs  ->  202 { runId }`}</
       <div class="chapter-inner">
         <div class="chapter-head" data-reveal>
           <div><p class="eyebrow">02 / How one run works</p><h2 class="section-title">Task in.<br />Receipt out.</h2></div>
-          <p class="section-lede">One run, four steps, one direction — then multiply it. Every task you fan out follows the same path and comes back with its own proof, even if you disconnect mid-flight.</p>
+          <p class="section-lede">One run takes four steps. Every task you fan out follows the same four steps and returns its own receipt, including runs that finish after you disconnect.</p>
         </div>
         <ol class="flow" data-reveal>
           <li class="fx-shine" style="--d:0"><span class="step-art"><img src="/campaign/v6/steps/task.jpg" alt="" aria-hidden="true" loading="lazy" /></span><span class="step">01</span><b>Task</b><span>Hand Terrarium one bounded job.</span></li>
@@ -404,8 +404,8 @@ POST https://terrarium-control.<you>.workers.dev/api/runs  ->  202 { runId }`}</
     <section class="chapter edge">
       <div class="chapter-inner">
         <div class="chapter-head" data-reveal>
-          <div><p class="eyebrow">03 / Runs on the edge</p><h2 class="section-title">No origin server.<br />No local machine.</h2></div>
-          <p class="section-lede">Submit a task, close your laptop. Admission, the run-control cell, execution, logs, the model route, and the wake callback all live on <b>Cloudflare's global network</b> — so correctness, liveness, logs, and delivery never depend on a machine you own.</p>
+          <div><p class="eyebrow">03 / Where a run lives</p><h2 class="section-title">No origin server.<br />No local machine.</h2></div>
+          <p class="section-lede">Submit a task and close your laptop. Admission, the run-control cell, execution, logs, the model route, and the wake callback all run on <b>Cloudflare's global network</b>. State, logs, and delivery do not depend on a machine you own.</p>
         </div>
         <div class="globe-wrap" data-reveal aria-hidden="true">
           <div class="globe">
@@ -431,7 +431,7 @@ POST https://terrarium-control.<you>.workers.dev/api/runs  ->  202 { runId }`}</
 
     <section class="closing">
       <div class="closing-inner" data-reveal>
-        <p><strong>Parallel-first agents, on the edge</strong> — where every run proves itself.</p>
+        <p><strong>Run bounded agent tasks in parallel on Cloudflare. Read a receipt for each one.</strong></p>
         <div class="hero-actions">
           <a class="btn btn-primary" href="/docs?page=tutorial" onclick={(e) => navigate('/docs?page=tutorial', e)}>Run your first task</a>
           <a class="btn" href="/docs?page=explain" onclick={(e) => navigate('/docs?page=explain', e)}>Why receipts?</a>
@@ -530,7 +530,7 @@ POST https://terrarium-control.<you>.workers.dev/api/runs  ->  202 { runId }`}</
       <div class="runs-head">
         <div class="eyebrow">Batch console</div>
         <h1>Fan out a batch.</h1>
-        <p class="lead">Admit N bounded tasks as one batch under a concurrency window. The aggregate below is the backend's failure-truth verbatim — a non-success is never rolled up as done. Owner-scoped; sign in with GitHub.</p>
+        <p class="lead">Admit N bounded tasks as one batch under a concurrency limit. The aggregate below is derived from the child receipts: the batch reads done only when every child is done and verified. Any failed, cancelled, or running child holds the batch back. Owner-scoped; sign in with GitHub.</p>
       </div>
 
       {#if !authChecked}
@@ -595,8 +595,8 @@ POST https://terrarium-control.<you>.workers.dev/api/runs  ->  202 { runId }`}</
     <section class="log-shell">
       <div class="log-head">
         <div class="eyebrow">Changelog</div>
-        <h1>What actually shipped.</h1>
-        <p class="lead">Notable product, API, and safety changes.</p>
+        <h1>What shipped.</h1>
+        <p class="lead">Product, API, and safety changes, most recent first.</p>
       </div>
       <div class="log">
         {#each changelog as entry}

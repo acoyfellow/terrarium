@@ -4,17 +4,17 @@
 
 ![A cozy glass terrarium on a wooden desk. Inside, a single small robot tends a tiny garden of even smaller robots, each working in their own pot.](./assets/social-card.jpg)
 
-**Run agents in parallel. Trust every result.**
+**Run agents in parallel. Check every result.**
 
-The thing blocking agents at scale isn't compute — it's trust. An agent that says "done" is not evidence. `exit 0` is not evidence. A callback firing is not evidence. So people run one agent, watch it, and never fan out.
+You can run a hundred agents at once. Checking a hundred results by hand is the part that stops you. An agent that says "done" does not prove the task ran. An `exit 0` does not prove it. A callback firing does not prove it. So people run one agent, watch it by hand, and stop there.
 
-Terrarium runs each bounded task as one isolated job and hands back a **verified receipt** — proof the run happened, correlated and yours to trust or reject. Trust one run the same way you trust a thousand: individually, by proof.
+Terrarium runs each bounded task as one isolated job and returns a **receipt**: the run ID, a task fingerprint, and a server-minted nonce that must all correlate. A thousand runs check the same way as one: one receipt at a time.
 
 ```text
-one bounded task → one isolated run → one correlated receipt
+one bounded task -> one isolated run -> one correlated receipt
 ```
 
-Success is not `exit 0`, not a callback, not model prose. Success is a `TERRARIUM_RESULT` whose server-minted **runId, taskFingerprint, and nonce all correlate** with the task Terrarium handed out. Everything else is a signal, not proof.
+A run succeeds when its `TERRARIUM_RESULT` carries a **runId, taskFingerprint, and nonce that all correlate** with the task Terrarium handed out. Logs, callbacks, and model prose are signals. They do not set the status.
 
 ---
 
@@ -91,7 +91,7 @@ Ordinary children inherit host authority and environment — use them for cooper
 Terrarium ships a cloud execution service you **deploy to your own Cloudflare account** — no shared tenancy. `terrarium.coey.dev` is only the maintainer's reference deployment; substitute your own URL everywhere.
 
 ```sh
-wrangler deploy                              # → https://terrarium-control.<you>.workers.dev
+wrangler deploy                              # -> https://terrarium-control.<you>.workers.dev
 wrangler secret put TERRARIUM_CONTROL_TOKEN_CURRENT
 ```
 
@@ -99,23 +99,23 @@ A task runs entirely on your Cloudflare-managed infrastructure — admission, ex
 
 ```text
 authenticated POST /api/runs (Bearer + Idempotency-Key)
-→ ordered admission + per-principal budget
-→ durable RunControl Durable Object
-→ Cloudflare-managed Pi execution cell (Dockerfile.pi, linux/amd64)
-→ credentialless server-owned Workers AI route
-→ durable integrity-checked logs (DO SQL inline + R2 overflow, byte count + SHA-256)
-→ verified correlated TERRARIUM_RESULT (runId + taskFingerprint + nonce)
-→ durable principal-scoped terminal callback (Pulse)
+-> ordered admission + per-principal budget
+-> durable RunControl Durable Object
+-> Cloudflare-managed Pi execution cell (Dockerfile.pi, linux/amd64)
+-> credentialless server-owned Workers AI route
+-> durable integrity-checked logs (DO SQL inline + R2 overflow, byte count + SHA-256)
+-> verified correlated TERRARIUM_RESULT (runId + taskFingerprint + nonce)
+-> durable principal-scoped terminal callback (Pulse)
 ```
 
 All `/api/runs*` and `/api/batches*` routes require an `Authorization` header of the form `Bearer $TERRARIUM_CONTROL_TOKEN` (your control token, supplied via env — never hardcoded); `POST /api/runs` and `POST /api/batches` also require an `Idempotency-Key`. Your deployed instance also serves owner-authenticated web consoles at `/runs` (run index) and `/batches` (batch fan-out). Those pages sign in with GitHub (`/auth/login` sets an HttpOnly session cookie); only the configured owner login may enter, and the page never holds a token. Requires `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `SESSION_SECRET`, and `GITHUB_ALLOWED_LOGIN`; without them `/auth/*` fails closed and the API still requires a bearer.
 
 | Method + path | Purpose | Notes |
 | --- | --- | --- |
-| `POST /api/runs` | Admit one bounded task | Body `{ task, spec? }` → `202 { runId, contract, executionRef }`. Missing key `400`; over budget `429`; task > 64 KiB `413`. |
-| `GET /api/runs` | List your runs | Owner-scoped, indexed. Filter by `channel`, `status`, `since` → `{ runs, channels }`. |
-| `POST /api/batches` | Admit N bounded tasks as one batch | Also requires an `Idempotency-Key`. Body `{ tasks[], maxConcurrency? }` → `202 { batchId, admitted, childRunIds, peakLive, rejected }`. Each task composes through the *same* single-run admit path; `maxConcurrency` is capped at the per-owner ceiling (8). |
-| `GET /api/batches/:id` | Batch aggregate | References child runIds only; **failure-truth** status (`done` only when all children terminal + ok; any failure → `failed`). Unknown/cross-owner `404`. |
+| `POST /api/runs` | Admit one bounded task | Body `{ task, spec? }` -> `202 { runId, contract, executionRef }`. Missing key `400`; over budget `429`; task > 64 KiB `413`. |
+| `GET /api/runs` | List your runs | Owner-scoped, indexed. Filter by `channel`, `status`, `since` -> `{ runs, channels }`. |
+| `POST /api/batches` | Admit N bounded tasks as one batch | Also requires an `Idempotency-Key`. Body `{ tasks[], maxConcurrency? }` -> `202 { batchId, admitted, childRunIds, peakLive, rejected }`. Each task composes through the *same* single-run admit path; `maxConcurrency` is capped at the per-owner ceiling (8). |
+| `GET /api/batches/:id` | Batch aggregate | References child runIds only; **failure-truth** status (`done` only when all children terminal + ok; any failure -> `failed`). Unknown/cross-owner `404`. |
 | `GET /api/runs/:id/status` | Terminal + contract status | Owner-scoped; cross-principal `401`; unknown `404`. |
 | `GET /api/runs/:id/logs` | Durable logs + R2 overflow refs | Inline logs plus `logRefs`. |
 | `GET /api/runs/:id/logs/ref?seq=N` | Fetch an R2 overflow chunk | Integrity-checked; fails closed on corrupt/missing. |
@@ -145,7 +145,7 @@ For any delegated run, success has exactly one authoritative proof chain:
 
 ```text
 child exits 0 + verified TERRARIUM_RESULT receipt (runId, taskFingerprint, nonce, summary)
-  → terminal status: done, ok: true
+  -> terminal status: done, ok: true
 ```
 
 Exit 0 alone is never success: a missing, mismatched, or malformed receipt settles as `inconclusive` or `failed`. Every surface Terrarium exposes maps to exactly one role, and the diagnostic, notification, and presentation surfaces are deliberately **not** authoritative success proof. Only **Authoritative** and **Evidence** can establish that a task succeeded:
@@ -165,7 +165,7 @@ When in doubt, the run/task-correlated receipt — and the tests it claims to ha
 ## CLI reference
 
 ```text
---agent <cmd>       Child command. Default: config → $TERRARIUM_AGENT → opencode run.
+--agent <cmd>       Child command. Default: config -> $TERRARIUM_AGENT -> opencode run.
 --model <id>        Pin model for opencode run or pi. Default: env/config/runner.
 --read-only         Use the configured read-only child command.
 --profile <name>    default (structured handoff) or minimal (lean research shell).
@@ -179,7 +179,7 @@ When in doubt, the run/task-correlated receipt — and the tests it claims to ha
 --task              Force the argument to run as a task (bypass the command-typo guard).
 ```
 
-Precedence — agent: explicit `--agent` → `--read-only` command → `$TERRARIUM_AGENT` → `config.defaultAgent` → `opencode run`. Model: `--model` → `$TERRARIUM_MODEL` → `config.defaultModel` → runner default. For Pi one-shot children use `pi -p --no-session` so the child leaves no persistent conversation file.
+Precedence — agent: explicit `--agent` -> `--read-only` command -> `$TERRARIUM_AGENT` -> `config.defaultAgent` -> `opencode run`. Model: `--model` -> `$TERRARIUM_MODEL` -> `config.defaultModel` -> runner default. For Pi one-shot children use `pi -p --no-session` so the child leaves no persistent conversation file.
 
 Mistyped subcommands fail closed (`terra statsu`, `terra group` with no subcommand) — they suggest and exit non-zero rather than silently running the typo as a task. Config lives at `~/.terrarium/config.json` (`defaultAgent`, `readOnlyAgent`, `defaultModel`, `maxDepth`, `timeoutMs`, `startupWatchdogMs`).
 
@@ -197,7 +197,7 @@ Background supervisors use `startupWatchdogMs` (default 60000, or `TERRARIUM_STA
 - `terrarium_group` — create/status/read/cancel a collection of already-started runs. Group state is a fail-closed roll-up of member receipts (`ok` only when every member is `done, ok: true`); it is **not independent success proof** — confirm with each run's verified receipt.
 - `terrarium_callbacks` — durable **pull** subscription for terminal events: claim, ack, requeue, recover, prune. At-least-once with dedup; subscribing alone does not wake a conversation. A terminal callback is a notification that a run finished, **not authoritative proof** the task succeeded; confirm with the run's verified receipt.
 - `terrarium_doctor` — read-only diagnostics (storage, runs, attention, callbacks, groups, stale claims). The CLI adds an opt-in `--repair` executor.
-- `terrarium_report_failure` — turn a caught terminal failure into a structured, deduped bug report. Fetches the run's status + log by runId, classifies the failure (receipt-mismatch/absent/malformed, agent-timeout, model-config, ca-trust, poll-timeout) with an `agent`/`backend`/`image` blame hint, redacts + excerpts the log, and files it under `~/.terrarium/failure-reports`. Defect-level dedupe collapses N runs failing the same way into one report with an occurrence count; a trusted success is refused. Pass `markdown: true` for a paste-ready body. This is the honesty contract made durable — a caught failure becomes a filed artifact, not just a status poll.
+- `terrarium_report_failure` — turn a caught terminal failure into a structured, deduped bug report. Fetches the run's status + log by runId, classifies the failure (receipt-mismatch/absent/malformed, agent-timeout, model-config, ca-trust, poll-timeout) with an `agent`/`backend`/`image` blame hint, redacts + excerpts the log, and files it under `~/.terrarium/failure-reports`. Defect-level dedupe collapses N runs failing the same way into one report with an occurrence count; a trusted success is refused. Pass `markdown: true` for a paste-ready body. A caught failure becomes a filed artifact instead of a line in a status poll.
 
 Terrarium does not auto-load its Pi host extension — it stays out of unrelated Pi sessions. Hosts may explicitly install [`src/pi-extension.js`](./src/pi-extension.js) for a run widget and callback-triggered follow-ups scoped only to that session's runs.
 
@@ -209,7 +209,7 @@ Terrarium does not auto-load its Pi host extension — it stays out of unrelated
 
 ```sh
 npm run demo:dev      # local site with hot reload (Vite)
-npm run demo:build    # static build → app/dist
+npm run demo:build    # static build -> app/dist
 npm run deploy        # build + deploy to your own Cloudflare account
 ```
 
@@ -228,16 +228,16 @@ Go deeper:
 Deterministic probes assert declared containment boundaries; a contained baseline returns `"verdict": "contained"`.
 
 ```sh
-terra probe filesystem-write-outside-workspace --json    # write outside scratch → fails
-terra probe environment-canary --json                    # host env canary → absent
-terra probe network-disabled --json                      # network reach → fails
+terra probe filesystem-write-outside-workspace --json    # write outside scratch -> fails
+terra probe environment-canary --json                    # host env canary -> absent
+terra probe network-disabled --json                      # network reach -> fails
 terra verify <scenario> --json                           # reruns only an alleged escape; never manufactures evidence
 terra attack <scenario> --agent "opencode run" --json    # agent proposes; the deterministic detector decides
 ```
 
 Policy: `--network none`, read-only root fs, all Linux capabilities dropped, `no-new-privileges`, non-root user, writable `/workspace` + `/tmp` only, inline probe code (no host bind mount), planted canaries rather than real secrets.
 
-The agent-assisted path executes the deterministic Docker detector — detector output, not agent prose, decides `contained` / `escaped`. It does **not** run model-generated exploit programs, expose real credentials, grant GitHub write authority, or publish issues/PRs. A shipped known-vulnerable fixture exercises the full receipt → replay → issue-draft pipeline; drafts are labeled as fixtures and must not be published as real discoveries.
+The agent-assisted path executes the deterministic Docker detector — detector output, not agent prose, decides `contained` / `escaped`. It does **not** run model-generated exploit programs, expose real credentials, grant GitHub write authority, or publish issues/PRs. A shipped known-vulnerable fixture exercises the full receipt -> replay -> issue-draft pipeline; drafts are labeled as fixtures and must not be published as real discoveries.
 
 Full boundaries and the frozen public-automation history: [THREAT_MODEL.md](./THREAT_MODEL.md), [docs/AUTONOMOUS_LOOP.md](./docs/AUTONOMOUS_LOOP.md), [docs/GAPS_TO_AUTONOMY.md](./docs/GAPS_TO_AUTONOMY.md).
 
