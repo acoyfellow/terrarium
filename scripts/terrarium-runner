@@ -1,0 +1,311 @@
+#!/bin/sh
+# terrarium-runner — bounded runner executed inside the digest-pinned
+# @cloudflare/sandbox:0.12.3-opencode container.
+#
+# Contract (Round 5A):
+#   * Task text lives in a file at /workspace/terrarium-task.txt. It is never
+#     interpolated into a shell command and is never passed via `-p` (which is
+#     OpenCode's basic-auth password flag, not a prompt flag).
+#   * Contract JSON (runId, taskFingerprint, nonce) lives in a file at
+#     /workspace/terrarium-contract.json. It is never eval'd.
+#   * The runner invokes the parent-verified OpenCode 1.17.13 CLI shape:
+#       opencode run --pure --file <task> [--file <contract>]
+#                    --model <provider/model> [--agent <name>]
+#     using a positional message that references the file paths. The task text
+#     is delivered ONLY as file attachments; the message tells the agent where
+#     to read it. `--pure`, `--file`, `--model`, `--agent` are the four flags
+#     parent-verified in this OpenCode build (see loop Round 5A brief).
+#   * A model + provider MUST be explicitly configured before launch. If not,
+#     the runner fails BEFORE calling opencode. Model config is nonsecret and
+#     lives in env vars set by the image / RunControlDO — no API keys are
+#     ever accepted from the task or the contract.
+#   * The agent's stdout is captured to a temp file. The runner streams the
+#     captured stdout to its own stdout WITHOUT any TERRARIUM_RESULT= line,
+#     so a stray/duplicate/mismatched marker from the agent CANNOT reach the
+#     authoritative log window. After the agent completes, the runner
+#     structurally validates candidate markers and, only if exactly one line
+#     matches, prints exactly one verified TERRARIUM_RESULT= line at column
+#     zero as its last line before TASK_ENDED.
+#   * If the agent invocation fails, or exits nonzero, or emits zero/more-than-
+#     one candidate marker, or a candidate does not exactly match the contract
+#     runId/taskFingerprint/nonce, the runner exits nonzero and emits NO
+#     TERRARIUM_RESULT line. The backend then correctly classifies the run as
+#     inconclusive. The runner never synthesizes a receipt itself.
+set -eu
+
+CFG=/etc/terrarium/runner.config.json
+TASK=/workspace/terrarium-task.txt
+CONTRACT=/workspace/terrarium-contract.json
+
+# --- tiny JSON field reader (no jq dependency required) --------------------
+# Extracts the string value of a top-level "key":"value" pair. Only used to
+# read the contract file, whose shape is fixed and controlled by the backend.
+# No eval; no interpolation; no dynamic code path.
+json_field() {
+  # $1 = file, $2 = key
+  awk -v k="\"$2\"" '
+    {
+      s = $0
+      while ((p = index(s, k)) > 0) {
+        r = substr(s, p + length(k))
+        sub(/^[[:space:]]*:[[:space:]]*/, "", r)
+        if (substr(r, 1, 1) == "\"") {
+          r = substr(r, 2)
+          out = ""
+          while (r != "") {
+            c = substr(r, 1, 1)
+            if (c == "\\") {
+              out = out substr(r, 1, 2)
+              r = substr(r, 3)
+              continue
+            }
+            if (c == "\"") { print out; exit 0 }
+            out = out c
+            r = substr(r, 2)
+          }
+        }
+        s = substr(s, p + length(k))
+      }
+    }' "$1"
+}
+
+echo "TASK_RECEIVED"
+
+if [ ! -f "$CONTRACT" ] || [ ! -f "$TASK" ]; then
+  echo "[terrarium:runner] missing task or contract file"
+  echo "TASK_ENDED"
+  exit 1
+fi
+
+RUN_ID=$(json_field "$CONTRACT" runId || true)
+TASK_FP=$(json_field "$CONTRACT" taskFingerprint || true)
+NONCE=$(json_field "$CONTRACT" nonce || true)
+
+if [ -z "${RUN_ID:-}" ] || [ -z "${TASK_FP:-}" ] || [ -z "${NONCE:-}" ]; then
+  echo "[terrarium:runner] invalid contract"
+  echo "TASK_ENDED"
+  exit 1
+fi
+
+# --- Explicit nonsecret model/provider config gate -------------------------
+# The runner fails BEFORE launching opencode if the model config is missing.
+# TERRARIUM_MODEL is required and must have the shape "provider/model" per the
+# verified `opencode run --model` flag. TERRARIUM_AGENT is optional; when set
+# it is passed via `--agent`. Neither variable carries API secrets; provider
+# credentials (if any) reach opencode via its own credentialless outbound
+# interception path, never through this runner.
+MODEL_SPEC="${TERRARIUM_MODEL:-}"
+AGENT_NAME="${TERRARIUM_AGENT:-}"
+PROVIDER_CONFIG="${OPENCODE_CONFIG:-/etc/terrarium/opencode.json}"
+if [ -z "$MODEL_SPEC" ]; then
+  echo "[terrarium:runner] TERRARIUM_MODEL is not configured; refusing to launch agent"
+  echo "TASK_ENDED"
+  exit 2
+fi
+case "$MODEL_SPEC" in
+  terrarium/workers-ai) : ;;
+  *)
+    echo "[terrarium:runner] TERRARIUM_MODEL must select the fixed Terrarium Workers AI model"
+    echo "TASK_ENDED"
+    exit 2
+    ;;
+esac
+if [ ! -r "$PROVIDER_CONFIG" ] ||
+   ! grep -Fq '"terrarium"' "$PROVIDER_CONFIG" ||
+   ! grep -Fq '"workers-ai"' "$PROVIDER_CONFIG" ||
+   ! grep -Fq 'https://terrarium.coey.dev/_terrarium_model/v1' "$PROVIDER_CONFIG"; then
+  echo "[terrarium:runner] credentialless provider config is missing or invalid"
+  echo "TASK_ENDED"
+  exit 2
+fi
+export OPENCODE_CONFIG="$PROVIDER_CONFIG"
+
+# HTTPS interception requires the runtime-provided CA. Fail before OpenCode so
+# a missing trust anchor cannot degrade into an opaque provider hang. Local
+# non-intercepted probes may leave NODE_EXTRA_CA_CERTS unset.
+if [ -n "${NODE_EXTRA_CA_CERTS:-}" ]; then
+  case "$NODE_EXTRA_CA_CERTS" in
+    /*) : ;;
+    *)
+      echo "[terrarium:runner] NODE_EXTRA_CA_CERTS must be an absolute path"
+      echo "TASK_ENDED"
+      exit 11
+      ;;
+  esac
+  if [ ! -f "$NODE_EXTRA_CA_CERTS" ] || [ ! -r "$NODE_EXTRA_CA_CERTS" ]; then
+    echo "[terrarium:runner] NODE_EXTRA_CA_CERTS is not a readable regular file"
+    echo "TASK_ENDED"
+    exit 11
+  fi
+fi
+
+# Locate the OpenCode agent binary shipped in the -opencode base image.
+AGENT_BIN=""
+for candidate in /usr/local/bin/opencode /usr/local/bin/opencode-agent /usr/bin/opencode; do
+  if [ -x "$candidate" ]; then AGENT_BIN="$candidate"; break; fi
+done
+if [ -z "$AGENT_BIN" ]; then
+  echo "[terrarium:runner] no OpenCode agent binary present in image"
+  echo "TASK_ENDED"
+  exit 3
+fi
+
+# Fixed message body. The task body is NOT interpolated. The agent reads the
+# task from ${TASK} (attached via --file) and the contract from ${CONTRACT}
+# (attached via --file). The final receipt line is required to match runId,
+# taskFingerprint, and nonce exactly.
+# The receipt the agent must emit was simplified (2026-07-21): a small model
+# reliably fails to transcribe the long runId/taskFingerprint verbatim, which the
+# validator (correctly) rejected as mismatch:runId. We now ask the agent to echo
+# ONLY the nonce from the contract file plus a short summary. The nonce is the
+# proof-of-execution secret — the agent can only produce it by having read the
+# contract file, so requiring it preserves the "a claim is not proof" property.
+# The runner (which already holds the contract) fills in runId + taskFingerprint
+# when it assembles the sole authoritative receipt below. A full receipt that also
+# echoes runId/taskFingerprint is still accepted for backward compatibility.
+MSG="Read the attached Terrarium bounded task from ${TASK} and the contract from ${CONTRACT}. Complete the task exactly. Your final line MUST be exactly one JSON receipt of the shape TERRARIUM_RESULT={\"nonce\":\"${NONCE}\",\"summary\":\"...\"} where nonce is copied verbatim from the contract file and summary is a brief task-specific result. Emit no additional text and no other TERRARIUM_RESULT= lines."
+
+TMP_OUT=$(mktemp)
+trap 'rm -f "$TMP_OUT"' EXIT
+AGENT_TIMEOUT_SECONDS=120
+if ! command -v timeout >/dev/null 2>&1; then
+  echo "[terrarium:runner] timeout supervisor is required"
+  echo "TASK_ENDED"
+  exit 10
+fi
+
+# --- Agent invocation using parent-verified OpenCode 1.17.13 flags ---------
+# Only --pure, --file, --model, --agent are supported here. No --system, no
+# --input-file, no -p/--password. Task/contract are always file attachments.
+set +e
+if [ -n "$AGENT_NAME" ]; then
+  timeout --signal=TERM --kill-after=5s "${AGENT_TIMEOUT_SECONDS}s" \
+    "$AGENT_BIN" run "$MSG" --pure --model "$MODEL_SPEC" --agent "$AGENT_NAME" \
+    --file "$TASK" --file "$CONTRACT" >"$TMP_OUT" 2>&1
+else
+  timeout --signal=TERM --kill-after=5s "${AGENT_TIMEOUT_SECONDS}s" \
+    "$AGENT_BIN" run "$MSG" --pure --model "$MODEL_SPEC" \
+    --file "$TASK" --file "$CONTRACT" >"$TMP_OUT" 2>&1
+fi
+AGENT_EXIT=$?
+set -e
+
+# --- Stream normal logs WITHOUT any TERRARIUM_RESULT= candidate lines ------
+# A stray/duplicate/mismatched marker from the agent must not leak into the
+# authoritative log window. We strip every candidate line here; the sole
+# authoritative marker (if any) is re-emitted below after structural check.
+grep -av '^TERRARIUM_RESULT=' "$TMP_OUT" || true
+
+# --- Enforce exactly one column-zero candidate marker ----------------------
+CANDIDATES=$(grep -ac '^TERRARIUM_RESULT=' "$TMP_OUT" || true)
+CANDIDATES=${CANDIDATES:-0}
+
+if [ "$AGENT_EXIT" -ne 0 ]; then
+  if [ "$AGENT_EXIT" -eq 124 ]; then
+    LOG_FILE="${HOME:-/root}/.local/share/opencode/log/opencode.log"
+    if [ -r "$LOG_FILE" ]; then
+      grep ' level=ERROR ' "$LOG_FILE" | tail -n 20 | cut -c 1-2000 | sed 's/^/[terrarium:opencode-error] /' || true
+    fi
+  fi
+  echo "[terrarium:runner] agent exited nonzero (${AGENT_EXIT}); not emitting receipt"
+  echo "TASK_ENDED"
+  exit "$AGENT_EXIT"
+fi
+
+if [ "$CANDIDATES" -eq 0 ]; then
+  echo "[terrarium:runner] agent emitted no TERRARIUM_RESULT= line"
+  echo "TASK_ENDED"
+  exit 4
+fi
+if [ "$CANDIDATES" -gt 1 ]; then
+  echo "[terrarium:runner] agent emitted multiple TERRARIUM_RESULT= lines (${CANDIDATES}); refusing to pick"
+  echo "TASK_ENDED"
+  exit 5
+fi
+
+MATCH=$(grep -a '^TERRARIUM_RESULT=' "$TMP_OUT" | head -n 1)
+
+# Structural JSON parse via node (present in the OpenCode base image and in
+# the runner probe fake image). Validates exact runId/taskFingerprint/nonce,
+# allowed key set, and summary bounds. `node -e` receives inputs strictly via
+# environment variables — no interpolation of task/receipt content into JS.
+JSON_BODY=${MATCH#TERRARIUM_RESULT=}
+if ! command -v node >/dev/null 2>&1; then
+  echo "[terrarium:runner] node is required for receipt validation but is not present in image"
+  echo "TASK_ENDED"
+  exit 9
+fi
+# Validation contract (2026-07-21): the nonce is the sole proof-of-execution
+# secret and MUST match exactly. runId/taskFingerprint are non-secret framing:
+# if the agent echoes them they must be correct, but they are OPTIONAL — a
+# minimal receipt {nonce,summary} is accepted and the runner supplies the rest.
+# The validator prints `ok` plus the validated summary (base64) so the caller
+# can reconstruct the canonical receipt without re-parsing the agent's line.
+VALIDATION=$(RUN_ID="$RUN_ID" TASK_FP="$TASK_FP" NONCE="$NONCE" JSON_BODY="$JSON_BODY" node -e '
+try {
+  const allowed = new Set(["runId","taskFingerprint","nonce","summary"]);
+  let obj;
+  try { obj = JSON.parse(process.env.JSON_BODY); }
+  catch (e) { console.log("malformed:" + (e && e.message ? e.message : "parse")); process.exit(0); }
+  if (!obj || typeof obj !== "object" || Array.isArray(obj)) { console.log("malformed:not-object"); process.exit(0); }
+  const keys = Object.keys(obj);
+  const extra = keys.filter((k) => !allowed.has(k));
+  if (extra.length) { console.log("malformed:extra-keys:" + extra.sort().join(",")); process.exit(0); }
+  // nonce is the proof-of-execution secret: required and exact.
+  if (obj.nonce !== process.env.NONCE) { console.log("mismatch:nonce"); process.exit(0); }
+  // runId/taskFingerprint are OPTIONAL non-secret framing; if present they must
+  // be correct, but a minimal {nonce,summary} receipt is fully accepted.
+  if (obj.runId !== undefined && obj.runId !== process.env.RUN_ID) { console.log("mismatch:runId"); process.exit(0); }
+  if (obj.taskFingerprint !== undefined && obj.taskFingerprint !== process.env.TASK_FP) { console.log("mismatch:taskFingerprint"); process.exit(0); }
+  const summary = obj.summary;
+  if (typeof summary !== "string" || summary.trim() === "") { console.log("malformed:summary-empty"); process.exit(0); }
+  // Bound summary in UTF-8 bytes, not JS .length, to match backend byte accounting.
+  if (Buffer.byteLength(summary, "utf8") > 2000) { console.log("malformed:summary-too-long"); process.exit(0); }
+  console.log("ok:" + Buffer.from(summary, "utf8").toString("base64"));
+} catch (e) {
+  console.log("malformed:" + (e && e.message ? e.message : "unknown"));
+}
+' 2>&1 || true)
+
+case "$VALIDATION" in
+  ok:*)
+    # The agent's receipt validated (nonce matched; any echoed framing was
+    # correct). Assemble the SOLE authoritative receipt from the contract the
+    # runner holds + the validated summary, so the emitted line always carries
+    # the canonical runId/taskFingerprint regardless of whether the agent echoed
+    # them. The summary was returned base64 from the validator to avoid any
+    # shell re-quoting of agent-controlled text.
+    SUMMARY_B64=${VALIDATION#ok:}
+    CANON=$(RUN_ID="$RUN_ID" TASK_FP="$TASK_FP" NONCE="$NONCE" SUMMARY_B64="$SUMMARY_B64" node -e '
+      const summary = Buffer.from(process.env.SUMMARY_B64, "base64").toString("utf8");
+      process.stdout.write("TERRARIUM_RESULT=" + JSON.stringify({
+        runId: process.env.RUN_ID,
+        taskFingerprint: process.env.TASK_FP,
+        nonce: process.env.NONCE,
+        summary,
+      }));
+    ')
+    # TASK_ENDED is emitted BEFORE the sole verified marker so that the
+    # TERRARIUM_RESULT line is the LAST line of the authoritative log window.
+    # The backend's authoritative-receipt scan reads the trailing line and
+    # cannot be tricked by a stray marker earlier in stdout.
+    echo "TASK_ENDED"
+    printf '%s\n' "$CANON"
+    exit 0
+    ;;
+  mismatch:*)
+    echo "[terrarium:runner] receipt did not match contract (${VALIDATION})"
+    echo "TASK_ENDED"
+    exit 6
+    ;;
+  malformed:*)
+    echo "[terrarium:runner] receipt malformed (${VALIDATION})"
+    echo "TASK_ENDED"
+    exit 7
+    ;;
+  *)
+    echo "[terrarium:runner] receipt validation failed: ${VALIDATION}"
+    echo "TASK_ENDED"
+    exit 8
+    ;;
+esac

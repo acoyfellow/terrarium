@@ -130,8 +130,13 @@ trap 'rm -f "$PROMPT_FILE" "${TMP_OUT:-}"' EXIT
   printf 'Task:\n'
   cat "$TASK"
   printf '\n\n'
+  # Receipt simplified (2026-07-21): a small model reliably fails to transcribe
+  # the long runId/taskFingerprint verbatim (rejected as mismatch:runId). Ask
+  # for ONLY the nonce (the proof-of-execution secret the model can only know by
+  # reading this prompt) + a short summary. The runner fills in runId +
+  # taskFingerprint when it assembles the sole authoritative receipt.
   printf 'Your final line MUST be exactly one JSON receipt, nothing after it:\n'
-  printf 'TERRARIUM_RESULT={"runId":"%s","taskFingerprint":"%s","nonce":"%s","summary":"<short result>"}\n' "$RUN_ID" "$TASK_FP" "$NONCE"
+  printf 'TERRARIUM_RESULT={"nonce":"%s","summary":"<short result>"}\n' "$NONCE"
 } > "$PROMPT_FILE"
 
 TMP_OUT=$(mktemp)
@@ -195,22 +200,37 @@ try {
   const keys = Object.keys(obj);
   const extra = keys.filter((k) => !allowed.has(k));
   if (extra.length) { console.log("malformed:extra-keys:" + extra.sort().join(",")); process.exit(0); }
-  if (obj.runId !== process.env.RUN_ID) { console.log("mismatch:runId"); process.exit(0); }
-  if (obj.taskFingerprint !== process.env.TASK_FP) { console.log("mismatch:taskFingerprint"); process.exit(0); }
+  // nonce is the proof-of-execution secret: required and exact. runId/
+  // taskFingerprint are OPTIONAL non-secret framing (correct if present).
   if (obj.nonce !== process.env.NONCE) { console.log("mismatch:nonce"); process.exit(0); }
+  if (obj.runId !== undefined && obj.runId !== process.env.RUN_ID) { console.log("mismatch:runId"); process.exit(0); }
+  if (obj.taskFingerprint !== undefined && obj.taskFingerprint !== process.env.TASK_FP) { console.log("mismatch:taskFingerprint"); process.exit(0); }
   const summary = obj.summary;
   if (typeof summary !== "string" || summary.trim() === "") { console.log("malformed:summary-empty"); process.exit(0); }
   if (Buffer.byteLength(summary, "utf8") > 2000) { console.log("malformed:summary-too-long"); process.exit(0); }
-  console.log("ok");
+  console.log("ok:" + Buffer.from(summary, "utf8").toString("base64"));
 } catch (e) {
   console.log("malformed:" + (e && e.message ? e.message : "unknown"));
 }
 ' 2>&1 || true)
 
 case "$VALIDATION" in
-  ok)
+  ok:*)
+    # Assemble the sole authoritative receipt from the contract the runner holds
+    # + the validated summary (base64 to avoid shell re-quoting of agent text),
+    # so the emitted line always carries the canonical runId/taskFingerprint.
+    SUMMARY_B64=${VALIDATION#ok:}
+    CANON=$(RUN_ID="$RUN_ID" TASK_FP="$TASK_FP" NONCE="$NONCE" SUMMARY_B64="$SUMMARY_B64" node -e '
+      const summary = Buffer.from(process.env.SUMMARY_B64, "base64").toString("utf8");
+      process.stdout.write("TERRARIUM_RESULT=" + JSON.stringify({
+        runId: process.env.RUN_ID,
+        taskFingerprint: process.env.TASK_FP,
+        nonce: process.env.NONCE,
+        summary,
+      }));
+    ')
     echo "TASK_ENDED"
-    printf '%s\n' "$MATCH"
+    printf '%s\n' "$CANON"
     exit 0
     ;;
   mismatch:*)
