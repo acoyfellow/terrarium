@@ -6,6 +6,7 @@ import { createRunGroup, getRunGroupStatus, readRunGroupLogs } from "./groups.js
 import { spawnBatch, BATCH_STRATEGIES, validateBatchShape } from "./batch.js";
 import { acknowledgeMailboxEvent, claimMailboxEvents, getMailboxStatus, getSubscriber, pruneRouter, registerSubscriber, requeueInflightEvents, unregisterSubscriber } from "./router.js";
 import { diagnoseTerrarium } from "./doctor.js";
+import { buildFailureReport, persistFailureReport, renderFailureReportMarkdown, FAILURE_REPORT_DIR } from "./failure-report.js";
 import { BATCH_API_VERSION, BATCH_SUPPORTED_OPTIONS, MCP_SCHEMA_VERSION, TERRARIUM_API_VERSION } from "./versions.js";
 
 const tools = [
@@ -140,6 +141,19 @@ const tools = [
     name: "terrarium_doctor",
     description: "Run read-only diagnostics for storage, active/orphaned runs, attention signals, callback queues, groups, and stale child claims.",
     inputSchema: { type: "object", properties: {} }
+  },
+  {
+    name: "terrarium_report_failure",
+    description: "Turn a caught terminal failure into a structured, deduped bug report. Fetches the run's terminal status + log, classifies the failure (receipt-mismatch/absent/malformed, agent-timeout, model-config, ca-trust, poll-timeout, ...), assigns a blame hint (agent/backend/image), redacts + excerpts the log, and files it under ~/.terrarium/failure-reports with defect-level dedupe (N runs failing the same way collapse into one report with an occurrence count). A trusted success or still-running run is refused (not-a-failure). Pass markdown=true for a ready-to-paste bug report body. This is the honesty contract made durable: a caught failure becomes a filed artifact, not just an observation.",
+    inputSchema: {
+      type: "object",
+      properties: {
+        runId: { type: "string", description: "Terminal run to report. Its status + log are fetched automatically." },
+        markdown: { type: "boolean", description: "Also return a Markdown bug-report body suitable for a docs/BUGREPORT file or a GitHub issue." },
+        persist: { type: "boolean", description: "Persist + dedupe under ~/.terrarium/failure-reports. Default true." }
+      },
+      required: ["runId"]
+    }
   }
 ];
 
@@ -157,7 +171,7 @@ function visibleTools(policy) {
   return tools
     .filter((tool) => {
       if (!policy.allowSpawn && (tool.name === "terrarium_spawn" || tool.name === "terrarium_spawn_batch")) return false;
-      if (policy.requesterRunId && tool.name === "terrarium_doctor") return false;
+      if (policy.requesterRunId && (tool.name === "terrarium_doctor" || tool.name === "terrarium_report_failure")) return false;
       return true;
     })
     // Stamp every advertised tool with the runtime schema version so a client that
@@ -519,6 +533,53 @@ async function handle(msg) {
         if (args.action === "requeue") return send(msg.id, content(await requeueInflightEvents(ownedArgs)));
         if (args.action === "unsubscribe") { await unregisterSubscriber(args.subscriberId, ownedArgs); return send(msg.id, content({ subscriberId: args.subscriberId, unsubscribed: true })); }
         throw new Error("unknown Terrarium callback action");
+      }
+      if (name === "terrarium_report_failure") {
+        if (policy.requesterRunId) throw new Error("Terrarium failure reporting is available only to a top-level controller");
+        if (!args.runId) throw new Error("terrarium_report_failure requires runId");
+        // Fetch terminal status + log from whichever backend owns the run, so a
+        // caller only needs the runId. Cloud runs (or the cloud-default backend)
+        // route to the cloud instance; local runs stay local.
+        const useCloud = isCloudRunId(args.runId) || cloudEnabled();
+        const runStatus = useCloud
+          ? await cloudStatus(args.runId)
+          : await getRunStatus({ runId: args.runId, requesterRunId: policy.requesterRunId, scope: policy.statusScope });
+        let logText = "";
+        try {
+          const logRes = useCloud
+            ? await cloudRead(args.runId)
+            : await readRun({ runId: args.runId, requesterRunId: policy.requesterRunId, scope: policy.readScope });
+          logText = typeof logRes?.text === "string" ? logRes.text : (typeof logRes === "string" ? logRes : "");
+        } catch { /* log fetch is best-effort; classification still works from status */ }
+        const report = buildFailureReport(runStatus, logText, { source: policy.requesterRunId ? "child" : "controller" });
+        if (!report) {
+          return send(msg.id, content({ ok: false, reason: "not-a-failure", runId: args.runId, status: runStatus?.status ?? null, taskContractStatus: runStatus?.taskContractStatus ?? null, note: "run is a trusted success or still running; nothing to report" }));
+        }
+        let persisted = { report, duplicate: false, occurrences: 1, path: null };
+        if (args.persist !== false) {
+          try { persisted = await persistFailureReport(report); }
+          catch (e) { persisted = { report, duplicate: false, occurrences: 1, path: null, persistError: e.message }; }
+        }
+        const payload = {
+          ok: true,
+          reportId: persisted.report.reportId,
+          runId: report.runId,
+          class: report.classification.class,
+          title: report.title,
+          blameHint: report.blameHint,
+          detail: report.classification.detail,
+          exitCode: report.classification.exitCode,
+          reason: report.classification.reason,
+          taskContractStatus: report.taskContractStatus,
+          duplicate: persisted.duplicate,
+          occurrences: persisted.occurrences,
+          dedupeSignature: report.dedupeSignature,
+          reportDir: FAILURE_REPORT_DIR,
+          path: persisted.path ?? undefined,
+          ...(persisted.persistError ? { persistError: persisted.persistError } : {}),
+          ...(args.markdown ? { markdown: renderFailureReportMarkdown(persisted.report) } : {}),
+        };
+        return send(msg.id, content(payload));
       }
       if (name === "terrarium_doctor") {
         if (policy.requesterRunId) throw new Error("Terrarium doctor is available only to a top-level controller");
