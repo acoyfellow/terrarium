@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { createInterface } from "node:readline";
 import { cancelRun, ensureTerminalCallback, getRunStatus, isRunAccessible, listRuns, pruneStaleChildClaims, readRun, runTerrarium, spawnTerrariumBackground, VERSION } from "./core.js";
-import { cloudSpawn, cloudSpawnBatch, cloudEnabled, cloudStatus, cloudList, cloudRead, cloudCancel, isCloudRunId } from "./cloud-client.js";
+import { cloudSpawn, cloudSpawnBatch, cloudEnabled, cloudStatus, cloudList, cloudRead, cloudCancel, isCloudRunId, detectFilesystemDependency } from "./cloud-client.js";
 import { createRunGroup, getRunGroupStatus, readRunGroupLogs } from "./groups.js";
 import { spawnBatch, BATCH_STRATEGIES, validateBatchShape } from "./batch.js";
 import { acknowledgeMailboxEvent, claimMailboxEvents, getMailboxStatus, getSubscriber, pruneRouter, registerSubscriber, requeueInflightEvents, unregisterSubscriber } from "./router.js";
@@ -379,10 +379,21 @@ async function handle(msg) {
         // nor local is allowed, fail closed with an actionable error rather than
         // silently spawning a local process (which was never the intended default).
         const allowLocal = process.env.TERRARIUM_ALLOW_LOCAL === "1";
+        // Local-routing opt-in (2026-07-21 fix): when the operator has set
+        // TERRARIUM_ALLOW_LOCAL=1 AND this spawn is filesystem-dependent (explicit
+        // cwd / isolation!=none / a task that reads local paths or files), route
+        // to the LOCAL backend instead of the cloud cell. Previously cloudEnabled()
+        // alone forced cloud, so a local-grounded task (e.g. driving a dev server
+        // on localhost, or reviewing the working tree) was refused by cloudSpawn's
+        // filesystem guard with no way to reach the local runner even though the
+        // operator had explicitly allowed local. The guard's own message points
+        // here ("run LOCAL with --isolation copy (TERRARIUM_ALLOW_LOCAL=1)").
+        const wantsLocal = allowLocal && detectFilesystemDependency(args).dependent;
         // Cloud-default: a real (non-dry-run) spawn executes on the Cloudflare
-        // cell when configured. dryRun always plans locally (no execution, no
-        // host authority), so it is exempt from the gate.
-        if (cloudEnabled() && !args.dryRun) {
+        // cell when configured, UNLESS the operator opted into local for a
+        // filesystem-dependent task. dryRun always plans locally (no execution,
+        // no host authority), so it is exempt from the gate.
+        if (cloudEnabled() && !wantsLocal && !args.dryRun) {
           const safeArgs = sanitizeSpawnArgs({ ...args, background });
           const result = await cloudSpawn(safeArgs);
           const projected = verbose ? result : conciseSpawn(result);
