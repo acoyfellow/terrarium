@@ -2,6 +2,12 @@
 
 Dated, factual record of what shipped or got fixed. Newest first. Not a full commit log.
 
+## 2026-07-22
+
+- Rewrote the README and CHANGELOG in Simplified Technical English; validated every claim against the code.
+- Fixed local spawn routing: `TERRARIUM_ALLOW_LOCAL=1` routes a filesystem-dependent spawn to the local backend instead of refusing it to cloud.
+- Fixed the service worker: per-build cache ID plus network-first for mutable content, so a deploy is never masked by a stale cache.
+
 ## 2026-07-21
 
 - Added `terrarium_report_failure`: turns a caught terminal failure into a deduped bug report under `~/.terrarium/failure-reports` (`src/failure-report.js`, 10 tests).
@@ -80,10 +86,66 @@ Dated, factual record of what shipped or got fixed. Newest first. Not a full com
 - Added cancellation launch-handoff recovery: a dead-supervisor run with a cancel marker settles `cancelled` with one callback.
 - Added `terra doctor` / `terrarium_doctor` diagnostics for malformed subscribers, journals, callbacks, stale claims, and missing terminal callbacks.
 
-## Earlier
+## 2026-06-25
 
-- Established Terrarium as a runner-independent execution and callback layer around one bounded delegated task.
-- Shipped the stable primitive: `terra "task"`, `terrarium_spawn`, `terrarium_status`, `terrarium_read`.
-- Added workspace separation modes (`none`, `copy`, `worktree`); documented that they are not security sandboxes.
-- Added the secure-v1 / secure-agent capability-brokered workspace experiments.
-- Added lifecycle replay fixtures for cancellation and completion ordering.
+- Added `terrarium_spawn_batch`: one-call fan-out with join strategies (`all`/`allSettled`/`race`/`any`/`quorum`).
+- Made run timing decisions replayable.
+- Made terminal callbacks durable across finish-before-subscribe races and restarts; Pi wakes on them and they stay bound to the spawning session.
+
+## 2026-06-21
+
+- Added durable run groups with process-tree cancellation and scoped status/read/cancel.
+- Added scoped exactly-once callback delivery, requeue, and retention pruning.
+- Detached MCP agent runs by default; callbacks stay opt-in for compatibility.
+- Added top-level `doctor` operational diagnostics.
+- Added ephemeral Pi defaults and a factual attention status; shows run groups in the native Pi widget.
+- Froze the public lab and focused Terrarium on durable callbacks.
+
+## 2026-06-18
+
+- Added an Effect-based event runtime with a scoped event router and explicit channels.
+- Added a periodic progress heartbeat and an active-run count across concurrent runs.
+- Fixed parallel child context isolation and task correlation.
+
+## 2026-06-16
+
+- Added the secure-v1 execution profile and a permanent hardening gate; recorded a five-task benchmark.
+- Wrapped Pi in a run-scoped code-mode secure workspace.
+- Shipped verified self-healing records with safe per-turn traces and a GitHub proof chain per finding.
+
+## 2026-06-13
+
+- Unified boundaries into one campaign scenario registry with a local multi-surface runner.
+- Serialized real campaigns with a Durable Object lock; added control-plane attack scenarios.
+- Rewrote public copy in grounded, plain language.
+
+## 2026-06-12
+
+- Switched the public campaign to a receipt-backed live ledger; attacker model metadata stays private.
+- Hardened control-plane boundaries; enforced budgets on manual real campaigns.
+- Added a trusted policy gate that wires verified findings into isolated fixer branches.
+
+## 2026-06-14
+
+- Added an SEO + PWA baseline: metadata, OG/Twitter, JSON-LD, manifest, service worker, and icons.
+
+## 2026-06-11
+
+- Added configurable child models and the Pi runner.
+- Added authenticated bounded manual hostile campaigns and a generated campaign gallery demo.
+
+## 2026-06-04
+
+- Added the opt-in containment lab: baseline, reporting fixtures, and probes that run without host bind mounts.
+- Added a reusable fixture policy, an issue-publication workflow, and a synthetic fixture-remediation PR loop.
+
+## 2026-05-01
+
+- Added workspace isolation modes (`none`, `copy`, `worktree`); documented that they are not security sandboxes.
+- Added the Wake continuity eval and the agent operating-loop eval.
+- Reconcile stale Terrarium runs.
+
+## 2026-04-30
+
+- Created Terrarium: a runner-independent execution and callback layer around one bounded delegated task.
+- Shipped the stable primitive (`terra "task"`, `terrarium_spawn`, `terrarium_status`, `terrarium_read`), the MCP interface, run metadata, and depth guards.
