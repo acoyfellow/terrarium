@@ -412,8 +412,13 @@ async function handle(msg) {
         if (policy.requesterRunId) throw new Error("nested Terrarium runs cannot fan out a batch; the top-level owner fans out");
         // Cloud-default: fan out onto the Cloudflare cell using cloud-native
         // batch (independent cloud runs + the shared pure decide() for join
-        // semantics + cloud cancel for losers). Local batch requires opt-in.
-        if (cloudEnabled()) {
+        // semantics + cloud cancel for losers). Mirror single-spawn routing:
+        // with explicit local permission, a batch containing a filesystem-
+        // dependent job must run locally instead of being rejected by the
+        // cloud preflight. Local batch still requires explicit opt-in.
+        const allowLocal = process.env.TERRARIUM_ALLOW_LOCAL === "1";
+        const batchNeedsLocal = Array.isArray(args.jobs) && args.jobs.some((job) => detectFilesystemDependency(job).dependent);
+        if (cloudEnabled() && !(allowLocal && batchNeedsLocal)) {
           const cloudJobs = Array.isArray(args.jobs) ? args.jobs.map((job) => sanitizeSpawnArgs(job)) : args.jobs;
           const result = await cloudSpawnBatch({ jobs: cloudJobs, strategy: args.strategy, quorum: args.quorum, concurrency: args.concurrency, label: args.label, timeoutMs: args.timeoutMs });
           const projected = verbose ? result : conciseBatch(result);

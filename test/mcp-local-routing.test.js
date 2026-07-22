@@ -9,7 +9,7 @@ const MCP_PATH = fileURLToPath(new URL("../src/mcp.js", import.meta.url));
 // tool-call response text. A dry-run plans without executing (no host
 // authority, no cloud call), so it is safe in CI while still exercising the
 // cloud-vs-local ROUTING decision that precedes execution.
-function spawnCall(args, env = {}) {
+function mcpCall(name, args, env = {}) {
   return new Promise((resolve, reject) => {
     const child = spawn(process.execPath, [MCP_PATH], {
       stdio: ["pipe", "pipe", "pipe"],
@@ -26,10 +26,18 @@ function spawnCall(args, env = {}) {
       resolve(call?.result?.content?.[0]?.text ?? JSON.stringify(call));
     });
     child.stdin.write(JSON.stringify({ jsonrpc: "2.0", id: 0, method: "initialize" }) + "\n");
-    child.stdin.write(JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "terrarium_spawn", arguments: args } }) + "\n");
+    child.stdin.write(JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name, arguments: args } }) + "\n");
     child.stdin.end();
     setTimeout(() => child.kill(), 15000).unref?.();
   });
+}
+
+function spawnCall(args, env = {}) {
+  return mcpCall("terrarium_spawn", args, env);
+}
+
+function batchCall(args, env = {}) {
+  return mcpCall("terrarium_spawn_batch", args, env);
 }
 
 // Simulated cloud config: TERRARIUM_URL + token present => cloudEnabled() true.
@@ -56,6 +64,17 @@ test("TERRARIUM_ALLOW_LOCAL=1 routes a filesystem-dependent task to the LOCAL ba
   );
   // The whole point of the fix: it must NOT hit the cloud filesystem refusal.
   assert.doesNotMatch(text, /cloud spawn refused/i, text);
+});
+
+test("TERRARIUM_ALLOW_LOCAL=1 routes a filesystem-dependent batch to the LOCAL backend", async () => {
+  const text = await batchCall(
+    {
+      jobs: [{ task: "run a local command", cwd: "/tmp", isolation: "none" }],
+      strategy: "all",
+    },
+    { ...CLOUD_ENV, TERRARIUM_ALLOW_LOCAL: "1" },
+  );
+  assert.doesNotMatch(text, /cloud batch refused|filesystem-dependent/i, text);
 });
 
 test("a NON-filesystem cloud-suitable task still routes to cloud even with allowLocal set", async () => {
