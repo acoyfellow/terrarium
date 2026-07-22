@@ -113,6 +113,10 @@ Dated, factual record of what shipped or got fixed. Newest first. Not a full com
 - Wrapped Pi in a run-scoped code-mode secure workspace.
 - Shipped verified self-healing records with safe per-turn traces and a GitHub proof chain per finding.
 
+## 2026-06-14
+
+- Added an SEO + PWA baseline: metadata, OG/Twitter, JSON-LD, manifest, service worker, and icons.
+
 ## 2026-06-13
 
 - Unified boundaries into one campaign scenario registry with a local multi-surface runner.
@@ -124,10 +128,6 @@ Dated, factual record of what shipped or got fixed. Newest first. Not a full com
 - Switched the public campaign to a receipt-backed live ledger; attacker model metadata stays private.
 - Hardened control-plane boundaries; enforced budgets on manual real campaigns.
 - Added a trusted policy gate that wires verified findings into isolated fixer branches.
-
-## 2026-06-14
-
-- Added an SEO + PWA baseline: metadata, OG/Twitter, JSON-LD, manifest, service worker, and icons.
 
 ## 2026-06-11
 
