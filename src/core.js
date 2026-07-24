@@ -198,14 +198,26 @@ async function log(path, line) {
 }
 
 export async function spawnCapture(cmd, args, opts = {}) {
+  const { timeoutMs, ...spawnOpts } = opts;
   return await new Promise((resolve) => {
-    const child = spawn(cmd, args, { stdio: ["ignore", "pipe", "pipe"], ...opts });
+    const child = spawn(cmd, args, { stdio: ["ignore", "pipe", "pipe"], ...spawnOpts });
     let stdout = "";
     let stderr = "";
+    let timer = null;
+    // Bound the call so a slow subprocess (e.g. `git status` on a huge tree)
+    // cannot block the caller indefinitely. On timeout, kill the process group
+    // and resolve with a non-zero code + a timed-out marker rather than hanging.
+    if (Number.isFinite(timeoutMs) && timeoutMs > 0) {
+      timer = setTimeout(() => {
+        try { child.kill("SIGKILL"); } catch { /* already gone */ }
+        resolve({ code: 124, signal: "SIGKILL", timedOut: true, stdout, stderr: stderr + `\n[spawnCapture] ${cmd} exceeded ${timeoutMs}ms` });
+      }, timeoutMs);
+      timer.unref?.();
+    }
     child.stdout?.on("data", (d) => stdout += String(d));
     child.stderr?.on("data", (d) => stderr += String(d));
-    child.on("error", (e) => resolve({ code: 127, stdout, stderr: stderr + e.message }));
-    child.on("close", (code, signal) => resolve({ code: code ?? (signal ? 128 : 0), signal, stdout, stderr }));
+    child.on("error", (e) => { if (timer) clearTimeout(timer); resolve({ code: 127, stdout, stderr: stderr + e.message }); });
+    child.on("close", (code, signal) => { if (timer) clearTimeout(timer); resolve({ code: code ?? (signal ? 128 : 0), signal, stdout, stderr }); });
   });
 }
 
@@ -213,8 +225,20 @@ function tail(text, max = 12000) {
   return text.length > max ? text.slice(-max) : text;
 }
 
-async function gitOutput(cwd, args) {
-  const r = await spawnCapture("git", args, { cwd });
+// Bounded git call. `git status --short` on a huge working tree (e.g. a 98GB
+// monorepo cwd) can take many seconds and BLOCK the caller. Because gitInfo runs
+// synchronously inside prepareRun BEFORE the durable accept-receipt is returned,
+// a slow git there stalls the whole spawn past the MCP host's RPC deadline ->
+// `-32001 Request timed out` with NO runId (the exact MCP-vs-CLI boundary in the
+// 2026-07-24 incident: the native CLI has no RPC deadline, so it just waits).
+// git metadata is advisory, not load-bearing, so a timeout returns null rather
+// than blocking. Default 3s; override with TERRARIUM_GIT_INFO_TIMEOUT_MS.
+const GIT_INFO_TIMEOUT_MS = (() => {
+  const v = Number(process.env.TERRARIUM_GIT_INFO_TIMEOUT_MS);
+  return Number.isFinite(v) && v > 0 ? v : 3000;
+})();
+async function gitOutput(cwd, args, timeoutMs = GIT_INFO_TIMEOUT_MS) {
+  const r = await spawnCapture("git", args, { cwd, timeoutMs });
   return r.code === 0 ? r.stdout.trim() : null;
 }
 
