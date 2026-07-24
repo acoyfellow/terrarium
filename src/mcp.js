@@ -449,10 +449,15 @@ async function handle(msg) {
         return send(msg.id, content(projected, !result.ok));
       }
       if (name === "terrarium_status") {
-        // A cloud runId (or any status-by-id while cloud is the default backend)
-        // is inspected against the cloud instance; local runs stay local. This
-        // keeps cloud runs queryable without a separate tool.
-        if (args.runId && (isCloudRunId(args.runId) || cloudEnabled())) {
+        // Route a by-id status by the runId's SHAPE, not by whether cloud is
+        // configured. A cloud runId (isCloudRunId) is inspected against the cloud
+        // instance; a local-shaped runId is inspected locally EVEN WHEN cloud is
+        // the default backend. The old `|| cloudEnabled()` forced every by-id
+        // read to cloud, so a local (cwd-scoped) background run returned by spawn
+        // was unreadable via cloud ("run not found on cloud instance") — the
+        // local/cloud namespace-mismatch bug. List-mode (no runId) still uses the
+        // cloud index below when cloud is the default.
+        if (args.runId && isCloudRunId(args.runId)) {
           const result = await cloudStatus(args.runId);
           return send(msg.id, content(verbose ? result : conciseStatus(result)));
         }
@@ -473,13 +478,15 @@ async function handle(msg) {
         return send(msg.id, content(verbose ? result : conciseListing(result)));
       }
       if (name === "terrarium_read") {
-        if (args.runId && (isCloudRunId(args.runId) || cloudEnabled())) {
+        // Route by runId shape (see terrarium_status): a local-shaped runId reads
+        // locally even when cloud is the default backend.
+        if (args.runId && isCloudRunId(args.runId)) {
           return send(msg.id, content(await cloudRead(args.runId)));
         }
         return send(msg.id, content(await readRun({ ...args, requesterRunId: policy.requesterRunId, scope: policy.readScope })));
       }
       if (name === "terrarium_cancel") {
-        if (args.runId && (isCloudRunId(args.runId) || cloudEnabled())) {
+        if (args.runId && isCloudRunId(args.runId)) {
           return send(msg.id, content(await cloudCancel(args.runId)));
         }
         return send(msg.id, content(await cancelRun({ ...args, requesterRunId: policy.requesterRunId, scope: policy.statusScope })));
@@ -553,10 +560,11 @@ async function handle(msg) {
       if (name === "terrarium_report_failure") {
         if (policy.requesterRunId) throw new Error("Terrarium failure reporting is available only to a top-level controller");
         if (!args.runId) throw new Error("terrarium_report_failure requires runId");
-        // Fetch terminal status + log from whichever backend owns the run, so a
-        // caller only needs the runId. Cloud runs (or the cloud-default backend)
-        // route to the cloud instance; local runs stay local.
-        const useCloud = isCloudRunId(args.runId) || cloudEnabled();
+        // Fetch terminal status + log from whichever backend owns the run, routed
+        // by the runId's SHAPE (a cloud-shaped id -> cloud; a local-shaped id ->
+        // local) even when cloud is the default backend. Not `|| cloudEnabled()`,
+        // which misrouted local by-id lookups to cloud.
+        const useCloud = isCloudRunId(args.runId);
         const runStatus = useCloud
           ? await cloudStatus(args.runId)
           : await getRunStatus({ runId: args.runId, requesterRunId: policy.requesterRunId, scope: policy.statusScope });
