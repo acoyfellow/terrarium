@@ -6,6 +6,25 @@ import { BATCH_API_VERSION, BATCH_SUPPORTED_OPTIONS, MCP_SCHEMA_VERSION, TERRARI
 import { GROUP_DIR } from "./groups.js";
 import { JOURNAL_DIR, MAILBOXES_DIR, ROUTER_DIR, SUBSCRIBERS_DIR } from "./router.js";
 import { cloudEnabled, pulseEnabled } from "./cloud-client.js";
+import { detectHostCapacity } from "./host-capacity.js";
+
+// Dual-env split (incident 2026-07-24 ask #3): the long-lived MCP process and a
+// fresh CLI invocation can resolve DIFFERENT effective cloud/pulse config (the
+// MCP process caches process.env from when it started). Report BOTH the config
+// file's recorded intent and this process's effective env so an operator can see
+// the split rather than infer it. `processRole` names which process is answering.
+function diagnoseEnvSplit(env = process.env) {
+  const processRole = env.TERRARIUM_MCP_SERVER === "1" ? "mcp" : "cli";
+  return {
+    processRole,
+    pid: process.pid,
+    effective: {
+      cloudConfigured: cloudEnabled(env),
+      pulseConfigured: pulseEnabled(env),
+      cloudUrl: (env.TERRARIUM_URL || "").replace(/\/$/, "") || null,
+    },
+  };
+}
 
 // Stale-cloud-env: a session configured for cloud execution (TERRARIUM_URL +
 // control token) but WITHOUT a pulse token cannot receive a background cloud
@@ -137,6 +156,8 @@ export async function diagnoseTerrarium() {
   const subscriberHealth = await jsonHealth(SUBSCRIBERS_DIR, validSubscriber);
   const journalHealth = await jsonHealth(JOURNAL_DIR, validEvent);
   const workspace = await workspaceFootprint();
+  const hostCapacity = await detectHostCapacity();
+  const envSplit = diagnoseEnvSplit();
   const checks = {
     homeWritable: await writable(HOME),
     logsWritable: await writable(LOG_DIR),
@@ -165,6 +186,8 @@ export async function diagnoseTerrarium() {
     workspaceDirs: workspace.workspaceDirs,
     workspaceBytes: workspace.workspaceBytes,
     leakedWorkspaces: workspace.leakedWorkspaces,
+    hostCapacity,
+    envSplit,
     ...diagnoseCloudEnv(),
     ...(await diagnoseStaleCloudEnv()),
   };
@@ -238,6 +261,8 @@ export async function diagnoseTerrarium() {
   if (checks.leakedWorkspaces) warnings.push(`${checks.leakedWorkspaces} isolation workspace(s) survived a terminal run without keepWorkspace (possible workspace leak); inspect ${WORKSPACE_DIR}`);
   if (checks.cloudCallbacksUndeliverable) warnings.push("Cloud execution is configured (TERRARIUM_URL + control token) but no pulse token is set, so background cloud runs' terminal callbacks cannot reach this session; set TERRARIUM_PULSE_TOKEN(_FILE) and /reload the MCP process");
   if (checks.staleCloudEnv) warnings.push(`Stale MCP process env: config.json records cloudUrl=${checks.configuredCloudUrl} but this process's TERRARIUM_URL is ${checks.processCloudUrl ? checks.processCloudUrl : "unset"}; the running MCP process was started before cloud was configured and will execute locally — /reload the MCP process to pick up the cloud env`);
+  if (hostCapacity.starved) warnings.push(`Host CPU starvation: 1-min loadavg ${hostCapacity.loadavg1} is ${hostCapacity.loadRatio}x the ${hostCapacity.cpuCount} CPUs (threshold ${hostCapacity.loadRatioThreshold}x); spawns may cross the MCP RPC deadline before returning a receipt`);
+  if (hostCapacity.orphanedPiCount) warnings.push(`${hostCapacity.orphanedPiCount} orphaned pi process(es) on a tty absent from cmux (leaked from closed panes); a stuck one can peg a core for days - inspect: ${hostCapacity.orphanedPi.map((p) => `pid ${p.pid} (${p.pcpu}% cpu)`).join(", ")}`);
   const repairPlan = buildRepairPlan(checks, details);
   const repairPlanSummary = summarizeRepairPlan(repairPlan);
   return { ok: warnings.length === 0, version: VERSION, apiVersion: TERRARIUM_API_VERSION, schemaVersion: MCP_SCHEMA_VERSION, batchApiVersion: BATCH_API_VERSION, batchSupportedOptions: BATCH_SUPPORTED_OPTIONS, checks, details, warnings, repairPlan, repairPlanSummary, paths: { home: HOME, logs: LOG_DIR, workspaces: WORKSPACE_DIR, events: EVENT_DIR, router: ROUTER_DIR } };

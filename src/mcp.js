@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { createInterface } from "node:readline";
 import { cancelRun, ensureTerminalCallback, getRunStatus, isRunAccessible, listRuns, pruneStaleChildClaims, readRun, runTerrarium, spawnTerrariumBackground, VERSION } from "./core.js";
+import { detectHostCapacity } from "./host-capacity.js";
 import { cloudSpawn, cloudSpawnBatch, cloudEnabled, cloudStatus, cloudList, cloudRead, cloudCancel, isCloudRunId, detectFilesystemDependency } from "./cloud-client.js";
 import { createRunGroup, getRunGroupStatus, readRunGroupLogs } from "./groups.js";
 import { spawnBatch, BATCH_STRATEGIES, validateBatchShape } from "./batch.js";
@@ -405,6 +406,28 @@ async function handle(msg) {
         const safeArgs = sanitizeSpawnArgs({ ...args, background });
         const result = background ? await spawnTerrariumBackground(safeArgs) : await runWithBoundedRetries(safeArgs, maxRetries);
         const projected = verbose ? result : conciseSpawn(result);
+        // Non-blocking host-capacity preflight (incident 2026-07-24 ask #2): if the
+        // host is CPU-starved or has leaked orphaned pi processes, a synchronous
+        // spawn step can cross the MCP RPC deadline and lose the receipt. The spawn
+        // already returned above; we only ANNOTATE the result so the caller sees the
+        // host fault instead of an opaque timeout. Best-effort; never throws. Skipped
+        // for dry-runs (nothing executed, so host capacity is irrelevant).
+        try {
+          if (!args.dryRun) {
+          const cap = await detectHostCapacity();
+          if (cap.starved || cap.orphanedPiCount > 0) {
+            projected.hostCapacityWarning = {
+              starved: cap.starved,
+              loadRatio: cap.loadRatio,
+              cpuCount: cap.cpuCount,
+              orphanedPiCount: cap.orphanedPiCount,
+              note: cap.starved
+                ? `Host loadavg ${cap.loadavg1} is ${cap.loadRatio}x ${cap.cpuCount} CPUs; spawns may time out before returning a receipt.`
+                : `${cap.orphanedPiCount} orphaned pi process(es) leaked from closed panes may starve the host; run 'terrarium doctor' to inspect.`,
+            };
+          }
+          }
+        } catch { /* preflight is advisory; ignore detection failure */ }
         return send(msg.id, content(projected, !result.ok));
       }
       if (name === "terrarium_spawn_batch") {
