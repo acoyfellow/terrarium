@@ -12,7 +12,7 @@ import pulseWorker, { PulseRouter } from "./pulse/worker.js";
 import { RunControlDO } from "./cloud/run-control-do.js";
 import { handleApiRuns } from "./cloud/api-runs.js";
 import { handleApiBatches } from "./cloud/api-batches.js";
-import { handleAuth } from "./cloud/web-session.js";
+
 import { TerrariumSandbox } from "./cloud/terrarium-sandbox.js";
 import { PrincipalBudgetDO } from "./cloud/principal-budget-do.js";
 
@@ -199,12 +199,6 @@ const legacyWorker = {
     }
     if (url.pathname.startsWith("/api/batches")) {
       const routed = await handleApiBatches(request, env);
-      if (routed) return routed;
-    }
-    // Human web-session OAuth flow for the /runs + /batches consoles. The
-    // programmatic Bearer path is unchanged; this only adds cookie login.
-    if (url.pathname.startsWith("/auth/")) {
-      const routed = await handleAuth(request, env);
       if (routed) return routed;
     }
     if (url.pathname === "/health") return Response.json({
