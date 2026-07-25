@@ -33,6 +33,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { mkdtempSync, writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
+import { build } from 'esbuild';
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 
@@ -57,12 +58,33 @@ function makeFixtureAssetsDir() {
   return dir;
 }
 
-function makeMf(assetsDir, userWorkerGlobs) {
-  return new Miniflare({
-    scriptPath: join(root, 'src/control-worker.js'),
+async function makeMf(assetsDir, userWorkerGlobs) {
+  // Wrangler bundles npm dependencies (Hono, Sandbox) before upload. A raw
+  // Miniflare scriptPath cannot resolve bare npm specifiers, so mirror the
+  // production bundle boundary instead of testing an environment Wrangler
+  // never deploys.
+  const built = await build({
+    entryPoints: [join(root, 'src/control-worker.js')],
+    write: false,
+    bundle: true,
+    format: 'esm',
+    platform: 'node',
+    target: 'es2022',
+    external: ['cloudflare:*'],
+    plugins: [{
+      name: 'workerd-node-path-posix-compat',
+      setup(build) {
+        build.onResolve({ filter: /^node:path\/posix$/ }, () => ({ path: 'node:path', external: true }));
+      },
+    }],
+    logLevel: 'silent',
+  });
+  const mf = new Miniflare({
+    script: built.outputFiles[0].text,
     modules: true,
     modulesRules: [{ type: 'ESModule', include: ['**/*.js'] }],
     compatibilityDate: '2026-06-05',
+    compatibilityFlags: ['nodejs_compat'],
     // PROD entry has these bindings; provide them so the worker boots and runs.
     durableObjects: {
       PULSE_ROUTER: { className: 'PulseRouter', useSQLite: true },
@@ -82,6 +104,7 @@ function makeMf(assetsDir, userWorkerGlobs) {
       },
     },
   });
+  return mf;
 }
 
 async function fetchRaw(mf, method, path) {
@@ -99,7 +122,7 @@ const PULSE_ROUTES = [
 
 test('prod topology: pulse routes reach the worker (401 token gate), not the SPA fallback', async () => {
   const assetsDir = makeFixtureAssetsDir();
-  const mf = makeMf(assetsDir, runWorkerFirstFromWrangler());
+  const mf = await makeMf(assetsDir, runWorkerFirstFromWrangler());
   try {
     for (const { method, path } of PULSE_ROUTES) {
       const r = await fetchRaw(mf, method, path);
@@ -119,7 +142,7 @@ test('prod topology: pulse routes reach the worker (401 token gate), not the SPA
 
 test('prod topology: an unknown route still gets the SPA index.html fallback (not over-routed)', async () => {
   const assetsDir = makeFixtureAssetsDir();
-  const mf = makeMf(assetsDir, runWorkerFirstFromWrangler());
+  const mf = await makeMf(assetsDir, runWorkerFirstFromWrangler());
   try {
     const r = await fetchRaw(mf, 'GET', '/definitely-not-a-route');
     assert.equal(r.status, 200, `unknown route should get SPA 200, got ${r.status}: ${r.text.slice(0, 120)}`);

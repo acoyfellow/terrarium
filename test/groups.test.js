@@ -95,8 +95,12 @@ test('group status reconstructs contract-layer truth distinct from process ok', 
 });
 
 test('group contractTruth.fullyVerified requires every member verified', async () => {
-  const a = await runTerrarium({ task: 'verify alpha', dryRun: false, stream: false, requireTaskContract: false });
-  const b = await runTerrarium({ task: 'verify beta', dryRun: false, stream: false, requireTaskContract: false });
+  // Use an explicit deterministic local child. Falling back to the developer's
+  // configured model runner makes this hermetic test depend on network/model
+  // availability and can leave an unbounded OpenCode process behind.
+  const agent = `${process.execPath} -e "console.log('group-test-ok')"`;
+  const a = await runTerrarium({ task: 'verify alpha', agent, dryRun: false, stream: false, requireTaskContract: false });
+  const b = await runTerrarium({ task: 'verify beta', agent, dryRun: false, stream: false, requireTaskContract: false });
   const group = await createRunGroup({ label: 'all not-required', runIds: [a.runId, b.runId] });
   const status = await getRunGroupStatus({ groupId: group.groupId });
   // These dry/non-contract runs are not-required: trusted, but not 'verified'.

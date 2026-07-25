@@ -13,7 +13,7 @@
 //   ack             -> 200, settled
 //   second claim    -> EMPTY (nothing left to claim after ack)
 //   401 without token (fail-closed)
-//   cross-owner claim denied (403)
+//   client ownership claims ignored; authenticated principal remains authoritative
 //   finish-before-subscribe then subscribe replays the journaled event
 //
 // Companion to test/pulse-do.test.js (unit, SQLite shim) and test/pulse-e2e.test.js
@@ -28,8 +28,9 @@ import { fileURLToPath } from 'node:url';
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 const TOKEN = 'gate1-capability-token-not-a-secret';
+const PRINCIPAL = 'gate1-principal';
 
-function makeMf(bindings = { PULSE_TOKEN: TOKEN }) {
+function makeMf(bindings = { TERRARIUM_PRINCIPAL_ID: PRINCIPAL, TERRARIUM_PULSE_TOKEN_CURRENT: TOKEN }) {
   return new Miniflare({
     scriptPath: join(root, 'src/pulse/worker.js'),
     modules: true,
@@ -91,7 +92,7 @@ test('gate1: full worker+DO+SQLite path — emit, status, claim, ack, second cla
     // status -> shows pending
     const sPending = await call(mf, 'GET', `/status?subscriberId=${subscriberId}&ownerRunId=ter_gate1_owner`);
     assert.equal(sPending.status, 200);
-    assert.deepEqual(sPending.json.result, { subscriberId, pending: 1, inflight: 0, acknowledged: 0 });
+    assert.deepEqual(sPending.json.result, { subscriberId, pending: 1, inflight: 0, acknowledged: 0, dead: 0 });
 
     // claim -> returns the event (claimedAt set; private fields stripped)
     const claimed = await call(mf, 'POST', '/claim', { body: { subscriberId, ownerRunId: 'ter_gate1_owner' } });
@@ -110,7 +111,7 @@ test('gate1: full worker+DO+SQLite path — emit, status, claim, ack, second cla
     assert.equal(acked.json.result.acknowledged, true);
 
     const sAcked = await call(mf, 'GET', `/status?subscriberId=${subscriberId}&ownerRunId=ter_gate1_owner`);
-    assert.deepEqual(sAcked.json.result, { subscriberId, pending: 0, inflight: 0, acknowledged: 1 });
+    assert.deepEqual(sAcked.json.result, { subscriberId, pending: 0, inflight: 0, acknowledged: 1, dead: 0 });
 
     // second claim -> EMPTY (nothing pending after ack)
     const claimed2 = await call(mf, 'POST', '/claim', { body: { subscriberId, ownerRunId: 'ter_gate1_owner' } });
@@ -138,22 +139,20 @@ test('gate1: 401 without a bearer token (fail-closed) on every gated route', asy
   }
 });
 
-test('gate1: cross-owner claim is denied (403) through the real worker', async () => {
+test('gate1: client ownerRunId claims are ignored through the real worker', async () => {
   const mf = makeMf();
   try {
     const runId = 'ter_g1_owned';
     const subscriberId = 'sub_g1_owned';
-    await call(mf, 'POST', '/pulse', {
+    const subscribed = await call(mf, 'POST', '/pulse', {
       body: { action: 'subscribe', args: { subscriberId, runIds: [runId], ownerRunId: 'ter_g1_owner' } },
     });
+    assert.equal(subscribed.json.result.ownerRunId, null);
     await call(mf, 'POST', '/pulse', { body: { event: terminalEvent(runId) } });
 
-    const intruder = await call(mf, 'POST', '/claim', { body: { subscriberId, ownerRunId: 'ter_g1_intruder' } });
-    assert.equal(intruder.status, 403, JSON.stringify(intruder.json));
-
-    const owner = await call(mf, 'POST', '/claim', { body: { subscriberId, ownerRunId: 'ter_g1_owner' } });
-    assert.equal(owner.status, 200);
-    assert.equal(owner.json.result.events.length, 1);
+    const claimed = await call(mf, 'POST', '/claim', { body: { subscriberId, ownerRunId: 'ter_g1_intruder' } });
+    assert.equal(claimed.status, 200, JSON.stringify(claimed.json));
+    assert.equal(claimed.json.result.events.length, 1);
   } finally {
     await mf.dispose();
   }

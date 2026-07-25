@@ -54,8 +54,8 @@ function makeSqlShim() {
 
 // Build a DO instance over a fresh in-memory SQLite, mimicking the ctx the
 // Workers runtime hands the DO constructor.
-function makeRouter() {
-  const sql = makeSqlShim();
+function makeRouter(sharedSql) {
+  const sql = sharedSql || makeSqlShim();
   const ctx = { storage: { sql } };
   const router = new PulseRouter(ctx);
   return { router, sql };
@@ -217,6 +217,37 @@ test('do: finish-before-subscribe replays journal for concrete runIds', async ()
   assert.equal(wild.replayed, 0, 'wildcard subscriber does not replay journal history');
 });
 
+test('do: journal replay survives a fresh router over the same durable SQL', async () => {
+  const sharedSql = makeSqlShim();
+  const { router: beforeRestart } = makeRouter(sharedSql);
+  const routed = await beforeRestart.route(terminalEvent({ runId: 'ter_restart' }));
+
+  const { router: afterRestart } = makeRouter(sharedSql);
+  const sub = await afterRestart.subscribe({
+    subscriberId: 'sub-after-restart',
+    ownerRunId: OWNER,
+    runIds: ['ter_restart'],
+  });
+  assert.equal(sub.replayed, 1);
+  const claimed = afterRestart.claim({ subscriberId: 'sub-after-restart', ownerRunId: OWNER });
+  assert.equal(claimed.events[0].eventId, routed.eventId);
+});
+
+test('do: inflight claim survives a fresh router and can be requeued', async () => {
+  const sharedSql = makeSqlShim();
+  const { router: beforeRestart } = makeRouter(sharedSql);
+  await beforeRestart.subscribe({ subscriberId: 'sub-restart-lease', ownerRunId: OWNER });
+  const routed = await beforeRestart.route(terminalEvent({ runId: 'ter_restart_lease' }));
+  beforeRestart.claim({ subscriberId: 'sub-restart-lease', ownerRunId: OWNER });
+
+  const { router: afterRestart } = makeRouter(sharedSql);
+  assert.equal(afterRestart.status('sub-restart-lease', OWNER).inflight, 1);
+  assert.equal(afterRestart.requeue({ subscriberId: 'sub-restart-lease', olderThanMs: 0, ownerRunId: OWNER }).requeued, 1);
+  const claimed = afterRestart.claim({ subscriberId: 'sub-restart-lease', ownerRunId: OWNER });
+  assert.equal(claimed.events[0].eventId, routed.eventId);
+  assert.equal(claimed.events[0].deliveryAttempts, 1);
+});
+
 test('do: claim then ack is idempotent', async () => {
   const { router } = makeRouter();
   await router.subscribe({ subscriberId: 'sub-idem', ownerRunId: OWNER });
@@ -314,9 +345,9 @@ test('do: requeue tracks deliveryAttempts so operators can spot a poison event',
 });
 
 test('do: claim quarantines a poison event once it reaches maxDeliveryAttempts', async () => {
-  const { router } = makeRouter();
+  const { router, sql } = makeRouter();
   await router.subscribe({ subscriberId: 'sub-dead', ownerRunId: OWNER });
-  await router.route(terminalEvent());
+  const routed = await router.route(terminalEvent());
 
   // Drive deliveryAttempts up to the cap of 2 via claim+requeue.
   for (let i = 1; i <= 2; i++) {
@@ -337,6 +368,9 @@ test('do: claim quarantines a poison event once it reaches maxDeliveryAttempts',
   assert.equal(after.events.length, 0);
   assert.equal(after.quarantined, 0);
   assert.equal(router.status('sub-dead', OWNER).dead, 1);
+  const journal = sql._db.prepare('SELECT payload FROM journal WHERE event_id = ?').all(routed.eventId);
+  assert.equal(journal.length, 1, 'retry exhaustion preserves the canonical journal event');
+  assert.equal(JSON.parse(journal[0].payload).deliveryAttempts, undefined, 'mailbox retries never mutate the journal payload');
 
   // Prune clears the dead-letter on the callback cutoff.
   const pruned = router.prune({ callbackOlderThanMs: 0, subscriberIds: ['sub-dead'], ownerRunId: OWNER });
