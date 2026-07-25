@@ -69,7 +69,10 @@ async function admit(task, deadlineMs) {
   });
   const status = res.status;
   let body = null; try { body = await res.json(); } catch { /* non-json */ }
-  return { idem, admitStatus: status, admitMs: now() - t0, runId: body?.runId || null, contract: body?.contract || null, admitBody: body };
+  // Distinguish 429 reasons: concurrency-limit (true parallel backpressure) vs
+  // minute/day/token/cost limits (quota exhaustion, NOT parallelism signal).
+  const limitReason = status === 429 ? (body?.error || 'unknown-429') : null;
+  return { idem, admitStatus: status, limitReason, admitMs: now() - t0, runId: body?.runId || null, contract: body?.contract || null, admitBody: body };
 }
 
 async function pollTerminal(runId) {
@@ -106,7 +109,13 @@ async function runOne(task, deadlineMs, jsonl) {
   const rec = { kind: 'run', tStart: new Date().toISOString() };
   const a = await admit(task, deadlineMs);
   Object.assign(rec, a);
-  if (a.admitStatus === 429) { rec.outcome = 'backpressure-429'; appendFileSync(jsonl, JSON.stringify(rec) + '\n'); return rec; }
+  if (a.admitStatus === 429) {
+    // concurrency-limit is genuine parallel backpressure; *-day/minute/token/cost
+    // limits are quota exhaustion and must not be read as a parallelism result.
+    rec.outcome = a.limitReason === 'concurrency-limit' ? 'backpressure-concurrency' : `quota-${a.limitReason}`;
+    appendFileSync(jsonl, JSON.stringify(rec) + '\n');
+    return rec;
+  }
   if (a.admitStatus !== 202 || !a.runId) { rec.outcome = 'admit-failed'; appendFileSync(jsonl, JSON.stringify(rec) + '\n'); return rec; }
   const wallStart = now();
   const term = await pollTerminal(a.runId);
@@ -158,7 +167,9 @@ function summarizeCohort(width, cohortResults) {
     totalRuns: total,
     verified: verifiedRuns.length,
     verifiedRate: total ? verifiedRuns.length / total : 0,
-    backpressure429: allRuns.filter((r) => r.outcome === 'backpressure-429').length,
+    backpressureConcurrency: allRuns.filter((r) => r.outcome === 'backpressure-concurrency').length,
+    quotaExhausted: allRuns.filter((r) => String(r.outcome).startsWith('quota-')).length,
+    quotaReasons: [...new Set(allRuns.filter((r) => String(r.outcome).startsWith('quota-')).map((r) => r.outcome))],
     admitFailed: allRuns.filter((r) => r.outcome === 'admit-failed').length,
     doneButUnverified: allRuns.filter((r) => r.outcome === 'done-but-unverified').length,
     inconclusive: allRuns.filter((r) => String(r.outcome).startsWith('inconclusive')).length,

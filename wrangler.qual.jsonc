@@ -24,7 +24,10 @@
     // knobs, not correctness invariants.
     "TERRARIUM_BUDGET_MAX_ACTIVE": "5",
     "TERRARIUM_BUDGET_MAX_PER_MINUTE": "120",
-    "TERRARIUM_BUDGET_MAX_PER_DAY": "5000"
+    "TERRARIUM_BUDGET_MAX_PER_DAY": "5000",
+    // Dogfood: route the server-owned Workers AI call through an AI Gateway.
+    // "default" auto-creates on first authenticated request. Opt-in + fail-open.
+    "TERRARIUM_AI_GATEWAY_ID": "default"
   },
   "kv_namespaces": [
     { "binding": "TERRARIUM_LEDGER", "id": "7e322bfe94234a52896706a5c8231407" },

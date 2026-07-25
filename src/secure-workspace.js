@@ -63,6 +63,18 @@ export class SecureWorkspace {
     return { passed: result.status === 0, exitCode: result.status ?? 124, output: String(result.stdout || result.stderr || "").slice(-12000) };
   }
 
+  runTool({ name, command, input, timeoutMs = 15000 } = {}) {
+    if (typeof name !== "string" || !/^[a-z][a-z0-9_]{0,31}$/.test(name)) throw new Error("invalid sandbox tool name");
+    if (typeof command !== "string" || !command.trim() || command.length > 4096) throw new Error("bounded sandbox tool command required");
+    const stdin = typeof input === "string" ? input : "";
+    if (Buffer.byteLength(stdin) > MAX_FILE_BYTES) throw new Error("bounded sandbox tool input required");
+    // Same containment as every other brokered tool: docker exec into the
+    // --network none secure-v1 container as the non-root user, workspace cwd,
+    // bounded timeout + output. No host process, no host fs, no network.
+    const result = spawnSync("docker", ["exec", "-i", "--user", SECURE_PROFILE.user, "--workdir", "/workspace", this.container, "sh", "-lc", command], { input: stdin, encoding: "utf8", timeout: Math.min(Math.max(Number(timeoutMs) || 15000, 0), 30000), maxBuffer: SECURE_PROFILE.maxOutputBytes });
+    return { name, exitCode: result.status ?? 124, output: String(result.stdout || result.stderr || "").slice(-12000) };
+  }
+
   getDiff() {
     const changes = [];
     for (const [path, before] of this.originals) {

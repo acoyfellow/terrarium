@@ -1,17 +1,17 @@
 {
   "receipt": "c2-batch-happy-path",
   "mode": "fixture (in-process, no live token, no network)",
-  "generatedAt": "2026-07-20T11:25:57.059Z",
+  "generatedAt": "2026-07-20T12:07:58.841Z",
   "scenarioA": {
     "tasks": 6,
     "maxConcurrency": 3,
-    "batchId": "bat_mrt52a9s_f1c32b008ddf",
+    "batchId": "bat_mrt6kc39_5d915332aab4",
     "admitted": 6,
     "peakLive": 3,
     "finalStatus": "done"
   },
   "scenarioB_failureTruth": {
-    "batchId": "bat_mrt52aaq_0fe7644039f2",
+    "batchId": "bat_mrt6kc48_fe2fdaf9d549",
     "finalStatus": "failed",
     "done": 2,
     "failed": 1
@@ -31,12 +31,12 @@
       "pass": true,
       "detail": {
         "childRunIds": [
-          "ter_mrt52a9t_15a1ca32b013",
-          "ter_mrt52a9t_b42736360d7d",
-          "ter_mrt52a9t_3f078f4f9fcf",
-          "ter_mrt52aa9_bef3ede5a234",
-          "ter_mrt52aa9_66b23222232a",
-          "ter_mrt52aaa_b2fe1060d8f6"
+          "ter_mrt6kc39_20bcb7cd3366",
+          "ter_mrt6kc3a_e30c696b1df7",
+          "ter_mrt6kc3a_13bf0e18704c",
+          "ter_mrt6kc3r_1a3a2836e501",
+          "ter_mrt6kc3r_ff1f10fd7e9f",
+          "ter_mrt6kc3r_ab38a02c9315"
         ]
       }
     },

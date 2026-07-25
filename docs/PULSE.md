@@ -4,7 +4,7 @@ Terrarium's local callback router (journal → claim → ack → replay, with pe
 
 **Promise:** a terminal run event emitted once is durably journaled at the edge and delivered at-least-once, with dedup, to every subscriber whose filters match, and only the owning run can claim, ack, or read its mailbox.
 
-Status: live in production at `terrarium.coey.dev` and proven end-to-end (emit → claim → ack, dedup, journal replay, per-owner isolation, fail-closed auth). v0 — no consumer reads from it yet (see [Limits](#limits-and-non-goals)).
+Status: live in production at `terrarium.coey.dev` and proven end-to-end (emit → claim → ack, dedup, journal replay, per-owner isolation, fail-closed auth). v0 — no consumer reads from it yet (see [Limits](#limits-and-non-goals)). Pulse currently lives inside Terrarium; the extraction plan is tracked in [Pulse extraction plan](./PULSE_EXTRACTION.md).
 
 ## How it works
 
