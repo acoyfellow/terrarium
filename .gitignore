@@ -37,3 +37,25 @@ wasm-verifier/target/
 
 # terrarium-airlock spike run output
 experiments/terrarium-airlock/out/
+
+# Cloud proof/evidence run artifacts (receipts, logs, verdicts, backups) — local
+# operational output, not repo content. The re-runnable scripts stay tracked.
+artifacts/cloud-proof/
+artifacts/cloud-scale-eval/*.md
+artifacts/terrarium-fanout-demo.cast
+artifacts/terrarium-fanout-result.json
+
+# Local runner runtime install dir (has its own package.json/lock).
+scripts/opencode-runtime/
+
+# Internal handoff/redteam notes that cite .context/ loops or internal-only
+# context — keep local until deliberately sanitized (same policy as the
+# DRIFT_RESEARCH_*/CLOUD_NORTHSTAR_RESEARCH docs above).
+docs/PULSE-HANDOFF-2026-06-27.md
+docs/CLOUD_NORTHSTAR_REDTEAM.md
+docs/DRIFT_REDTEAM.md
+docs/DRIFT_EXPERIMENTS.md
+
+# Drift-experiment run output (raw receipts + logs, internal markers) — internal
+# ops evidence, kept local. The re-runnable drift-lab scripts stay tracked.
+docs/evidence/
