@@ -4,6 +4,11 @@
   "main": "src/control-worker.js",
   "compatibility_date": "2026-06-05",
   "compatibility_flags": ["nodejs_compat"],
+  // Custom domain only (terrarium.coey.dev). No public workers.dev URL — the
+  // worker carries sensitive bindings (AI, KV, R2, DOs), so the workers.dev
+  // URL is an unnecessary exposed surface. Serving is via the route below.
+  "workers_dev": false,
+  "preview_urls": false,
   "assets": {
     "directory": "./app/dist",
     "binding": "APP_ASSETS",
@@ -18,7 +23,12 @@
     "TERRARIUM_BUDGET_MAX_ACTIVE": "20",
     "TERRARIUM_BUDGET_MAX_PER_MINUTE": "120",
     "TERRARIUM_BUDGET_MAX_PER_DAY": "5000",
-    "TERRARIUM_STARTUP_GRACE_MS": "90000"
+    "TERRARIUM_STARTUP_GRACE_MS": "90000",
+    // Dogfood: route the server-owned Workers AI call through an AI Gateway so
+    // every run gains cached/rate-limited/observable inference and per-run usage
+    // evidence. "default" auto-creates on first authenticated request. Opt-in and
+    // fail-open: unset => env.AI.run behaves exactly as before. Server-owned only.
+    "TERRARIUM_AI_GATEWAY_ID": "default"
   },
   "kv_namespaces": [
     {
