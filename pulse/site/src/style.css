@@ -1,0 +1,70 @@
+:root {
+  --bg: #0b0d12;
+  --panel: #141821;
+  --ink: #e6e9ef;
+  --muted: #8b93a7;
+  --accent: #6ea8fe;
+  --ok: #4ade80;
+  --line: #232838;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  line-height: 1.55;
+}
+
+main {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 3rem 1.25rem 5rem;
+}
+
+h1 { font-size: 1.7rem; margin: 0 0 .25rem; }
+.tag { color: var(--accent); }
+.pitch { color: var(--muted); margin: 0 0 2rem; }
+
+.steps { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: 1.5rem; }
+.steps span {
+  font-size: .78rem; color: var(--muted);
+  border: 1px solid var(--line); border-radius: 999px; padding: .2rem .7rem;
+}
+
+.demo {
+  background: var(--panel); border: 1px solid var(--line);
+  border-radius: 12px; padding: 1.25rem;
+}
+
+.controls { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: 1rem; }
+button {
+  font: inherit; font-size: .85rem;
+  background: #1d2330; color: var(--ink);
+  border: 1px solid var(--line); border-radius: 8px;
+  padding: .5rem .9rem; cursor: pointer;
+}
+button:hover:not(:disabled) { border-color: var(--accent); }
+button:disabled { opacity: .4; cursor: not-allowed; }
+button.primary { background: var(--accent); color: #06121f; border-color: var(--accent); }
+
+.counts { display: flex; gap: 1.25rem; margin: 1rem 0; font-size: .85rem; }
+.counts b { color: var(--ink); }
+.counts .ack b { color: var(--ok); }
+.counts span { color: var(--muted); }
+
+.log {
+  background: #0c0f16; border: 1px solid var(--line); border-radius: 8px;
+  padding: .75rem; font-size: .78rem; max-height: 320px; overflow: auto;
+  white-space: pre-wrap; word-break: break-word;
+}
+.log .row { padding: .15rem 0; border-bottom: 1px dashed var(--line); }
+.log .row:last-child { border-bottom: 0; }
+.log .ts { color: var(--muted); }
+.log .ok { color: var(--ok); }
+.empty { color: var(--muted); }
+
+footer { margin-top: 2.5rem; color: var(--muted); font-size: .8rem; }
+a { color: var(--accent); }

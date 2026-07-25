@@ -1,0 +1,16 @@
+{
+  "runnerVersion": "3",
+  "taskPath": "/workspace/terrarium-task.txt",
+  "contractPath": "/workspace/terrarium-contract.json",
+  "opencodeFlags": ["--pure", "--file", "--model", "--agent"],
+  "providerConfigPath": "/etc/terrarium/opencode.json",
+  "providerBaseURL": "https://terrarium.coey.dev/_terrarium_model/v1",
+  "requiredEnv": {
+    "TERRARIUM_MODEL": "Nonsecret terrarium/model spec for `opencode run --model`; the runner refuses every other provider.",
+    "OPENCODE_CONFIG": "Path to the baked credentialless provider config."
+  },
+  "optionalEnv": {
+    "TERRARIUM_AGENT": "Optional agent name passed via `opencode run --agent`."
+  },
+  "notes": "The runner treats task/contract text as data only. Task/contract paths are also baked into src/cloud/sandbox-backend.js."
+}

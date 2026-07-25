@@ -1,0 +1,2 @@
+demo_fact=correlated-receipt
+Only a receipt matching the run ID, task fingerprint, and nonce is authoritative.

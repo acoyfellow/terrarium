@@ -1,0 +1,2 @@
+demo_fact=canonical-event
+At-least-once delivery retains one canonical terminal event under stable event-ID deduplication.

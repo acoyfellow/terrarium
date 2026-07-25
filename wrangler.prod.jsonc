@@ -1,0 +1,75 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "terrarium-control",
+  "main": "src/control-worker.js",
+  "compatibility_date": "2026-06-05",
+  "compatibility_flags": ["nodejs_compat"],
+  "assets": {
+    "directory": "./app/dist",
+    "binding": "APP_ASSETS",
+    "not_found_handling": "single-page-application",
+    "run_worker_first": ["/health", "/api/*", "/policy", "/campaigns", "/campaigns/*", "/pulse", "/claim", "/ack", "/status"]
+  },
+  "account_id": "bfcb6ac5b3ceaf42a09607f6f7925823",
+  "vars": {
+    "TERRARIUM_MODE": "fixture",
+    // Admission concurrency aligned to container capacity (max_instances: 20).
+    // Operational knobs, not correctness invariants; failures fail closed.
+    "TERRARIUM_BUDGET_MAX_ACTIVE": "20",
+    "TERRARIUM_BUDGET_MAX_PER_MINUTE": "120",
+    "TERRARIUM_BUDGET_MAX_PER_DAY": "5000",
+    "TERRARIUM_STARTUP_GRACE_MS": "90000"
+  },
+  "kv_namespaces": [
+    {
+      "binding": "TERRARIUM_LEDGER",
+      "id": "7e322bfe94234a52896706a5c8231407"
+    },
+    {
+      "binding": "TERRARIUM_POLICY",
+      "id": "7e322bfe94234a52896706a5c8231407"
+    }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "TERRARIUM_ARTIFACTS",
+      "bucket_name": "terrarium-control-artifacts"
+    }
+  ],
+  "routes": [
+    { "pattern": "terrarium.coey.dev", "custom_domain": true }
+  ],
+  "observability": { "enabled": true },
+  "ai": { "binding": "AI" },
+  "durable_objects": {
+    "bindings": [
+      { "name": "CAMPAIGN_LOCK", "class_name": "CampaignLock" },
+      { "name": "PULSE_ROUTER", "class_name": "PulseRouter" },
+      { "name": "TERRARIUM_RUN", "class_name": "RunControlDO" },
+      { "name": "TERRARIUM_SANDBOX", "class_name": "TerrariumSandbox" },
+      { "name": "TERRARIUM_PRINCIPAL_BUDGET", "class_name": "PrincipalBudgetDO" }
+    ]
+  },
+  "containers": [
+    {
+      "class_name": "TerrariumSandbox",
+      "image": "./Dockerfile.pi",
+      "image_build_context": ".",
+      "max_instances": 20
+    }
+  ],
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["CampaignLock"] },
+    { "tag": "v2", "new_sqlite_classes": ["PulseRouter"] },
+    { "tag": "v3", "new_sqlite_classes": ["RunControlDO"] },
+    { "tag": "v4", "new_sqlite_classes": ["TerrariumSandbox"] },
+    { "tag": "v5", "new_sqlite_classes": ["PrincipalBudgetDO"] }
+  ],
+  "workflows": [
+    {
+      "name": "terrarium-campaign",
+      "binding": "TERRARIUM_CAMPAIGN",
+      "class_name": "TerrariumCampaignWorkflow"
+    }
+  ]
+}

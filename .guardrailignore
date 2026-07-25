@@ -1,0 +1,2 @@
+# Synthetic auth-logic test fixtures (Bearer T / T-current / LEGACY) — not real secrets.
+test/cloud-principal-budget.test.js

@@ -1,0 +1,26 @@
+[
+  {
+    "id": "receipt-authority",
+    "label": "Receipt authority",
+    "file": "fixtures/demo-fanout/receipt-authority.txt",
+    "expected": "correlated-receipt"
+  },
+  {
+    "id": "callback-dedup",
+    "label": "Callback deduplication",
+    "file": "fixtures/demo-fanout/callback-dedup.txt",
+    "expected": "canonical-event"
+  },
+  {
+    "id": "owner-isolation",
+    "label": "Owner isolation",
+    "file": "fixtures/demo-fanout/owner-isolation.txt",
+    "expected": "principal-scoped"
+  },
+  {
+    "id": "deadline-ordering",
+    "label": "Deadline ordering",
+    "file": "fixtures/demo-fanout/deadline-ordering.txt",
+    "expected": "intent-wins"
+  }
+]

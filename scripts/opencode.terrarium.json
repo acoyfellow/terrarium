@@ -1,0 +1,18 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "terrarium": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Terrarium Workers AI (credentialless child)",
+      "options": {
+        "baseURL": "https://terrarium.coey.dev/_terrarium_model/v1",
+        "apiKey": "terrarium-nonsecret-placeholder"
+      },
+      "models": {
+        "workers-ai": {
+          "name": "Terrarium Workers AI"
+        }
+      }
+    }
+  }
+}

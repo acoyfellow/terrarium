@@ -1,0 +1,2 @@
+demo_fact=principal-scoped
+Run state, logs, cancellation, replay, and callbacks remain scoped to the stable principal.
