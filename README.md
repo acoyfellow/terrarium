@@ -198,8 +198,8 @@ A background supervisor uses `startupWatchdogMs` to terminate a child that produ
 - `terrarium_status` — inspect one run or list recent runs, with a factual needs-attention flag.
 - `terrarium_read` — read a recorded run log (`kind: "mre"` for the MRE side log).
 - `terrarium_cancel` — cancel one active run and its descendant process group within lineage scope.
-- `terrarium_group` — create, status, read, or cancel a collection of already-started runs. Group state is a fail-closed roll-up of member receipts. It reads `ok` only when every member is `done, ok: true`. It is **not** independent success proof. Confirm each run with its own verified receipt.
-- `terrarium_callbacks` — a durable **pull** subscription for terminal events. It supports claim, ack, requeue, recover, and prune. Delivery is at-least-once with dedup. Subscribing alone does not wake a conversation. A terminal callback notifies you that a run finished. It is **not** proof that the task succeeded. Confirm with the run's verified receipt.
+- `terrarium_group` — create, status, read, or cancel a collection of already-started runs. Group state is a fail-closed roll-up of member receipts, not independent success proof: it reads `ok` only when every member is `done, ok: true`. Confirm each run with its own verified receipt.
+- `terrarium_callbacks` — a durable **pull** subscription for terminal events. It supports claim, ack, requeue, recover, and prune. Delivery is at-least-once with dedup. Subscribing alone does not wake a conversation. A terminal callback is a notification that a run finished, not authoritative proof that the task succeeded. Confirm with the run's verified receipt.
 - `terrarium_doctor` — read-only diagnostics (storage, runs, attention, callbacks, groups, stale claims). The CLI adds an opt-in `--repair` executor.
 - `terrarium_report_failure` — turn a caught terminal failure into a structured, deduped bug report. It fetches the run's status and log by run ID. It classifies the failure as one of receipt-mismatch, receipt-absent, receipt-malformed, agent-timeout, model-config, ca-trust, or poll-timeout. It adds a blame hint of `agent`, `backend`, or `image`. It redacts and excerpts the log. It files the report under `~/.terrarium/failure-reports`. Defect-level dedupe collapses N runs that fail the same way into one report with an occurrence count. It refuses a trusted success. Pass `markdown: true` for a paste-ready body.
 
@@ -255,6 +255,13 @@ The agent-assisted path runs the deterministic Docker detector. The detector out
 Full boundaries and the frozen public-automation history: [THREAT_MODEL.md](./THREAT_MODEL.md), [docs/AUTONOMOUS_LOOP.md](./docs/AUTONOMOUS_LOOP.md), [docs/GAPS_TO_AUTONOMY.md](./docs/GAPS_TO_AUTONOMY.md).
 
 ---
+
+## Adoption signal for the original primitive
+
+- Installed as MCP, Terrarium was selected without explicit prompting: **24 unprompted spawns in 5 sessions**.
+- In a same-model, same-task 14-point eval building *Wake*, baseline scored **11/14**; a run using one read-only Terrarium design dig scored **14/14**.
+
+These are adoption signals, not authoritative success proof. Each underlying run still proves itself with its own receipt.
 
 ## Dogfood evidence
 
