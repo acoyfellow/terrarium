@@ -50,7 +50,7 @@ one bounded task
 -> one durable terminal wake event
 ```
 
-A large fanout call is many ordinary primitives admitted, scheduled, observed, and aggregated safely. The aggregate is not proof; the per-task receipt is proof.
+A large fanout call admits, schedules, observes, and aggregates many ordinary primitives under bounded parallel admission. The aggregate is not proof; the per-task receipt is proof.
 
 ## Non-goals
 
@@ -141,7 +141,7 @@ Non-scope:
 Why first:
 
 ```text
-N=1 is the product invariant. If cloud one-off is not true, fanout is just a larger lie.
+`N=1` is the product invariant. If the cloud one-off path does not meet the invariant, fanout has no validated per-task primitive.
 ```
 
 Exit criteria:

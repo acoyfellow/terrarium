@@ -1,16 +1,16 @@
-# BUGREPORT 2026-07-20 — direct-tools MCP resolves with NO cloud env, walling every real spawn
+# BUGREPORT 2026-07-20: direct-tools MCP resolves with no cloud env and blocks every real spawn
 
-Status: **OPEN — needs owner. Blocks all orchestration from this Pi session.**
+Status: **OPEN. Needs owner. This blocks orchestration from this Pi session.**
 
-Filed by: Pi session in `/Users/jcoeyman/cloudflare` (workspace_id 4AF51288-6D9A-4D7E-B38D-07FCC90BECA9), mid "Liquify Jordan's CFSA board" terraloop. Reporter is the ORCHESTRATOR and cannot spawn children — the loop is stalled at the layer, not the task.
+Filed by: Pi session in `/Users/jcoeyman/cloudflare` (workspace_id 4AF51288-6D9A-4D7E-B38D-07FCC90BECA9), mid "Liquify Jordan's CFSA board" terraloop. The reporter is the orchestrator and cannot spawn children. The missing configuration stalls the terraloop at the orchestration layer, not the task.
 
 ## Severity
-HIGH — `terrarium_spawn` cannot execute a single real child from this session. Dry-run succeeds (it skips the env gate), so the failure is invisible until a real task runs — which produced a false "spawn is up" reading earlier this session.
+HIGH. `terrarium_spawn` cannot execute a real child from this session. Dry-run skips the env gate, so the failure stays invisible until a real task runs. This produced a false "spawn is up" reading earlier this session.
 
 ## Symptom
 - `terrarium_spawn` (real, non-dryRun) errors:
   `Terrarium runs on Cloudflare by default: set TERRARIUM_URL and TERRARIUM_CONTROL_TOKEN (or TERRARIUM_TOKEN_FILE) to run in the cloud. To run locally set TERRARIUM_ALLOW_LOCAL=1.`
-- `terrarium_spawn { dryRun:true }` → **succeeds**, resolves `model: gpt-5.6-terra` and the full child invocation. (False positive: dryRun bypasses the env gate.)
+- `terrarium_spawn { dryRun:true }` -> **succeeds**, resolves `model: gpt-5.6-terra` and the full child invocation. (False positive: dryRun bypasses the env gate.)
 
 ## Root cause (confirmed via doctor)
 `terrarium_doctor` on this session reports:
@@ -37,20 +37,20 @@ staleCloudEnv:     false
 
 **The `env` block declared in `mcp.json` is not applied to the direct-tools
 in-process instance.** With `directTools: true`, terrarium runs inside the Pi
-host process and inherits the *host* env — which has `TERRARIUM_URL`,
+host process and inherits the *host* env, which has `TERRARIUM_URL`,
 `TERRARIUM_CONTROL_TOKEN`, and `TERRARIUM_TOKEN_FILE` all empty (session started
 before the Jul 18 cloud config landed). So the MCP resolves neither cloud
-(no URL/token in process env) nor local (`TERRARIUM_ALLOW_LOCAL` empty) → wall.
+(no URL/token in process env) nor local (`TERRARIUM_ALLOW_LOCAL` empty) -> wall.
 
 Verified out-of-band, all healthy:
 - Token files present + non-empty: `prod-token.secret`, `prod-pulse-token.secret` (Jul 18).
-- Cloud endpoint reachable: `GET https://terrarium.coey.dev/health` → **200**.
-- `~/.terrarium/.env` has `TERRARIUM_ALLOW_LOCAL=1` — **not read** by the process.
+- Cloud endpoint reachable: `GET https://terrarium.coey.dev/health` -> **200**.
+- `~/.terrarium/.env` has `TERRARIUM_ALLOW_LOCAL=1`, which the process does **not** read.
 
 ## Impact
 Orchestration is impossible from this session. Worse: the previous session's
 operator (this same agent) misread "spawn down" as license to demote itself to
-worker and do ticket code inline for multiple ticks — a hygiene failure the
+worker and do ticket code inline for multiple ticks, a hygiene failure the
 broken layer directly enabled. A down orchestration layer should HARD-STOP and
 escalate, not silently degrade to inline work.
 
@@ -60,7 +60,7 @@ escalate, not silently degrade to inline work.
    in-process config resolution (or at minimum `TERRARIUM_URL`/token-file paths
    should be honored from the registration, not only from `process.env`).
 2. **Fail the dry-run the same way a real run fails** when no cloud/local target
-   resolves — so `dryRun` can't report a false-positive "up". Or have doctor's
+   resolves, so `dryRun` cannot report a false-positive "up". Or have doctor's
    `ok:false` short-circuit spawn readiness checks callers rely on.
 3. **Session bootstrap**: relaunch Pi with the cloud env exported so
    `process.env` carries `TERRARIUM_URL` + token-file paths (workaround, not a fix).
@@ -84,6 +84,6 @@ Verified from the ORIGINAL cached-env Pi session (no reload/restart):
 - real inline spawn: **ok:true, status:done, taskContractStatus:verified** (ter_mrtd08fz_ccce86b3737c).
 - local-path spawn now hits the grounded-refusal guardrail (auth works) instead of the env wall.
 
-Residual (separate from this bug): pulseConfigured:false ⇒ background cloud callbacks undeliverable
+Residual (separate from this bug): pulseConfigured:false means background cloud callbacks are undeliverable
 until TERRARIUM_PULSE_TOKEN(_FILE) is set + /reload; use synchronous or local isolation:copy meanwhile.
 Deeper host-side fix (Pi applies mcp.json env to directTools instances) belongs upstream in the Pi harness.

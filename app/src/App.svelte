@@ -12,15 +12,15 @@
         ['2. Dry-run one bounded task', 'terra --dry-run "summarize README.md and list any stale claims"', 'code'],
         ['3. Run it for real', 'terra --agent "pi -p --no-session" "summarize README.md"', 'code'],
         ['4. Read the receipt', 'terra status <runId>\nterra read <runId>', 'code'],
-        ['What you just got', 'One bounded task ran as one isolated child ON YOUR MACHINE and returned one correlated receipt — the run ID, its status, and a verified result you can trust or reject. No guessing from prose. No cloud involved.', 'text'],
+        ['What you just got', 'One bounded task ran as one isolated child ON YOUR MACHINE and returned one correlated receipt: the run ID, its status, and a verified result you can trust or reject. The check does not depend on prose or on the cloud.', 'text'],
         ['5. (optional) Run on your own Cloudflare edge instead', 'wrangler deploy   # deploys a Worker to YOUR Cloudflare account, at your own URL', 'code'],
-        ['When to use the cloud path', 'Deploy the cloud service when you want to submit a task over HTTP (POST /api/runs), close your laptop, and pull the proof back later — execution then runs on Cloudflare instead of your machine. It is fully self-hosted: your Worker, your account, your data. terrarium.coey.dev is just the maintainer\'s reference copy, not a shared backend the CLI calls.', 'text'],
+        ['When to use the cloud path', 'Deploy the cloud service when you want to submit a task over HTTP (POST /api/runs), close your laptop, and pull the proof back later. Execution then runs on Cloudflare instead of your machine. It is fully self-hosted: it runs in the Cloudflare account where you deploy the Worker. terrarium.coey.dev is the maintainer\'s reference deployment. The CLI uses the instance configured in TERRARIUM_URL.', 'text'],
       ],
     },
     {
       id: 'howto', label: 'How-to', kind: 'Do',
       title: 'Get a specific job done',
-      lead: 'Recipes for the common things.',
+      lead: 'Use these commands to run, cancel, and deploy tasks.',
       blocks: [
         ['Run in an isolated copy', 'terra --isolation copy --agent "pi -p --no-session" \\\n  "fix the failing callback test and run test/router.test.js"', 'code'],
         ['Fan out several tasks in parallel', 'terra batch --concurrency 8 --strategy allSettled \\\n  "lint src" "run test/router.test.js" "update CHANGELOG"', 'code'],
@@ -46,7 +46,7 @@
       title: 'Why checking results is the bottleneck',
       lead: 'Bounded agent tasks run in parallel on Cloudflare. Each run returns a receipt you can check.',
       blocks: [
-        ['The bottleneck', 'Running agents in parallel is easy. Checking the results is the slow part. An agent that says "done" does not prove the task ran. An exit code of 0 does not prove it. A callback firing does not prove it. So people run one agent, watch it by hand, and stop there.', 'text'],
+        ['The bottleneck', 'Running agents in parallel is easy. Checking the results is the slow part. Agent output and process signals do not prove that a task ran: not a "done" message, not an exit code of 0, not a callback. So people run one agent, watch it by hand, and stop there.', 'text'],
         ['What a receipt changes', 'Each run carries its own receipt. One run and a thousand runs check the same way: one receipt at a time.', 'text'],
         ['The primitive', 'one bounded task -> one isolated run -> one correlated receipt', 'code'],
         ['What counts as success', 'A run succeeds when its run ID, task fingerprint, and nonce match the task Terrarium handed out. Logs, callbacks, and model prose are signals, not the status. The nonce is server-minted, so a run cannot forge its own success.', 'text'],
@@ -160,7 +160,7 @@
           <div class="hero-copy">
             <div class="eyebrow">Parallel agents on Cloudflare</div>
             <h1>Run agents in parallel.<br />Check <em>every</em> result.</h1>
-            <p class="sub">You can run a hundred agents at once. Checking a hundred results by hand is the part that stops you. Terrarium runs each bounded task <b>on Cloudflare by default</b> and returns a receipt: the run ID, a task fingerprint, and a server-minted nonce that must all correlate. Submit a task, close your laptop, and read the receipt later. No origin server. No machine you own in the loop.</p>
+            <p class="sub">You can run a hundred agents at once. Checking a hundred results by hand is the part that stops you. Terrarium runs each bounded task <b>on Cloudflare by default</b> and returns a receipt: the run ID, a task fingerprint, and a server-minted nonce that must all correlate. Submit a task, close your laptop, and read the receipt later. The task runs on Cloudflare without an origin server or a machine you own.</p>
             <div class="hero-actions">
               <a class="btn btn-primary" href="/docs?page=tutorial" onclick={(e) => navigate('/docs?page=tutorial', e)}>Get started</a>
               <a class="btn" href="https://github.com/acoyfellow/terrarium">View source</a>
@@ -176,7 +176,7 @@
               <span class="hsc hsc-1"><b class="mono">01</b> one task, fanned out</span>
               <span class="hsc hsc-2"><b class="mono">02</b> isolated runs, in parallel</span>
               <span class="hsc hsc-3"><b class="mono">03</b> each returns its own receipt</span>
-              <span class="hsc hsc-4"><b class="mono">✓</b> many runs at once — each one proven</span>
+              <span class="hsc hsc-4"><b class="mono">✓</b> many runs at once, each with its own receipt</span>
             </div>
             <div class="receipt-chip fx-shine hs-receipt">
               <span class="rc-dot"></span>
@@ -244,7 +244,7 @@ POST https://terrarium-control.<you>.workers.dev/api/runs  ->  202 { runId }`}</
     <section class="chapter edge">
       <div class="chapter-inner">
         <div class="chapter-head" data-reveal>
-          <div><p class="eyebrow">03 / Where a run lives</p><h2 class="section-title">No origin server.<br />No local machine.</h2></div>
+          <div><p class="eyebrow">03 / Where a run lives</p><h2 class="section-title">Runs on Cloudflare.<br />No machine you own.</h2></div>
           <p class="section-lede">Submit a task and close your laptop. Admission, the run-control cell, execution, logs, the model route, and the wake callback all run on <b>Cloudflare's global network</b>. State, logs, and delivery do not depend on a machine you own.</p>
         </div>
         <div class="globe-wrap" data-reveal aria-hidden="true">
@@ -255,7 +255,7 @@ POST https://terrarium-control.<you>.workers.dev/api/runs  ->  202 { runId }`}</
             <span class="g-core"></span>
             {#each Array(11) as _, i}<span class="pop" style={`--p:${i}`}></span>{/each}
           </div>
-          <span class="globe-cap mono">POPs firing — parallel runs across the edge</span>
+          <span class="globe-cap mono">parallel runs across Cloudflare edge POPs</span>
         </div>
         <ol class="edge-flow" data-reveal>
           <span class="edge-packet" aria-hidden="true"></span>

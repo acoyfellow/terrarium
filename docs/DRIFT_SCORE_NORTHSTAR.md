@@ -49,4 +49,4 @@ Audit-only establishes a baseline. Enforcement can only prove improvement after 
 
 Build a tiny fixture and recorder that can score one control run and one treatment run.
 
-The first implementation target is not to prevent drift. It is to measure drift well enough that prevention experiments have a denominator.
+The first implementation measures drift well enough that prevention experiments have a denominator.

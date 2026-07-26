@@ -4,7 +4,7 @@ Status: decision recorded and local detached E2E proof passed. Architecture-disc
 
 ## North star
 
-Find the smallest Cloudflare-native substrate for cloud Terrariums / facet cells that can scale massively while preserving Terrarium's operational truth:
+Find the smallest Cloudflare-native substrate for cloud Terrariums and facet cells that preserves Terrarium's operational truth under bounded parallel admission:
 
 ```text
 one bounded task -> one execution cell -> one correlated receipt -> durable wake event
@@ -340,7 +340,7 @@ Run: `ter_20260701090544038_uc75xq`
 
 Verdict: **Dynamic Workflows strengthen the parent orchestration story; they do not replace per-run control cells or receipt authority.**
 
-Evidence included local `docs/DYNAMIC_WORKFLOW_SKETCH.md`, `TerrariumCampaignWorkflow` in `src/control-worker.js`, and internal `cfi` research. The important shape is dynamic fanout with stable job IDs, signal/wait or parked workflow semantics, idempotent retries, explicit cancel signals, and history-bounding patterns like Continue-As-New in Temporal-style systems.
+Evidence included local `docs/DYNAMIC_WORKFLOW_SKETCH.md`, `TerrariumCampaignWorkflow` in `src/control-worker.js`, and internal `cfi` research. The experiment should test dynamic fanout with stable job IDs, signal/wait or parked workflow semantics, idempotent retries, explicit cancellation signals, and history-bounding patterns such as Continue-As-New in Temporal-style systems.
 
 Decision impact:
 

@@ -14,7 +14,7 @@ build-library
 
 ## Why
 
-The drift lab shows that naming allowed reads/writes/commands can improve behavior on a synthetic fixture, and the hardened scorer can produce a reconstructable receipt. But enforcement and observation are not complete yet:
+On a synthetic fixture, the drift lab records allowed reads, writes, and commands, and the scorer produces a reconstructable receipt. Enforcement and observation are not complete yet:
 
 - shell command recording exists;
 - before/after write hashing exists;
@@ -26,9 +26,9 @@ The drift lab shows that naming allowed reads/writes/commands can improve behavi
 - command recording only works when the child is launched through the harness;
 - n is still too low for broad claims.
 
-So the next safe product slice is a library/harness that emits capability-audit receipts. Core Terrarium should integrate the receipt fields only after the harness proves stable across replicated delegated runs.
+So the next product slice is a library/harness that emits capability-audit receipts. Core Terrarium should integrate the receipt fields only after replicated delegated runs meet the stability criteria below.
 
-`cloudbox/` should be weighed as a preferred next execution/proof substrate for stronger repo-level receipts: it already centers fresh Cloudflare computers, command/verify receipts, diffs, artifacts, and shareable proof pages. The boundary should stay clear: Cloudbox can produce stronger execution evidence, while Terrarium owns bounded task admission, capability-audit receipt semantics, and durable terminal wake events.
+Evaluate `cloudbox/` as the next execution and proof substrate for repo-level receipts: it already provides fresh Cloudflare computers, command and verification receipts, diffs, artifacts, and shareable proof pages. Cloudbox provides execution evidence. Terrarium owns bounded task admission, capability-audit receipt semantics, and durable terminal wake events.
 
 ## Integrate later when
 
@@ -50,7 +50,7 @@ Still open:
 - `receiptComplete` is only a structural completeness check, not a semantic proof;
 - writes/tasks remain content-light and fixture-specific;
 - replicated delegated receipts are still needed before core integration;
-- a small Cloudbox-backed drift receipt adapter is a good next implementation slice if local synthetic receipts are rejected by the independent stop-gate audit.
+- implement a small Cloudbox-backed drift receipt adapter if the independent stop-gate audit rejects local synthetic receipts.
 
 ## Rejected alternatives
 
@@ -60,4 +60,4 @@ Still open:
 | Keep as docs only | Drift-score north star needs runnable receipts and regression tests |
 | Integrate external workflow engine | The problem is capability audit semantics, not workflow fanout |
 | Collapse into Cloudbox | Cloudbox is a strong repo computer/proof substrate, but Terrarium still owns task/callback/capability-audit semantics |
-| Reject entirely | Early fixture evidence shows measurable behavior change worth pursuing |
+| Reject entirely | Keep the library evaluation open until replicated receipts establish the observed behavior change |

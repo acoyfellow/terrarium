@@ -1,14 +1,14 @@
 # Self-host onboarding — "Install on Cloudflare"
 
-Goal: a fresh person lands on `terrarium.coey.dev`, clicks **Install on Cloudflare**, and ends
-up with their **own** working Terrarium instance at their **own** URL — with the least friction
-honestly possible. This maps every gap between today and that CTA, friendliest path first.
+Goal: a new user opens `terrarium.coey.dev`, clicks **Install on Cloudflare**, and deploys a
+Terrarium instance to a URL in their account. This document maps every gap between today and
+that CTA, lowest-friction path first.
 
 ## The North Star CTA
 
 Primary button, everywhere the current "Get started" lives:
 
-> **Install on Cloudflare** → Cloudflare's official Deploy button (`deploy.workers.cloudflare.com/?url=<repo>`)
+> **Install on Cloudflare**: Cloudflare's official Deploy button (`deploy.workers.cloudflare.com/?url=<repo>`)
 
 Deploy-to-Cloudflare (DtC) clones the repo into the user's own GitHub, provisions the bound
 resources (KV, R2, DO, container, Workers AI) on **their** account, runs the build, and deploys.
@@ -16,7 +16,7 @@ That is the friendly path. The CLI/`wrangler deploy` path stays documented as th
 
 ---
 
-## Gaps (blockers → nice-to-have)
+## Gaps, from blockers to nice-to-have
 
 ### G1 — `wrangler.jsonc` is hardwired to the maintainer's account  🔴 BLOCKER
 A fresh `wrangler deploy` fails today because the config pins maintainer-only identifiers:
@@ -58,17 +58,17 @@ failures with no explanation.
 **Fix:** state prerequisites up front (Workers Paid, Containers enabled, R2 enabled). Consider a
 lighter default (`max_instances` smaller) for first deploy; the qual config already uses `5`.
 
-### G5 — Container build is heavy and easy to get wrong  🟠 FRICTION
+### G5 - Local container deployment requires Docker  🟠 FRICTION
 `Dockerfile.pi` (`linux/amd64`) builds a Pi execution cell; local `wrangler deploy` needs a
-running Docker daemon (colima). DtC builds server-side, which is actually *friendlier* — but the
-manual path must say "you need Docker running."
+running Docker daemon (colima). DtC builds the container server-side. The manual path requires a
+running Docker daemon and must state that requirement.
 
 **Fix:** document the Docker requirement for the manual path; note DtC avoids it.
 
 ### G6 — `TERRARIUM_MODE: "fixture"` is a non-issue for `/api/runs`  🟢 RESOLVED (verified)
 Verified in source: `TERRARIUM_MODE` only gates the legacy campaign/policy routes
-(`/policy`, `/campaigns`, `/health` label). The cloud execution path (`POST /api/runs` →
-admission → container → `env.AI.run`) is **mode-independent** — it does real Workers AI
+(`/policy`, `/campaigns`, `/health` label). The cloud execution path (`POST /api/runs` ->
+admission -> container -> `env.AI.run`) is **mode-independent**. It does real Workers AI
 execution regardless of mode. No action needed beyond a one-line doc note that `fixture` refers
 to the campaign lab, not `/api/runs`.
 
@@ -76,7 +76,7 @@ to the campaign lab, not `/api/runs`.
 After deploy the user has a URL but no guided "prove it works" step.
 
 **Fix:** a copy-paste smoke: `curl /health` (200), then an authed `POST /api/runs` with their
-token → `202 { runId }`, then `GET /api/runs/:id/status`. Put it in the tutorial as step 6.
+token -> `202 { runId }`, then `GET /api/runs/:id/status`. Put it in the tutorial as step 6.
 
 ### G8 — Site messaging still blurs local CLI vs. cloud  🟡 POLISH
 Partially addressed (Two-ways-to-run section). The CTA change makes the cloud path primary, so
@@ -87,13 +87,13 @@ the split must be crisp: hero button = "Install on Cloudflare" (your own edge); 
 
 ## Proposed friendly flow (target state)
 
-1. Land on site → **Install on Cloudflare** button.
-2. DtC: authorize → repo cloned to user's GitHub → resources provisioned on their account.
+1. Land on site -> **Install on Cloudflare** button.
+2. DtC: authorize -> repo cloned to user's GitHub -> resources provisioned on their account.
 3. DtC prompts for `TERRARIUM_PRINCIPAL_ID` + `TERRARIUM_CONTROL_TOKEN_CURRENT` (with a
    "generate one" hint).
-4. Build + deploy → user gets `https://terrarium-control.<them>.workers.dev`.
-5. Site/README smoke block: `curl /health`, then authed `POST /api/runs` → `202 { runId }`.
-6. Done: their own instance, their own URL, their own data.
+4. Build + deploy -> user gets `https://terrarium-control.<them>.workers.dev`.
+5. Site/README smoke block: `curl /health`, then authed `POST /api/runs` -> `202 { runId }`.
+6. Done: the user has a Terrarium instance at a URL in their account.
 
 ## Execution order
 

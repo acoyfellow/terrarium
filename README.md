@@ -6,7 +6,7 @@
 
 **Run agents in parallel. Check every result.**
 
-Fan out many agent tasks and the bottleneck is not compute. It is checking the results. An agent that says "done" does not prove the task ran. An `exit 0` does not prove it. A callback firing does not prove it. So people run one agent, watch it by hand, and stop there.
+Fan out many agent tasks and the slow part is checking the results. Agent output and process signals do not prove that a task ran: not a "done" message, not an `exit 0`, not a callback. So people run one agent, watch it by hand, and stop there.
 
 Terrarium runs each bounded task as one isolated job. Each job returns a **receipt**. A receipt is the run ID, a task fingerprint, and a server-minted nonce that must all correlate. You check a receipt the same way whether you have one or a thousand: one receipt at a time. Execution runs under a stated concurrency ceiling (a batch caps at 8 per owner; see [Cloud](#cloud-submit-close-your-laptop-pull-the-receipt)). The number of receipts you can collect and check is not capped; the number of runs executing at one moment is.
 
@@ -18,7 +18,7 @@ A run succeeds when its `TERRARIUM_RESULT` carries a **runId, taskFingerprint, a
 
 ---
 
-## Where your runs execute — cloud by default
+## Where your runs execute: cloud by default
 
 The MCP tools (`terrarium_spawn`, `terrarium_spawn_batch`) run **on Cloudflare by default**. Point them at your own deployed instance. Each spawn then executes in a Cloudflare-managed cell. No process runs on your machine. The cell holds no host authority. Each spawn returns a verified receipt. Status, logs, cancel, and terminal callbacks all work against cloud runs.
 
@@ -38,7 +38,7 @@ With that set, a spawn runs in the cloud and comes back `done` + `verified` with
 | Receipt | Verified, server-minted. No local machine runs the task. | Verified, but the task ran locally. |
 | Use it when | Real work: submit a task, walk away, read the receipt and callbacks later | Cooperative local digs where host access is intended |
 
-`terrarium.coey.dev` is the maintainer's reference deployment, not a shared backend — you deploy your own (`wrangler deploy`) and point `TERRARIUM_URL` at it.
+`terrarium.coey.dev` is the maintainer's reference deployment. It is not a shared backend. You deploy your own with `wrangler deploy` and point `TERRARIUM_URL` at it.
 
 ---
 
