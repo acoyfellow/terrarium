@@ -2,6 +2,10 @@
 
 Dated, factual record of what shipped or got fixed. Newest first. Not a full commit log.
 
+## 2026-07-26
+
+- Reviewed public docs and website copy against ASD-STE100 Simplified Technical English. Removed decorative em-dash drama, "not X - it's Y" reframes, rule-of-three cadence, metaphor-as-evidence, and Unicode arrows. Kept definitional em-dashes.
+
 ## 2026-07-25
 
 - Restored the proof-chain documentation: the README names one authoritative success proof, not four confusable surfaces. Callbacks and group roll-ups are notifications, not proof; adoption numbers are a signal, not proof. Each run still proves itself with its own receipt.
