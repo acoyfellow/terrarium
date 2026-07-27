@@ -1,27 +1,52 @@
-// Cloudbox delegation client.
-//
-// Terrarium's cloud cell has no operator filesystem, so a repo-grounded task
-// (review/test/build against real files) cannot run there and is failed closed
-// (see detectFilesystemDependency in cloud-client.js). Cloudbox is the sibling
-// system that DOES boot a Cloudflare container with a real Git checkout and
-// closes around evidence (clone commit + reproduce/verify command receipts +
-// diff + artifact). Per the build-backwards doctrine (don't reinvent a shape
-// that already exists), Terrarium DELEGATES repo-grounded work to Cloudbox
-// rather than growing its own clone/egress/grant stack.
-//
-// Terrarium stays the bounded-task + receipt/callback fabric; Cloudbox is the
-// grounded cloud computer. This client is the seam between them.
-//
-// Config (operator-supplied, never hardcoded):
-//   CLOUDBOX_URL          e.g. https://cloudbox.coey.dev  (or a local dev slot)
-//   CLOUDBOX_TOKEN        Bearer token for Cloudbox (CLOUDBOX_API_TOKEN on that instance)
-//   CLOUDBOX_TOKEN_FILE   alternative: path to a file containing the token
-//
-// Cloudbox contract (verified against cloudbox/src/client.ts + container-runner.ts):
-//   POST /api/runs { repo, commands?, verify?, artifact? } + Bearer
-//     -> { id, status: "passed"|"failed", receipts[], artifact, proof, live? }
 
 import { readFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { spawnCapture } from "./core.js";
+
+const WORKTREE_MAX_BYTES = (() => {
+  const v = Number(process.env.TERRARIUM_WORKTREE_MAX_BYTES);
+  return Number.isFinite(v) && v > 0 ? v : 5 * 1024 * 1024;
+})();
+const WORKTREE_MAX_FILES = 500;
+
+export async function captureWorktreeSource(cwd, { includeIgnored = false, timeoutMs = 10_000 } = {}) {
+  if (!cwd || typeof cwd !== "string") return null;
+  const top = await spawnCapture("git", ["rev-parse", "--show-toplevel"], { cwd, timeoutMs });
+  if (top.code !== 0 || top.timedOut) return null;
+  const headRes = await spawnCapture("git", ["rev-parse", "HEAD"], { cwd, timeoutMs });
+  if (headRes.code !== 0) return null;
+  const base = headRes.stdout.trim();
+
+  const diff = await spawnCapture("git", ["diff", "HEAD"], { cwd, timeoutMs });
+  if (diff.code !== 0) return null;
+  let patch = diff.stdout || "";
+
+  const lsArgs = ["ls-files", "--others", "--exclude-standard"];
+  if (includeIgnored) lsArgs.splice(2, 1);
+  const untracked = await spawnCapture("git", lsArgs, { cwd, timeoutMs });
+  const untrackedFiles = (untracked.stdout || "").split("\n").map((l) => l.trim()).filter(Boolean);
+  let includeUntracked = false;
+  for (const file of untrackedFiles) {
+    const add = await spawnCapture("git", ["diff", "--no-index", "--", "/dev/null", file], { cwd, timeoutMs });
+    if (add.stdout) { patch += (patch.endsWith("\n") || !patch ? "" : "\n") + add.stdout; includeUntracked = true; }
+  }
+
+  if (!patch.trim()) return null;
+
+  const bytes = Buffer.byteLength(patch, "utf8");
+  if (bytes > WORKTREE_MAX_BYTES) {
+    throw new Error(`worktree patch is ${bytes} bytes, over the ${WORKTREE_MAX_BYTES}-byte cap; commit or reduce the working tree, or raise TERRARIUM_WORKTREE_MAX_BYTES`);
+  }
+  const files = (patch.match(new RegExp("^diff " + "[-][-]git ", "gm")) || []).length;
+  if (files > WORKTREE_MAX_FILES) {
+    throw new Error(`worktree patch touches ${files} files, over the ${WORKTREE_MAX_FILES}-file cap`);
+  }
+  if (/^GIT binary patch$/m.test(patch) || /^Binary files .* differ$/m.test(patch)) {
+    throw new Error("worktree contains binary changes, which the patch transport does not support; commit or exclude them");
+  }
+  const sha256 = createHash("sha256").update(patch).digest("hex");
+  return { kind: "patch", patch, base, includeUntracked, includeIgnored, files, bytes, sha256 };
+}
 
 export function cloudboxConfig(env = process.env) {
   const url = typeof env.CLOUDBOX_URL === "string" ? env.CLOUDBOX_URL.replace(/\/$/, "") : "";
@@ -49,12 +74,17 @@ export async function cloudboxRun(args = {}, { env = process.env } = {}) {
   if (!config.url) throw new Error("cloudbox delegation requires CLOUDBOX_URL (and usually CLOUDBOX_TOKEN)");
   const repo = String(args.repo ?? args.spec?.repo ?? "").trim();
   if (!repo) throw new Error("cloudbox run requires a repo (github https URL or an authorized repo key)");
+  let worktreeSource = args.worktreeSource;
+  if (!worktreeSource && args.cwd) {
+    worktreeSource = await captureWorktreeSource(String(args.cwd), { includeIgnored: args.includeIgnored === true });
+  }
   const body = {
     repo,
     ...(Array.isArray(args.commands ?? args.spec?.commands) ? { commands: args.commands ?? args.spec.commands } : {}),
     ...(Array.isArray(args.verify ?? args.spec?.verify) ? { verify: args.verify ?? args.spec.verify } : {}),
     ...(args.artifact ?? args.spec?.artifact ? { artifact: args.artifact ?? args.spec.artifact } : {}),
     ...(Number.isFinite(args.timeoutMs) ? { timeoutMs: Number(args.timeoutMs) } : {}),
+    ...(worktreeSource ? { worktreeSource } : {}),
   };
   const res = await fetch(`${config.url}/api/runs`, {
     method: "POST",
