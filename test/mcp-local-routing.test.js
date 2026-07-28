@@ -4,6 +4,7 @@ import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 const MCP_PATH = fileURLToPath(new URL("../src/mcp.js", import.meta.url));
+const IMMEDIATELY_EXITING_AGENT = `${process.execPath} -e ""`;
 
 // Drive the MCP spawn handler over stdio with a controlled env. Returns the
 // tool-call response text. A dry-run plans without executing (no host
@@ -69,7 +70,7 @@ test("TERRARIUM_ALLOW_LOCAL=1 routes a filesystem-dependent task to the LOCAL ba
 test("TERRARIUM_ALLOW_LOCAL=1 routes a filesystem-dependent batch to the LOCAL backend", async () => {
   const text = await batchCall(
     {
-      jobs: [{ task: "run a local command", cwd: "/tmp", isolation: "none" }],
+      jobs: [{ task: "run a local command", cwd: "/tmp", isolation: "none", agent: IMMEDIATELY_EXITING_AGENT }],
       strategy: "all",
     },
     { ...CLOUD_ENV, TERRARIUM_ALLOW_LOCAL: "1" },
