@@ -6,6 +6,42 @@ const PINNED_MODEL_PROVIDERS = new Map([
   ["gpt-5.6-terra", "opencode.cloudflare.dev"],
 ]);
 
+const SPAWN_MODEL_CATALOG = [
+  { model: "gpt-5.6-terra", provider: "opencode.cloudflare.dev", tier: 3 },
+];
+
+export function spawnModelCatalog({ config = {} } = {}) {
+  const extra = Array.isArray(config.spawnModelCatalog) ? config.spawnModelCatalog : [];
+  const seen = new Map();
+  for (const entry of [...SPAWN_MODEL_CATALOG, ...extra]) {
+    if (!entry || typeof entry.model !== "string" || !entry.model.trim()) continue;
+    if (!Number.isFinite(Number(entry.tier))) continue;
+    seen.set(entry.model, {
+      model: entry.model,
+      provider: typeof entry.provider === "string" && entry.provider.trim() ? entry.provider.trim() : null,
+      tier: Number(entry.tier),
+    });
+  }
+  return [...seen.values()];
+}
+
+export function buildModelLadder(strategy, { config = {}, fallbackModel = null } = {}) {
+  const catalog = spawnModelCatalog({ config });
+  const type = strategy && typeof strategy === "object" ? strategy.type : null;
+  if (type === "custom") {
+    const models = Array.isArray(strategy.models) ? strategy.models.filter((m) => typeof m === "string" && m.trim()) : [];
+    if (models.length === 0) throw new Error("modelStrategy custom requires a non-empty models array of model-name strings");
+    return models.map((model) => ({ model, provider: catalog.find((c) => c.model === model)?.provider ?? null }));
+  }
+  if (type === "low-to-high" || type === "high-to-low") {
+    if (catalog.length === 0) throw new Error(`modelStrategy ${type} requires a non-empty spawn model catalog`);
+    const sorted = [...catalog].sort((a, b) => type === "low-to-high" ? a.tier - b.tier : b.tier - a.tier);
+    return sorted.map(({ model, provider }) => ({ model, provider }));
+  }
+  if (type != null) throw new Error(`unknown modelStrategy.type "${type}"; expected low-to-high, high-to-low, or custom`);
+  return fallbackModel ? [{ model: fallbackModel, provider: null }] : [];
+}
+
 function readJson(path) {
   try {
     if (!existsSync(path)) return {};

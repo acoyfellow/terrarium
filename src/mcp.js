@@ -1,9 +1,10 @@
 #!/usr/bin/env node
 import { createInterface } from "node:readline";
-import { cancelRun, ensureTerminalCallback, getRunStatus, isRunAccessible, listRuns, pruneStaleChildClaims, readRun, runTerrarium, spawnTerrariumBackground, VERSION } from "./core.js";
+import { cancelRun, ensureTerminalCallback, getRunStatus, isRunAccessible, listRuns, loadConfig, pruneStaleChildClaims, readRun, runTerrarium, spawnTerrariumBackground, VERSION } from "./core.js";
 import { detectHostCapacity } from "./host-capacity.js";
 import { cloudSpawn, cloudSpawnBatch, cloudEnabled, cloudStatus, cloudList, cloudRead, cloudCancel, isCloudRunId, detectFilesystemDependency } from "./cloud-client.js";
 import { createRunGroup, getRunGroupStatus, readRunGroupLogs } from "./groups.js";
+import { buildModelLadder } from "./model-resolution.js";
 import { spawnBatch, BATCH_STRATEGIES, validateBatchShape } from "./batch.js";
 import { acknowledgeMailboxEvent, claimMailboxEvents, getMailboxStatus, getSubscriber, pruneRouter, registerSubscriber, requeueInflightEvents, unregisterSubscriber } from "./router.js";
 import { diagnoseTerrarium } from "./doctor.js";
@@ -42,6 +43,7 @@ const tools = [
         logPath: { type: "string", description: "Override log file path. Default: ~/.terrarium/runs/<runId>.log" },
         mreLogPath: { type: "string", description: "Override MRE log file path passed to the child as TERRARIUM_MRE_LOG_PATH. Default: ~/.terrarium/runs/<runId>.mre.log" },
         maxRetries: { type: "number", minimum: 0, maximum: 2, description: "Bounded retries for missing/mismatched task receipts. Default: 0; background runs cannot retry." },
+        modelStrategy: { type: "object", description: "Model fallback ladder. On a retryable contract failure (missing/mismatch/malformed receipt with exit 0) the spawn advances to the next model. Composes with maxRetries (per-rung retries). Foreground only. { type: 'low-to-high' } cheapest-first escalate, { type: 'high-to-low' } strongest-first, { type: 'custom', models: [\"name\", ...] } explicit ordered model names.", properties: { type: { type: "string", enum: ["low-to-high", "high-to-low", "custom"] }, models: { type: "array", items: { type: "string" }, description: "Ordered model names for the custom strategy." } }, required: ["type"] },
         verbose: { type: "boolean", description: "Return the full unprojected result envelope. Default: false (concise projection)." }
       },
       required: ["task"]
@@ -182,7 +184,7 @@ function visibleTools(policy) {
     .map((tool) => (tool.schemaVersion ? tool : { ...tool, schemaVersion: MCP_SCHEMA_VERSION }));
 }
 
-const SPAWN_ARG_KEYS = new Set(["task", "agent", "model", "provider", "readOnly", "ephemeral", "profile", "cwd", "channel", "workflowId", "sessionId", "isolation", "keepWorkspace", "timeoutMs", "needsAttentionAfterMs", "startupWatchdogMs", "maxDepth", "allowSpawn", "statusScope", "readScope", "dryRun", "background", "logPath", "mreLogPath", "verbose"]);
+const SPAWN_ARG_KEYS = new Set(["task", "agent", "model", "provider", "readOnly", "ephemeral", "profile", "cwd", "channel", "workflowId", "sessionId", "isolation", "keepWorkspace", "timeoutMs", "needsAttentionAfterMs", "startupWatchdogMs", "maxDepth", "allowSpawn", "statusScope", "readScope", "dryRun", "background", "logPath", "mreLogPath", "modelStrategy", "verbose"]);
 function sanitizeSpawnArgs(args) {
   const out = {};
   for (const [key, value] of Object.entries(args)) if (SPAWN_ARG_KEYS.has(key)) out[key] = value;
@@ -190,15 +192,27 @@ function sanitizeSpawnArgs(args) {
   return out;
 }
 
-async function runWithBoundedRetries(args, maxRetries) {
+function contractRetryable(result) {
+  return !result.ok && result.exitCode === 0 && ["missing", "mismatch", "malformed"].includes(result.taskContractStatus);
+}
+
+export async function runWithBoundedRetries(args, maxRetries, { config = {}, runOnce = (a) => runTerrarium({ ...a, runId: undefined, stream: false }), statusOf = (runId) => getRunStatus({ runId }) } = {}) {
   if (!Number.isInteger(maxRetries) || maxRetries < 0 || maxRetries > 2) throw new Error("maxRetries must be an integer from 0 to 2");
+  const ladder = buildModelLadder(args.modelStrategy, { config, fallbackModel: args.model ?? null });
+  const rungs = ladder.length > 0 ? ladder : [{ model: args.model ?? null, provider: args.provider ?? null }];
   const attempts = [];
-  for (let index = 0; index <= maxRetries; index++) {
-    const result = await runTerrarium({ ...args, runId: undefined, stream: false });
-    attempts.push(result.runId);
-    if (result.ok || result.exitCode !== 0 || !["missing", "mismatch", "malformed"].includes(result.taskContractStatus)) return { ...result, attemptRunIds: attempts, retryCount: index };
+  const ladderPath = [];
+  let result;
+  for (const rung of rungs) {
+    const rungArgs = { ...args, model: rung.model ?? args.model, provider: rung.provider ?? args.provider };
+    ladderPath.push({ model: rungArgs.model ?? null, provider: rungArgs.provider ?? null });
+    for (let index = 0; index <= maxRetries; index++) {
+      result = await runOnce(rungArgs);
+      attempts.push(result.runId);
+      if (!contractRetryable(result)) return { ...result, attemptRunIds: attempts, retryCount: attempts.length - 1, ladderPath };
+    }
   }
-  return { ...(await getRunStatus({ runId: attempts.at(-1) })), attemptRunIds: attempts, retryCount: maxRetries };
+  return { ...(await statusOf(attempts.at(-1))), attemptRunIds: attempts, retryCount: attempts.length - 1, ladderPath };
 }
 
 const SPAWN_TAIL_CAP = 2000;
@@ -377,7 +391,9 @@ async function handle(msg) {
         const backgroundDefault = process.env.TERRARIUM_BACKGROUND_BY_DEFAULT === "true";
         const background = args.background ?? (backgroundDefault && !args.dryRun && maxRetries === 0);
         if (background && maxRetries > 0) throw new Error("background Terrarium runs do not support retries");
+        if (background && args.modelStrategy) throw new Error("background Terrarium runs do not support a model fallback ladder; run foreground");
         if (policy.requesterRunId && maxRetries > 0) throw new Error("nested Terrarium runs do not support retries; the parent owns retry policy");
+        if (policy.requesterRunId && args.modelStrategy) throw new Error("nested Terrarium runs do not support a model fallback ladder; the parent owns model policy");
         // Cloud-default execution. A spawn runs on the Cloudflare-managed cell
         // (TERRARIUM_URL + token) unless the operator explicitly opts into local
         // execution with TERRARIUM_ALLOW_LOCAL=1. If neither cloud is configured
@@ -408,7 +424,8 @@ async function handle(msg) {
           throw new Error("Terrarium runs on Cloudflare by default: set TERRARIUM_URL and TERRARIUM_CONTROL_TOKEN (or TERRARIUM_TOKEN_FILE) to run in the cloud. To run locally on this machine, set TERRARIUM_ALLOW_LOCAL=1 (not recommended; local children inherit host authority and are not the production path).");
         }
         const safeArgs = sanitizeSpawnArgs({ ...args, background });
-        const result = background ? await spawnTerrariumBackground(safeArgs) : await runWithBoundedRetries(safeArgs, maxRetries);
+        const config = await loadConfig();
+        const result = background ? await spawnTerrariumBackground(safeArgs) : await runWithBoundedRetries(safeArgs, maxRetries, { config });
         const projected = verbose ? result : conciseSpawn(result);
         // Non-blocking host-capacity preflight (incident 2026-07-24 ask #2): if the
         // host is CPU-starved or has leaked orphaned pi processes, a synchronous
