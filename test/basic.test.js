@@ -202,11 +202,12 @@ test("Pi session agents are forced into print mode before Terrarium appends the 
   assert.doesNotMatch(session.agent, /--no-session/);
 });
 
-test("runTerrarium dry-run records and pins a Pi model", async () => {
-  const result = await runTerrarium({ task: "dig", agent: "pi -p --no-session", model: "test-model", dryRun: true, stream: false, config: {} });
+test("runTerrarium dry-run records and pins a Pi provider and model", async () => {
+  const result = await runTerrarium({ task: "dig", agent: "pi -p --no-session", provider: "test-provider", model: "test-model", dryRun: true, stream: false, config: {} });
+  assert.equal(result.provider, "test-provider");
   assert.equal(result.model, "test-model");
-  assert.equal(result.agent, "pi -p --no-session --model test-model");
-  assert.match(result.invocation, /^pi -p --no-session --model test-model /);
+  assert.equal(result.agent, "pi -p --no-session --provider test-provider --model test-model");
+  assert.match(result.invocation, /^pi -p --no-session --provider test-provider --model test-model /);
 });
 
 test("runTerrarium dry-run minimal profile produces a leaner child invocation", async () => {
