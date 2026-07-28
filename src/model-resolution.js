@@ -7,7 +7,10 @@ const PINNED_MODEL_PROVIDERS = new Map([
 ]);
 
 const SPAWN_MODEL_CATALOG = [
+  { model: "gemini-2.5-flash-lite", provider: "example-gateway", tier: 1 },
+  { model: "claude-haiku-4-5", provider: "example-gateway", tier: 2 },
   { model: "gpt-5.6-terra", provider: "example-gateway", tier: 3 },
+  { model: "claude-sonnet-4-5", provider: "example-gateway", tier: 4 },
 ];
 
 export function spawnModelCatalog({ config = {} } = {}) {

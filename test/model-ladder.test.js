@@ -12,10 +12,12 @@ const config = {
 
 test("low-to-high orders the catalog cheapest first", () => {
   const ladder = buildModelLadder({ type: "low-to-high" }, { config }).map((r) => r.model);
-  assert.equal(ladder[0], "gpt-5.6-terra");
   assert.ok(ladder.indexOf("cheap-fast") < ladder.indexOf("mid"));
   assert.ok(ladder.indexOf("mid") < ladder.indexOf("top"));
   assert.equal(ladder.at(-1), "top");
+  const tiers = buildModelLadder({ type: "low-to-high" }, { config: {} });
+  assert.ok(tiers.length > 1, "the built-in catalog must offer more than one rung");
+  assert.equal(tiers[0].model, "gemini-2.5-flash-lite");
 });
 
 test("low-to-high and high-to-low are exact reverses over tiers", () => {
