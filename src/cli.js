@@ -15,6 +15,7 @@ import { runSecureTask } from "./secure.js";
 import { verifyHardening } from "./hardening.js";
 import { runSecureAgent } from "./secure-agent.js";
 import { diagnoseTerrarium, executeRepairPlan } from "./doctor.js";
+import { reapOrphanedPi } from "./host-capacity.js";
 import { replayScheduleFile } from "./schedule-replay.js";
 import { initialRunState } from "./run-machine.js";
 import { detectMistypedCommand } from "./command-guard.js";
@@ -57,6 +58,7 @@ Usage:
   terra secure-agent --model <id> "task"
   terra hardening verify
   terra doctor
+  terra doctor --reap-orphans
   terra doctor --repair [--apply] [--verify]
   terra schedule replay <fixture.json>
   terra campaign read <campaignId>
@@ -117,6 +119,7 @@ function parse(argv) {
     else if (a === "--unsafe-network") out.unsafeNetwork = true;
     else if (a === "--read-only" || a === "--readonly") out.readOnly = true;
     else if (a === "--repair") out.repair = true;
+    else if (a === "--reap-orphans") out.reapOrphans = true;
     else if (a === "--apply") out.apply = true;
     else if (a === "--verify") out.verify = true;
     else if (a === "--task") out.forceTask = true;
@@ -184,6 +187,10 @@ else if (cmd === "attack") runAttackExperiment({ scenarioId: rest[0], agent: opt
 }).catch((e) => { console.error(`terrarium: ${e.message}`); process.exit(1); });
 else if (cmd === "secure-agent") runSecureAgent({ task: rest.join(" "), cwd: opts.cwd, model: opts.model, timeoutMs: opts.timeoutMs || undefined }).then((result) => console.log(JSON.stringify(result, null, 2))).catch((e) => { console.error(`terrarium: ${e.message}`); process.exit(1); });
 else if (cmd === "secure") runSecureTask({ task: rest.join(" "), cwd: opts.cwd, timeoutMs: opts.timeoutMs || undefined }).then((result) => console.log(JSON.stringify(result, null, 2))).catch((e) => { console.error(`terrarium: ${e.message}`); process.exit(1); });
+else if (cmd === "doctor" && opts.reapOrphans) reapOrphanedPi().then((result) => {
+  console.log(JSON.stringify(result, null, 2));
+  process.exit(result.ok ? 0 : 1);
+}).catch((e) => { console.error(`terrarium: ${e.message}`); process.exit(1); });
 else if (cmd === "doctor" && opts.repair) diagnoseTerrarium().then(async (diagnosis) => {
   // --repair drives only the mechanically-safe, idempotent self-healing steps
   // (recover/requeue/prune); --apply opts in to mutation, default is dry-run.

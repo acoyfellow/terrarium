@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import os from "node:os";
-import { detectHostCapacity, classifyOrphans, parsePiProcesses } from "../src/host-capacity.js";
+import { detectHostCapacity, classifyOrphans, parsePiProcesses, reapOrphanedPi } from "../src/host-capacity.js";
 
 // Deterministic fixture: a fake `run` that returns canned cmux + ps output so
 // the orphan classifier is proven without depending on live machine state.
@@ -36,6 +36,55 @@ test("classifyOrphans flags a pi on a tty absent from cmux, spares live-surface 
 test("classifyOrphans returns none when cmux is unavailable (cannot classify)", () => {
   const procs = parsePiProcesses("102 ttys009 99.0 3-18:00 pi");
   assert.deepEqual(classifyOrphans(procs, null), []);
+});
+
+test("reapOrphanedPi refuses a candidate in its own ancestor chain", async () => {
+  const signals = [];
+  const parents = new Map([[400, 300], [300, 1]]);
+  const run = async (command, args) => {
+    if (command === "cmux") return { code: 0, stdout: 'surface:1 tty=ttys001\n' };
+    if (command === "tmux") return { code: 1, stdout: "" };
+    if (command !== "ps") return { code: 127, stdout: "" };
+    if (args.includes("ppid=")) return { code: 0, stdout: `${parents.get(Number(args.at(-1)))}\n` };
+    if (args.includes("pid=,tty=,pcpu=,etime=,comm=")) return { code: 0, stdout: "300 ttys009 99.0 3-18:00 pi\n" };
+    return { code: 127, stdout: "" };
+  };
+
+  const result = await reapOrphanedPi({
+    processId: 400,
+    run,
+    kill: (pid, signal) => signals.push({ pid, signal }),
+    sleep: async () => {},
+  });
+
+  assert.equal(result.ok, false);
+  assert.deepEqual(result.reaped, []);
+  assert.deepEqual(result.skipped, [{ pid: 300, tty: "ttys009", reason: "own-ancestor" }]);
+  assert.deepEqual(signals, []);
+});
+
+test("reapOrphanedPi skips a tty that tmux reports as live", async () => {
+  const signals = [];
+  const run = async (command, args) => {
+    if (command === "cmux") return { code: 0, stdout: 'surface:1 tty=ttys001\n' };
+    if (command === "tmux") return { code: 0, stdout: "/dev/ttys009\n" };
+    if (command !== "ps") return { code: 127, stdout: "" };
+    if (args.includes("ppid=")) return { code: 0, stdout: "1\n" };
+    if (args.includes("pid=,tty=,pcpu=,etime=,comm=")) return { code: 0, stdout: "900 ttys009 99.0 3-18:00 pi\n" };
+    return { code: 127, stdout: "" };
+  };
+
+  const result = await reapOrphanedPi({
+    processId: 400,
+    run,
+    kill: (pid, signal) => signals.push({ pid, signal }),
+    sleep: async () => {},
+  });
+
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.reaped, []);
+  assert.deepEqual(result.skipped, []);
+  assert.deepEqual(signals, []);
 });
 
 test("detectHostCapacity with injected run detects a synthesized leaked pi", async () => {

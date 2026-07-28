@@ -24,10 +24,27 @@ function parseCmuxTtys(stdout) {
   for (const m of stdout.matchAll(/tty=(ttys\d+)/g)) set.add(m[1]);
   return set;
 }
+
+function parseTmuxTtys(stdout) {
+  const set = new Set();
+  for (const line of stdout.split("\n")) {
+    const value = line.trim();
+    const tty = normTty(value.startsWith("/dev/") ? value.slice(5) : value);
+    if (tty) set.add(tty);
+  }
+  return set;
+}
+
 async function liveCmuxTtys(timeoutMs, run) {
   const r = await run("cmux", ["tree", "--all"], { timeoutMs });
-  if (r.code !== 0 || r.timedOut) return null; // cmux absent/failed -> unknown
+  if (r.code !== 0 || r.timedOut) return null;
   return parseCmuxTtys(r.stdout);
+}
+
+async function liveTmuxTtys(timeoutMs, run) {
+  const r = await run("tmux", ["list-panes", "-a", "-F", "#{pane_tty}"], { timeoutMs });
+  if (r.code !== 0 || r.timedOut) return new Set();
+  return parseTmuxTtys(r.stdout);
 }
 
 // List pi processes with pid, controlling tty, %cpu, elapsed time. Uses `ps`
@@ -80,18 +97,120 @@ function normTty(tty) {
   return tty;
 }
 
+function isPaneLeaked(processInfo, cmuxTtys, tmuxTtys) {
+  return cmuxTtys !== null && Boolean(processInfo.tty) && !cmuxTtys.has(processInfo.tty) && !tmuxTtys.has(processInfo.tty);
+}
+
+async function currentPiProcess(pid, timeoutMs, run) {
+  const r = await run("ps", ["-p", String(pid), "-o", "pid=,tty=,pcpu=,etime=,comm="], { timeoutMs });
+  if (r.code !== 0 || r.timedOut) return null;
+  return parsePiProcesses(r.stdout).find((processInfo) => processInfo.pid === Number(pid)) ?? null;
+}
+
+async function ancestorPids(processId, timeoutMs, run) {
+  const ancestors = new Set();
+  let current = Number(processId);
+  while (Number.isInteger(current) && current > 1 && !ancestors.has(current)) {
+    ancestors.add(current);
+    const r = await run("ps", ["-o", "ppid=", "-p", String(current)], { timeoutMs });
+    const parentText = r.code === 0 && !r.timedOut ? r.stdout.trim() : "";
+    if (!/^\d+$/.test(parentText)) return { ancestors, complete: false };
+    const parent = Number(parentText);
+    if (!Number.isInteger(parent) || parent < 1 || parent === current) return { ancestors, complete: false };
+    current = parent;
+  }
+  return { ancestors, complete: current === 1 };
+}
+
+function processAlive(pid, kill) {
+  try {
+    kill(pid, 0);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function wait(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+export async function reapOrphanedPi({ timeoutMs = 3000, processId = process.pid, run = spawnCapture, kill = process.kill, sleep = wait } = {}) {
+  const ancestry = await ancestorPids(processId, timeoutMs, run);
+  if (!ancestry.complete) {
+    return {
+      ok: false,
+      reaped: [],
+      skipped: [{ reason: "ancestor-chain-unavailable" }],
+      ancestorPids: [...ancestry.ancestors],
+    };
+  }
+
+  const [cmuxTtys, tmuxTtys, piProcesses] = await Promise.all([
+    liveCmuxTtys(timeoutMs, run),
+    liveTmuxTtys(timeoutMs, run),
+    listPiProcesses(timeoutMs, run),
+  ]);
+  const reaped = [];
+  const skipped = [];
+
+  for (const candidate of piProcesses) {
+    if (!isPaneLeaked(candidate, cmuxTtys, tmuxTtys)) continue;
+    if (ancestry.ancestors.has(candidate.pid)) {
+      skipped.push({ pid: candidate.pid, tty: candidate.tty, reason: "own-ancestor" });
+      continue;
+    }
+
+    const [current, currentCmuxTtys, currentTmuxTtys] = await Promise.all([
+      currentPiProcess(candidate.pid, timeoutMs, run),
+      liveCmuxTtys(timeoutMs, run),
+      liveTmuxTtys(timeoutMs, run),
+    ]);
+    if (!current || !isPaneLeaked(current, currentCmuxTtys, currentTmuxTtys)) {
+      skipped.push({ pid: candidate.pid, tty: candidate.tty, reason: "no-longer-pane-leaked" });
+      continue;
+    }
+
+    try {
+      kill(candidate.pid, "SIGTERM");
+    } catch {
+      skipped.push({ pid: candidate.pid, tty: candidate.tty, reason: "sigterm-failed" });
+      continue;
+    }
+    await sleep(2000);
+    const killed = processAlive(candidate.pid, kill);
+    if (killed) {
+      try {
+        kill(candidate.pid, "SIGKILL");
+      } catch {
+        skipped.push({ pid: candidate.pid, tty: candidate.tty, reason: "sigkill-failed" });
+        continue;
+      }
+    }
+    reaped.push({ pid: candidate.pid, tty: candidate.tty, signal: killed ? "SIGKILL" : "SIGTERM" });
+  }
+
+  return {
+    ok: skipped.length === 0,
+    reaped,
+    skipped,
+    ancestorPids: [...ancestry.ancestors],
+  };
+}
+
 export async function detectHostCapacity({ timeoutMs = 3000, run = spawnCapture } = {}) {
   const cpuCount = os.cpus().length || 1;
   const [load1] = os.loadavg();
   const loadRatio = Number((load1 / cpuCount).toFixed(2));
   const starved = loadRatio > LOAD_RATIO_STARVED;
 
-  const [ttys, piProcs] = await Promise.all([
+  const [ttys, tmuxTtys, piProcs] = await Promise.all([
     liveCmuxTtys(timeoutMs, run),
+    liveTmuxTtys(timeoutMs, run),
     listPiProcesses(timeoutMs, run),
   ]);
   const cmuxAvailable = ttys !== null;
-  const orphanedPi = classifyOrphans(piProcs, ttys);
+  const orphanedPi = classifyOrphans(piProcs, ttys).filter((processInfo) => !tmuxTtys.has(processInfo.tty));
 
   return {
     cpuCount,
