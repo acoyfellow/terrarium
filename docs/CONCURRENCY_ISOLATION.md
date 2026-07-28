@@ -91,6 +91,8 @@ Detached background runs use `transition(state, input) -> { state, decisions }` 
 
 MCP `terrarium_spawn.maxRetries` is bounded to 0–2 and defaults to zero. Retries occur only for missing/malformed/mismatched task receipts. Background runs cannot retry automatically. Every attempt has a distinct run ID and the response lists `attemptRunIds`.
 
+MCP `terrarium_spawn.modelStrategy` builds a model fallback ladder for a foreground run. When a task fails with a retryable contract result (a missing, malformed, or mismatched receipt with exit code zero), the spawn advances to the next model instead of retrying the same one. It composes with `maxRetries`: each rung runs up to `maxRetries + 1` times before the ladder advances. Three strategies exist. `low-to-high` orders the catalog by cost tier cheapest first and escalates on failure. `high-to-low` starts with the strongest model. `custom` takes an explicit ordered `models` array of model names. A non-zero exit stops the ladder at once, so it never masks a genuine task error. The response lists `ladderPath` (the resolved model and provider tried at each rung) alongside `attemptRunIds`. The ladder is foreground only; background and nested runs reject it because the parent owns model policy.
+
 ## Remaining boundary
 
 Ordinary Terrarium children still execute as the invoking OS user. A child with general host filesystem tools may directly read `~/.terrarium` outside the MCP/CLI APIs. MCP/CLI lineage enforcement prevents accidental and tool-mediated sibling inspection, but strong filesystem confidentiality requires `terra secure-agent` or another sandboxed profile. Copy/worktree isolation is not a security sandbox.

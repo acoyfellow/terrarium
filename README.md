@@ -193,7 +193,7 @@ A background supervisor uses `startupWatchdogMs` to terminate a child that produ
 
 ## MCP tools
 
-- `terrarium_spawn` — run one bounded child task. Synchronous unless `background: true`.
+- `terrarium_spawn` — run one bounded child task. Synchronous unless `background: true`. A foreground `modelStrategy` (`low-to-high`, `high-to-low`, or `custom` with an ordered `models` array) advances to the next model on a retryable contract failure and records the `ladderPath`.
 - `terrarium_spawn_batch` — fan out an array of jobs under one group; join by `all` / `allSettled` / `race` / `any` / `quorum`. Winner-picking strategies cancel losers; prefer `isolation: copy|worktree` for side effects.
 - `terrarium_status` — inspect one run or list recent runs, with a factual needs-attention flag.
 - `terrarium_read` — read a recorded run log (`kind: "mre"` for the MRE side log).
