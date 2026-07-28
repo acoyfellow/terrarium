@@ -8,6 +8,7 @@ import { fileURLToPath } from "node:url";
 import { publishEvent, eventForRun, TerrariumEventType } from "./event-runtime.js";
 import { routeEvent } from "./router.js";
 import { initialRunState, transition } from "./run-machine.js";
+import { preflightAgentModel, resolveAgentModel } from "./model-resolution.js";
 
 export const VERSION = "0.0.1";
 export const HOME = process.env.TERRARIUM_HOME ? resolve(process.env.TERRARIUM_HOME) : join(homedir(), ".terrarium");
@@ -78,7 +79,7 @@ export function resolveModel({ model } = {}, { env = process.env, config = {} } 
  * caller to know each runner's CLI shape. Unknown commands remain available
  * through --agent, but must carry their own model flag.
  */
-export function applyModelToAgent(agent, model, { strict = true } = {}) {
+export function applyModelToAgent(agent, model, { strict = true, provider = null } = {}) {
   if (!model) return agent;
   const parts = splitCommand(agent);
   const executable = basename(parts[0] || "");
@@ -90,6 +91,14 @@ export function applyModelToAgent(agent, model, { strict = true } = {}) {
   }
   if (parts.includes("--model") || parts.includes("-m")) {
     throw new Error("agent command already contains a model flag; use either --model or an inline model, not both");
+  }
+  if (provider && isPi) {
+    const providerIndex = parts.findIndex((part) => part === "--provider");
+    if (providerIndex >= 0) {
+      if (parts[providerIndex + 1] !== provider) throw new Error("agent provider does not match the resolved provider");
+      return [...parts, "--model", model].map(shellToken).join(" ");
+    }
+    return [...parts, "--provider", provider, "--model", model].map(shellToken).join(" ");
   }
   return [...parts, "--model", model].map(shellToken).join(" ");
 }
@@ -282,8 +291,10 @@ function buildRun(opts, config) {
   const requestedReadOnly = Boolean(opts.readOnly ?? config.readOnly ?? false);
   const baseAgent = resolveAgent({ agent: opts.agent, readOnly: requestedReadOnly }, { env: process.env, config });
   const requestedModel = resolveModel({ model: opts.model }, { env: process.env, config });
-  const appliedAgent = applyModelToAgent(baseAgent, requestedModel, { strict: Boolean(opts.model) });
-  const model = appliedAgent === baseAgent ? modelFlagInAgent(appliedAgent) : requestedModel;
+  const modelResolution = resolveAgentModel({ agent: baseAgent, model: requestedModel, provider: opts.provider }, { env: process.env, config });
+  const appliedAgent = applyModelToAgent(baseAgent, modelResolution.model, { strict: Boolean(opts.model), provider: modelResolution.provider });
+  const model = appliedAgent === baseAgent ? modelFlagInAgent(appliedAgent) : modelResolution.model;
+  const provider = modelResolution.provider;
   let agent = appliedAgent;
   const agentParts = splitCommand(agent);
   if (basename(agentParts[0] || "") === "pi" && !agentParts.includes("--no-session") && !agentParts.includes("--session") && !agentParts.includes("--session-id") && opts.ephemeral !== false) {
@@ -325,7 +336,7 @@ function buildRun(opts, config) {
   const channel = correlationValue(opts.channel ?? process.env.TERRARIUM_EVENT_CHANNEL ?? callerChannel, "channel");
   const workflowId = correlationValue(opts.workflowId ?? parentRunId ?? runId, "workflow id");
   const sessionId = correlationValue(opts.sessionId ?? process.env.TERRARIUM_SESSION_ID ?? null, "session id");
-  return { runId, parentRunId, depth, maxDepth, agent, model, profile, readOnly, timeoutMs, task, dryRun, cwd, originalCwd: cwd, stream, logPath, mreLogPath, isolation, keepWorkspace, callerSpawnAllowed, allowSpawn, statusScope, readScope, requireTaskContract, taskContract, needsAttentionAfterMs, startupWatchdogMs, channel, workflowId, sessionId };
+  return { runId, parentRunId, depth, maxDepth, agent, model, provider, modelResolution, profile, readOnly, timeoutMs, task, dryRun, cwd, originalCwd: cwd, stream, logPath, mreLogPath, isolation, keepWorkspace, callerSpawnAllowed, allowSpawn, statusScope, readScope, requireTaskContract, taskContract, needsAttentionAfterMs, startupWatchdogMs, channel, workflowId, sessionId };
 }
 
 async function workspaceExcludes() {
@@ -455,6 +466,11 @@ async function prepareRun(opts = {}) {
   const run = buildRun(opts, config);
   // All non-mutating validation must happen before a child slot is claimed.
   if (!run.task) throw new Error("missing task");
+  if (!run.dryRun) {
+    const preflight = preflightAgentModel(run.modelResolution, { env: process.env });
+    if (!preflight.ok) throw new Error(preflight.message);
+    run.modelCredentialSource = preflight.credentialSource;
+  }
   if (run.depth > run.maxDepth) throw new Error(`Terrarium max depth exceeded (${run.depth}/${run.maxDepth})`);
   if (run.parentRunId && !run.callerSpawnAllowed) throw new Error("Terrarium spawn capability denied for this child");
   const parts = splitCommand(run.agent);
@@ -472,8 +488,8 @@ async function prepareRun(opts = {}) {
       run.logPath ??= await defaultLogPath(run.runId);
       await writeMetadata({
         runId: run.runId, parentRunId: run.parentRunId, version: VERSION, agent: run.agent,
-        model: run.model, task: run.task, cwd: run.cwd, originalCwd: run.originalCwd,
-        isolation: run.isolation, logPath: run.logPath, startedAt: new Date().toISOString(),
+        model: run.model, provider: run.provider, task: run.task, cwd: run.cwd, originalCwd: run.originalCwd,
+        modelCredentialSource: run.modelCredentialSource ?? null, isolation: run.isolation, logPath: run.logPath, startedAt: new Date().toISOString(),
         status: "accepted", channel: run.channel, workflowId: run.workflowId, sessionId: run.sessionId,
         taskFingerprint: run.taskContract?.taskFingerprint ?? taskFingerprint(run.task),
       });
@@ -484,12 +500,12 @@ async function prepareRun(opts = {}) {
   run.logPath ??= await defaultLogPath(run.runId);
   run.mreLogPath ??= await defaultMreLogPath(run.runId);
   const startedAt = new Date().toISOString();
-  const base = { runId: run.runId, parentRunId: run.parentRunId, depth: run.depth, maxDepth: run.maxDepth, version: VERSION, agent: run.agent, model: run.model, profile: run.profile, readOnly: run.readOnly, task: run.task, cwd: run.cwd, originalCwd: run.originalCwd, isolation: run.isolation, workspace, logPath: run.logPath, mreLogPath: run.mreLogPath, startedAt, lastActivityAt: startedAt, progressText: "started", needsAttentionAfterMs: run.needsAttentionAfterMs, status: "running", git: await gitInfo(run.cwd), allowSpawn: run.allowSpawn, statusScope: run.statusScope, readScope: run.readScope, channel: run.channel, workflowId: run.workflowId, sessionId: run.sessionId, taskFingerprint: run.taskContract?.taskFingerprint ?? taskFingerprint(run.task), taskContractStatus: run.requireTaskContract ? "pending" : "not-required", taskContract: run.taskContract };
+  const base = { runId: run.runId, parentRunId: run.parentRunId, depth: run.depth, maxDepth: run.maxDepth, version: VERSION, agent: run.agent, model: run.model, provider: run.provider, modelCredentialSource: run.modelCredentialSource ?? null, profile: run.profile, readOnly: run.readOnly, task: run.task, cwd: run.cwd, originalCwd: run.originalCwd, isolation: run.isolation, workspace, logPath: run.logPath, mreLogPath: run.mreLogPath, startedAt, lastActivityAt: startedAt, progressText: "started", needsAttentionAfterMs: run.needsAttentionAfterMs, status: "running", git: await gitInfo(run.cwd), allowSpawn: run.allowSpawn, statusScope: run.statusScope, readScope: run.readScope, channel: run.channel, workflowId: run.workflowId, sessionId: run.sessionId, taskFingerprint: run.taskContract?.taskFingerprint ?? taskFingerprint(run.task), taskContractStatus: run.requireTaskContract ? "pending" : "not-required", taskContract: run.taskContract };
   let claimPath = null;
   try {
     claimPath = await claimChildSlot(run);
     await writeMetadata(base);
-    const header = `terrarium ${VERSION}\nrun: ${run.runId}\nparent: ${run.parentRunId ?? "none"}\ndepth: ${run.depth}/${run.maxDepth}\nagent: ${run.agent}${run.readOnly ? " (read-only preset)" : ""}\nmodel: ${run.model ?? "runner default"}\nprofile: ${run.profile}\ntask: ${run.task}\ncwd: ${run.cwd}\noriginal cwd: ${run.originalCwd}\nisolation: ${run.isolation}${workspace ? ` (${workspace.path})` : ""}\nlog: ${run.logPath}\nmre log: ${run.mreLogPath}\n\n`;
+    const header = `terrarium ${VERSION}\nrun: ${run.runId}\nparent: ${run.parentRunId ?? "none"}\ndepth: ${run.depth}/${run.maxDepth}\nagent: ${run.agent}${run.readOnly ? " (read-only preset)" : ""}\nprovider: ${run.provider ?? "runner default"}\nmodel: ${run.model ?? "runner default"}\nprofile: ${run.profile}\ntask: ${run.task}\ncwd: ${run.cwd}\noriginal cwd: ${run.originalCwd}\nisolation: ${run.isolation}${workspace ? ` (${workspace.path})` : ""}\nlog: ${run.logPath}\nmre log: ${run.mreLogPath}\n\n`;
     if (run.stream) process.stdout.write(header);
     await writeFile(run.logPath, header);
     await writeFile(run.mreLogPath, "", { flag: "wx" });

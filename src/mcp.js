@@ -20,6 +20,7 @@ const tools = [
         task: { type: "string", description: "The single bounded objective for the child agent. Be specific. Include 'do not edit files' for read-only digs." },
         agent: { type: "string", description: "Child command. Explicit agent overrides readOnly preset. Defaults through config/env to 'opencode run'. Recommended ephemeral Pi child: 'pi -p --no-session'." },
         model: { type: "string", description: "Pin the child model for opencode run or pi. Precedence: explicit model, TERRARIUM_MODEL, config.defaultModel, runner default." },
+        provider: { type: "string", description: "Pin the Pi provider for model resolution. Default: configured Pi provider." },
         readOnly: { type: "boolean", description: "Use the configured read-only child command when no explicit agent is given. Configure readOnlyAgent or TERRARIUM_READ_ONLY_AGENT; legacy fallback is opencode explore." },
         ephemeral: { type: "boolean", description: "For Pi agents, append --no-session unless an explicit session flag is already present. Default true." },
         profile: { type: "string", enum: ["default", "minimal"], description: "Child prompt profile. 'default' (full structured contract) or 'minimal' (lean shell for bounded read-only digs). Orthogonal to agent/readOnly. Default: 'default'." },
@@ -53,7 +54,7 @@ const tools = [
     inputSchema: {
       type: "object",
       properties: {
-        jobs: { type: "array", minItems: 1, maxItems: 256, description: "Job option objects, each accepting the same fields as terrarium_spawn (task required). Over 32 jobs requires an explicit concurrency bound.", items: { type: "object", properties: { task: { type: "string" }, agent: { type: "string" }, model: { type: "string" }, readOnly: { type: "boolean" }, ephemeral: { type: "boolean" }, profile: { type: "string", enum: ["default", "minimal"] }, cwd: { type: "string" }, channel: { type: "string" }, workflowId: { type: "string" }, sessionId: { type: "string" }, isolation: { type: "string", enum: ["none", "copy", "worktree"] }, keepWorkspace: { type: "boolean" }, timeoutMs: { type: "number" }, needsAttentionAfterMs: { type: "number" }, startupWatchdogMs: { type: "number", minimum: 0, maximum: 3600000 }, maxDepth: { type: "number" }, allowSpawn: { type: "boolean" }, statusScope: { type: "string", enum: ["self", "descendants", "all"] }, readScope: { type: "string", enum: ["self", "descendants", "all"] }, logPath: { type: "string" }, mreLogPath: { type: "string" } }, required: ["task"] } },
+        jobs: { type: "array", minItems: 1, maxItems: 256, description: "Job option objects, each accepting the same fields as terrarium_spawn (task required). Over 32 jobs requires an explicit concurrency bound.", items: { type: "object", properties: { task: { type: "string" }, agent: { type: "string" }, model: { type: "string" }, provider: { type: "string" }, readOnly: { type: "boolean" }, ephemeral: { type: "boolean" }, profile: { type: "string", enum: ["default", "minimal"] }, cwd: { type: "string" }, channel: { type: "string" }, workflowId: { type: "string" }, sessionId: { type: "string" }, isolation: { type: "string", enum: ["none", "copy", "worktree"] }, keepWorkspace: { type: "boolean" }, timeoutMs: { type: "number" }, needsAttentionAfterMs: { type: "number" }, startupWatchdogMs: { type: "number", minimum: 0, maximum: 3600000 }, maxDepth: { type: "number" }, allowSpawn: { type: "boolean" }, statusScope: { type: "string", enum: ["self", "descendants", "all"] }, readScope: { type: "string", enum: ["self", "descendants", "all"] }, logPath: { type: "string" }, mreLogPath: { type: "string" } }, required: ["task"] } },
         strategy: { type: "string", enum: BATCH_STRATEGIES, description: "Join strategy. Default: all." },
         quorum: { type: "number", description: "Required successes for the quorum strategy (1..jobs.length)." },
         concurrency: { type: "number", minimum: 1, description: "Max simultaneously active runs. Required when jobs.length > 32 (a missing bound is rejected at preflight with a suggested value). Default: launch all at once." },
@@ -181,7 +182,7 @@ function visibleTools(policy) {
     .map((tool) => (tool.schemaVersion ? tool : { ...tool, schemaVersion: MCP_SCHEMA_VERSION }));
 }
 
-const SPAWN_ARG_KEYS = new Set(["task", "agent", "model", "readOnly", "ephemeral", "profile", "cwd", "channel", "workflowId", "sessionId", "isolation", "keepWorkspace", "timeoutMs", "needsAttentionAfterMs", "startupWatchdogMs", "maxDepth", "allowSpawn", "statusScope", "readScope", "dryRun", "background", "logPath", "mreLogPath", "verbose"]);
+const SPAWN_ARG_KEYS = new Set(["task", "agent", "model", "provider", "readOnly", "ephemeral", "profile", "cwd", "channel", "workflowId", "sessionId", "isolation", "keepWorkspace", "timeoutMs", "needsAttentionAfterMs", "startupWatchdogMs", "maxDepth", "allowSpawn", "statusScope", "readScope", "dryRun", "background", "logPath", "mreLogPath", "verbose"]);
 function sanitizeSpawnArgs(args) {
   const out = {};
   for (const [key, value] of Object.entries(args)) if (SPAWN_ARG_KEYS.has(key)) out[key] = value;
@@ -225,6 +226,7 @@ export function conciseSpawn(full) {
     runId: full.runId,
     status: full.status,
     model: full.model,
+    provider: full.provider,
     background: full.background ? true : undefined,
     exitCode: full.exitCode,
     signal: full.signal,
@@ -252,6 +254,7 @@ export function conciseStatus(full) {
     runId: full.runId,
     status: full.status,
     model: full.model,
+    provider: full.provider,
     ok: full.ok,
     background: full.background ? true : undefined,
     alive: typeof full.alive === "boolean" ? full.alive : undefined,
@@ -282,6 +285,7 @@ export function conciseListing(full) {
       runId: r.runId,
       status: r.status,
       model: r.model,
+      provider: r.provider,
       ok: r.ok,
       background: r.background ? true : undefined,
       alive: typeof r.alive === "boolean" ? r.alive : undefined,

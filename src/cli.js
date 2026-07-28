@@ -83,6 +83,7 @@ Options:
                      Explicit --agent overrides --read-only.
   --model <id>       Pin the child model. Supported for opencode run and pi agents.
                      Default: $TERRARIUM_MODEL, config.defaultModel, or runner default.
+  --provider <id>    Pin the Pi provider for --model. Default: configured Pi provider.
   --read-only        Use config.readOnlyAgent, $TERRARIUM_READ_ONLY_AGENT, or
                      the legacy opencode explore preset. Good for read-only digs.
   --profile <name>   Child prompt profile: default or minimal. Default: default.
@@ -126,6 +127,7 @@ function parse(argv) {
     else if (a === "--profile") out.profile = argv[++i];
     else if (a === "--agent") out.agent = argv[++i];
     else if (a === "--model") out.model = argv[++i];
+    else if (a === "--provider") out.provider = argv[++i];
     else if (a === "--image") out.image = argv[++i];
     else if (a === "--cwd") out.cwd = argv[++i];
     else if (a === "--timeout-ms") out.timeoutMs = Number(argv[++i]);
@@ -169,7 +171,7 @@ else if (cmd === "status" && rest[0]?.startsWith("ter_")) getRunStatus({ runId: 
 else if (cmd === "status") listRuns({ limit: Number(rest[0] || 20) }).then((r) => console.log(opts.json ? JSON.stringify(r, null, 2) : formatRunList(r)));
 else if (cmd === "read") readRun({ runId: rest[0], tailBytes: Number(rest[1] === "mre" ? rest[2] || 20000 : rest[1] || 20000), kind: rest[1] === "mre" ? "mre" : "terrarium" }).then((r) => console.log(r.text));
 else if (cmd === "cancel") cancelRun({ runId: rest[0] }).then((r) => console.log(JSON.stringify(r, null, 2))).catch((e) => { console.error(`terrarium: ${e.message}`); process.exit(1); });
-else if (cmd === "batch") spawnBatch({ jobs: rest.map((task) => ({ task, agent: opts.agent, model: opts.model, profile: opts.profile, cwd: opts.cwd, isolation: opts.isolation, timeoutMs: opts.timeoutMs, requireTaskContract: true })), strategy: opts.strategy || "all", quorum: opts.quorum, concurrency: opts.concurrency, pollMs: opts.pollMs, timeoutMs: opts.batchTimeoutMs, cleanupTimeoutMs: opts.cleanupTimeoutMs }).then((r) => { console.log(JSON.stringify(r, null, 2)); process.exit(r.ok ? 0 : 1); }).catch((e) => { console.error(`terrarium: ${e.message}`); process.exit(1); });
+else if (cmd === "batch") spawnBatch({ jobs: rest.map((task) => ({ task, agent: opts.agent, model: opts.model, provider: opts.provider, profile: opts.profile, cwd: opts.cwd, isolation: opts.isolation, timeoutMs: opts.timeoutMs, requireTaskContract: true })), strategy: opts.strategy || "all", quorum: opts.quorum, concurrency: opts.concurrency, pollMs: opts.pollMs, timeoutMs: opts.batchTimeoutMs, cleanupTimeoutMs: opts.cleanupTimeoutMs }).then((r) => { console.log(JSON.stringify(r, null, 2)); process.exit(r.ok ? 0 : 1); }).catch((e) => { console.error(`terrarium: ${e.message}`); process.exit(1); });
 else if (cmd === "group" && rest[0] === "create") createRunGroup({ label: rest[1], runIds: rest.slice(2) }).then((r) => console.log(JSON.stringify(r, null, 2))).catch((e) => { console.error(`terrarium: ${e.message}`); process.exit(1); });
 else if (cmd === "group" && rest[0] === "status") getRunGroupStatus({ groupId: rest[1], verbose: opts.verbose }).then((r) => console.log(JSON.stringify(r, null, 2))).catch((e) => { console.error(`terrarium: ${e.message}`); process.exit(1); });
 else if (cmd === "group" && rest[0] === "read") readRunGroupLogs({ groupId: rest[1] }).then((r) => console.log(JSON.stringify(r, null, 2))).catch((e) => { console.error(`terrarium: ${e.message}`); process.exit(1); });
