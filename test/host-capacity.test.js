@@ -59,7 +59,9 @@ test("reapOrphanedPi refuses a candidate in its own ancestor chain", async () =>
 
   assert.equal(result.ok, false);
   assert.deepEqual(result.reaped, []);
-  assert.deepEqual(result.skipped, [{ pid: 300, tty: "ttys009", reason: "own-ancestor" }]);
+  assert.deepEqual(result.refusedAncestor, [{ pid: 300, tty: "ttys009", pcpu: 99, etime: "3-18:00" }]);
+  assert.deepEqual(result.skippedLiveSurface, []);
+  assert.deepEqual(result.skippedActive, []);
   assert.deepEqual(signals, []);
 });
 
@@ -83,7 +85,54 @@ test("reapOrphanedPi skips a tty that tmux reports as live", async () => {
 
   assert.equal(result.ok, true);
   assert.deepEqual(result.reaped, []);
-  assert.deepEqual(result.skipped, []);
+  assert.deepEqual(result.refusedAncestor, []);
+  assert.deepEqual(result.skippedLiveSurface, [{ pid: 900, tty: "ttys009", pcpu: 99, etime: "3-18:00" }]);
+  assert.deepEqual(result.skippedActive, []);
+  assert.deepEqual(signals, []);
+});
+
+test("reapOrphanedPi reaps a confirmed pane-leaked idle process", async () => {
+  const signals = [];
+  const waits = [];
+  const run = async (command, args) => {
+    if (command === "cmux") return { code: 0, stdout: 'surface:1 tty=ttys001\n' };
+    if (command === "tmux") return { code: 1, stdout: "" };
+    if (command !== "ps") return { code: 127, stdout: "" };
+    if (args.includes("ppid=")) return { code: 0, stdout: "1\n" };
+    if (args.includes("pid=,tty=,pcpu=,etime=,comm=")) return { code: 0, stdout: "900 ttys009 0.0 3-18:00 pi\n" };
+    return { code: 127, stdout: "" };
+  };
+  const kill = (pid, signal) => signals.push({ pid, signal });
+
+  const result = await reapOrphanedPi({ processId: 400, run, kill, sleep: async (ms) => waits.push(ms) });
+
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.reaped, [{ pid: 900, tty: "ttys009", signal: "SIGKILL" }]);
+  assert.deepEqual(result.refusedAncestor, []);
+  assert.deepEqual(result.skippedLiveSurface, []);
+  assert.deepEqual(result.skippedActive, []);
+  assert.deepEqual(waits, [2000]);
+  assert.deepEqual(signals, [{ pid: 900, signal: "SIGTERM" }, { pid: 900, signal: 0 }, { pid: 900, signal: "SIGKILL" }]);
+});
+
+test("reapOrphanedPi leaves active pane-leaked processes alone", async () => {
+  const signals = [];
+  const run = async (command, args) => {
+    if (command === "cmux") return { code: 0, stdout: 'surface:1 tty=ttys001\n' };
+    if (command === "tmux") return { code: 1, stdout: "" };
+    if (command !== "ps") return { code: 127, stdout: "" };
+    if (args.includes("ppid=")) return { code: 0, stdout: "1\n" };
+    if (args.includes("pid=,tty=,pcpu=,etime=,comm=")) return { code: 0, stdout: "900 ttys009 1.0 3-18:00 pi\n" };
+    return { code: 127, stdout: "" };
+  };
+
+  const result = await reapOrphanedPi({ processId: 400, run, kill: (pid, signal) => signals.push({ pid, signal }), sleep: async () => {} });
+
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.reaped, []);
+  assert.deepEqual(result.refusedAncestor, []);
+  assert.deepEqual(result.skippedLiveSurface, []);
+  assert.deepEqual(result.skippedActive, [{ pid: 900, tty: "ttys009", pcpu: 1, etime: "3-18:00" }]);
   assert.deepEqual(signals, []);
 });
 

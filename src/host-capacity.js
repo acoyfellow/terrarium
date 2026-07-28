@@ -97,8 +97,16 @@ function normTty(tty) {
   return tty;
 }
 
+function isLiveSurface(processInfo, cmuxTtys, tmuxTtys) {
+  return Boolean(processInfo.tty) && (cmuxTtys?.has(processInfo.tty) || tmuxTtys.has(processInfo.tty));
+}
+
 function isPaneLeaked(processInfo, cmuxTtys, tmuxTtys) {
-  return cmuxTtys !== null && Boolean(processInfo.tty) && !cmuxTtys.has(processInfo.tty) && !tmuxTtys.has(processInfo.tty);
+  return cmuxTtys !== null && Boolean(processInfo.tty) && !isLiveSurface(processInfo, cmuxTtys, tmuxTtys);
+}
+
+function isIdlePiProcess(processInfo) {
+  return processInfo.pcpu === 0;
 }
 
 async function currentPiProcess(pid, timeoutMs, run) {
@@ -119,6 +127,7 @@ async function ancestorPids(processId, timeoutMs, run) {
     if (!Number.isInteger(parent) || parent < 1 || parent === current) return { ancestors, complete: false };
     current = parent;
   }
+  if (current === 1) ancestors.add(current);
   return { ancestors, complete: current === 1 };
 }
 
@@ -135,15 +144,16 @@ function wait(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function emptyReapReport() {
+  return { reaped: [], refusedAncestor: [], skippedLiveSurface: [], skippedActive: [] };
+}
+
 export async function reapOrphanedPi({ timeoutMs = 3000, processId = process.pid, run = spawnCapture, kill = process.kill, sleep = wait } = {}) {
+  const report = emptyReapReport();
   const ancestry = await ancestorPids(processId, timeoutMs, run);
   if (!ancestry.complete) {
-    return {
-      ok: false,
-      reaped: [],
-      skipped: [{ reason: "ancestor-chain-unavailable" }],
-      ancestorPids: [...ancestry.ancestors],
-    };
+    report.refusedAncestor.push({ pid: null, reason: "ancestor-chain-unavailable" });
+    return { ok: false, ...report };
   }
 
   const [cmuxTtys, tmuxTtys, piProcesses] = await Promise.all([
@@ -151,13 +161,19 @@ export async function reapOrphanedPi({ timeoutMs = 3000, processId = process.pid
     liveTmuxTtys(timeoutMs, run),
     listPiProcesses(timeoutMs, run),
   ]);
-  const reaped = [];
-  const skipped = [];
 
   for (const candidate of piProcesses) {
-    if (!isPaneLeaked(candidate, cmuxTtys, tmuxTtys)) continue;
     if (ancestry.ancestors.has(candidate.pid)) {
-      skipped.push({ pid: candidate.pid, tty: candidate.tty, reason: "own-ancestor" });
+      report.refusedAncestor.push(candidate);
+      continue;
+    }
+    if (isLiveSurface(candidate, cmuxTtys, tmuxTtys)) {
+      report.skippedLiveSurface.push(candidate);
+      continue;
+    }
+    if (!isPaneLeaked(candidate, cmuxTtys, tmuxTtys)) continue;
+    if (!isIdlePiProcess(candidate)) {
+      report.skippedActive.push(candidate);
       continue;
     }
 
@@ -166,36 +182,25 @@ export async function reapOrphanedPi({ timeoutMs = 3000, processId = process.pid
       liveCmuxTtys(timeoutMs, run),
       liveTmuxTtys(timeoutMs, run),
     ]);
-    if (!current || !isPaneLeaked(current, currentCmuxTtys, currentTmuxTtys)) {
-      skipped.push({ pid: candidate.pid, tty: candidate.tty, reason: "no-longer-pane-leaked" });
+    if (!current) continue;
+    if (isLiveSurface(current, currentCmuxTtys, currentTmuxTtys)) {
+      report.skippedLiveSurface.push(current);
+      continue;
+    }
+    if (!isPaneLeaked(current, currentCmuxTtys, currentTmuxTtys)) continue;
+    if (!isIdlePiProcess(current)) {
+      report.skippedActive.push(current);
       continue;
     }
 
-    try {
-      kill(candidate.pid, "SIGTERM");
-    } catch {
-      skipped.push({ pid: candidate.pid, tty: candidate.tty, reason: "sigterm-failed" });
-      continue;
-    }
+    kill(current.pid, "SIGTERM");
     await sleep(2000);
-    const killed = processAlive(candidate.pid, kill);
-    if (killed) {
-      try {
-        kill(candidate.pid, "SIGKILL");
-      } catch {
-        skipped.push({ pid: candidate.pid, tty: candidate.tty, reason: "sigkill-failed" });
-        continue;
-      }
-    }
-    reaped.push({ pid: candidate.pid, tty: candidate.tty, signal: killed ? "SIGKILL" : "SIGTERM" });
+    const stillAlive = processAlive(current.pid, kill);
+    if (stillAlive) kill(current.pid, "SIGKILL");
+    report.reaped.push({ pid: current.pid, tty: current.tty, signal: stillAlive ? "SIGKILL" : "SIGTERM" });
   }
 
-  return {
-    ok: skipped.length === 0,
-    reaped,
-    skipped,
-    ancestorPids: [...ancestry.ancestors],
-  };
+  return { ok: report.refusedAncestor.length === 0, ...report };
 }
 
 export async function detectHostCapacity({ timeoutMs = 3000, run = spawnCapture } = {}) {
