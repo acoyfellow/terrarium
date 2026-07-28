@@ -2,6 +2,10 @@
 
 Dated, factual record of what shipped or got fixed. Newest first. Not a full commit log.
 
+## 2026-07-28
+
+- Added a model fallback ladder to `terrarium_spawn`. A foreground `modelStrategy` (`low-to-high`, `high-to-low`, or `custom` with an ordered model array) advances to the next model when a task returns a retryable contract failure (a missing, malformed, or mismatched receipt with exit code zero), instead of retrying the same flaky model. It composes with `maxRetries` and stops at once on a non-zero exit. The response records `ladderPath` and `attemptRunIds`. Background and nested runs reject it.
+
 ## 2026-07-26
 
 - Reviewed public docs and website copy against ASD-STE100 Simplified Technical English. Removed decorative em-dash drama, "not X - it's Y" reframes, rule-of-three cadence, metaphor-as-evidence, and Unicode arrows. Kept definitional em-dashes.
