@@ -130,7 +130,9 @@ export function resolveAgent({ agent, readOnly } = {}, { env = process.env, conf
 export function childPrompt(task, opts = {}) {
   const { depth, maxDepth, runId, parentRunId, profile, allowSpawn = true, taskContract } = opts;
   const resolved = resolvePromptProfile(profile);
-  const contract = taskContract ? `\nYour final output MUST include exactly one line:\nTERRARIUM_RESULT=${JSON.stringify({ runId: taskContract.runId, taskFingerprint: taskContract.taskFingerprint, nonce: taskContract.nonce, summary: "brief task-specific result" })}` : "";
+  const contractLine = taskContract ? `TERRARIUM_RESULT=${JSON.stringify({ runId: taskContract.runId, taskFingerprint: taskContract.taskFingerprint, nonce: taskContract.nonce, summary: "brief task-specific result" })}` : "";
+  const contract = taskContract ? `\nYour final output MUST include exactly one line:\n${contractLine}` : "";
+  const contractReminder = taskContract ? `\n\nFinish by emitting the TERRARIUM_RESULT= line above as your last line.` : "";
   if (resolved === "minimal") {
     return `Terrarium child. Single bounded task. Do not spawn subagents.\n${allowSpawn ? "One explicit Terrarium child call is available only if the task requires it." : "Terrarium recursion is disabled; do not call Terrarium tools."}
 
@@ -138,7 +140,7 @@ Do the assigned task directly. Do not inspect unrelated Terrarium runs, callback
 Reply with: Summary, Changed files, Verification.${contract}
 
 Task:
-${task}`;
+${task}${contractReminder}`;
   }
   return `You are a Terrarium child agent.
 
@@ -158,7 +160,7 @@ Verification:
 Follow-ups:${contract}
 
 Task:
-${task}`;
+${task}${contractReminder}`;
 }
 
 export async function loadConfig() {
