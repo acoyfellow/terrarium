@@ -275,6 +275,32 @@ async function writeMetadata(meta) {
   await rename(temp, target);
 }
 
+export async function recordCloudAdmission({ runId, channel = null, workflowId = null, task = "", model = null, contract = null, executionRef = null, background = false } = {}) {
+  assertRunId(runId);
+  if (existsSync(metadataPath(runId))) return { runId, persisted: false };
+  const startedAt = new Date().toISOString();
+  await writeMetadata({
+    runId,
+    parentRunId: process.env.TERRARIUM_RUN_ID || null,
+    version: VERSION,
+    cloud: true,
+    status: "running",
+    background,
+    progressText: "admitted",
+    startedAt,
+    lastActivityAt: startedAt,
+    channel,
+    workflowId,
+    task,
+    model,
+    executionRef,
+    taskFingerprint: contract?.taskFingerprint ?? taskFingerprint(task),
+    taskContractStatus: "pending",
+    taskContract: contract ?? null,
+  });
+  return { runId, persisted: true };
+}
+
 function buildRun(opts, config) {
   const runId = assertRunId(opts.runId || makeRunId());
   const inheritedParent = process.env.TERRARIUM_RUN_ID || null;
