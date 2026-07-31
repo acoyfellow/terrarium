@@ -4,6 +4,7 @@ Dated, factual record of what shipped or got fixed. Newest first. Not a full com
 
 ## 2026-07-28
 
+- Fixed a cloud spawn that could time out without returning a run ID. The durable accept-receipt existed only on the local path while cloud was the default backend, so an MCP transport timeout left no record under `~/.terrarium/runs`: no status, no logs, no cancel, no callback recovery, and no deduped failure report. A cloud run is now persisted at admission, before polling, and batch jobs inherit it.
 - Seeded the model ladder with four cost-tiered rungs on the pinned provider (`gemini-2.5-flash-lite`, `claude-haiku-4-5`, `gpt-5.6-terra`, `claude-sonnet-4-5`), so a ladder has real models to climb. Override the catalog with `spawnModelCatalog` in `~/.terrarium/config.json`.
 - Fixed a child that finished its work but emitted no receipt. A long task pushed the `TERRARIUM_RESULT=` contract far from where the model stops generating, so the run was reported as receipt-absent even though the commits landed. The child prompt now closes with the receipt requirement.
 - Fixed the last flaky test in the suite. The local-batch routing test launched a real agent and hit a 15-second kill; it now pins an immediately-exiting agent. The full suite is deterministic at 778 tests.
