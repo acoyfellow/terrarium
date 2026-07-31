@@ -25,6 +25,7 @@ import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import { randomUUID } from "node:crypto";
 import { decide, validateBatchShape, BATCH_STRATEGIES } from "./batch.js";
+import { recordCloudAdmission } from "./core.js";
 import { cloudboxEnabled, cloudboxRun } from "./cloudbox-client.js";
 
 // Read ~/.terrarium/config.json (or $TERRARIUM_HOME/config.json) synchronously.
@@ -137,6 +138,16 @@ export async function cloudSpawn(args = {}, { env = process.env, pollMs = 4000, 
   const runId = submit.json.runId;
   const contract = submit.json.contract;
   const executionRef = submit.json.executionRef;
+  await recordCloudAdmission({
+    runId,
+    channel: args.channel ?? null,
+    workflowId: args.workflowId ?? null,
+    task,
+    model: args.model ?? null,
+    contract,
+    executionRef,
+    background: Boolean(args.background),
+  }).catch(() => {});
 
   // Background: return the accepted runId immediately; caller polls status/pulls callback.
   if (args.background) {
