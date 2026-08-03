@@ -275,6 +275,20 @@ async function writeMetadata(meta) {
   await rename(temp, target);
 }
 
+const MAX_PROOF_OUTPUT_BYTES = 4 * 1024;
+const DEFAULT_PROOF_TIMEOUT_MS = 120_000;
+
+export async function runTaskProof(proof, { cwd, timeoutMs = DEFAULT_PROOF_TIMEOUT_MS } = {}) {
+  if (proof == null) return { status: "not-required" };
+  if (typeof proof !== "string" || !proof.trim()) return { status: "invalid", reason: "proof must be a non-empty shell command" };
+  const command = proof.trim();
+  const result = await spawnCapture("/bin/sh", ["-c", command], { cwd, timeoutMs });
+  const output = `${result.stdout ?? ""}${result.stderr ?? ""}`.slice(-MAX_PROOF_OUTPUT_BYTES);
+  if (result.timedOut) return { status: "timeout", command, exitCode: result.code, output };
+  if (result.code !== 0) return { status: "failed", command, exitCode: result.code, output };
+  return { status: "proved", command, exitCode: 0, output };
+}
+
 export function findUnisolatedCoWriters({ runs = [], cwd, isolation = "none", readOnly = false } = {}) {
   if (readOnly || isolation !== "none" || !cwd) return [];
   return runs
@@ -363,6 +377,7 @@ function buildRun(opts, config) {
   const readScope = inheritedReadScope ? accessScope(inheritedReadScope, "self") : requestedReadScope;
   const requireTaskContract = Boolean(opts.requireTaskContract ?? config.requireTaskContract ?? false);
   const taskContract = requireTaskContract ? { runId, taskFingerprint: taskFingerprint(task), nonce: randomUUID() } : null;
+  const taskProof = typeof opts.taskProof === "string" && opts.taskProof.trim() ? opts.taskProof.trim() : null;
   const needsAttentionAfterMs = Number(opts.needsAttentionAfterMs ?? config.needsAttentionAfterMs ?? 60000);
   if (!Number.isFinite(needsAttentionAfterMs) || needsAttentionAfterMs < 5000 || needsAttentionAfterMs > 3600000) throw new Error("needsAttentionAfterMs must be between 5000 and 3600000");
   // pi -p buffers its first stdout until task completion. Five minutes leaves room for
@@ -373,7 +388,7 @@ function buildRun(opts, config) {
   const channel = correlationValue(opts.channel ?? process.env.TERRARIUM_EVENT_CHANNEL ?? callerChannel, "channel");
   const workflowId = correlationValue(opts.workflowId ?? parentRunId ?? runId, "workflow id");
   const sessionId = correlationValue(opts.sessionId ?? process.env.TERRARIUM_SESSION_ID ?? null, "session id");
-  return { runId, parentRunId, depth, maxDepth, agent, model, provider, modelResolution, profile, readOnly, timeoutMs, task, dryRun, cwd, originalCwd: cwd, stream, logPath, mreLogPath, isolation, keepWorkspace, callerSpawnAllowed, allowSpawn, statusScope, readScope, requireTaskContract, taskContract, needsAttentionAfterMs, startupWatchdogMs, channel, workflowId, sessionId };
+  return { runId, parentRunId, depth, maxDepth, agent, model, provider, modelResolution, profile, readOnly, timeoutMs, task, dryRun, cwd, originalCwd: cwd, stream, logPath, mreLogPath, isolation, keepWorkspace, callerSpawnAllowed, allowSpawn, statusScope, readScope, requireTaskContract, taskContract, taskProof, needsAttentionAfterMs, startupWatchdogMs, channel, workflowId, sessionId };
 }
 
 async function workspaceExcludes() {
@@ -537,7 +552,7 @@ async function prepareRun(opts = {}) {
   run.logPath ??= await defaultLogPath(run.runId);
   run.mreLogPath ??= await defaultMreLogPath(run.runId);
   const startedAt = new Date().toISOString();
-  const base = { runId: run.runId, parentRunId: run.parentRunId, depth: run.depth, maxDepth: run.maxDepth, version: VERSION, agent: run.agent, model: run.model, provider: run.provider, modelCredentialSource: run.modelCredentialSource ?? null, profile: run.profile, readOnly: run.readOnly, task: run.task, cwd: run.cwd, originalCwd: run.originalCwd, isolation: run.isolation, workspace, logPath: run.logPath, mreLogPath: run.mreLogPath, startedAt, lastActivityAt: startedAt, progressText: "started", needsAttentionAfterMs: run.needsAttentionAfterMs, status: "running", git: await gitInfo(run.cwd), allowSpawn: run.allowSpawn, statusScope: run.statusScope, readScope: run.readScope, channel: run.channel, workflowId: run.workflowId, sessionId: run.sessionId, taskFingerprint: run.taskContract?.taskFingerprint ?? taskFingerprint(run.task), taskContractStatus: run.requireTaskContract ? "pending" : "not-required", taskContract: run.taskContract };
+  const base = { runId: run.runId, parentRunId: run.parentRunId, depth: run.depth, maxDepth: run.maxDepth, version: VERSION, agent: run.agent, model: run.model, provider: run.provider, modelCredentialSource: run.modelCredentialSource ?? null, profile: run.profile, readOnly: run.readOnly, task: run.task, cwd: run.cwd, originalCwd: run.originalCwd, isolation: run.isolation, workspace, logPath: run.logPath, mreLogPath: run.mreLogPath, startedAt, lastActivityAt: startedAt, progressText: "started", needsAttentionAfterMs: run.needsAttentionAfterMs, status: "running", git: await gitInfo(run.cwd), allowSpawn: run.allowSpawn, statusScope: run.statusScope, readScope: run.readScope, channel: run.channel, workflowId: run.workflowId, sessionId: run.sessionId, taskFingerprint: run.taskContract?.taskFingerprint ?? taskFingerprint(run.task), taskContractStatus: run.requireTaskContract ? "pending" : "not-required", taskContract: run.taskContract, taskProof: run.taskProof ?? null };
   let claimPath = null;
   try {
     claimPath = await claimChildSlot(run);
@@ -665,6 +680,20 @@ async function persistFinishedRun(base, patch) {
     result.taskContractStatus = contract.status;
     if (contract.summary) result.taskResultSummary = contract.summary;
     if (contract.status !== "verified") result = { ...result, ok: false, status: result.exitCode === 0 ? "inconclusive" : result.status, note: `Task contract ${contract.status}; process exit is not accepted as task success.` };
+    else if (base.taskProof != null) {
+      const proof = await runTaskProof(base.taskProof, { cwd: base.originalCwd ?? base.cwd });
+      result.taskProofStatus = proof.status;
+      result.taskProof = { command: proof.command ?? null, exitCode: proof.exitCode ?? null, output: proof.output ?? null };
+      if (proof.status !== "proved") {
+        result = {
+          ...result,
+          ok: false,
+          status: "inconclusive",
+          taskContractStatus: "unproven",
+          note: `The child reported success, but the operator proof command ${proof.status}. A self-reported receipt is a claim; the proof is the evidence.`,
+        };
+      }
+    }
   }
   delete result.contractOutput;
   delete result.taskContract;

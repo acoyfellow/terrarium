@@ -30,6 +30,7 @@ const tools = [
         workflowId: { type: "string", description: "Optional external workflow correlation ID." },
         sessionId: { type: "string", description: "Optional parent session correlation ID." },
         isolation: { type: "string", enum: ["none", "copy", "worktree"], description: "Workspace separation mode. This is not a security sandbox. Default: none." },
+        taskProof: { type: "string", description: "Shell command that Terrarium runs ITSELF after the child exits, in the run's cwd. Exit 0 proves the work; any other exit marks the run inconclusive with taskContractStatus 'unproven'. The child never runs this and cannot forge it, so a fabricated TERRARIUM_RESULT receipt no longer passes. Use an external fact: an API lookup for a merge request, 'git cat-file -e <sha>', or the project's test command." },
         keepWorkspace: { type: "boolean", description: "Retain an isolated copy/worktree for inspection instead of cleaning it up." },
         timeoutMs: { type: "number", description: "Kill the child after this many milliseconds. Default: none." },
         needsAttentionAfterMs: { type: "number", minimum: 5000, maximum: 3600000, description: "Mark a running child needs-attention after this much time without observed output. Default: 60000." },
@@ -184,7 +185,7 @@ function visibleTools(policy) {
     .map((tool) => (tool.schemaVersion ? tool : { ...tool, schemaVersion: MCP_SCHEMA_VERSION }));
 }
 
-const SPAWN_ARG_KEYS = new Set(["task", "agent", "model", "provider", "readOnly", "ephemeral", "profile", "cwd", "channel", "workflowId", "sessionId", "isolation", "keepWorkspace", "timeoutMs", "needsAttentionAfterMs", "startupWatchdogMs", "maxDepth", "allowSpawn", "statusScope", "readScope", "dryRun", "background", "logPath", "mreLogPath", "modelStrategy", "verbose"]);
+const SPAWN_ARG_KEYS = new Set(["task", "agent", "model", "provider", "readOnly", "ephemeral", "profile", "cwd", "channel", "workflowId", "sessionId", "isolation", "keepWorkspace", "timeoutMs", "needsAttentionAfterMs", "startupWatchdogMs", "maxDepth", "allowSpawn", "statusScope", "readScope", "dryRun", "background", "logPath", "mreLogPath", "modelStrategy", "taskProof", "verbose"]);
 function sanitizeSpawnArgs(args) {
   const out = {};
   for (const [key, value] of Object.entries(args)) if (SPAWN_ARG_KEYS.has(key)) out[key] = value;
