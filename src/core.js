@@ -275,6 +275,15 @@ async function writeMetadata(meta) {
   await rename(temp, target);
 }
 
+export function findUnisolatedCoWriters({ runs = [], cwd, isolation = "none", readOnly = false } = {}) {
+  if (readOnly || isolation !== "none" || !cwd) return [];
+  return runs
+    .filter((run) => run.status === "running" && run.alive !== false)
+    .filter((run) => (run.isolation ?? "none") === "none" && !run.readOnly)
+    .filter((run) => (run.cwd ?? run.originalCwd) === cwd)
+    .map((run) => run.runId);
+}
+
 export async function recordCloudAdmission({ runId, channel = null, workflowId = null, task = "", model = null, contract = null, executionRef = null, background = false } = {}) {
   assertRunId(runId);
   if (existsSync(metadataPath(runId))) return { runId, persisted: false };

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { createInterface } from "node:readline";
-import { cancelRun, ensureTerminalCallback, getRunStatus, isRunAccessible, listRuns, loadConfig, pruneStaleChildClaims, readRun, runTerrarium, spawnTerrariumBackground, VERSION } from "./core.js";
+import { cancelRun, ensureTerminalCallback, findUnisolatedCoWriters, getRunStatus, isRunAccessible, listRuns, loadConfig, pruneStaleChildClaims, readRun, runTerrarium, spawnTerrariumBackground, VERSION } from "./core.js";
 import { detectHostCapacity } from "./host-capacity.js";
 import { cloudSpawn, cloudSpawnBatch, cloudEnabled, cloudStatus, cloudList, cloudRead, cloudCancel, isCloudRunId, detectFilesystemDependency } from "./cloud-client.js";
 import { createRunGroup, getRunGroupStatus, readRunGroupLogs } from "./groups.js";
@@ -425,8 +425,27 @@ async function handle(msg) {
         }
         const safeArgs = sanitizeSpawnArgs({ ...args, background });
         const config = await loadConfig();
+        let coWriters = [];
+        try {
+          if (!args.dryRun) {
+            const listed = await listRuns({ limit: 200, requesterRunId: policy.requesterRunId, scope: policy.statusScope });
+            coWriters = findUnisolatedCoWriters({
+              runs: listed.runs ?? [],
+              cwd: safeArgs.cwd ?? process.cwd(),
+              isolation: safeArgs.isolation ?? "none",
+              readOnly: safeArgs.readOnly === true,
+            });
+          }
+        } catch { coWriters = []; }
         const result = background ? await spawnTerrariumBackground(safeArgs) : await runWithBoundedRetries(safeArgs, maxRetries, { config });
         const projected = verbose ? result : conciseSpawn(result);
+        if (coWriters.length) {
+          projected.concurrentWriterWarning = {
+            runIds: coWriters,
+            cwd: safeArgs.cwd ?? process.cwd(),
+            note: `${coWriters.length} live run(s) already write ${safeArgs.cwd ?? process.cwd()} with isolation "none". Concurrent writers can interleave edits to the same files, and file mtimes then cannot attribute a change to one run. Use isolation "copy" or "worktree", or wait for the listed runs to finish.`,
+          };
+        }
         // Non-blocking host-capacity preflight (incident 2026-07-24 ask #2): if the
         // host is CPU-starved or has leaked orphaned pi processes, a synchronous
         // spawn step can cross the MCP RPC deadline and lose the receipt. The spawn
