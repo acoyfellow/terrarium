@@ -203,6 +203,8 @@ A background supervisor uses `startupWatchdogMs` to terminate a child that produ
 - `terrarium_doctor` — read-only diagnostics (storage, runs, attention, callbacks, groups, stale claims). The CLI adds an opt-in `--repair` executor.
 - `terrarium_report_failure` — turn a caught terminal failure into a structured, deduped bug report. It fetches the run's status and log by run ID. It classifies the failure as one of receipt-mismatch, receipt-absent, receipt-malformed, agent-timeout, model-config, ca-trust, or poll-timeout. It adds a blame hint of `agent`, `backend`, or `image`. It redacts and excerpts the log. It files the report under `~/.terrarium/failure-reports`. Defect-level dedupe collapses N runs that fail the same way into one report with an occurrence count. It refuses a trusted success. Pass `markdown: true` for a paste-ready body.
 
+Do not put `-ne` (`--no-extensions`) in a child `agent` command when the model provider comes from a Pi extension. The flag disables extension discovery, so Pi no longer knows the provider and the child dies in about one second with `Unknown provider "<name>"`. `opencode.cloudflare.dev` is supplied by the `opencode-cloudflare` extension, so `pi -ne -p --provider opencode.cloudflare.dev` always fails. Use plain `pi -p --no-session`. Terrarium rejects this combination at preflight, before it claims a child slot.
+
 Terrarium does not auto-load its Pi host extension. It stays out of unrelated Pi sessions. A host may install [`src/pi-extension.js`](./src/pi-extension.js) on purpose. The extension adds a run widget and callback-triggered follow-ups. It scopes them to that session's runs only.
 
 ---

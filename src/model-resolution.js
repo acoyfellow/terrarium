@@ -117,8 +117,23 @@ function environmentCredential(provider, env) {
   return Boolean(name && typeof env[name] === "string" && env[name].trim());
 }
 
-export function preflightAgentModel(resolution, { env = process.env } = {}) {
+const EXTENSION_PROVIDED_PROVIDERS = new Set(["opencode.cloudflare.dev"]);
+const NO_EXTENSION_FLAGS = new Set(["-ne", "--no-extensions"]);
+
+export function extensionDiscoveryDisabled(agent) {
+  return String(agent || "").trim().split(/\s+/).some((part) => NO_EXTENSION_FLAGS.has(part));
+}
+
+export function preflightAgentModel(resolution, { env = process.env, agent = null } = {}) {
   if (resolution.runner !== "pi" || !resolution.model) return { ok: true, provider: resolution.provider, model: resolution.model, credentialSource: null };
+  if (agent && resolution.provider && EXTENSION_PROVIDED_PROVIDERS.has(resolution.provider) && extensionDiscoveryDisabled(agent)) {
+    return {
+      ok: false,
+      provider: resolution.provider,
+      model: resolution.model,
+      message: `model preflight failed: provider "${resolution.provider}" is registered by a Pi extension, but the agent disables extension discovery (-ne / --no-extensions). The child would die in about one second with 'Unknown provider "${resolution.provider}"'. Remove -ne from the agent command, or disable only the colliding extension.`,
+    };
+  }
   if (!resolution.provider) {
     return {
       ok: false,

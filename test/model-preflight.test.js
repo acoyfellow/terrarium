@@ -5,6 +5,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { preflightAgentModel } from "../src/model-resolution.js";
 
 const root = dirname(dirname(fileURLToPath(import.meta.url)));
 
@@ -87,4 +88,23 @@ test("CLI uses the configured Pi provider for gpt-5.6-terra and refuses a missin
     rmSync(authenticated.dir, { recursive: true, force: true });
     rmSync(unauthenticated.dir, { recursive: true, force: true });
   }
+});
+
+test("an extension-provided provider is rejected when the agent disables extension discovery", () => {
+  const resolution = { runner: "pi", model: "gpt-5.6-terra", provider: "opencode.cloudflare.dev" };
+  for (const flag of ["-ne", "--no-extensions"]) {
+    const verdict = preflightAgentModel(resolution, { agent: `pi ${flag} -p --no-session` });
+    assert.equal(verdict.ok, false);
+    assert.match(verdict.message, /registered by a Pi extension/);
+  }
+});
+
+test("the same provider passes when extension discovery stays enabled", () => {
+  const resolution = { runner: "pi", model: "gpt-5.6-terra", provider: "opencode.cloudflare.dev" };
+  assert.equal(preflightAgentModel(resolution, { agent: "pi -p --no-session" }).ok, true);
+});
+
+test("a substring that merely contains -ne does not trip the guard", () => {
+  const resolution = { runner: "pi", model: "gpt-5.6-terra", provider: "opencode.cloudflare.dev" };
+  assert.equal(preflightAgentModel(resolution, { agent: "pi -p --session-name my-ne-run" }).ok, true);
 });
