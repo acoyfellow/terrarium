@@ -519,7 +519,7 @@ async function prepareRun(opts = {}) {
   // All non-mutating validation must happen before a child slot is claimed.
   if (!run.task) throw new Error("missing task");
   if (!run.dryRun) {
-    const preflight = preflightAgentModel(run.modelResolution, { env: process.env });
+    const preflight = preflightAgentModel(run.modelResolution, { env: process.env, agent: run.agent });
     if (!preflight.ok) throw new Error(preflight.message);
     run.modelCredentialSource = preflight.credentialSource;
   }
