@@ -2,6 +2,12 @@
 
 Dated, factual record of what shipped or got fixed. Newest first. Not a full commit log.
 
+## 2026-08-07
+
+- Added `taskProof` to `terrarium_spawn`. A task receipt only ever proved that the child echoed back the run ID, fingerprint, and nonce it was given, plus any non-empty summary. Every field is self-reported, so a child that invented its whole output and echoed the nonce was recorded as `verified`, and `terrarium_report_failure` then refused to file a report because the run looked like a trusted success. In one session three of twelve children fabricated their output and all three passed. `taskProof` is a shell command that Terrarium runs itself, in the run's cwd, after the child exits. The child never executes it and cannot forge its exit code. A non-zero exit downgrades the run to `inconclusive` with `taskContractStatus: "unproven"`. Proof output is captured, bounded, and time-limited. Runs without a proof are unchanged.
+- Added a concurrent-writer warning to `terrarium_spawn`. A session ran 65 children in one shared cwd with `isolation: "none"` and 67 pairs overlapped in time; two writers editing the same files made mtime and hash forensics blame the wrong run. A spawn that joins a live unisolated writer in the same cwd now returns `concurrentWriterWarning` naming the colliding runs. Advisory only: isolated and read-only spawns are never warned, and detection failure never blocks a spawn.
+- Fixed a child that died about one second after launch with `Unknown provider`. `opencode.cloudflare.dev` is registered by a Pi extension, so an agent command containing `-ne` (`--no-extensions`) removed the provider Pi was told to use. Terrarium now rejects that combination at preflight, before it claims a child slot.
+
 ## 2026-07-28
 
 - Fixed a cloud spawn that could time out without returning a run ID. The durable accept-receipt existed only on the local path while cloud was the default backend, so an MCP transport timeout left no record under `~/.terrarium/runs`: no status, no logs, no cancel, no callback recovery, and no deduped failure report. A cloud run is now persisted at admission, before polling, and batch jobs inherit it.
