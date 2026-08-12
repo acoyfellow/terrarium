@@ -2,6 +2,10 @@
 
 Dated, factual record of what shipped or got fixed. Newest first. Not a full commit log.
 
+## 2026-08-11
+
+- Added a limited Effect 4 migration. The bundled `terrarium-effect@1.0.0` package, on `effect@4.0.0-beta.107`, handles cloud foreground spawn, background admission, and cloud batch orchestration. Local execution and cloud status, read, and single-run cancel remain on the existing JavaScript paths. The root `effect@^3.21.3` dependency remains. This records a limited implementation scope, not a full migration or production proof.
+
 ## 2026-08-07
 
 - Added `taskProof` to `terrarium_spawn`. A task receipt only ever proved that the child echoed back the run ID, fingerprint, and nonce it was given, plus any non-empty summary. Every field is self-reported, so a child that invented its whole output and echoed the nonce was recorded as `verified`, and `terrarium_report_failure` then refused to file a report because the run looked like a trusted success. In one session three of twelve children fabricated their output and all three passed. `taskProof` is a shell command that Terrarium runs itself, in the run's cwd, after the child exits. The child never executes it and cannot forge its exit code. A non-zero exit downgrades the run to `inconclusive` with `taskContractStatus: "unproven"`. Proof output is captured, bounded, and time-limited. Runs without a proof are unchanged.

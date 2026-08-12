@@ -40,6 +40,10 @@ With that set, a spawn runs in the cloud and comes back `done` + `verified` with
 
 `terrarium.coey.dev` is the maintainer's reference deployment. It is not a shared backend. You deploy your own with `wrangler deploy` and point `TERRARIUM_URL` at it.
 
+### Limited Effect 4 migration
+
+The bundled `terrarium-effect@1.0.0` package, on `effect@4.0.0-beta.107`, handles cloud foreground spawn, background admission, and cloud batch orchestration. Local execution and cloud status, read, and single-run cancel remain on the existing JavaScript paths. The root `effect@^3.21.3` dependency remains. This is a limited migration, not a full Effect migration or production proof.
+
 ---
 
 ## Quick start
