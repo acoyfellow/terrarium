@@ -921,8 +921,14 @@ export async function materializePromptTransport(run, prompt) {
 }
 
 function childEnvironment(run, transport = null) {
+  const env = { ...process.env };
+  for (const key of Object.keys(env)) {
+    if (key === "CMUX_PI_HOOKS_DISABLED") continue;
+    if (key.startsWith("CMUX_")) delete env[key];
+  }
   return {
-    ...process.env,
+    ...env,
+    CMUX_PI_HOOKS_DISABLED: "1",
     TERRARIUM_RUN_ID: run.runId,
     TERRARIUM_PARENT_RUN_ID: run.parentRunId ?? "",
     TERRARIUM_DEPTH: String(run.depth),
