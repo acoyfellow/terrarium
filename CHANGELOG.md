@@ -2,6 +2,10 @@
 
 Dated, factual record of what shipped or got fixed. Newest first. Not a full commit log.
 
+## 2026-08-14
+
+- Fixed Terrarium children that stayed `running` with no model output after a parent cmux session-start hook failed. Child env now disables Pi cmux hooks and strips inherited `CMUX_*` targeting so a child cannot call the parent's pane.
+
 ## 2026-08-11
 
 - Added a limited Effect 4 migration. The bundled `terrarium-effect@1.0.0` package, on `effect@4.0.0-beta.107`, handles cloud foreground spawn, background admission, and cloud batch orchestration. Local execution and cloud status, read, and single-run cancel remain on the existing JavaScript paths. The root `effect@^3.21.3` dependency remains. This records a limited implementation scope, not a full migration or production proof.
