@@ -57,6 +57,11 @@ export function taskFingerprint(task) {
   return createHash("sha256").update(String(task)).digest("hex").slice(0, 24);
 }
 
+export function isStartupHandshake(text) {
+  const lines = String(text || "").split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  return lines.length > 0 && lines.every((line) => /^terrarium-pi:\s*runner started$/i.test(line));
+}
+
 export function classifyRunnerFailure({ agent, stdoutTail, stderrTail, error } = {}) {
   const parts = splitCommand(agent || "");
   const executable = basename(parts[0] || "");
@@ -1067,8 +1072,16 @@ export async function superviseTerrariumBackground({ run, parts, prompt, base, w
       await execute(step.decisions);
     };
     const timer = run.timeoutMs > 0 ? setTimeout(() => { void observe({ type: "DeadlineReached" }); }, run.timeoutMs) : null;
-    child.stdout.on("data", async (d) => { childOutputSeen = true; if (startupWatchdog) clearInterval(startupWatchdog); const s = String(d); stdout += s; await log(run.logPath, s); await progress(s); });
-    child.stderr.on("data", async (d) => { childOutputSeen = true; if (startupWatchdog) clearInterval(startupWatchdog); const s = String(d); stderr += s; await log(run.logPath, s); await progress(s); });
+    const noteChildOutput = (chunk) => {
+      const s = String(chunk);
+      if (!isStartupHandshake(s) && !isStartupHandshake(`${stdout}${stderr}${s}`)) {
+        childOutputSeen = true;
+        if (startupWatchdog) clearInterval(startupWatchdog);
+      }
+      return s;
+    };
+    child.stdout.on("data", async (d) => { const s = noteChildOutput(d); stdout += s; await log(run.logPath, s); await progress(s); });
+    child.stderr.on("data", async (d) => { const s = noteChildOutput(d); stderr += s; await log(run.logPath, s); await progress(s); });
     child.on("error", async (e) => {
       await log(run.logPath, `\nerror: ${e.message}\n`);
       const receipt = validateTaskContractOutput(stdout, base.taskContract);
