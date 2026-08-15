@@ -4,7 +4,7 @@ import { execFileSync, execSync } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
-import { applyModelToAgent, assertRunId, capturePatch, childPrompt, classifyRunnerFailure, defaultMreLogPath, finalizeWorkspace, getRunStatus, isPidAlive, materializePromptTransport, prepareWorkspace, PROMPT_ARG_MAX_BYTES, readRun, reconcileRun, resolveAgent, resolveModel, resolvePromptProfile, runTerrarium, spawnTerrariumBackground, splitCommand, validateTaskContractOutput, READ_ONLY_AGENT } from "../src/core.js";
+import { applyModelToAgent, assertRunId, capturePatch, childPrompt, classifyRunnerFailure, defaultMreLogPath, finalizeWorkspace, getRunStatus, isPidAlive, isStartupHandshake, materializePromptTransport, prepareWorkspace, PROMPT_ARG_MAX_BYTES, readRun, reconcileRun, resolveAgent, resolveModel, resolvePromptProfile, runTerrarium, spawnTerrariumBackground, splitCommand, validateTaskContractOutput, READ_ONLY_AGENT } from "../src/core.js";
 import { clearInheritedTerrariumEnv } from "./helpers/terrarium-env.js";
 
 clearInheritedTerrariumEnv();
@@ -455,6 +455,34 @@ test("background wedged-but-alive child is killed at the startup hard ceiling", 
     assert.equal(status.terminalCallback?.eventId, `evt_${started.runId}_Failed`);
     const log = await readRun({ runId: started.runId });
     assert.match(log.text, /startup-timeout/);
+  } finally {
+    if (prevWin === undefined) delete process.env.TERRARIUM_STARTUP_WATCHDOG_MS; else process.env.TERRARIUM_STARTUP_WATCHDOG_MS = prevWin;
+    if (prevCeil === undefined) delete process.env.TERRARIUM_STARTUP_HARD_CEILING_MS; else process.env.TERRARIUM_STARTUP_HARD_CEILING_MS = prevCeil;
+  }
+});
+
+test("isStartupHandshake treats only the runner-started banner as handshake", () => {
+  assert.equal(isStartupHandshake("terrarium-pi: runner started\n"), true);
+  assert.equal(isStartupHandshake("terrarium-pi: runner started\nworking\n"), false);
+  assert.equal(isStartupHandshake(""), false);
+});
+
+test("background banner-only child is still killed at the startup hard ceiling", async () => {
+  const prevWin = process.env.TERRARIUM_STARTUP_WATCHDOG_MS;
+  const prevCeil = process.env.TERRARIUM_STARTUP_HARD_CEILING_MS;
+  try {
+    process.env.TERRARIUM_STARTUP_WATCHDOG_MS = "200";
+    process.env.TERRARIUM_STARTUP_HARD_CEILING_MS = "800";
+    const agent = `${process.execPath} -e "console.log('terrarium-pi: runner started'); setInterval(() => {}, 1000)"`;
+    const started = await spawnTerrariumBackground({ task: "banner then hang", agent, timeoutMs: 10000 });
+    const status = await waitForTerminal(started.runId, { attempts: 200, delayMs: 25 });
+    assert.equal(status.status, "error");
+    assert.equal(status.ok, false);
+    assert.equal(status.exitCode, 124);
+    assert.match(status.error, /hard ceiling/);
+    const log = await readRun({ runId: started.runId });
+    assert.match(log.text, /startup-timeout/);
+    assert.match(log.text, /terrarium-pi: runner started/);
   } finally {
     if (prevWin === undefined) delete process.env.TERRARIUM_STARTUP_WATCHDOG_MS; else process.env.TERRARIUM_STARTUP_WATCHDOG_MS = prevWin;
     if (prevCeil === undefined) delete process.env.TERRARIUM_STARTUP_HARD_CEILING_MS; else process.env.TERRARIUM_STARTUP_HARD_CEILING_MS = prevCeil;
