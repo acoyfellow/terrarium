@@ -649,7 +649,8 @@ async function emitCompletionEvent(result) {
 
 const TASK_RESULT_MARKER = "TERRARIUM_RESULT=";
 const MAX_TASK_RESULT_LINE_BYTES = 16 * 1024;
-const TASK_RESULT_KEYS = new Set(["runId", "taskFingerprint", "nonce", "summary"]);
+const TASK_RESULT_KEYS = new Set(["runId", "taskFingerprint", "nonce", "summary", "result"]);
+const MAX_TASK_RESULT_JSON_BYTES = 32 * 1024;
 
 export function validateTaskContractOutput(output, expected) {
   if (!expected) return { status: "not-required" };
@@ -663,7 +664,15 @@ export function validateTaskContractOutput(output, expected) {
   if (Object.keys(receipt).some((key) => !TASK_RESULT_KEYS.has(key))) return { status: "malformed" };
   if (receipt.runId !== expected.runId || receipt.taskFingerprint !== expected.taskFingerprint || receipt.nonce !== expected.nonce) return { status: "mismatch" };
   if (typeof receipt.summary !== "string" || !receipt.summary.trim() || receipt.summary.length > 2000) return { status: "malformed" };
-  return { status: "verified", summary: receipt.summary.trim() };
+  let taskResult;
+  if (Object.prototype.hasOwnProperty.call(receipt, "result")) {
+    if (receipt.result === undefined) return { status: "malformed" };
+    let encoded;
+    try { encoded = JSON.stringify(receipt.result); } catch { return { status: "malformed" }; }
+    if (encoded == null || Buffer.byteLength(encoded, "utf8") > MAX_TASK_RESULT_JSON_BYTES) return { status: "malformed" };
+    taskResult = receipt.result;
+  }
+  return { status: "verified", summary: receipt.summary.trim(), ...(taskResult !== undefined ? { taskResult } : {}) };
 }
 
 async function persistFinishedRun(base, patch) {
@@ -683,6 +692,7 @@ async function persistFinishedRun(base, patch) {
     const contract = validateTaskContractOutput(contractOutput, base.taskContract);
     result.taskContractStatus = contract.status;
     if (contract.summary) result.taskResultSummary = contract.summary;
+    if (contract.taskResult !== undefined) result.taskResult = contract.taskResult;
     if (contract.status !== "verified") result = { ...result, ok: false, status: result.exitCode === 0 ? "inconclusive" : result.status, note: `Task contract ${contract.status}; process exit is not accepted as task success.` };
   }
   const receiptLooksVerified = result.taskContractStatus === "verified";
