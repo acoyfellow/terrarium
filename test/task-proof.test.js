@@ -3,10 +3,40 @@ import assert from "node:assert/strict";
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { runTaskProof, validateTaskContractOutput } from "../src/core.js";
+import { getRunStatus, runTaskProof, spawnTerrariumBackground, validateTaskContractOutput } from "../src/core.js";
+import { clearInheritedTerrariumEnv } from "./helpers/terrarium-env.js";
+
+clearInheritedTerrariumEnv();
+
+async function waitForTerminal(runId, { attempts = 80, delayMs = 40 } = {}) {
+  let status;
+  for (let i = 0; i < attempts; i++) {
+    status = await getRunStatus({ runId, staleMs: 5000 });
+    if (status.status !== "running") return status;
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
+  }
+  return status;
+}
+
+function echoReceiptAgent(dir, summary) {
+  const scriptPath = join(dir, "echo-receipt.mjs");
+  writeFileSync(scriptPath, `import { readFileSync } from "node:fs";
+const arg = process.argv.at(-1);
+const text = process.env.TERRARIUM_PROMPT_FILE ? readFileSync(process.env.TERRARIUM_PROMPT_FILE, "utf8") : String(arg ?? "");
+const line = text.split("\\n").find((value) => value.includes("TERRARIUM_RESULT="));
+if (!line) {
+  console.error("no receipt template");
+  process.exit(2);
+}
+const receipt = JSON.parse(line.slice(line.indexOf("TERRARIUM_RESULT=") + "TERRARIUM_RESULT=".length));
+receipt.summary = ${JSON.stringify(summary)};
+console.log("TERRARIUM_RESULT=" + JSON.stringify(receipt));
+`);
+  return `${process.execPath} ${scriptPath}`;
+}
 
 const expected = { runId: "ter_20260803120000000_proof1", taskFingerprint: "fp-abc", nonce: "nonce-1" };
-const fabricated = `TERRARIUM_RESULT=${JSON.stringify({ ...expected, summary: "Created MRs for CFSA-663 and CFSA-456" })}`;
+const fabricated = `TERRARIUM_RESULT=${JSON.stringify({ ...expected, summary: "Created MRs for TICKET-A and TICKET-B" })}`;
 
 test("a fabricated receipt still passes contract validation, which is why a proof is required", () => {
   assert.equal(validateTaskContractOutput(fabricated, expected).status, "verified");
@@ -60,4 +90,39 @@ test("stderr is captured too, so a failing proof explains itself", async () => {
   assert.equal(proof.status, "failed");
   assert.equal(proof.exitCode, 3);
   assert.match(proof.output, /no such merge request/);
+});
+
+test("a background receipt is unproven when the host proof fails", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "proof-bg-"));
+  const started = await spawnTerrariumBackground({
+    task: "claim a missing file",
+    cwd: dir,
+    agent: echoReceiptAgent(dir, "claimed the file exists"),
+    requireTaskContract: true,
+    taskProof: "test -f delivered.txt",
+    timeoutMs: 5000,
+  });
+  const status = await waitForTerminal(started.runId);
+  assert.equal(status.status, "inconclusive");
+  assert.equal(status.ok, false);
+  assert.equal(status.taskContractStatus, "unproven");
+  assert.equal(status.taskProofStatus, "failed");
+});
+
+test("a background receipt stays verified when the host proof passes", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "proof-ok-"));
+  writeFileSync(join(dir, "delivered.txt"), "real work\n");
+  const started = await spawnTerrariumBackground({
+    task: "prove a present file",
+    cwd: dir,
+    agent: echoReceiptAgent(dir, "file is present"),
+    requireTaskContract: true,
+    taskProof: "test -f delivered.txt",
+    timeoutMs: 5000,
+  });
+  const status = await waitForTerminal(started.runId);
+  assert.equal(status.status, "done");
+  assert.equal(status.ok, true);
+  assert.equal(status.taskContractStatus, "verified");
+  assert.equal(status.taskProofStatus, "proved");
 });

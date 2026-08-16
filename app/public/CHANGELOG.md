@@ -2,6 +2,10 @@
 
 Dated, factual record of what shipped or got fixed. Newest first. Not a full commit log.
 
+## 2026-08-15
+
+- Fixed `taskProof` on the background run-machine path. A child receipt still classified as `verified` and skipped the host proof, so a failing `grade.mjs` left six skill-eval arms `verified`. The host proof now runs after receipt classification. A failing proof marks the run `inconclusive` with `taskContractStatus: "unproven"`.
+
 ## 2026-08-14
 
 - Fixed Terrarium children that stayed `running` with no model output after a parent cmux session-start hook failed. Child env now disables Pi cmux hooks and strips inherited `CMUX_*` targeting so a child cannot call the parent's pane.

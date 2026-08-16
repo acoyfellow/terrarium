@@ -673,7 +673,6 @@ async function persistFinishedRun(base, patch) {
     if (classification) result = { ...result, ...classification };
   }
   if (patch.taskContractStatus != null) {
-    // A run-machine adapter already made the contract/terminal decision.
   } else if (patch.dryRun === true && base.taskContractStatus === "pending") result.taskContractStatus = "not-applicable";
   else if (base.taskContractStatus === "pending") {
     // Validate the receipt against the FULL captured stdout, not the bounded
@@ -685,19 +684,22 @@ async function persistFinishedRun(base, patch) {
     result.taskContractStatus = contract.status;
     if (contract.summary) result.taskResultSummary = contract.summary;
     if (contract.status !== "verified") result = { ...result, ok: false, status: result.exitCode === 0 ? "inconclusive" : result.status, note: `Task contract ${contract.status}; process exit is not accepted as task success.` };
-    else if (base.taskProof != null) {
-      const proof = await runTaskProof(base.taskProof, { cwd: base.originalCwd ?? base.cwd });
-      result.taskProofStatus = proof.status;
-      result.taskProof = { command: proof.command ?? null, exitCode: proof.exitCode ?? null, output: proof.output ?? null };
-      if (proof.status !== "proved") {
-        result = {
-          ...result,
-          ok: false,
-          status: "inconclusive",
-          taskContractStatus: "unproven",
-          note: `The child reported success, but the operator proof command ${proof.status}. A self-reported receipt is a claim; the proof is the evidence.`,
-        };
-      }
+  }
+  const receiptLooksVerified = result.taskContractStatus === "verified";
+  const proofCommand = base.taskProof ?? result.taskProof;
+  const shouldRunProof = receiptLooksVerified && typeof proofCommand === "string" && proofCommand.trim() && result.taskProofStatus == null && patch.dryRun !== true;
+  if (shouldRunProof) {
+    const proof = await runTaskProof(proofCommand, { cwd: base.originalCwd ?? base.cwd });
+    result.taskProofStatus = proof.status;
+    result.taskProof = { command: proof.command ?? null, exitCode: proof.exitCode ?? null, output: proof.output ?? null };
+    if (proof.status !== "proved") {
+      result = {
+        ...result,
+        ok: false,
+        status: "inconclusive",
+        taskContractStatus: "unproven",
+        note: `The child reported success, but the operator proof command ${proof.status}. A self-reported receipt is a claim; the proof is the evidence.`,
+      };
     }
   }
   delete result.contractOutput;
