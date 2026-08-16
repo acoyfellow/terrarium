@@ -68,6 +68,7 @@ test("task receipt validation enforces summary boundaries and preserves JSON tex
   assert.deepEqual(validateTaskContractOutput(output(" x ".padEnd(2001, "a")), expected), { status: "malformed" });
   assert.deepEqual(validateTaskContractOutput(output("a".repeat(2000)), expected), { status: "verified", summary: "a".repeat(2000) });
   assert.deepEqual(validateTaskContractOutput(output("  done ✅\n第二行  "), expected), { status: "verified", summary: "done ✅\n第二行" });
+  assert.deepEqual(validateTaskContractOutput(output("done", { result: { answer: 42 } }), expected), { status: "verified", summary: "done", taskResult: { answer: 42 } });
   assert.deepEqual(validateTaskContractOutput(output("done", { evidenceRef: "https://attacker.invalid", arbitrary: { trusted: true } }), expected), { status: "malformed" });
   assert.deepEqual(validateTaskContractOutput(`${output("first")}\n${output("second")}`, expected), { status: "malformed" });
 });
