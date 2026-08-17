@@ -2,7 +2,8 @@
 import { createInterface } from "node:readline";
 import { cancelRun, ensureTerminalCallback, findUnisolatedCoWriters, getRunStatus, isRunAccessible, listRuns, loadConfig, pruneStaleChildClaims, readRun, runTerrarium, spawnTerrariumBackground, VERSION } from "./core.js";
 import { detectHostCapacity } from "./host-capacity.js";
-import { cloudSpawn, cloudSpawnBatch, cloudEnabled, cloudStatus, cloudList, cloudRead, cloudCancel, isCloudRunId, detectFilesystemDependency } from "./cloud-client.js";
+import { cloudEnabled, cloudStatus, cloudList, cloudRead, cloudCancel, isCloudRunId, detectFilesystemDependency } from "./cloud-client.js";
+import { effectCloudAdmitBackground, effectCloudSpawn, effectCloudSpawnBatch } from "./effect-cloud-client.js";
 import { createRunGroup, getRunGroupStatus, readRunGroupLogs } from "./groups.js";
 import { buildModelLadder } from "./model-resolution.js";
 import { spawnBatch, BATCH_STRATEGIES, validateBatchShape } from "./batch.js";
@@ -260,6 +261,7 @@ export function conciseSpawn(full) {
     tail,
     tailTruncated: typeof full.stdoutTail === "string" && full.stdoutTail.length > SPAWN_TAIL_CAP ? true : undefined,
     errTail,
+    correlation: full.correlation,
   });
 }
 
@@ -417,7 +419,9 @@ async function handle(msg) {
         // no host authority), so it is exempt from the gate.
         if (cloudEnabled() && !wantsLocal && !args.dryRun) {
           const safeArgs = sanitizeSpawnArgs({ ...args, background });
-          const result = await cloudSpawn(safeArgs);
+          const result = background
+            ? await effectCloudAdmitBackground(safeArgs)
+            : await effectCloudSpawn(safeArgs);
           const projected = verbose ? result : conciseSpawn(result);
           return send(msg.id, content(projected, !result.ok));
         }
@@ -484,7 +488,7 @@ async function handle(msg) {
         const batchNeedsLocal = Array.isArray(args.jobs) && args.jobs.some((job) => detectFilesystemDependency(job).dependent);
         if (cloudEnabled() && !(allowLocal && batchNeedsLocal)) {
           const cloudJobs = Array.isArray(args.jobs) ? args.jobs.map((job) => sanitizeSpawnArgs(job)) : args.jobs;
-          const result = await cloudSpawnBatch({ jobs: cloudJobs, strategy: args.strategy, quorum: args.quorum, concurrency: args.concurrency, label: args.label, timeoutMs: args.timeoutMs });
+          const result = await effectCloudSpawnBatch({ jobs: cloudJobs, strategy: args.strategy, quorum: args.quorum, concurrency: args.concurrency, label: args.label, pollMs: args.pollMs, timeoutMs: args.timeoutMs, cleanupTimeoutMs: args.cleanupTimeoutMs });
           const projected = verbose ? result : conciseBatch(result);
           return send(msg.id, content(projected, !result.ok));
         }
