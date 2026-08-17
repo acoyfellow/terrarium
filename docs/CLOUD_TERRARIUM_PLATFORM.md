@@ -26,6 +26,12 @@ Do **not** choose Cloudbox-only, Sandbox/Containers-only, Pulse-only, Workflows-
 
 Facets remain an optional follow-up only when dynamic/untrusted runner code or mediated authority is the thing being tested. The first prototype should use an ordinary DO-shaped `TerrariumRunCell`.
 
+## Limited Effect 4 migration
+
+The bundled `terrarium-effect@1.0.0` package, on `effect@4.0.0-beta.107`, handles cloud foreground spawn, background admission, and cloud batch orchestration. Local execution and cloud status, read, and single-run cancel remain on the existing JavaScript paths. The root `effect@^3.21.3` dependency remains.
+
+This is a limited migration boundary. It does not claim that all Terrarium paths use Effect 4, and it is not production proof.
+
 ## Scorecard
 
 | Candidate | Best role | Fit | First blocker | Decision |

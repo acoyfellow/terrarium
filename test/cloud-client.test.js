@@ -60,11 +60,11 @@ test("detectFilesystemDependency flags repo/path tasks, not self-contained ones"
   assert.equal(detectFilesystemDependency({ task: "reply with exactly: OK" }).dependent, false);
 });
 
-test("cloudSpawn fails closed on a filesystem-dependent task unless override set", async () => {
-  const { cloudSpawn } = await import("../src/cloud-client.js");
+test("Effect cloud spawn fails closed on a filesystem-dependent task unless override set", async () => {
+  const { effectCloudSpawn } = await import("../src/effect-cloud-client.js");
   const env = { TERRARIUM_URL: "https://x", TERRARIUM_CONTROL_TOKEN: "t" };
   await assert.rejects(
-    () => cloudSpawn({ task: "review /Users/x/repo and list files" }, { env }),
+    () => effectCloudSpawn({ task: "review /Users/x/repo and list files" }, { env }),
     /cloud spawn refused/,
     "must refuse a filesystem-dependent task before creating a run",
   );
@@ -91,11 +91,11 @@ test("cloudbox delegation: config gating + response shaping into a terrarium env
   } finally { globalThis.fetch = origFetch; }
 });
 
-test("cloud fsdep steers WIP review to local --isolation copy, cloudbox for committed repo", async () => {
-  const { cloudSpawn } = await import("../src/cloud-client.js");
-  const env = { TERRARIUM_URL: "https://x", TERRARIUM_CONTROL_TOKEN: "t" }; // no cloudbox, no repo
+test("Effect cloud spawn steers WIP review to local --isolation copy", async () => {
+  const { effectCloudSpawn } = await import("../src/effect-cloud-client.js");
+  const env = { TERRARIUM_URL: "https://x", TERRARIUM_CONTROL_TOKEN: "t" };
   await assert.rejects(
-    () => cloudSpawn({ task: "review the repo at /Users/x/t2t for issues" }, { env }),
+    () => effectCloudSpawn({ task: "review the repo at /Users/x/t2t for issues" }, { env }),
     /--isolation copy|committed AND uncommitted/,
     "fail-closed message must steer local-WIP review to --isolation copy",
   );

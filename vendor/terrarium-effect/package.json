@@ -1,0 +1,26 @@
+{
+  "name": "terrarium-effect",
+  "version": "1.0.0",
+  "description": "Standalone Effect 4 rebuild experiment",
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "build": "tsc -p tsconfig.build.json",
+    "test": "vitest run",
+    "purity": "node scripts/purity.mjs",
+    "gate": "npm run typecheck && npm run purity && npm run test"
+  },
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "files": ["dist"],
+  "private": true,
+  "dependencies": {
+    "effect": "4.0.0-beta.107"
+  },
+  "devDependencies": {
+    "@types/node": "26.2.0",
+    "typescript": "7.0.2",
+    "vitest": "4.1.10"
+  }
+}

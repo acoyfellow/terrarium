@@ -78,15 +78,11 @@ test("TERRARIUM_ALLOW_LOCAL=1 routes a filesystem-dependent batch to the LOCAL b
   assert.doesNotMatch(text, /cloud batch refused|filesystem-dependent/i, text);
 });
 
-test("a NON-filesystem cloud-suitable task still routes to cloud even with allowLocal set", async () => {
-  // No local path, no cwd, no read-files intent => not filesystem-dependent =>
-  // stays on cloud (the default) even when local is allowed. allowLocal only
-  // diverts filesystem-dependent tasks, it does not force everything local.
+test("a cloud-suitable foreground task takes the direct Effect migration even when local is allowed", async () => {
   const text = await spawnCall(
-    { task: "Say the word ACORN and nothing else.", background: true },
+    { task: "Say the word ACORN and nothing else.", background: false },
     { ...CLOUD_ENV, TERRARIUM_ALLOW_LOCAL: "1" },
   );
-  // Cloud is unreachable (invalid host) so this errors on the cloud call — the
-  // signal that it CHOSE cloud, not local. It must NOT be a local dry-run plan.
-  assert.doesNotMatch(text, /dryRun|plan|isolation/i, text);
+  assert.match(text, /Effect CloudClient admission is ambiguous/i, text);
+  assert.doesNotMatch(text, /dryRun|plan|isolation|cloud spawn refused/i, text);
 });

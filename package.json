@@ -35,6 +35,7 @@
   },
   "files": [
     "src",
+    "vendor/terrarium-effect",
     "docs/SECURE_V1.md",
     "docs/ARCHITECTURE.md",
     "docs/SECURE_AGENT_PROOF.md",
@@ -45,6 +46,9 @@
     "docs/RUN_SCHEDULES.md",
     "fixtures/secure-agent-parser",
     "fixtures/run-schedules"
+  ],
+  "bundleDependencies": [
+    "terrarium-effect"
   ],
   "keywords": [
     "agent",
@@ -76,6 +80,7 @@
     "@modelcontextprotocol/sdk": "^1.29.0",
     "effect": "^3.21.3",
     "hono": "^4.12.27",
-    "mcp-code-mode": "github:acoyfellow/mcp-code-mode#f27af39d5aa020200f712f222c02d682c7ab9c2a"
+    "mcp-code-mode": "github:acoyfellow/mcp-code-mode#f27af39d5aa020200f712f222c02d682c7ab9c2a",
+    "terrarium-effect": "file:vendor/terrarium-effect"
   }
 }
