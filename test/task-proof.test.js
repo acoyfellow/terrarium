@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { getRunStatus, runTaskProof, spawnTerrariumBackground, validateTaskContractOutput } from "../src/core.js";
@@ -18,9 +18,9 @@ async function waitForTerminal(runId, { attempts = 80, delayMs = 40 } = {}) {
   return status;
 }
 
-function echoReceiptAgent(dir, summary) {
+function echoReceiptAgent(dir, summary, deliver = false) {
   const scriptPath = join(dir, "echo-receipt.mjs");
-  writeFileSync(scriptPath, `import { readFileSync } from "node:fs";
+  writeFileSync(scriptPath, `import { readFileSync, writeFileSync } from "node:fs";
 const arg = process.argv.at(-1);
 const text = process.env.TERRARIUM_PROMPT_FILE ? readFileSync(process.env.TERRARIUM_PROMPT_FILE, "utf8") : String(arg ?? "");
 const line = text.split("\\n").find((value) => value.includes("TERRARIUM_RESULT="));
@@ -28,6 +28,7 @@ if (!line) {
   console.error("no receipt template");
   process.exit(2);
 }
+if (${JSON.stringify(deliver)}) writeFileSync("delivered.txt", "real work\\n");
 const receipt = JSON.parse(line.slice(line.indexOf("TERRARIUM_RESULT=") + "TERRARIUM_RESULT=".length));
 receipt.summary = ${JSON.stringify(summary)};
 console.log("TERRARIUM_RESULT=" + JSON.stringify(receipt));
@@ -125,4 +126,26 @@ test("a background receipt stays verified when the host proof passes", async () 
   assert.equal(status.ok, true);
   assert.equal(status.taskContractStatus, "verified");
   assert.equal(status.taskProofStatus, "proved");
+});
+
+test("a retained isolated workspace runs its proof inside that workspace", async () => {
+  const dir = mkdtempSync(join(tmpdir(), "proof-isolated-"));
+  const started = await spawnTerrariumBackground({
+    task: "write and prove an isolated file",
+    cwd: dir,
+    agent: echoReceiptAgent(dir, "isolated file is present", true),
+    isolation: "copy",
+    keepWorkspace: true,
+    requireTaskContract: true,
+    taskProof: "test -f delivered.txt",
+    timeoutMs: 5000,
+  });
+  const status = await waitForTerminal(started.runId);
+  assert.equal(status.status, "done");
+  assert.equal(status.ok, true);
+  assert.equal(status.taskContractStatus, "verified");
+  assert.equal(status.taskProofStatus, "proved");
+  assert.equal(existsSync(join(dir, "delivered.txt")), false);
+  assert.equal(existsSync(join(status.workspace.path, "delivered.txt")), true);
+  rmSync(status.workspace.path, { recursive: true, force: true });
 });

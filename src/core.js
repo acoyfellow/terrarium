@@ -699,7 +699,8 @@ async function persistFinishedRun(base, patch) {
   const proofCommand = base.taskProof ?? result.taskProof;
   const shouldRunProof = receiptLooksVerified && typeof proofCommand === "string" && proofCommand.trim() && result.taskProofStatus == null && patch.dryRun !== true;
   if (shouldRunProof) {
-    const proof = await runTaskProof(proofCommand, { cwd: base.originalCwd ?? base.cwd });
+    const proofCwd = base.workspace?.cleanup === false ? base.cwd : base.originalCwd ?? base.cwd;
+    const proof = await runTaskProof(proofCommand, { cwd: proofCwd });
     result.taskProofStatus = proof.status;
     result.taskProof = { command: proof.command ?? null, exitCode: proof.exitCode ?? null, output: proof.output ?? null };
     if (proof.status !== "proved") {
