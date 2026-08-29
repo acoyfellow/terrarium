@@ -112,8 +112,13 @@ function admittedFailure(error, idempotencyKey, runId) {
 }
 
 function failureMessage(error) {
+  if (typeof error === "string") return error;
   if (error && typeof error === "object") {
     if (typeof error.reason === "string") return error.reason;
+    if (typeof error.status === "number") {
+      const detail = error.body?.error || error.body?.raw || error.body?.message;
+      return typeof detail === "string" ? `HTTP ${error.status}: ${detail}` : `HTTP ${error.status}`;
+    }
     if (typeof error.message === "string") return error.message;
     if (typeof error.error === "string") return error.error;
     if (typeof error._tag === "string") return error._tag;
@@ -129,8 +134,14 @@ function unsupportedBatchOption(args) {
   return Object.keys(args).find((key) => args[key] !== undefined && !EFFECT_BATCH_OPTIONS.has(key));
 }
 
+const IDEMPOTENCY_KEY_RE = /^[A-Za-z0-9._~+/=-]{8,255}$/;
+
 function batchIdempotencyKey(idempotencyKey, index) {
-  return `${idempotencyKey}:${index}`;
+  const key = `${idempotencyKey}.${index}`;
+  if (!IDEMPOTENCY_KEY_RE.test(key)) {
+    throw new Error(`Effect cloud batch produced an invalid idempotency-key for job ${index}`);
+  }
+  return key;
 }
 
 function cloudBatchRequest(args, index, idempotencyKey, env) {
@@ -148,7 +159,10 @@ function effectResultValue(result) {
 }
 
 function effectResultError(result) {
-  return result?._tag === "Failure" ? failureMessage(result.failure) : null;
+  if (!result || typeof result !== "object") return null;
+  if (result.failure != null) return failureMessage(result.failure);
+  if (result._tag === "Failure") return failureMessage(result);
+  return null;
 }
 
 function terminalRun(run, outcome) {
@@ -175,29 +189,46 @@ function winnerRunId(outcome) {
   return effectResultValue(outcome?.result)?.admission.runId;
 }
 
-function batchResult(execution, strategy) {
+function jobErrors(execution) {
+  return (execution.batch?.outcomes ?? []).flatMap((outcome) => {
+    const error = effectResultError(outcome?.result);
+    if (!error) return [];
+    const admission = execution.admissions.find((item) => item.index === outcome.index);
+    return [{
+      index: outcome.index,
+      error,
+      ...(admission?.runId ? { runId: admission.runId } : {}),
+    }];
+  });
+}
+
+function batchResult(execution, strategy, jobCount = 0) {
   const batch = execution.batch;
   const outcomes = new Map((batch?.outcomes ?? []).map((outcome) => [outcome.index, outcome]));
   const runs = execution.admissions.map((admission) => terminalRun(admission, outcomes.get(admission.index)));
   const cleanupErrors = execution.cancellationFailures.map((failure) => `${failure.runId}: ${failureMessage(failure.error)}`);
   const winner = winnerRunId(batch?.winner);
   const winners = batch?.winners?.map(winnerRunId).filter(Boolean);
+  const errors = jobErrors(execution);
+  const emptyAdmissionComplete = jobCount > 0 && execution.admissions.length === 0 && batch != null && !execution.timedOut;
   return {
-    ok: batch?.ok ?? false,
+    ok: emptyAdmissionComplete ? false : (batch?.ok ?? false),
     cloud: true,
     effectCloud: true,
     strategy: batch?.strategy ?? strategy,
-    reason: batch?.reason ?? "timeout",
+    reason: emptyAdmissionComplete ? "admission-failed" : (batch?.reason ?? "timeout"),
     timedOut: execution.timedOut,
     successCount: batch?.successCount ?? 0,
     failureCount: batch?.failureCount ?? 0,
     runIds: execution.admissions.map((admission) => admission.runId),
+    ...(emptyAdmissionComplete ? { error: "cloud batch settled without admitting any runs" } : {}),
+    ...(errors.length ? { jobErrors: errors } : {}),
     ...(winner ? { winner } : {}),
     ...(winners?.length ? { winners } : {}),
     ...(cleanupErrors.length ? { cleanupErrors } : {}),
     group: {
       complete: batch !== null,
-      ok: batch?.ok ?? false,
+      ok: emptyAdmissionComplete ? false : (batch?.ok ?? false),
       runs,
     },
     admissions: execution.admissions,
@@ -441,7 +472,7 @@ export async function effectCloudSpawnBatch(args = {}, {
     background: false,
   }).catch(() => {})));
 
-  return batchResult(execution, args.strategy ?? "all");
+  return batchResult(execution, args.strategy ?? "all", args.jobs.length);
 }
 
 export async function effectCloudSpawn(args = {}, options = {}) {

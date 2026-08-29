@@ -276,7 +276,7 @@ test("Effect CloudBatch maps MCP jobs, persists admissions, and returns a concis
   assert.deepEqual(result.runIds.sort(), Object.values(runIds).sort());
   assert.equal(result.group.complete, true);
   assert.deepEqual(result.group.runs.map((run) => run.status).sort(), ["done", "done"]);
-  assert.deepEqual(requests.filter(({ init }) => init.method === "POST").map(({ init }) => init.headers["idempotency-key"]).sort(), ["idem-batch:0", "idem-batch:1"]);
+  assert.deepEqual(requests.filter(({ init }) => init.method === "POST").map(({ init }) => init.headers["idempotency-key"]).sort(), ["idem-batch.0", "idem-batch.1"]);
   assert.ok(requests.every(({ init }) => init.headers.authorization === "Bearer effect-token"));
   assert.deepEqual(persisted.map((admission) => admission.runId).sort(), Object.values(runIds).sort());
   assert.equal(persisted.find((admission) => admission.runId === runIds.first).channel, "batch-channel");
@@ -341,4 +341,68 @@ test("MCP sends foreground cloud spawns to Effect without a feature flag", async
   } finally {
     await new Promise((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
   }
+});
+
+test("Effect cloud batch uses API-legal per-job idempotency keys", async () => {
+  const keys = [];
+  const runIds = ["ter_batch_a", "ter_batch_b", "ter_batch_c"];
+  const result = await effectCloudSpawnBatch(
+    {
+      jobs: [{ task: "A" }, { task: "B" }, { task: "C" }],
+      strategy: "all",
+      concurrency: 3,
+      pollMs: 0,
+    },
+    {
+      env,
+      idempotencyKey: "7f3c9a2b-1d4e-4f60-8a1b-2c3d4e5f6a7b",
+      fetchImpl: async (url, init) => {
+        if (init.method === "POST") {
+          keys.push(init.headers["idempotency-key"]);
+          const { task } = JSON.parse(init.body);
+          const runId = runIds["ABC".indexOf(task)];
+          return response(202, { runId, contract: contract(runId), executionRef: `exec-${task}` });
+        }
+        const runId = new URL(url).pathname.split("/")[3];
+        return response(200, { status: { status: "done", terminal: terminal(runId) } });
+      },
+    },
+  );
+  assert.equal(result.ok, true);
+  assert.deepEqual(keys.sort(), [
+    "7f3c9a2b-1d4e-4f60-8a1b-2c3d4e5f6a7b.0",
+    "7f3c9a2b-1d4e-4f60-8a1b-2c3d4e5f6a7b.1",
+    "7f3c9a2b-1d4e-4f60-8a1b-2c3d4e5f6a7b.2",
+  ]);
+  assert.equal(keys.every((key) => /^[A-Za-z0-9._~+/=-]{8,255}$/.test(key)), true);
+  assert.equal(keys.some((key) => key.includes(":")), false);
+  assert.equal(result.runIds.length, 3);
+});
+
+test("Effect cloud batch surfaces per-job admission 400s instead of empty all-complete", async () => {
+  const result = await effectCloudSpawnBatch(
+    {
+      jobs: [{ task: "A" }, { task: "B" }, { task: "C" }],
+      strategy: "all",
+      concurrency: 3,
+      pollMs: 0,
+    },
+    {
+      env,
+      idempotencyKey: "idem-batch-400",
+      fetchImpl: async (_url, init) => {
+        if (init.method === "POST") {
+          return response(400, { ok: false, error: "idempotency-key required" });
+        }
+        return response(404, { ok: false });
+      },
+    },
+  );
+  assert.equal(result.ok, false);
+  assert.equal(result.reason, "admission-failed");
+  assert.equal(result.error, "cloud batch settled without admitting any runs");
+  assert.deepEqual(result.runIds, []);
+  assert.deepEqual(result.admissions, []);
+  assert.equal(result.jobErrors.length, 3);
+  assert.deepEqual(result.jobErrors.map((job) => job.index).sort(), [0, 1, 2]);
 });
