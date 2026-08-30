@@ -197,15 +197,17 @@ A background supervisor uses `startupWatchdogMs` to terminate a child that produ
 
 ## MCP tools
 
-- `terrarium_spawn` — run one bounded child task. Synchronous unless `background: true`. A foreground `modelStrategy` (`low-to-high`, `high-to-low`, or `custom` with an ordered `models` array) advances to the next model on a retryable contract failure and records the `ladderPath`.
-- `terrarium_spawn_batch` — fan out an array of jobs under one group; join by `all` / `allSettled` / `race` / `any` / `quorum`. Winner-picking strategies cancel losers; prefer `isolation: copy|worktree` for side effects.
-- `terrarium_status` — inspect one run or list recent runs, with a factual needs-attention flag.
-- `terrarium_read` — read a recorded run log (`kind: "mre"` for the MRE side log).
-- `terrarium_cancel` — cancel one active run and its descendant process group within lineage scope.
-- `terrarium_group` — create, status, read, or cancel a collection of already-started runs. Group state is a fail-closed roll-up of member receipts, not independent success proof: it reads `ok` only when every member is `done, ok: true`. Confirm each run with its own verified receipt.
-- `terrarium_callbacks` — a durable **pull** subscription for terminal events. It supports claim, ack, requeue, recover, and prune. Delivery is at-least-once with dedup. Subscribing alone does not wake a conversation. A terminal callback is a notification that a run finished, not authoritative proof that the task succeeded. Confirm with the run's verified receipt.
-- `terrarium_doctor` — read-only diagnostics (storage, runs, attention, callbacks, groups, stale claims). The CLI adds an opt-in `--repair` executor.
-- `terrarium_report_failure` — turn a caught terminal failure into a structured, deduped bug report. It fetches the run's status and log by run ID. It classifies the failure as one of receipt-mismatch, receipt-absent, receipt-malformed, agent-timeout, model-config, ca-trust, or poll-timeout. It adds a blame hint of `agent`, `backend`, or `image`. It redacts and excerpts the log. It files the report under `~/.terrarium/failure-reports`. Defect-level dedupe collapses N runs that fail the same way into one report with an occurrence count. It refuses a trusted success. Pass `markdown: true` for a paste-ready body.
+| Tool | What it does |
+| --- | --- |
+| `terrarium_spawn` | Run one bounded child. Synchronous unless `background: true`. Foreground `modelStrategy` (`low-to-high`, `high-to-low`, or `custom`) advances on a retryable contract failure and records `ladderPath`. |
+| `terrarium_spawn_batch` | Fan out jobs under one group. Join with `all` / `allSettled` / `race` / `any` / `quorum`. Winner strategies cancel losers. Prefer `isolation: copy` or `worktree` for writers. |
+| `terrarium_status` | Inspect one run by id, or list recent runs. Needs-attention is factual, not a guess. |
+| `terrarium_read` | Read a recorded run log. Use `kind: "mre"` for the MRE side log. |
+| `terrarium_cancel` | Cancel one active run and its process group, within lineage scope. |
+| `terrarium_group` | Create, status, read, or cancel a set of already-started runs. Group `ok` is true only when every member is `done` and `ok: true`. Confirm each run with its own receipt. |
+| `terrarium_callbacks` | Pull terminal events: claim, ack, requeue, recover, prune. At-least-once with dedup. Subscribe does not wake a chat. A callback means the run finished, not that the task succeeded. |
+| `terrarium_doctor` | Read-only diagnostics: storage, runs, attention, callbacks, groups, stale claims. CLI adds opt-in `--repair`. |
+| `terrarium_report_failure` | File a deduped bug report from a terminal failure. Classifies receipt, timeout, model-config, and related faults. Refuses a trusted success. |
 
 Do not put `-ne` (`--no-extensions`) in a child `agent` command when the model provider comes from a Pi extension. The flag disables extension discovery, so Pi no longer knows the provider and the child dies in about one second with `Unknown provider "<name>"`. An extension-provided provider is unavailable when extensions are disabled, so `pi -ne -p --provider <extension-provided-provider>` always fails. Use plain `pi -p --no-session`. Terrarium rejects this combination at preflight, before it claims a child slot.
 

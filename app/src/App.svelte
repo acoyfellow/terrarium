@@ -37,7 +37,18 @@
       blocks: [
         ['CLI', 'terra [--agent <cmd>] "task"   run one bounded task\nterra --dry-run "task"          plan only, no agent needed\nterra status <runId>           inspect status + receipt\nterra read <runId>             read logs\nterra cancel <runId>           cancel a run\nterra batch <tasks...>         fan out in parallel\nterra doctor --repair          heal durable state', 'code'],
         ['Cloud API', 'POST /api/runs               admit a task -> 202 { runId, contract }\nGET  /api/runs               list your runs (channel/status/since)\nPOST /api/batches            admit N tasks as one batch (windowed)\nGET  /api/batches/:id        aggregate (failure-truth, child runIds)\nGET  /api/runs/:id/status    terminal + contract status\nGET  /api/runs/:id/logs      durable logs (+ R2 overflow refs)\nGET  /api/runs/:id/graded    trust grade + re-verifiable receipt\nPOST /api/runs/:id/cancel    cancel\nGET  /api/models             owner-scoped model catalog', 'code'],
-        ['MCP tools', 'terrarium_spawn, terrarium_status, terrarium_read, terrarium_cancel,\nterrarium_spawn_batch, terrarium_group, terrarium_callbacks, terrarium_doctor', 'code'],
+        ['MCP tools', [
+          ['Tool', 'What it does'],
+          ['terrarium_spawn', 'One bounded child. Synchronous unless background: true.'],
+          ['terrarium_spawn_batch', 'Fan-out with all / allSettled / race / any / quorum. Prefer isolation copy or worktree.'],
+          ['terrarium_status', 'One run by id, or list recent runs.'],
+          ['terrarium_read', 'Recorded log. kind: mre for the side log.'],
+          ['terrarium_cancel', 'Cancel one run and its process group.'],
+          ['terrarium_group', 'Roll up already-started runs. Group ok only if every member is done and ok.'],
+          ['terrarium_callbacks', 'Pull terminal events. A callback is not proof the task succeeded.'],
+          ['terrarium_doctor', 'Read-only diagnostics. CLI --repair is opt-in.'],
+          ['terrarium_report_failure', 'Deduped bug report from a terminal failure.'],
+        ], 'table'],
         ['A receipt', 'runId · taskFingerprint · nonce · summary — a task succeeded only when all three correlate.', 'text'],
       ],
     },
@@ -296,7 +307,7 @@ POST https://terrarium-control.<you>.workers.dev/api/runs  ->  202 { runId }`}</
           {#each currentDoc().blocks as [heading, body, kind]}
             <section class="doc-block">
               <h2>{heading}</h2>
-              {#if kind === 'code'}<pre><code>{body}</code></pre>{:else}<p>{body}</p>{/if}
+              {#if kind === 'code'}<pre><code>{body}</code></pre>{:else if kind === 'table'}<div class="doc-table-wrap"><table class="doc-table">{#each body as row, i}<tr>{#each row as cell}{#if i === 0}<th>{cell}</th>{:else}<td>{cell}</td>{/if}{/each}</tr>{/each}</table></div>{:else}<p>{body}</p>{/if}
             </section>
           {/each}
         </article>

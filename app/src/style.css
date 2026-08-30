@@ -168,6 +168,13 @@ img { max-width: 100%; display: block; }
 .doc-block p { margin: 0; color: var(--muted); font-size: .96rem; line-height: 1.7; }
 .doc-block pre { margin: 0; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--code); padding: 1rem 1.1rem; overflow-x: auto; }
 .doc-block pre code { font: 500 .8rem/1.65 var(--font-mono); color: var(--subtle); white-space: pre; }
+.doc-table-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius-md); }
+.doc-table { width: 100%; border-collapse: collapse; font-size: .88rem; }
+.doc-table th, .doc-table td { padding: .65rem .8rem; text-align: left; vertical-align: top; border-bottom: 1px solid var(--border); }
+.doc-table th { font: 600 .72rem/1.4 var(--font-mono); color: var(--mint); letter-spacing: .04em; text-transform: uppercase; background: var(--layer-2); }
+.doc-table td { color: var(--muted); line-height: 1.5; }
+.doc-table td:first-child { font: 500 .8rem/1.45 var(--font-mono); color: var(--text); white-space: nowrap; }
+.doc-table tr:last-child th, .doc-table tr:last-child td { border-bottom: 0; }
 
 /* ============================================================ changelog */
 .log-shell { max-width: var(--page-max); margin: 0 auto; padding: clamp(2rem, 4vw, 3.5rem) clamp(1.25rem, 5vw, 5rem); }
