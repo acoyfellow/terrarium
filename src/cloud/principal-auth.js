@@ -92,7 +92,45 @@ function authenticateWithTokens(request, env, currentKey, previousKey, { rejectT
  * { ok: true, principalId } on success. On failure returns
  * { ok: false, status, error } — always fail-closed.
  */
+function parsePrincipalDirectory(raw) {
+  if (typeof raw !== "string" || !raw.trim()) return null;
+  let parsed;
+  try { parsed = JSON.parse(raw); } catch { return { ok: false, status: 401, error: "unauthorized" }; }
+  if (!Array.isArray(parsed) || parsed.length === 0) return { ok: false, status: 401, error: "unauthorized" };
+  const entries = [];
+  for (const row of parsed) {
+    if (!row || typeof row !== "object") return { ok: false, status: 401, error: "unauthorized" };
+    const id = typeof row.id === "string" ? row.id : "";
+    const token = typeof row.token === "string" ? row.token : "";
+    const previous = typeof row.previous === "string" ? row.previous : "";
+    if (!PRINCIPAL_ID_RE.test(id) || !token) return { ok: false, status: 401, error: "unauthorized" };
+    entries.push({ id, token, previous });
+  }
+  return { ok: true, entries };
+}
+
+function authenticateFromDirectory(request, directory) {
+  const presented = extractBearer(request);
+  if (!presented) return { ok: false, status: 401, error: "unauthorized" };
+  let matchedId = "";
+  let matches = 0;
+  for (const entry of directory.entries) {
+    const hit = constantTimeEqualStr(presented, entry.token) || (entry.previous ? constantTimeEqualStr(presented, entry.previous) : false);
+    if (hit) {
+      matches += 1;
+      matchedId = entry.id;
+    }
+  }
+  if (matches !== 1) return { ok: false, status: 401, error: "unauthorized" };
+  return { ok: true, principalId: matchedId };
+}
+
 export function authenticatePrincipal(request, env) {
+  const directory = parsePrincipalDirectory(env?.TERRARIUM_PRINCIPALS);
+  if (directory) {
+    if (directory.ok === false) return directory;
+    return authenticateFromDirectory(request, directory);
+  }
   return authenticateWithTokens(request, env, "TERRARIUM_CONTROL_TOKEN_CURRENT", "TERRARIUM_CONTROL_TOKEN_PREVIOUS");
 }
 
