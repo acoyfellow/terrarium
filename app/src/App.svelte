@@ -307,7 +307,7 @@ POST https://terrarium-control.<you>.workers.dev/api/runs  ->  202 { runId }`}</
           {#each currentDoc().blocks as [heading, body, kind]}
             <section class="doc-block">
               <h2>{heading}</h2>
-              {#if kind === 'code'}<pre><code>{body}</code></pre>{:else if kind === 'table'}<div class="doc-table-wrap"><table class="doc-table">{#each body as row, i}<tr>{#each row as cell}{#if i === 0}<th>{cell}</th>{:else}<td>{cell}</td>{/if}{/each}</tr>{/each}</table></div>{:else}<p>{body}</p>{/if}
+              {#if kind === 'code'}<pre><code>{body}</code></pre>{:else if kind === 'table'}<div class="doc-table-wrap"><table class="doc-table"><thead><tr>{#each body[0] as cell}<th>{cell}</th>{/each}</tr></thead><tbody>{#each body.slice(1) as row}<tr>{#each row as cell}<td>{cell}</td>{/each}</tr>{/each}</tbody></table></div>{:else}<p>{body}</p>{/if}
             </section>
           {/each}
         </article>
