@@ -240,6 +240,32 @@ test("authenticatePrincipal: legacy TERRARIUM_CONTROL_TOKEN never authorizes /ap
   assert.equal(res.ok, false, "legacy TERRARIUM_CONTROL_TOKEN must be ignored");
 });
 
+test("authenticatePrincipal: directory maps distinct tokens to distinct principals", () => {
+  const env = {
+    TERRARIUM_PRINCIPALS: JSON.stringify([
+      { id: "alice", token: "tok-alice" },
+      { id: "bob", token: "tok-bob" },
+    ]),
+    TERRARIUM_PRINCIPAL_ID: "ignored-single",
+    TERRARIUM_CONTROL_TOKEN_CURRENT: "tok-alice",
+  };
+  const alice = authenticatePrincipal(new Request("https://x/", { headers: { authorization: "Bearer tok-alice" } }), env);
+  const bob = authenticatePrincipal(new Request("https://x/", { headers: { authorization: "Bearer tok-bob" } }), env);
+  const unknown = authenticatePrincipal(new Request("https://x/", { headers: { authorization: "Bearer tok-eve" } }), env);
+  assert.equal(alice.ok, true);
+  assert.equal(alice.principalId, "alice");
+  assert.equal(bob.ok, true);
+  assert.equal(bob.principalId, "bob");
+  assert.equal(unknown.ok, false);
+});
+
+test("authenticatePrincipal: malformed directory fails closed", () => {
+  const req = new Request("https://x/", { headers: { authorization: "Bearer tok-alice" } });
+  const res = authenticatePrincipal(req, { TERRARIUM_PRINCIPALS: "{not-json" });
+  assert.equal(res.ok, false);
+  assert.equal(res.status, 401);
+});
+
 // ---------------- estimator + canonical hash ----------------
 
 test("estimateBudgetFromTask is deterministic and server-computed", () => {
