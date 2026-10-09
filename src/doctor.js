@@ -129,6 +129,26 @@ const validDeliveryAttempts = (value) => value === undefined || (Number.isIntege
 const validEvent = (value, file) => hasOnlyKeys(value, CALLBACK_KEYS) && validId(value.eventId) && value.eventId === file.slice(0, -5) && TERMINAL_TYPES.has(value.type) && typeof value.runId === "string" && validTimestamp(value.at) && validDeliveryAttempts(value.deliveryAttempts);
 const validPendingEvent = (value, file) => validEvent(value, file) && !Object.hasOwn(value, "claimedAt");
 const validClaimedEvent = (value, file) => validEvent(value, file) && Object.hasOwn(value, "claimedAt") && validTimestamp(value.claimedAt);
+async function validlyDeliveredEventIds() {
+  const valid = new Set();
+  const malformedAcked = new Set();
+  let subscribers = [];
+  try { subscribers = await readdir(MAILBOXES_DIR); } catch { return { valid, malformedAcked }; }
+  for (const subscriber of subscribers) {
+    for (const [state, validate] of [["pending", validPendingEvent], ["inflight", validClaimedEvent], ["acked", validClaimedEvent]]) {
+      let files = [];
+      try { files = (await readdir(`${MAILBOXES_DIR}/${subscriber}/${state}`)).filter((name) => name.endsWith(".json")); } catch { continue; }
+      for (const file of files) {
+        const id = file.slice(0, -5);
+        let ok = false;
+        try { ok = validate(JSON.parse(await readFile(`${MAILBOXES_DIR}/${subscriber}/${state}/${file}`, "utf8")), file); } catch { ok = false; }
+        if (ok) valid.add(id);
+        else if (state === "acked") malformedAcked.add(id);
+      }
+    }
+  }
+  return { valid, malformedAcked };
+}
 async function mailboxHealth(path, validate) {
   let valid = 0, malformed = 0;
   try {
@@ -191,10 +211,14 @@ export async function diagnoseTerrarium() {
     ...diagnoseCloudEnv(),
     ...(await diagnoseStaleCloudEnv()),
   };
+  const deliveredEventIds = await validlyDeliveredEventIds();
   for (const run of runs.runs) {
     if (["running", "orphaned"].includes(run.status)) continue;
     const type = run.status === "cancelled" ? "Cancelled" : run.ok ? "Completed" : "Failed";
-    if (!existsSync(`${JOURNAL_DIR}/evt_${run.runId}_${type}.json`)) {
+    const eventId = `evt_${run.runId}_${type}`;
+    const journaled = existsSync(`${JOURNAL_DIR}/${eventId}.json`);
+    const malformedOnly = deliveredEventIds.malformedAcked.has(eventId) && !deliveredEventIds.valid.has(eventId);
+    if (!journaled || malformedOnly) {
       checks.missingTerminalCallbacks++;
       details.missingTerminalCallbackRunIds.push(run.runId);
     }
