@@ -32,6 +32,8 @@ jobs:
 
       - name: Verify product tests
         run: npm test
+        env:
+          TERRARIUM_TEST_CONCURRENCY: "1"
 
       - name: Prepare artifact directory
         run: mkdir -p artifacts/probes artifacts/fixture
