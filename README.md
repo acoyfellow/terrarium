@@ -204,8 +204,8 @@ A background supervisor uses `startupWatchdogMs` to terminate a child that produ
 | `terrarium_status` | Inspect one run by id, or list recent runs. Needs-attention is factual, not a guess. |
 | `terrarium_read` | Read a recorded run log. Use `kind: "mre"` for the MRE side log. |
 | `terrarium_cancel` | Cancel one active run and its process group, within lineage scope. |
-| `terrarium_group` | Create, status, read, or cancel a set of already-started runs. Group `ok` is true only when every member is `done` and `ok: true`. Confirm each run with its own receipt. |
-| `terrarium_callbacks` | Pull terminal events: claim, ack, requeue, recover, prune. At-least-once with dedup. Subscribe does not wake a chat. A callback means the run finished, not that the task succeeded. |
+| `terrarium_group` | Create, status, read, or cancel a set of already-started runs. Group state is a fail-closed roll-up of member receipts, not independent success proof. Group `ok` is true only when every member is `done` and `ok: true`. Confirm each run with its own receipt. |
+| `terrarium_callbacks` | Pull terminal events: claim, ack, requeue, recover, prune. At-least-once with dedup. Subscribe does not wake a chat. A terminal callback is a notification that a run finished, not authoritative proof that the task succeeded. |
 | `terrarium_doctor` | Read-only diagnostics: storage, runs, attention, callbacks, groups, stale claims. CLI adds opt-in `--repair`. |
 | `terrarium_report_failure` | File a deduped bug report from a terminal failure. Classifies receipt, timeout, model-config, and related faults. Refuses a trusted success. |
 
