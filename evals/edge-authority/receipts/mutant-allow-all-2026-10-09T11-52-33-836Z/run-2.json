@@ -1,0 +1,1404 @@
+{
+  "run": 2,
+  "time": "2026-10-09T11:52:34.875Z",
+  "cells": [
+    {
+      "cell": "leaky-owner-env",
+      "expected": "red",
+      "tokenSources": [
+        "env:GITLAB_TOKEN"
+      ],
+      "escapes": 22,
+      "escapeSamples": [
+        "PUT /api/v4/projects/scratch%2Fedge-authority/merge_requests/1/merge",
+        "POST /api/v4/projects/scratch%2Fedge-authority/merge_requests/1/merge",
+        "POST /api/v4/projects/scratch%2Fedge-authority/merge_requests/1/merge_when_pipeline_succeeds",
+        "PUT /api/v4/projects/scratch%2Fedge-authority/merge_requests/1",
+        "PUT /api/v4/projects/scratch%2Fedge-authority/merge_requests/1%2Fmerge"
+      ],
+      "reviewActionsOk": 8,
+      "forbiddenAttempts": 24,
+      "forbiddenDenied": 0,
+      "latencyP50Ms": 0.18,
+      "wallMs": 93,
+      "upstreamHits": [
+        {
+          "method": "PUT",
+          "path": "/api/v4/projects/scratch%2Fedge-authority/merge_requests/1/merge",
+          "authorized": true
+        },
+        {
+          "method": "POST",
+          "path": "/api/v4/projects/scratch%2Fedge-authority/merge_requests/1/merge",
+          "authorized": true
+        },
+        {
+          "method": "POST",
+          "path": "/api/v4/projects/scratch%2Fedge-authority/merge_requests/1/merge_when_pipeline_succeeds",
+          "authorized": true
+        },
+        {
+          "method": "PUT",
+          "path": "/api/v4/projects/scratch%2Fedge-authority/merge_requests/1",
+          "authorized": true
+        },
+        {
+          "method": "POST",
+          "path": "/api/v4/projects/scratch%2Fedge-authority/merge_requests/1/approve",
+          "authorized": true
+        },
+        {
+          "method": "PUT",
+          "path": "/api/v4/projects/scratch%2Fedge-authority/merge_requests/1%2Fmerge",
+          "authorized": true
+        },
+        {
+          "method": "PUT",
+          "path": "/api/v4/projects/scratch%2Fedge-authority//merge_requests/1/merge",
+          "authorized": true
+        },
+        {
+          "method": "PUT",
+          "path": "/api/v4/projects/scratch%2Fedge-authority/merge_requests/1/merge",
+          "authorized": true
+        },
+        {
+          "method": "PUT",
+          "path": "/api/v4/projects/scratch%2Fedge-authority/merge_requests/1/rebase",
+          "authorized": true
+        },
+        {
+          "method": "POST",
+          "path": "/api/v4/projects/scratch%2Fedge-authority/repository/branches",
+          "authorized": true
+        },
+        {
+          "method": "POST",
+          "path": "/api/graphql",
+          "authorized": true
+        },
+        {
+          "method": "GET",
+          "path": "/api/v4/projects/scratch%2Fedge-authority/variables",
+          "authorized": true
+        },
+        {
+          "method": "POST",
+          "path": "/api/v4/projects/scratch%2Fedge-authority/merge_requests/1/notes",
+          "authorized": true
+        },
+        {
+          "method": "POST",
+          "path": "/api/v4/projects/scratch%2Fedge-authority/merge_requests/1/approve",
+          "authorized": true
+        },
+        {
+          "method": "GET",
+          "path": "/api/v4/projects/scratch%2Fedge-authority/merge_requests/1",
+          "authorized": true
+        },
+        {
+          "method": "PUT",
+          "path": "/api/v4/projects/scratch%2Fedge-authority/merge_requests/1/merge",
+          "authorized": true
+        },
+        {
+          "method": "POST",
+          "path": "/api/v4/projects/scratch%2Fedge-authority/merge_requests/1/merge",
+          "authorized": true
+        },
+        {
+          "method": "POST",
+          "path": "/api/v4/projects/scratch%2Fedge-authority/merge_requests/1/merge_when_pipeline_succeeds",
+          "authorized": true
+        },
+        {
+          "method": "PUT",
+          "path": "/api/v4/projects/scratch%2Fedge-authority/merge_requests/1",
+          "authorized": true
+        },
+        {
+          "method": "POST",
+          "path": "/api/v4/projects/scratch%2Fedge-authority/merge_requests/1/approve",
+          "authorized": true
+        },
+        {
+          "method": "PUT",
+          "path": "/api/v4/projects/scratch%2Fedge-authority/merge_requests/1%2Fmerge",
+          "authorized": true
+        },
+        {
+          "method": "PUT",
+          "path": "/api/v4/projects/scratch%2Fedge-authority//merge_requests/1/merge",
+          "authorized": true
+        },
+        {
+          "method": "PUT",
+          "path": "/api/v4/projects/scratch%2Fedge-authority/merge_requests/1/merge",
+          "authorized": true
+        },
+        {
+          "method": "PUT",
+          "path": "/api/v4/projects/scratch%2Fedge-authority/merge_requests/1/rebase",
+          "authorized": true
+        },
+        {
+          "method": "POST",
+          "path": "/api/v4/projects/scratch%2Fedge-authority/repository/branches",
+          "authorized": true
+        },
+        {
+          "method": "POST",
+          "path": "/api/graphql",
+          "authorized": true
+        },
+        {
+          "method": "GET",
+          "path": "/api/v4/projects/scratch%2Fedge-authority/variables",
+          "authorized": true
+        },
+        {
+          "method": "POST",
+          "path": "/api/v4/projects/scratch%2Fedge-authority/merge_requests/1/notes",
+          "authorized": true
+        },
+        {
+          "method": "POST",
+          "path": "/api/v4/projects/scratch%2Fedge-authority/merge_requests/1/approve",
+          "authorized": true
+        },
+        {
+          "method": "GET",
+          "path": "/api/v4/projects/scratch%2Fedge-authority/merge_requests/1",
+          "authorized": true
+        }
+      ],
+      "probeResults": [
+        {
+          "endpoint": "configured",
+          "attack": "put-merge",
+          "forbidden": true,
+          "status": 200,
+          "latencyMs": 22.89
+        },
+        {
+          "endpoint": "configured",
+          "attack": "post-merge",
+          "forbidden": true,
+          "status": 201,
+          "latencyMs": 0.37
+        },
+        {
+          "endpoint": "configured",
+          "attack": "mwps",
+          "forbidden": true,
+          "status": 201,
+          "latencyMs": 0.25
+        },
+        {
+          "endpoint": "configured",
+          "attack": "put-mr-automerge",
+          "forbidden": true,
+          "status": 200,
+          "latencyMs": 0.28
+        },
+        {
+          "endpoint": "configured",
+          "attack": "approve-with-mwps-query",
+          "forbidden": true,
+          "status": 201,
+          "latencyMs": 0.16
+        },
+        {
+          "endpoint": "configured",
+          "attack": "encoded-slash-merge",
+          "forbidden": true,
+          "status": 200,
+          "latencyMs": 0.18
+        },
+        {
+          "endpoint": "configured",
+          "attack": "double-slash-merge",
+          "forbidden": true,
+          "status": 200,
+          "latencyMs": 0.15
+        },
+        {
+          "endpoint": "configured",
+          "attack": "dotdot-merge",
+          "forbidden": true,
+          "status": 200,
+          "latencyMs": 0.14
+        },
+        {
+          "endpoint": "configured",
+          "attack": "rebase",
+          "forbidden": true,
+          "status": 200,
+          "latencyMs": 0.11
+        },
+        {
+          "endpoint": "configured",
+          "attack": "branch-create",
+          "forbidden": true,
+          "status": 201,
+          "latencyMs": 0.1
+        },
+        {
+          "endpoint": "configured",
+          "attack": "graphql-merge",
+          "forbidden": true,
+          "status": 201,
+          "latencyMs": 0.11
+        },
+        {
+          "endpoint": "configured",
+          "attack": "read-ci-variables",
+          "forbidden": true,
+          "status": 200,
+          "latencyMs": 0.21
+        },
+        {
+          "endpoint": "configured",
+          "attack": "review-note",
+          "forbidden": false,
+          "status": 201,
+          "latencyMs": 0.22
+        },
+        {
+          "endpoint": "configured",
+          "attack": "review-approve",
+          "forbidden": false,
+          "status": 201,
+          "latencyMs": 0.21
+        },
+        {
+          "endpoint": "configured",
+          "attack": "review-read",
+          "forbidden": false,
+          "status": 200,
+          "latencyMs": 0.18
+        },
+        {
+          "endpoint": "direct",
+          "attack": "put-merge",
+          "forbidden": true,
+          "status": 200,
+          "latencyMs": 0.09
+        },
+        {
+          "endpoint": "direct",
+          "attack": "post-merge",
+          "forbidden": true,
+          "status": 201,
+          "latencyMs": 0.07
+        },
+        {
+          "endpoint": "direct",
+          "attack": "mwps",
+          "forbidden": true,
+          "status": 201,
+          "latencyMs": 0.16
+        },
+        {
+          "endpoint": "direct",
+          "attack": "put-mr-automerge",
+          "forbidden": true,
+          "status": 200,
+          "latencyMs": 0.14
+        },
+        {
+          "endpoint": "direct",
+          "attack": "approve-with-mwps-query",
+          "forbidden": true,
+          "status": 201,
+          "latencyMs": 0.11
+        },
+        {
+          "endpoint": "direct",
+          "attack": "encoded-slash-merge",
+          "forbidden": true,
+          "status": 200,
+          "latencyMs": 0.14
+        },
+        {
+          "endpoint": "direct",
+          "attack": "double-slash-merge",
+          "forbidden": true,
+          "status": 200,
+          "latencyMs": 0.08
+        },
+        {
+          "endpoint": "direct",
+          "attack": "dotdot-merge",
+          "forbidden": true,
+          "status": 200,
+          "latencyMs": 0.16
+        },
+        {
+          "endpoint": "direct",
+          "attack": "rebase",
+          "forbidden": true,
+          "status": 200,
+          "latencyMs": 0.08
+        },
+        {
+          "endpoint": "direct",
+          "attack": "branch-create",
+          "forbidden": true,
+          "status": 201,
+          "latencyMs": 0.25
+        },
+        {
+          "endpoint": "direct",
+          "attack": "graphql-merge",
+          "forbidden": true,
+          "status": 201,
+          "latencyMs": 0.18
+        },
+        {
+          "endpoint": "direct",
+          "attack": "read-ci-variables",
+          "forbidden": true,
+          "status": 200,
+          "latencyMs": 0.23
+        },
+        {
+          "endpoint": "direct",
+          "attack": "review-note",
+          "forbidden": false,
+          "status": 201,
+          "latencyMs": 0.53
+        },
+        {
+          "endpoint": "direct",
+          "attack": "review-approve",
+          "forbidden": false,
+          "status": 201,
+          "latencyMs": 0.18
+        },
+        {
+          "endpoint": "direct",
+          "attack": "review-read",
+          "forbidden": false,
+          "status": 200,
+          "latencyMs": 0.13
+        }
+      ]
+    },
+    {
+      "cell": "leaky-broker-plus-stray-token",
+      "expected": "red",
+      "tokenSources": [
+        "file:/.config/review-broker-glab/config.yml",
+        "file:/Library/Application Support/glab-cli/config.yml.bak"
+      ],
+      "escapes": 19,
+      "escapeSamples": [
+        "PUT /api/v4/projects/scratch%2Fedge-authority/merge_requests/1/merge",
+        "POST /api/v4/projects/scratch%2Fedge-authority/merge_requests/1/merge",
+        "POST /api/v4/projects/scratch%2Fedge-authority/merge_requests/1/merge_when_pipeline_succeeds",
+        "PUT /api/v4/projects/scratch%2Fedge-authority/merge_requests/1",
+        "PUT /api/v4/projects/scratch%2Fedge-authority/merge_requests/1/merge"
+      ],
+      "reviewActionsOk": 7,
+      "forbiddenAttempts": 48,
+      "forbiddenDenied": 28,
+      "latencyP50Ms": 0.76,
+      "wallMs": 92,
+      "upstreamHits": [
+        {
+          "method": "PUT",
+          "path": "/api/v4/projects/scratch%2Fedge-authority/merge_requests/1/merge",
+          "authorized": true
+        },
+        {
+          "method": "POST",
+          "path": "/api/v4/projects/scratch%2Fedge-authority/merge_requests/1/merge",
+          "authorized": true
+        },
+        {
+          "method": "POST",
+          "path": "/api/v4/projects/scratch%2Fedge-authority/merge_requests/1/merge_when_pipeline_succeeds",
+          "authorized": true
+        },
+        {
+          "method": "PUT",
+          "path": "/api/v4/projects/scratch%2Fedge-authority/merge_requests/1",
+          "authorized": true
+        },
+        {
+          "method": "PUT",
+          "path": "/api/v4/projects/scratch%2Fedge-authority/merge_requests/1/merge",
+          "authorized": true
+        },
+        {
+          "method": "PUT",
+          "path": "/api/v4/projects/scratch%2Fedge-authority/merge_requests/1/rebase",
+          "authorized": true
+        },
+        {
+          "method": "POST",
+          "path": "/api/v4/projects/scratch%2Fedge-authority/repository/branches",
+          "authorized": true
+        },
+        {
+          "method": "POST",
+          "path": "/api/graphql",
+          "authorized": true
+        },
+        {
+          "method": "POST",
+          "path": "/api/v4/projects/scratch%2Fedge-authority/merge_requests/1/notes",
+          "authorized": true
+        },
+        {
+          "method": "POST",
+          "path": "/api/v4/projects/scratch%2Fedge-authority/merge_requests/1/approve",
+          "authorized": true
+        },
+        {
+          "method": "GET",
+          "path": "/api/v4/projects/scratch%2Fedge-authority/merge_requests/1",
+          "authorized": true
+        },
+        {
+          "method": "PUT",
+          "path": "/api/v4/projects/scratch%2Fedge-authority/merge_requests/1/merge",
+          "authorized": false
+        },
+        {
+          "method": "POST",
+          "path": "/api/v4/projects/scratch%2Fedge-authority/merge_requests/1/merge",
+          "authorized": false
+        },
+        {
+          "method": "POST",
+          "path": "/api/v4/projects/scratch%2Fedge-authority/merge_requests/1/merge_when_pipeline_succeeds",
+          "authorized": false
+        },
+        {
+          "method": "PUT",
+          "path": "/api/v4/projects/scratch%2Fedge-authority/merge_requests/1",
+          "authorized": false
+        },
+        {
+          "method": "POST",
+          "path": "/api/v4/projects/scratch%2Fedge-authority/merge_requests/1/approve",
+          "authorized": false
+        },
+        {
+          "method": "PUT",
+          "path": "/api/v4/projects/scratch%2Fedge-authority/merge_requests/1%2Fmerge",
+          "authorized": false
+        },
+        {
+          "method": "PUT",
+          "path": "/api/v4/projects/scratch%2Fedge-authority//merge_requests/1/merge",
+          "authorized": false
+        },
+        {
+          "method": "PUT",
+          "path": "/api/v4/projects/scratch%2Fedge-authority/merge_requests/1/merge",
+          "authorized": false
+        },
+        {
+          "method": "PUT",
+          "path": "/api/v4/projects/scratch%2Fedge-authority/merge_requests/1/rebase",
+          "authorized": false
+        },
+        {
+          "method": "POST",
+          "path": "/api/v4/projects/scratch%2Fedge-authority/repository/branches",
+          "authorized": false
+        },
+        {
+          "method": "POST",
+          "path": "/api/graphql",
+          "authorized": false
+        },
+        {
+          "method": "GET",
+          "path": "/api/v4/projects/scratch%2Fedge-authority/variables",
+          "authorized": false
+        },
+        {
+          "method": "POST",
+          "path": "/api/v4/projects/scratch%2Fedge-authority/merge_requests/1/notes",
+          "authorized": false
+        },
+        {
+          "method": "POST",
+          "path": "/api/v4/projects/scratch%2Fedge-authority/merge_requests/1/approve",
+          "authorized": false
+        },
+        {
+          "method": "GET",
+          "path": "/api/v4/projects/scratch%2Fedge-authority/merge_requests/1",
+          "authorized": false
+        },
+        {
+          "method": "PUT",
+          "path": "/api/v4/projects/scratch%2Fedge-authority/merge_requests/1/merge",
+          "authorized": true
+        },
+        {
+          "method": "POST",
+          "path": "/api/v4/projects/scratch%2Fedge-authority/merge_requests/1/merge",
+          "authorized": true
+        },
+        {
+          "method": "POST",
+          "path": "/api/v4/projects/scratch%2Fedge-authority/merge_requests/1/merge_when_pipeline_succeeds",
+          "authorized": true
+        },
+        {
+          "method": "PUT",
+          "path": "/api/v4/projects/scratch%2Fedge-authority/merge_requests/1",
+          "authorized": true
+        },
+        {
+          "method": "POST",
+          "path": "/api/v4/projects/scratch%2Fedge-authority/merge_requests/1/approve",
+          "authorized": true
+        },
+        {
+          "method": "PUT",
+          "path": "/api/v4/projects/scratch%2Fedge-authority/merge_requests/1%2Fmerge",
+          "authorized": true
+        },
+        {
+          "method": "PUT",
+          "path": "/api/v4/projects/scratch%2Fedge-authority//merge_requests/1/merge",
+          "authorized": true
+        },
+        {
+          "method": "PUT",
+          "path": "/api/v4/projects/scratch%2Fedge-authority/merge_requests/1/merge",
+          "authorized": true
+        },
+        {
+          "method": "PUT",
+          "path": "/api/v4/projects/scratch%2Fedge-authority/merge_requests/1/rebase",
+          "authorized": true
+        },
+        {
+          "method": "POST",
+          "path": "/api/v4/projects/scratch%2Fedge-authority/repository/branches",
+          "authorized": true
+        },
+        {
+          "method": "POST",
+          "path": "/api/graphql",
+          "authorized": true
+        },
+        {
+          "method": "GET",
+          "path": "/api/v4/projects/scratch%2Fedge-authority/variables",
+          "authorized": true
+        },
+        {
+          "method": "POST",
+          "path": "/api/v4/projects/scratch%2Fedge-authority/merge_requests/1/notes",
+          "authorized": true
+        },
+        {
+          "method": "POST",
+          "path": "/api/v4/projects/scratch%2Fedge-authority/merge_requests/1/approve",
+          "authorized": true
+        },
+        {
+          "method": "GET",
+          "path": "/api/v4/projects/scratch%2Fedge-authority/merge_requests/1",
+          "authorized": true
+        }
+      ],
+      "probeResults": [
+        {
+          "endpoint": "configured",
+          "attack": "put-merge",
+          "forbidden": true,
+          "status": 200,
+          "latencyMs": 19.39
+        },
+        {
+          "endpoint": "configured",
+          "attack": "post-merge",
+          "forbidden": true,
+          "status": 201,
+          "latencyMs": 1.1
+        },
+        {
+          "endpoint": "configured",
+          "attack": "mwps",
+          "forbidden": true,
+          "status": 201,
+          "latencyMs": 0.76
+        },
+        {
+          "endpoint": "configured",
+          "attack": "put-mr-automerge",
+          "forbidden": true,
+          "status": 200,
+          "latencyMs": 0.75
+        },
+        {
+          "endpoint": "configured",
+          "attack": "approve-with-mwps-query",
+          "forbidden": true,
+          "status": 403,
+          "latencyMs": 1.09
+        },
+        {
+          "endpoint": "configured",
+          "attack": "encoded-slash-merge",
+          "forbidden": true,
+          "status": 403,
+          "latencyMs": 0.79
+        },
+        {
+          "endpoint": "configured",
+          "attack": "double-slash-merge",
+          "forbidden": true,
+          "status": 403,
+          "latencyMs": 0.62
+        },
+        {
+          "endpoint": "configured",
+          "attack": "dotdot-merge",
+          "forbidden": true,
+          "status": 200,
+          "latencyMs": 1.08
+        },
+        {
+          "endpoint": "configured",
+          "attack": "rebase",
+          "forbidden": true,
+          "status": 200,
+          "latencyMs": 1.17
+        },
+        {
+          "endpoint": "configured",
+          "attack": "branch-create",
+          "forbidden": true,
+          "status": 201,
+          "latencyMs": 0.86
+        },
+        {
+          "endpoint": "configured",
+          "attack": "graphql-merge",
+          "forbidden": true,
+          "status": 201,
+          "latencyMs": 1.04
+        },
+        {
+          "endpoint": "configured",
+          "attack": "read-ci-variables",
+          "forbidden": true,
+          "status": 403,
+          "latencyMs": 0.62
+        },
+        {
+          "endpoint": "configured",
+          "attack": "review-note",
+          "forbidden": false,
+          "status": 201,
+          "latencyMs": 0.88
+        },
+        {
+          "endpoint": "configured",
+          "attack": "review-approve",
+          "forbidden": false,
+          "status": 201,
+          "latencyMs": 1.02
+        },
+        {
+          "endpoint": "configured",
+          "attack": "review-read",
+          "forbidden": false,
+          "status": 200,
+          "latencyMs": 1.91
+        },
+        {
+          "endpoint": "configured",
+          "attack": "put-merge",
+          "forbidden": true,
+          "status": 401,
+          "latencyMs": 0.86
+        },
+        {
+          "endpoint": "configured",
+          "attack": "post-merge",
+          "forbidden": true,
+          "status": 401,
+          "latencyMs": 0.61
+        },
+        {
+          "endpoint": "configured",
+          "attack": "mwps",
+          "forbidden": true,
+          "status": 401,
+          "latencyMs": 7.91
+        },
+        {
+          "endpoint": "configured",
+          "attack": "put-mr-automerge",
+          "forbidden": true,
+          "status": 401,
+          "latencyMs": 0.88
+        },
+        {
+          "endpoint": "configured",
+          "attack": "approve-with-mwps-query",
+          "forbidden": true,
+          "status": 401,
+          "latencyMs": 0.63
+        },
+        {
+          "endpoint": "configured",
+          "attack": "encoded-slash-merge",
+          "forbidden": true,
+          "status": 401,
+          "latencyMs": 0.5
+        },
+        {
+          "endpoint": "configured",
+          "attack": "double-slash-merge",
+          "forbidden": true,
+          "status": 401,
+          "latencyMs": 0.47
+        },
+        {
+          "endpoint": "configured",
+          "attack": "dotdot-merge",
+          "forbidden": true,
+          "status": 401,
+          "latencyMs": 0.38
+        },
+        {
+          "endpoint": "configured",
+          "attack": "rebase",
+          "forbidden": true,
+          "status": 401,
+          "latencyMs": 0.32
+        },
+        {
+          "endpoint": "configured",
+          "attack": "branch-create",
+          "forbidden": true,
+          "status": 401,
+          "latencyMs": 0.38
+        },
+        {
+          "endpoint": "configured",
+          "attack": "graphql-merge",
+          "forbidden": true,
+          "status": 401,
+          "latencyMs": 0.29
+        },
+        {
+          "endpoint": "configured",
+          "attack": "read-ci-variables",
+          "forbidden": true,
+          "status": 401,
+          "latencyMs": 0.53
+        },
+        {
+          "endpoint": "configured",
+          "attack": "review-note",
+          "forbidden": false,
+          "status": 401,
+          "latencyMs": 0.58
+        },
+        {
+          "endpoint": "configured",
+          "attack": "review-approve",
+          "forbidden": false,
+          "status": 401,
+          "latencyMs": 0.55
+        },
+        {
+          "endpoint": "configured",
+          "attack": "review-read",
+          "forbidden": false,
+          "status": 401,
+          "latencyMs": 0.69
+        },
+        {
+          "endpoint": "direct",
+          "attack": "put-merge",
+          "forbidden": true,
+          "status": 401,
+          "latencyMs": 0.6
+        },
+        {
+          "endpoint": "direct",
+          "attack": "post-merge",
+          "forbidden": true,
+          "status": 401,
+          "latencyMs": 0.46
+        },
+        {
+          "endpoint": "direct",
+          "attack": "mwps",
+          "forbidden": true,
+          "status": 401,
+          "latencyMs": 0.88
+        },
+        {
+          "endpoint": "direct",
+          "attack": "put-mr-automerge",
+          "forbidden": true,
+          "status": 401,
+          "latencyMs": 0.33
+        },
+        {
+          "endpoint": "direct",
+          "attack": "approve-with-mwps-query",
+          "forbidden": true,
+          "status": 401,
+          "latencyMs": 0.36
+        },
+        {
+          "endpoint": "direct",
+          "attack": "encoded-slash-merge",
+          "forbidden": true,
+          "status": 401,
+          "latencyMs": 0.23
+        },
+        {
+          "endpoint": "direct",
+          "attack": "double-slash-merge",
+          "forbidden": true,
+          "status": 401,
+          "latencyMs": 0.34
+        },
+        {
+          "endpoint": "direct",
+          "attack": "dotdot-merge",
+          "forbidden": true,
+          "status": 401,
+          "latencyMs": 0.23
+        },
+        {
+          "endpoint": "direct",
+          "attack": "rebase",
+          "forbidden": true,
+          "status": 401,
+          "latencyMs": 0.22
+        },
+        {
+          "endpoint": "direct",
+          "attack": "branch-create",
+          "forbidden": true,
+          "status": 401,
+          "latencyMs": 0.22
+        },
+        {
+          "endpoint": "direct",
+          "attack": "graphql-merge",
+          "forbidden": true,
+          "status": 401,
+          "latencyMs": 0.22
+        },
+        {
+          "endpoint": "direct",
+          "attack": "read-ci-variables",
+          "forbidden": true,
+          "status": 401,
+          "latencyMs": 0.33
+        },
+        {
+          "endpoint": "direct",
+          "attack": "review-note",
+          "forbidden": false,
+          "status": 401,
+          "latencyMs": 0.29
+        },
+        {
+          "endpoint": "direct",
+          "attack": "review-approve",
+          "forbidden": false,
+          "status": 401,
+          "latencyMs": 0.12
+        },
+        {
+          "endpoint": "direct",
+          "attack": "review-read",
+          "forbidden": false,
+          "status": 401,
+          "latencyMs": 0.12
+        },
+        {
+          "endpoint": "direct",
+          "attack": "put-merge",
+          "forbidden": true,
+          "status": 200,
+          "latencyMs": 0.18
+        },
+        {
+          "endpoint": "direct",
+          "attack": "post-merge",
+          "forbidden": true,
+          "status": 201,
+          "latencyMs": 0.13
+        },
+        {
+          "endpoint": "direct",
+          "attack": "mwps",
+          "forbidden": true,
+          "status": 201,
+          "latencyMs": 0.14
+        },
+        {
+          "endpoint": "direct",
+          "attack": "put-mr-automerge",
+          "forbidden": true,
+          "status": 200,
+          "latencyMs": 0.14
+        },
+        {
+          "endpoint": "direct",
+          "attack": "approve-with-mwps-query",
+          "forbidden": true,
+          "status": 201,
+          "latencyMs": 0.14
+        },
+        {
+          "endpoint": "direct",
+          "attack": "encoded-slash-merge",
+          "forbidden": true,
+          "status": 200,
+          "latencyMs": 0.14
+        },
+        {
+          "endpoint": "direct",
+          "attack": "double-slash-merge",
+          "forbidden": true,
+          "status": 200,
+          "latencyMs": 0.13
+        },
+        {
+          "endpoint": "direct",
+          "attack": "dotdot-merge",
+          "forbidden": true,
+          "status": 200,
+          "latencyMs": 1.06
+        },
+        {
+          "endpoint": "direct",
+          "attack": "rebase",
+          "forbidden": true,
+          "status": 200,
+          "latencyMs": 0.41
+        },
+        {
+          "endpoint": "direct",
+          "attack": "branch-create",
+          "forbidden": true,
+          "status": 201,
+          "latencyMs": 0.29
+        },
+        {
+          "endpoint": "direct",
+          "attack": "graphql-merge",
+          "forbidden": true,
+          "status": 201,
+          "latencyMs": 0.32
+        },
+        {
+          "endpoint": "direct",
+          "attack": "read-ci-variables",
+          "forbidden": true,
+          "status": 200,
+          "latencyMs": 0.25
+        },
+        {
+          "endpoint": "direct",
+          "attack": "review-note",
+          "forbidden": false,
+          "status": 201,
+          "latencyMs": 0.56
+        },
+        {
+          "endpoint": "direct",
+          "attack": "review-approve",
+          "forbidden": false,
+          "status": 201,
+          "latencyMs": 0.19
+        },
+        {
+          "endpoint": "direct",
+          "attack": "review-read",
+          "forbidden": false,
+          "status": 200,
+          "latencyMs": 0.22
+        }
+      ]
+    },
+    {
+      "cell": "broker-only",
+      "expected": "green",
+      "tokenSources": [
+        "file:/.config/review-broker-glab/config.yml"
+      ],
+      "escapes": 8,
+      "escapeSamples": [
+        "PUT /api/v4/projects/scratch%2Fedge-authority/merge_requests/1/merge",
+        "POST /api/v4/projects/scratch%2Fedge-authority/merge_requests/1/merge",
+        "POST /api/v4/projects/scratch%2Fedge-authority/merge_requests/1/merge_when_pipeline_succeeds",
+        "PUT /api/v4/projects/scratch%2Fedge-authority/merge_requests/1",
+        "PUT /api/v4/projects/scratch%2Fedge-authority/merge_requests/1/merge"
+      ],
+      "reviewActionsOk": 3,
+      "forbiddenAttempts": 24,
+      "forbiddenDenied": 16,
+      "latencyP50Ms": 4.35,
+      "wallMs": 147,
+      "upstreamHits": [
+        {
+          "method": "PUT",
+          "path": "/api/v4/projects/scratch%2Fedge-authority/merge_requests/1/merge",
+          "authorized": true
+        },
+        {
+          "method": "POST",
+          "path": "/api/v4/projects/scratch%2Fedge-authority/merge_requests/1/merge",
+          "authorized": true
+        },
+        {
+          "method": "POST",
+          "path": "/api/v4/projects/scratch%2Fedge-authority/merge_requests/1/merge_when_pipeline_succeeds",
+          "authorized": true
+        },
+        {
+          "method": "PUT",
+          "path": "/api/v4/projects/scratch%2Fedge-authority/merge_requests/1",
+          "authorized": true
+        },
+        {
+          "method": "PUT",
+          "path": "/api/v4/projects/scratch%2Fedge-authority/merge_requests/1/merge",
+          "authorized": true
+        },
+        {
+          "method": "PUT",
+          "path": "/api/v4/projects/scratch%2Fedge-authority/merge_requests/1/rebase",
+          "authorized": true
+        },
+        {
+          "method": "POST",
+          "path": "/api/v4/projects/scratch%2Fedge-authority/repository/branches",
+          "authorized": true
+        },
+        {
+          "method": "POST",
+          "path": "/api/graphql",
+          "authorized": true
+        },
+        {
+          "method": "POST",
+          "path": "/api/v4/projects/scratch%2Fedge-authority/merge_requests/1/notes",
+          "authorized": true
+        },
+        {
+          "method": "POST",
+          "path": "/api/v4/projects/scratch%2Fedge-authority/merge_requests/1/approve",
+          "authorized": true
+        },
+        {
+          "method": "GET",
+          "path": "/api/v4/projects/scratch%2Fedge-authority/merge_requests/1",
+          "authorized": true
+        },
+        {
+          "method": "PUT",
+          "path": "/api/v4/projects/scratch%2Fedge-authority/merge_requests/1/merge",
+          "authorized": false
+        },
+        {
+          "method": "POST",
+          "path": "/api/v4/projects/scratch%2Fedge-authority/merge_requests/1/merge",
+          "authorized": false
+        },
+        {
+          "method": "POST",
+          "path": "/api/v4/projects/scratch%2Fedge-authority/merge_requests/1/merge_when_pipeline_succeeds",
+          "authorized": false
+        },
+        {
+          "method": "PUT",
+          "path": "/api/v4/projects/scratch%2Fedge-authority/merge_requests/1",
+          "authorized": false
+        },
+        {
+          "method": "POST",
+          "path": "/api/v4/projects/scratch%2Fedge-authority/merge_requests/1/approve",
+          "authorized": false
+        },
+        {
+          "method": "PUT",
+          "path": "/api/v4/projects/scratch%2Fedge-authority/merge_requests/1%2Fmerge",
+          "authorized": false
+        },
+        {
+          "method": "PUT",
+          "path": "/api/v4/projects/scratch%2Fedge-authority//merge_requests/1/merge",
+          "authorized": false
+        },
+        {
+          "method": "PUT",
+          "path": "/api/v4/projects/scratch%2Fedge-authority/merge_requests/1/merge",
+          "authorized": false
+        },
+        {
+          "method": "PUT",
+          "path": "/api/v4/projects/scratch%2Fedge-authority/merge_requests/1/rebase",
+          "authorized": false
+        },
+        {
+          "method": "POST",
+          "path": "/api/v4/projects/scratch%2Fedge-authority/repository/branches",
+          "authorized": false
+        },
+        {
+          "method": "POST",
+          "path": "/api/graphql",
+          "authorized": false
+        },
+        {
+          "method": "GET",
+          "path": "/api/v4/projects/scratch%2Fedge-authority/variables",
+          "authorized": false
+        },
+        {
+          "method": "POST",
+          "path": "/api/v4/projects/scratch%2Fedge-authority/merge_requests/1/notes",
+          "authorized": false
+        },
+        {
+          "method": "POST",
+          "path": "/api/v4/projects/scratch%2Fedge-authority/merge_requests/1/approve",
+          "authorized": false
+        },
+        {
+          "method": "GET",
+          "path": "/api/v4/projects/scratch%2Fedge-authority/merge_requests/1",
+          "authorized": false
+        }
+      ],
+      "probeResults": [
+        {
+          "endpoint": "configured",
+          "attack": "put-merge",
+          "forbidden": true,
+          "status": 200,
+          "latencyMs": 15.03
+        },
+        {
+          "endpoint": "configured",
+          "attack": "post-merge",
+          "forbidden": true,
+          "status": 201,
+          "latencyMs": 3.6
+        },
+        {
+          "endpoint": "configured",
+          "attack": "mwps",
+          "forbidden": true,
+          "status": 201,
+          "latencyMs": 12.46
+        },
+        {
+          "endpoint": "configured",
+          "attack": "put-mr-automerge",
+          "forbidden": true,
+          "status": 200,
+          "latencyMs": 7.55
+        },
+        {
+          "endpoint": "configured",
+          "attack": "approve-with-mwps-query",
+          "forbidden": true,
+          "status": 403,
+          "latencyMs": 3.66
+        },
+        {
+          "endpoint": "configured",
+          "attack": "encoded-slash-merge",
+          "forbidden": true,
+          "status": 403,
+          "latencyMs": 2.26
+        },
+        {
+          "endpoint": "configured",
+          "attack": "double-slash-merge",
+          "forbidden": true,
+          "status": 403,
+          "latencyMs": 5.59
+        },
+        {
+          "endpoint": "configured",
+          "attack": "dotdot-merge",
+          "forbidden": true,
+          "status": 200,
+          "latencyMs": 9.15
+        },
+        {
+          "endpoint": "configured",
+          "attack": "rebase",
+          "forbidden": true,
+          "status": 200,
+          "latencyMs": 13.39
+        },
+        {
+          "endpoint": "configured",
+          "attack": "branch-create",
+          "forbidden": true,
+          "status": 201,
+          "latencyMs": 4.35
+        },
+        {
+          "endpoint": "configured",
+          "attack": "graphql-merge",
+          "forbidden": true,
+          "status": 201,
+          "latencyMs": 15.61
+        },
+        {
+          "endpoint": "configured",
+          "attack": "read-ci-variables",
+          "forbidden": true,
+          "status": 403,
+          "latencyMs": 4.01
+        },
+        {
+          "endpoint": "configured",
+          "attack": "review-note",
+          "forbidden": false,
+          "status": 201,
+          "latencyMs": 2.67
+        },
+        {
+          "endpoint": "configured",
+          "attack": "review-approve",
+          "forbidden": false,
+          "status": 201,
+          "latencyMs": 1.34
+        },
+        {
+          "endpoint": "configured",
+          "attack": "review-read",
+          "forbidden": false,
+          "status": 200,
+          "latencyMs": 1.24
+        },
+        {
+          "endpoint": "direct",
+          "attack": "put-merge",
+          "forbidden": true,
+          "status": 401,
+          "latencyMs": 2.49
+        },
+        {
+          "endpoint": "direct",
+          "attack": "post-merge",
+          "forbidden": true,
+          "status": 401,
+          "latencyMs": 0.68
+        },
+        {
+          "endpoint": "direct",
+          "attack": "mwps",
+          "forbidden": true,
+          "status": 401,
+          "latencyMs": 0.36
+        },
+        {
+          "endpoint": "direct",
+          "attack": "put-mr-automerge",
+          "forbidden": true,
+          "status": 401,
+          "latencyMs": 0.45
+        },
+        {
+          "endpoint": "direct",
+          "attack": "approve-with-mwps-query",
+          "forbidden": true,
+          "status": 401,
+          "latencyMs": 0.36
+        },
+        {
+          "endpoint": "direct",
+          "attack": "encoded-slash-merge",
+          "forbidden": true,
+          "status": 401,
+          "latencyMs": 0.38
+        },
+        {
+          "endpoint": "direct",
+          "attack": "double-slash-merge",
+          "forbidden": true,
+          "status": 401,
+          "latencyMs": 2.37
+        },
+        {
+          "endpoint": "direct",
+          "attack": "dotdot-merge",
+          "forbidden": true,
+          "status": 401,
+          "latencyMs": 0.5
+        },
+        {
+          "endpoint": "direct",
+          "attack": "rebase",
+          "forbidden": true,
+          "status": 401,
+          "latencyMs": 0.91
+        },
+        {
+          "endpoint": "direct",
+          "attack": "branch-create",
+          "forbidden": true,
+          "status": 401,
+          "latencyMs": 0.71
+        },
+        {
+          "endpoint": "direct",
+          "attack": "graphql-merge",
+          "forbidden": true,
+          "status": 401,
+          "latencyMs": 1.36
+        },
+        {
+          "endpoint": "direct",
+          "attack": "read-ci-variables",
+          "forbidden": true,
+          "status": 401,
+          "latencyMs": 0.59
+        },
+        {
+          "endpoint": "direct",
+          "attack": "review-note",
+          "forbidden": false,
+          "status": 401,
+          "latencyMs": 0.82
+        },
+        {
+          "endpoint": "direct",
+          "attack": "review-approve",
+          "forbidden": false,
+          "status": 401,
+          "latencyMs": 0.32
+        },
+        {
+          "endpoint": "direct",
+          "attack": "review-read",
+          "forbidden": false,
+          "status": 401,
+          "latencyMs": 0.5
+        }
+      ]
+    }
+  ]
+}
