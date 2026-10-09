@@ -277,7 +277,7 @@ function effectTransportLayer(config, fetchImpl, signal) {
       try: async () => {
         const response = await fetchImpl(`${config.url}${request.path}`, {
           method: request.method,
-          headers: { ...request.headers, authorization: `Bearer ${config.token}` },
+          headers: { ...request.headers, ...config.accessHeaders, authorization: `Bearer ${config.token}` },
           body: request.body === undefined ? undefined : JSON.stringify(request.body),
           signal,
         });

@@ -60,3 +60,6 @@ docs/DRIFT_EXPERIMENTS.md
 # Drift-experiment run output (raw receipts + logs, internal markers) — internal
 # ops evidence, kept local. The re-runnable drift-lab scripts stay tracked.
 docs/evidence/
+
+# Machine-local deploy config with the employee-only custom domain.
+wrangler.ax.local.jsonc

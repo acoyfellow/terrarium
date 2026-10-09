@@ -52,7 +52,18 @@ export function cloudConfig(env = process.env) {
     try { token = readFileSync(tokenFile, "utf8").trim(); } catch { /* leave empty */ }
   }
   if (!token && typeof file.controlToken === "string") token = file.controlToken;
-  return { url, token, configured: Boolean(url && token) };
+  return { url, token, accessHeaders: accessServiceTokenHeaders(env, file), configured: Boolean(url && token) };
+}
+
+function readSecretFile(path) {
+  if (!path) return "";
+  try { return readFileSync(path, "utf8").trim(); } catch { return ""; }
+}
+
+export function accessServiceTokenHeaders(env = process.env, file = readHomeConfig(env)) {
+  const id = env.TERRARIUM_ACCESS_CLIENT_ID || readSecretFile(env.TERRARIUM_ACCESS_CLIENT_ID_FILE || file.accessClientIdFile);
+  const secret = env.TERRARIUM_ACCESS_CLIENT_SECRET || readSecretFile(env.TERRARIUM_ACCESS_CLIENT_SECRET_FILE || file.accessClientSecretFile);
+  return id && secret ? { "cf-access-client-id": id, "cf-access-client-secret": secret } : {};
 }
 
 /** True when the operator has wired a cloud instance (URL + token). */
@@ -69,7 +80,7 @@ export function isCloudRunId(runId) {
 }
 
 async function api(path, { method = "GET", body, config } = {}) {
-  const headers = { authorization: `Bearer ${config.token}` };
+  const headers = { ...config.accessHeaders, authorization: `Bearer ${config.token}` };
   if (body !== undefined) { headers["content-type"] = "application/json"; headers["idempotency-key"] = randomUUID(); }
   const res = await fetch(`${config.url}${path}`, { method, headers, body: body !== undefined ? JSON.stringify(body) : undefined });
   const text = await res.text();
@@ -315,19 +326,19 @@ function isTerminalStatus(s) { return ["done", "failed", "cancelled", "inconclus
 // the local FS router the extension uses today.
 
 export function pulseConfig(env = process.env) {
-  const { url } = cloudConfig(env);
+  const { url, accessHeaders } = cloudConfig(env);
   let token = typeof env.TERRARIUM_PULSE_TOKEN === "string" ? env.TERRARIUM_PULSE_TOKEN : "";
   if (!token && env.TERRARIUM_PULSE_TOKEN_FILE) {
     try { token = readFileSync(env.TERRARIUM_PULSE_TOKEN_FILE, "utf8").trim(); } catch { /* empty */ }
   }
-  return { url, token, configured: Boolean(url && token) };
+  return { url, token, accessHeaders, configured: Boolean(url && token) };
 }
 export function pulseEnabled(env = process.env) { return pulseConfig(env).configured; }
 
 async function pulseApi(path, body, config) {
   const res = await fetch(`${config.url}${path}`, {
     method: "POST",
-    headers: { authorization: `Bearer ${config.token}`, "content-type": "application/json" },
+    headers: { ...config.accessHeaders, authorization: `Bearer ${config.token}`, "content-type": "application/json" },
     body: JSON.stringify(body),
   });
   const text = await res.text();
