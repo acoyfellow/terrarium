@@ -52,9 +52,8 @@ test("no strategy falls back to the single requested model", () => {
   assert.deepEqual(buildModelLadder(null, { config }), []);
 });
 
-test("the built-in catalog always contains the pinned gpt-5.6-terra rung", () => {
-  const catalog = spawnModelCatalog();
-  const pinned = catalog.find((c) => c.model === "gpt-5.6-terra");
-  assert.ok(pinned);
+test("the built-in catalog takes its providers from config, not from source", () => {
+  assert.equal(spawnModelCatalog().find((c) => c.model === "gpt-5.6-terra").provider, null);
+  const pinned = spawnModelCatalog({ config: { modelProviders: { "gpt-5.6-terra": "example-gateway" } } }).find((c) => c.model === "gpt-5.6-terra");
   assert.equal(pinned.provider, "example-gateway");
 });

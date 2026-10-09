@@ -81,8 +81,8 @@ test("CLI uses the configured Pi provider for gpt-5.6-terra and refuses a missin
 
     const failure = runCli(unauthenticated);
     assert.equal(failure.status, 1);
-    assert.match(failure.stderr, /model preflight failed: resolved provider "opencode\.cloudflare\.dev" and model "gpt-5\.6-terra" have no usable credential/);
-    assert.match(failure.stderr, /pi login opencode\.cloudflare\.dev/);
+    assert.match(failure.stderr, /model preflight failed: resolved provider "example-gateway" and model "gpt-5\.6-terra" have no usable credential/);
+    assert.match(failure.stderr, /pi login example-gateway/);
     assert.equal(existsSync(unauthenticated.launched), false);
   } finally {
     rmSync(authenticated.dir, { recursive: true, force: true });
@@ -93,7 +93,7 @@ test("CLI uses the configured Pi provider for gpt-5.6-terra and refuses a missin
 test("an extension-provided provider is rejected when the agent disables extension discovery", () => {
   const resolution = { runner: "pi", model: "gpt-5.6-terra", provider: "example-gateway" };
   for (const flag of ["-ne", "--no-extensions"]) {
-    const verdict = preflightAgentModel(resolution, { agent: `pi ${flag} -p --no-session` });
+    const verdict = preflightAgentModel(resolution, { agent: `pi ${flag} -p --no-session`, config: { extensionProviders: ["example-gateway"] } });
     assert.equal(verdict.ok, false);
     assert.match(verdict.message, /registered by a Pi extension/);
   }
@@ -101,10 +101,10 @@ test("an extension-provided provider is rejected when the agent disables extensi
 
 test("the same provider passes when extension discovery stays enabled", () => {
   const resolution = { runner: "pi", model: "gpt-5.6-terra", provider: "example-gateway" };
-  assert.equal(preflightAgentModel(resolution, { agent: "pi -p --no-session" }).ok, true);
+  assert.equal(preflightAgentModel(resolution, { agent: "pi -p --no-session", env: { EXAMPLE_GATEWAY_TOKEN: "t" }, config: { extensionProviders: ["example-gateway"], providerTokenEnv: { "example-gateway": "EXAMPLE_GATEWAY_TOKEN" } } }).ok, true);
 });
 
 test("a substring that merely contains -ne does not trip the guard", () => {
   const resolution = { runner: "pi", model: "gpt-5.6-terra", provider: "example-gateway" };
-  assert.equal(preflightAgentModel(resolution, { agent: "pi -p --session-name my-ne-run" }).ok, true);
+  assert.equal(preflightAgentModel(resolution, { agent: "pi -p --session-name my-ne-run", env: { EXAMPLE_GATEWAY_TOKEN: "t" }, config: { extensionProviders: ["example-gateway"], providerTokenEnv: { "example-gateway": "EXAMPLE_GATEWAY_TOKEN" } } }).ok, true);
 });

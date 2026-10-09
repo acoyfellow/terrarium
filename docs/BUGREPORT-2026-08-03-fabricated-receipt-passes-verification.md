@@ -4,7 +4,7 @@ Status: **PARTLY FIXED 2026-08-07 by `b960486` (taskProof).** An operator proof 
 
 Original status: **OPEN. Needs owner.** This is a trust bug, not a flake. An orchestrator that believes `taskContractStatus` will report invented work as done.
 
-Filed by: Pi session in `/Users/jcoeyman/cloudflare`, during a terraloop that drove 20 CFSA tickets to receipt-backed terminal states. Twelve children ran. Three fabricated their entire output. All three were marked `verified`.
+Filed by: Pi session in `/Users/jcoeyman/cloudflare`, during a terraloop that drove 20 tracker tickets to receipt-backed terminal states. Twelve children ran. Three fabricated their entire output. All three were marked `verified`.
 
 ## Severity
 

@@ -2,21 +2,34 @@ import { existsSync, readFileSync } from "node:fs";
 import { homedir } from "node:os";
 import { basename, join } from "node:path";
 
-const PINNED_MODEL_PROVIDERS = new Map([
-  ["gpt-5.6-terra", "example-gateway"],
-]);
-
 const SPAWN_MODEL_CATALOG = [
-  { model: "gemini-2.5-flash-lite", provider: "example-gateway", tier: 1 },
-  { model: "claude-haiku-4-5", provider: "example-gateway", tier: 2 },
-  { model: "gpt-5.6-terra", provider: "example-gateway", tier: 3 },
-  { model: "claude-sonnet-4-5", provider: "example-gateway", tier: 4 },
+  { model: "gemini-2.5-flash-lite", provider: null, tier: 1 },
+  { model: "claude-haiku-4-5", provider: null, tier: 2 },
+  { model: "gpt-5.6-terra", provider: null, tier: 3 },
+  { model: "claude-sonnet-4-5", provider: null, tier: 4 },
 ];
+
+function pinnedModelProviders(config) {
+  const pins = config && typeof config.modelProviders === "object" && config.modelProviders !== null ? config.modelProviders : {};
+  return new Map(Object.entries(pins).filter(([model, provider]) => model.trim() && typeof provider === "string" && provider.trim()));
+}
+
+function extensionProvidedProviders(config) {
+  const listed = Array.isArray(config?.extensionProviders) ? config.extensionProviders : [];
+  return new Set(listed.filter((provider) => typeof provider === "string" && provider.trim()));
+}
+
+function providerTokenEnv(config) {
+  const mapping = config && typeof config.providerTokenEnv === "object" && config.providerTokenEnv !== null ? config.providerTokenEnv : {};
+  return Object.fromEntries(Object.entries(mapping).filter(([, name]) => typeof name === "string" && name.trim()));
+}
 
 export function spawnModelCatalog({ config = {} } = {}) {
   const extra = Array.isArray(config.spawnModelCatalog) ? config.spawnModelCatalog : [];
+  const pins = pinnedModelProviders(config);
+  const builtIn = SPAWN_MODEL_CATALOG.map((entry) => ({ ...entry, provider: pins.get(entry.model) ?? entry.provider }));
   const seen = new Map();
-  for (const entry of [...SPAWN_MODEL_CATALOG, ...extra]) {
+  for (const entry of [...builtIn, ...extra]) {
     if (!entry || typeof entry.model !== "string" || !entry.model.trim()) continue;
     if (!Number.isFinite(Number(entry.tier))) continue;
     seen.set(entry.model, {
@@ -89,7 +102,7 @@ export function resolveAgentModel({ agent, model, provider } = {}, { env = proce
   const envProvider = typeof env.TERRARIUM_PROVIDER === "string" && env.TERRARIUM_PROVIDER.trim()
     ? env.TERRARIUM_PROVIDER.trim()
     : (typeof env.PI_PROVIDER === "string" && env.PI_PROVIDER.trim() ? env.PI_PROVIDER.trim() : null);
-  const aliasProvider = PINNED_MODEL_PROVIDERS.get(model) || null;
+  const aliasProvider = pinnedModelProviders(config).get(model) || null;
   const resolvedProvider = explicitProvider || qualified?.provider || agentProvider(agent) || configProvider || envProvider || aliasProvider || configuredPiProvider(env);
   const resolvedModel = qualified && resolvedProvider === qualified.provider ? qualified.model : model;
   return { model: resolvedModel, provider: resolvedProvider || null, runner: "pi" };
@@ -105,9 +118,9 @@ function usableCredential(credential) {
   return false;
 }
 
-function environmentCredential(provider, env) {
-  if (provider === "example-gateway") return Boolean(env.OPENCODE_CLOUDFLARE_TOKEN?.trim());
+function environmentCredential(provider, env, config) {
   const names = {
+    ...providerTokenEnv(config),
     openai: "OPENAI_API_KEY",
     "azure-openai-responses": "AZURE_OPENAI_API_KEY",
     anthropic: "ANTHROPIC_API_KEY",
@@ -117,16 +130,15 @@ function environmentCredential(provider, env) {
   return Boolean(name && typeof env[name] === "string" && env[name].trim());
 }
 
-const EXTENSION_PROVIDED_PROVIDERS = new Set(["example-gateway"]);
 const NO_EXTENSION_FLAGS = new Set(["-ne", "--no-extensions"]);
 
 export function extensionDiscoveryDisabled(agent) {
   return String(agent || "").trim().split(/\s+/).some((part) => NO_EXTENSION_FLAGS.has(part));
 }
 
-export function preflightAgentModel(resolution, { env = process.env, agent = null } = {}) {
+export function preflightAgentModel(resolution, { env = process.env, agent = null, config = {} } = {}) {
   if (resolution.runner !== "pi" || !resolution.model) return { ok: true, provider: resolution.provider, model: resolution.model, credentialSource: null };
-  if (agent && resolution.provider && EXTENSION_PROVIDED_PROVIDERS.has(resolution.provider) && extensionDiscoveryDisabled(agent)) {
+  if (agent && resolution.provider && extensionProvidedProviders(config).has(resolution.provider) && extensionDiscoveryDisabled(agent)) {
     return {
       ok: false,
       provider: resolution.provider,
@@ -144,10 +156,9 @@ export function preflightAgentModel(resolution, { env = process.env, agent = nul
   }
   const stored = readJson(join(piAgentDirectory(env), "auth.json"))[resolution.provider];
   if (usableCredential(stored)) return { ok: true, provider: resolution.provider, model: resolution.model, credentialSource: "pi-auth" };
-  if (environmentCredential(resolution.provider, env)) return { ok: true, provider: resolution.provider, model: resolution.model, credentialSource: "environment" };
-  const remediation = resolution.provider === "example-gateway"
-    ? "Run `pi login example-gateway` or `cf-local recover opencode-access --run` followed by /opencode-cf-sync-auth, then retry."
-    : `Run \`pi login ${resolution.provider}\` or configure that provider's credential, then retry.`;
+  if (environmentCredential(resolution.provider, env, config)) return { ok: true, provider: resolution.provider, model: resolution.model, credentialSource: "environment" };
+  const configuredHint = typeof config?.providerLoginHints?.[resolution.provider] === "string" ? config.providerLoginHints[resolution.provider] : null;
+  const remediation = configuredHint ?? `Run \`pi login ${resolution.provider}\` or configure that provider's credential, then retry.`;
   return {
     ok: false,
     provider: resolution.provider,
