@@ -4,9 +4,8 @@
   "main": "src/control-worker.js",
   "compatibility_date": "2026-06-05",
   "compatibility_flags": ["nodejs_compat"],
-  // Custom domain only (terrarium.coey.dev). No public workers.dev URL — the
-  // worker carries sensitive bindings (AI, KV, R2, DOs), so the workers.dev
-  // URL is an unnecessary exposed surface. Serving is via the route below.
+  // No public workers.dev URL: the worker carries sensitive bindings (AI, KV,
+  // R2, DOs), so the workers.dev URL is an unnecessary exposed surface.
   "workers_dev": false,
   "preview_urls": false,
   "assets": {
@@ -46,9 +45,7 @@
       "bucket_name": "terrarium-control-artifacts"
     }
   ],
-  "routes": [
-    { "pattern": "terrarium.coey.dev", "custom_domain": true }
-  ],
+  // No custom domain: there is no hosted instance. Add your own route to deploy one.
   "observability": { "enabled": true },
   "ai": { "binding": "AI" },
   "durable_objects": {

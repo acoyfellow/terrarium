@@ -14,7 +14,7 @@
         ['4. Read the receipt', 'terra status <runId>\nterra read <runId>', 'code'],
         ['What you just got', 'One bounded task ran as one isolated child ON YOUR MACHINE and returned one correlated receipt: the run ID, its status, and a verified result you can trust or reject. The check does not depend on prose or on the cloud.', 'text'],
         ['5. (optional) Run on your own Cloudflare edge instead', 'wrangler deploy   # deploys a Worker to YOUR Cloudflare account, at your own URL', 'code'],
-        ['When to use the cloud path', 'Deploy the cloud service when you want to submit a task over HTTP (POST /api/runs), close your laptop, and pull the proof back later. Execution then runs on Cloudflare instead of your machine. It is fully self-hosted: it runs in the Cloudflare account where you deploy the Worker. terrarium.coey.dev is the maintainer\'s reference deployment. The CLI uses the instance configured in TERRARIUM_URL.', 'text'],
+        ['When to use the cloud path', 'Deploy the cloud service when you want to submit a task over HTTP (POST /api/runs), close your laptop, and pull the proof back later. Execution then runs on Cloudflare instead of your machine. It is fully self-hosted: it runs in the Cloudflare account where you deploy the Worker. There is no hosted Terrarium instance; you deploy your own. The CLI uses the instance configured in TERRARIUM_URL.', 'text'],
       ],
     },
     {
@@ -336,6 +336,5 @@ POST https://terrarium-control.<you>.workers.dev/api/runs  ->  202 { runId }`}</
     <span>Terrarium</span>
     <a href="https://github.com/acoyfellow/terrarium">GitHub</a>
     <a href="/docs" onclick={(e) => navigate('/docs', e)}>Docs</a>
-    <a href="https://terrarium.coey.dev">terrarium.coey.dev</a>
   </footer>
 </div>
