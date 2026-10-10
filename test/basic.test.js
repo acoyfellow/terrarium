@@ -161,6 +161,16 @@ test("terminal run envelope links to durable callback journal event", async () =
   assert.equal(typeof status.terminalCallback.duplicate, "boolean");
 });
 
+test("a background run records its first callback delivery, not a later duplicate emit", async () => {
+  const started = await spawnTerrariumBackground({ task: "first delivery is recorded", agent: `${process.execPath} -e "console.log('ok')"`, timeoutMs: 10000 });
+  const status = await waitForTerminal(started.runId, { requireTerminalCallback: true, timeoutMs: 30000 });
+  await new Promise((resolve) => setTimeout(resolve, 500));
+  const settled = await getRunStatus({ runId: started.runId });
+  assert.equal(status.status, "done");
+  assert.equal(settled.terminalCallback.eventId, `evt_${started.runId}_Completed`);
+  assert.equal(settled.terminalCallback.duplicate, false);
+});
+
 test("runTerrarium dry-run wires readOnly preset into the child invocation when no agent is given", async () => {
   const result = await runTerrarium({ task: "dig", readOnly: true, dryRun: true, stream: false, config: {} });
   assert.equal(result.ok, true);

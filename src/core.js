@@ -648,6 +648,7 @@ async function emitCompletionEvent(result) {
     // reconstruct delivery/routing state without trusting child prose.
     try {
       const current = await readMetadata(result.runId);
+      if (routed.duplicate === true && current.terminalCallback?.eventId === routed.eventId) return routed;
       await writeMetadata({
         ...current,
         terminalCallback: { eventId: routed.eventId, delivered: routed.delivered, duplicate: routed.duplicate === true },
