@@ -5,8 +5,11 @@
     {
       id: 'tutorial', label: 'Tutorial', kind: 'Learn',
       title: 'Run your first task',
-      lead: 'Install the CLI, run one bounded task on your machine, read its receipt.',
+      lead: 'About two minutes. Sign in with your Cloudflare login and run one task in the cloud.',
       blocks: [
+        ['If your team runs Terrarium', 'brew install cloudflared\ngit clone https://github.com/acoyfellow/terrarium ~/terrarium\ncd ~/terrarium && npm ci && npm install -g .\nterra login https://terrarium.<your-team-domain>', 'code'],
+        ['Then', 'Sign in in the browser, reload your agent, and ask it: Use terrarium_spawn to run "Reply with exactly: hello". You get back status done and taskContractStatus verified.', 'text'],
+        ['Or try it on your laptop', 'No cloud needed. The steps below run a task locally with an agent you already have.', 'text'],
         ['Where does this run? Locally.', 'This tutorial is the local CLI. terra runs on YOUR machine — it spawns a coding agent you already have (Pi, OpenCode…) as a child process, in your filesystem, with your network and API keys. Nothing is sent to any cloud. "Running on the edge" is a separate, optional service you deploy yourself (step 5); the CLI never phones home.', 'text'],
         ['1. Install from source', 'git clone https://github.com/acoyfellow/terrarium\ncd terrarium && npm install -g .', 'code'],
         ['2. Dry-run one bounded task', 'terra --dry-run "summarize README.md and list any stale claims"', 'code'],
@@ -164,75 +167,38 @@
 
   {#if route() === 'home'}
     <section class="hero">
-      <div class="hero-glow" aria-hidden="true"></div>
-      <div class="hero-grid" aria-hidden="true"></div>
       <div class="hero-inner" data-reveal>
-        <div class="hero-split">
-          <div class="hero-copy">
-            <div class="eyebrow">Parallel agents on Cloudflare</div>
-            <h1>Run agents in parallel.<br />Check <em>every</em> result.</h1>
-            <p class="sub">You can run a hundred agents at once. Checking a hundred results by hand is the part that stops you. Terrarium runs each bounded task <b>on Cloudflare by default</b> and returns a receipt: the run ID, a task fingerprint, and a server-minted nonce that must all correlate. Submit a task, close your laptop, and read the receipt later. The task runs on Cloudflare without an origin server or a machine you own.</p>
-            <div class="hero-actions">
-              <a class="btn btn-primary" href="/docs?page=tutorial" onclick={(e) => navigate('/docs?page=tutorial', e)}>Get started</a>
-              <a class="btn" href="https://github.com/acoyfellow/terrarium">View source</a>
-            </div>
-          </div>
-          <div class="hero-art hero-story">
-            <img class="hs-frame hs-1" src="/campaign/v6/parallel/fanout.jpg" alt="One bounded task fanned out into many isolated runs" loading="eager" />
-            <img class="hs-frame hs-2" src="/campaign/v6/parallel/grid-wall.jpg" alt="" aria-hidden="true" loading="eager" />
-            <img class="hs-frame hs-3" src="/campaign/v6/parallel/receipts-rising.jpg" alt="" aria-hidden="true" loading="lazy" />
-            <img class="hs-frame hs-4" src="/campaign/v6/parallel/all-verified.jpg" alt="" aria-hidden="true" loading="lazy" />
-            <div class="hero-art-veil" aria-hidden="true"></div>
-            <div class="hs-caption" aria-hidden="true">
-              <span class="hsc hsc-1"><b class="mono">01</b> one task, fanned out</span>
-              <span class="hsc hsc-2"><b class="mono">02</b> isolated runs, in parallel</span>
-              <span class="hsc hsc-3"><b class="mono">03</b> each returns its own receipt</span>
-              <span class="hsc hsc-4"><b class="mono">✓</b> many runs at once, each with its own receipt</span>
-            </div>
-            <div class="receipt-chip fx-shine hs-receipt">
-              <span class="rc-dot"></span>
-              <div class="rc-body">
-                <span class="rc-status">verified receipt</span>
-                <span class="rc-id mono">ter_mrcb3k07_f606b3313eb8</span>
-                <span class="rc-meta mono">1 of many · runId · fingerprint · nonce correlate</span>
-              </div>
-            </div>
+        <div class="hero-copy">
+          <h1 class="calm">Hand a task to an agent in the cloud.<br />Get the answer back with a receipt.</h1>
+          <p class="sub">You ask your coding agent to run something. It runs on Cloudflare, not your laptop. You get the answer plus a run ID that shows exactly which task produced it.</p>
+          <div class="hero-actions">
+            <a class="btn btn-primary" href="/docs?page=tutorial" onclick={(e) => navigate('/docs?page=tutorial', e)}>Try it</a>
+            <a class="btn" href="https://github.com/acoyfellow/terrarium">Read the code</a>
           </div>
         </div>
-        <pre class="hero-code fx-shine"><span class="scan" aria-hidden="true"></span><code>{`# one bounded task -> one isolated run -> one verified receipt
-terra --agent "pi -p --no-session" "fix the failing test"
+        <pre class="hero-code"><code>{`> Use terrarium_spawn to run
+  "Reply with exactly: hello".
 
-# on your own edge deploy: submit, close your laptop, pull the receipt later
-POST https://terrarium-control.<you>.workers.dev/api/runs  ->  202 { runId }`}</code></pre>
-      </div>
-    </section>
-
-    <section class="trust">
-      <div class="trust-inner">
-        <div class="trust-head">
-          <span class="trust-label mono">Every run executes on</span>
-          <img class="trust-logo" src="/cloudflare.svg" alt="Cloudflare" width="110" height="50" />
-        </div>
-        <div class="trust-primitives" data-reveal>
-          <span class="tp" style="--d:0"><img src="/cf/workers.svg" alt="" aria-hidden="true" /><b class="mono">Workers</b></span>
-          <span class="tp" style="--d:1"><img src="/cf/durable-objects.svg" alt="" aria-hidden="true" /><b class="mono">Durable Objects</b></span>
-          <span class="tp" style="--d:2"><img src="/cf/containers.svg" alt="" aria-hidden="true" /><b class="mono">Containers</b></span>
-          <span class="tp" style="--d:3"><img src="/cf/r2.svg" alt="" aria-hidden="true" /><b class="mono">R2</b></span>
-          <span class="tp" style="--d:4"><img src="/cf/workers-ai.svg" alt="" aria-hidden="true" /><b class="mono">Workers AI</b></span>
-        </div>
+{
+  "ok": true,
+  "runId": "ter_mv2qdrha_9f5a3a434d2a",
+  "status": "done",
+  "taskContractStatus": "verified"
+}`}</code></pre>
+        <p class="sub">That's a real run. Ask for <code>background: true</code> and keep working; the result shows up in your session when it's done.</p>
       </div>
     </section>
 
     <section class="chapter">
       <div class="chapter-inner">
         <div class="chapter-head" data-reveal>
-          <div><p class="eyebrow">01 / What a receipt buys you</p><h2 class="section-title">Check one run.<br />Then check a thousand the same way.</h2></div>
-          <p class="section-lede">Each run carries its own receipt, so a thousand runs check the same way as one: read the receipt. The same command runs from the CLI, an agent, or a cloud endpoint.</p>
+          <div><h2 class="section-title">What you can check</h2></div>
+          <p class="section-lede">Every run hands back a run ID, a fingerprint of the task, and a one-time number the server picked. The agent has to echo all three back. If one is missing or wrong, the run isn't done, however confident the agent sounds.</p>
         </div>
         <div class="grid-cards" data-reveal>
-          <div class="cell fx-shine" style="--d:0"><span class="idx">A</span><h3>A receipt per run</h3><p>A run succeeds when its run ID, task fingerprint, and nonce correlate. An exit code of 0 or a line of agent prose does not set the status.</p></div>
-          <div class="cell fx-shine" style="--d:1"><span class="idx">B</span><h3>Bounded parallelism</h3><p>Fan out with an explicit concurrency limit. Each run is isolated and keeps its own receipt, so the check per run stays the same as the count grows.</p></div>
-          <div class="cell fx-shine" style="--d:2"><span class="idx">C</span><h3>No process to watch</h3><p>Submit a task and disconnect. The run lives on Cloudflare and sends a durable callback when it finishes.</p></div>
+          <div class="cell" style="--d:0"><h3>Did it finish?</h3><p><code>status: done</code> and <code>verified</code>. Nothing else counts.</p></div>
+          <div class="cell" style="--d:1"><h3>Which task?</h3><p>The run ID and task fingerprint tie the answer to the task you sent.</p></div>
+          <div class="cell" style="--d:2"><h3>Whose run?</h3><p>Yours. Runs, logs and results belong to your login and nobody else sees them.</p></div>
         </div>
       </div>
     </section>
@@ -240,52 +206,23 @@ POST https://terrarium-control.<you>.workers.dev/api/runs  ->  202 { runId }`}</
     <section class="chapter">
       <div class="chapter-inner">
         <div class="chapter-head" data-reveal>
-          <div><p class="eyebrow">02 / How one run works</p><h2 class="section-title">Task in.<br />Receipt out.</h2></div>
-          <p class="section-lede">One run takes four steps. Every task you fan out follows the same four steps and returns its own receipt, including runs that finish after you disconnect.</p>
+          <div><h2 class="section-title">What it doesn't do</h2></div>
+          <p class="section-lede">Worth knowing before you rely on it.</p>
         </div>
-        <ol class="flow" data-reveal>
-          <li class="fx-shine" style="--d:0"><span class="step-art"><img src="/campaign/v6/steps/task.jpg" alt="" aria-hidden="true" loading="lazy" /></span><span class="step">01</span><b>Task</b><span>Hand Terrarium one bounded job.</span></li>
-          <li class="fx-shine" style="--d:1"><span class="step-art"><img src="/campaign/v6/steps/run.jpg" alt="" aria-hidden="true" loading="lazy" /></span><span class="step">02</span><b>Run</b><span>It executes as one isolated child — local or a Cloudflare cell.</span></li>
-          <li class="fx-shine" style="--d:2"><span class="step-art"><img src="/campaign/v6/steps/receipt.jpg" alt="" aria-hidden="true" loading="lazy" /></span><span class="step">03</span><b>Receipt</b><span>You get a correlated, verifiable result back.</span></li>
-          <li class="fx-shine" style="--d:3"><span class="step-art"><img src="/campaign/v6/steps/wake.jpg" alt="" aria-hidden="true" loading="lazy" /></span><span class="step">04</span><b>Wake</b><span>A durable callback tells you it finished, even after you disconnect.</span></li>
-        </ol>
-      </div>
-    </section>
-
-    <section class="chapter edge">
-      <div class="chapter-inner">
-        <div class="chapter-head" data-reveal>
-          <div><p class="eyebrow">03 / Where a run lives</p><h2 class="section-title">Runs on Cloudflare.<br />No machine you own.</h2></div>
-          <p class="section-lede">Submit a task and close your laptop. Admission, the run-control cell, execution, logs, the model route, and the wake callback all run on <b>Cloudflare's global network</b>. State, logs, and delivery do not depend on a machine you own.</p>
+        <div class="grid-cards" data-reveal>
+          <div class="cell" style="--d:0"><h3>Check the answer is right</h3><p>"Verified" means the answer came from your task, not that it's correct. Check answers that matter.</p></div>
+          <div class="cell" style="--d:1"><h3>See your files</h3><p>A cloud task knows only what you put in the task text.</p></div>
+          <div class="cell" style="--d:2"><h3>Sandbox local runs</h3><p>A local run runs as you. For untrusted code, use the opt-in Docker profile.</p></div>
         </div>
-        <div class="globe-wrap" data-reveal aria-hidden="true">
-          <div class="globe">
-            <span class="g-ring g-ring-1"></span>
-            <span class="g-ring g-ring-2"></span>
-            <span class="g-ring g-ring-3"></span>
-            <span class="g-core"></span>
-            {#each Array(11) as _, i}<span class="pop" style={`--p:${i}`}></span>{/each}
-          </div>
-          <span class="globe-cap mono">parallel runs across Cloudflare edge POPs</span>
-        </div>
-        <ol class="edge-flow" data-reveal>
-          <span class="edge-packet" aria-hidden="true"></span>
-          <li style="--d:0"><span class="ef-k mono">Worker API</span><span class="ef-v">Authenticated <code>POST /api/runs</code>, ordered admission, per-principal budget.</span></li>
-          <li style="--d:1"><span class="ef-k mono">Durable Object</span><span class="ef-v">One run-control cell per run holds authoritative state — survives restarts and reconnects.</span></li>
-          <li style="--d:2"><span class="ef-k mono">Container cell</span><span class="ef-v">The task runs in an isolated Cloudflare-managed execution cell. Egress is deny-by-default.</span></li>
-          <li style="--d:3"><span class="ef-k mono">Workers AI</span><span class="ef-v">A credentialless, server-owned model route — the cell never holds a reusable key.</span></li>
-          <li style="--d:4"><span class="ef-k mono">R2 logs</span><span class="ef-v">Durable, integrity-checked logs (byte count + SHA-256), inline then overflow to R2.</span></li>
-          <li style="--d:5"><span class="ef-k mono">Pulse wake</span><span class="ef-v">A durable, principal-scoped terminal callback reaches you across closes, sessions, and machines.</span></li>
-        </ol>
       </div>
     </section>
 
     <section class="closing">
       <div class="closing-inner" data-reveal>
-        <p><strong>Run bounded agent tasks in parallel on Cloudflare. Read a receipt for each one.</strong></p>
+        <p><strong>Setup takes about two minutes:</strong> install, <code>terra login</code>, reload your agent.</p>
         <div class="hero-actions">
-          <a class="btn btn-primary" href="/docs?page=tutorial" onclick={(e) => navigate('/docs?page=tutorial', e)}>Run your first task</a>
-          <a class="btn" href="/docs?page=explain" onclick={(e) => navigate('/docs?page=explain', e)}>Why receipts?</a>
+          <a class="btn btn-primary" href="/docs?page=tutorial" onclick={(e) => navigate('/docs?page=tutorial', e)}>Try it</a>
+          <a class="btn" href="https://github.com/acoyfellow/terrarium">Read the code</a>
         </div>
       </div>
     </section>

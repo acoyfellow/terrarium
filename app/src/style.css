@@ -542,3 +542,6 @@ img { max-width: 100%; display: block; }
 .batch-stat-run b { color: var(--mint); }
 .batch-stat-done b { color: #9fe6c0; }
 .batch-stat-fail b { color: #ff9b9b; }
+
+.hero h1.calm { font-size: clamp(2rem, 4.2vw, 3.4rem); line-height: 1.08; }
+@media (max-width: 560px) { .hero-code { white-space: pre-wrap; word-break: break-word; } header nav a:not(.cta) { display: none; } }

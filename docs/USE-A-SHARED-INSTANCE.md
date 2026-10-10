@@ -1,92 +1,51 @@
-# Use a shared Terrarium instance
+# Use your team's Terrarium
 
-Your team runs one Terrarium instance behind Cloudflare Access. You sign in with your normal Cloudflare login. You don't copy any tokens, and your runs and results are visible only to you.
+Terrarium runs agent tasks in the cloud and hands back a verified receipt for each one. Your team already runs it. You sign in with your normal Cloudflare login, and your runs are visible only to you.
 
-This page is written so a coding agent can follow it for you.
+You can paste this page into your coding agent and tell it to follow along.
 
-## What you need
+## Setup (about 2 minutes)
 
-- Node 22 or newer
-- `cloudflared` (`brew install cloudflared`)
-- The instance URL from your team, for example `https://terrarium.<your-team-domain>`
-- Membership in the Access policy that protects that URL
-
-## 1. Install Terrarium
+You need Node 22+, Pi, and the Terrarium URL from your team.
 
 ```sh
-git clone https://github.com/acoyfellow/terrarium
-cd terrarium && npm ci && npm install -g .
-```
-
-## 2. Sign in
-
-```sh
+brew install cloudflared
+git clone https://github.com/acoyfellow/terrarium ~/terrarium
+cd ~/terrarium && npm ci && npm install -g .
 terra login https://terrarium.<your-team-domain>
 ```
 
-A browser window opens on the Cloudflare Access login page. Approve it. The command prints who you are signed in as, for example:
+`terra login` opens your browser. Sign in and approve. It then:
 
-```text
-Signed in to https://terrarium.<your-team-domain> as you@example.com (owner user:you:example.com)
-```
+- prints who you are (`Signed in ... as you@example.com`)
+- connects Pi: it adds the Terrarium tools to `~/.pi/agent/mcp.json` and installs the callback extension
 
-This stores the instance URL and turns on login-based access in `~/.terrarium/config.json`. Your session is held by `cloudflared` on your machine, and it never reaches the cloud cell where tasks run.
+**Reload Pi.** You're done.
 
-Check it at any time:
+## Try it
 
-```sh
-terra whoami
-```
+Ask your agent:
 
-When the session expires, run `terra login` again.
+> Use terrarium_spawn to run "Reply with exactly: hello" in the cloud.
 
-## 3. Connect your agent
+You get back `"status": "done"` and `"taskContractStatus": "verified"`.
 
-Add the Terrarium MCP server to your agent. For Pi, add this to `~/.pi/agent/mcp.json`:
+For a background run, ask it to spawn with `background: true`. When the run finishes, the result shows up in your Pi session as a "Terrarium completion event". There's nothing to poll.
 
-```json
-{
-  "mcpServers": {
-    "terrarium": {
-      "command": "node",
-      "args": ["<path-to-terrarium>/src/mcp.js"],
-      "env": {
-        "TERRARIUM_URL": "https://terrarium.<your-team-domain>",
-        "TERRARIUM_ACCESS_LOGIN": "1"
-      }
-    }
-  }
-}
-```
+## Good to know
 
-For Pi, also install the callback extension. It brings each background run's result back into your session when the run finishes, so you don't have to poll:
+- **Who can see your runs:** only you. Runs, logs, receipts and completion events belong to your email.
+- **Your session lasts about a day.** When tools start failing with `unauthorized`, run `terra login` again.
+- **Cloud runs can't see your laptop.** A cloud task only knows what you put in the task text. To work on local files, run Terrarium locally.
+- **"Verified" proves the result came from your task, not that it's correct.** Check answers that matter.
+- **Check who you are:** `terra whoami`.
 
-```sh
-./pi-extension/install.sh
-```
+## If something's off
 
-Reload the agent. `terrarium_spawn` now runs tasks on the shared instance as you and returns a verified receipt. A background spawn's result arrives in your session as a "Terrarium completion event" message.
-
-## What is scoped to you
-
-| Thing | Who can see it |
+| What you see | Fix |
 |---|---|
-| Runs you start | Only you |
-| Logs and receipts of your runs | Only you |
-| Completion callbacks for your runs | Only you |
-| Your run budget (concurrency, per-minute, per-day) | Counted for you alone |
-
-Your identity is the email in the Access login, checked on every request against Cloudflare's signature. Someone else on the team can't read your runs or receive your callbacks, even with their own valid login.
-
-## Machines and CI
-
-Something that can't open a browser, such as CI, uses an Access service token and a bearer token issued by the instance owner. Ask the owner for those. People should always use `terra login`.
-
-## Troubleshooting
-
-| Symptom | Fix |
-|---|---|
-| `whoami failed: HTTP 401` | Run `terra login` again; the session expired. |
-| A Cloudflare "nothing here" page in tool output | The agent is running old code or an old URL. Reload the agent. |
-| Login opens no browser | Copy the URL that `terra login` printed into your browser. |
-| Background runs finish but no completion event arrives | Run `./pi-extension/install.sh` and reload Pi. |
+| `unauthorized` or HTTP 401 | Run `terra login` again. |
+| A Cloudflare "nothing here" page in tool output | Reload Pi. |
+| The login page never opens | Copy the URL that `terra login` printed into your browser. |
+| Background runs finish but no completion event arrives | Run `terra login` again, then reload Pi. |
+| `terra: command not found` | Rerun `npm install -g .` in `~/terrarium`. |

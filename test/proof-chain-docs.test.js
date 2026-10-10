@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 const root = fileURLToPath(new URL('..', import.meta.url));
-const readme = readFileSync(root + 'README.md', 'utf8');
+const readme = readFileSync(root + 'docs/REFERENCE.md', 'utf8');
 const changelog = readFileSync(root + 'CHANGELOG.md', 'utf8');
 const publicChangelog = readFileSync(root + 'app/public/CHANGELOG.md', 'utf8');
 
