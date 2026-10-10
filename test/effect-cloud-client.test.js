@@ -450,3 +450,25 @@ test("Effect cloud batch surfaces per-job admission 400s instead of empty all-co
   assert.equal(result.jobErrors.length, 3);
   assert.deepEqual(result.jobErrors.map((job) => job.index).sort(), [0, 1, 2]);
 });
+
+test("a foreground cloud spawn records its terminal state locally so doctor never orphans it", async () => {
+  const runId = "ter_deployed04_cafe";
+  const recorded = [];
+  const scripted = [
+    response(202, { runId, contract: contract(runId), executionRef: "exec-1" }),
+    response(200, deployedStatus(runId, "done", "verified")),
+  ];
+  const result = await effectCloudSpawn({ task: "reply with OK" }, {
+    env,
+    pollMs: 0,
+    maxPolls: 1,
+    retryDelayMs: 0,
+    fetchImpl: async () => scripted.shift(),
+    recordAdmission: async () => {},
+    recordTerminal: async (settled) => { recorded.push(settled); },
+  });
+  assert.equal(result.ok, true);
+  assert.equal(recorded.length, 1);
+  assert.equal(recorded[0].runId, runId);
+  assert.equal(recorded[0].status, "done");
+});

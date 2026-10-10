@@ -10,7 +10,7 @@ import {
   pollCloudRun,
 } from "terrarium-effect";
 import { cloudConfig, detectFilesystemDependency } from "./cloud-client.js";
-import { recordCloudAdmission } from "./core.js";
+import { recordCloudAdmission, recordCloudTerminal } from "./core.js";
 import { validateBatchShape } from "./batch.js";
 
 const EFFECT_CLOUD_OPTIONS = new Set([
@@ -509,6 +509,7 @@ export async function effectCloudSpawn(args = {}, options = {}) {
     signal,
     onAdmitted,
     recordAdmission = recordCloudAdmission,
+    recordTerminal = recordCloudTerminal,
   } = options;
   const admitted = await submitEffectCloudAdmission(args, {
     env,
@@ -533,7 +534,7 @@ export async function effectCloudSpawn(args = {}, options = {}) {
   if (!polled.serverVerdict && !validReceipt(polled.terminal, contract, runId)) {
     return admittedFailure("terminal receipt is malformed or does not match the admitted contract", idempotencyKey, runId);
   }
-  return {
+  const settled = {
     ok: polled.status === "done" && polled.terminal.ok !== false,
     runId,
     status: polled.status,
@@ -549,5 +550,7 @@ export async function effectCloudSpawn(args = {}, options = {}) {
     reason: polled.terminal.reason,
     terminal: polled.terminal,
   };
+  await recordTerminal(settled).catch(() => {});
+  return settled;
 }
 

@@ -276,13 +276,39 @@ async function readMetadataIfPresent(runId) {
   try { return await readMetadata(runId); } catch { return null; }
 }
 
+const metadataWriteQueues = new Map();
+
+function serializeMetadataWrite(runId, write) {
+  const previous = metadataWriteQueues.get(runId) ?? Promise.resolve();
+  const next = previous.catch(() => {}).then(write);
+  metadataWriteQueues.set(runId, next);
+  next.finally(() => { if (metadataWriteQueues.get(runId) === next) metadataWriteQueues.delete(runId); }).catch(() => {});
+  return next;
+}
+
+const RUNNING_STATUSES = new Set(["running", "accepted"]);
+
 async function writeRunningMetadata(meta) {
-  const current = await readMetadataIfPresent(meta.runId);
-  if (current && current.status !== "running" && current.status !== "accepted") return;
-  await writeMetadata(meta);
+  return serializeMetadataWrite(meta.runId, async () => {
+    const current = await readMetadataIfPresent(meta.runId);
+    if (current && !RUNNING_STATUSES.has(current.status)) return;
+    await persistMetadata(meta);
+  });
+}
+
+async function updateRunningMetadata(runId, patch) {
+  return serializeMetadataWrite(runId, async () => {
+    const current = await readMetadataIfPresent(runId);
+    if (!current || current.status !== "running") return;
+    await persistMetadata({ ...current, ...patch });
+  });
 }
 
 async function writeMetadata(meta) {
+  return serializeMetadataWrite(meta.runId, () => persistMetadata(meta));
+}
+
+async function persistMetadata(meta) {
   await mkdir(LOG_DIR, { recursive: true });
   const target = metadataPath(meta.runId);
   const temp = `${target}.${process.pid}.${Math.random().toString(36).slice(2, 8)}.tmp`;
@@ -591,8 +617,7 @@ async function prepareRun(opts = {}) {
 async function emitProgressEvent(run, text, { activity = true } = {}) {
   try {
     if (activity) {
-      const current = await readMetadata(run.runId);
-      if (current.status === "running") await writeRunningMetadata({ ...current, lastActivityAt: new Date().toISOString(), progressText: String(text).slice(-300) });
+      await updateRunningMetadata(run.runId, { lastActivityAt: new Date().toISOString(), progressText: String(text).slice(-300) });
     }
     const channel = run.channel ?? process.env.TERRARIUM_EVENT_CHANNEL;
     const event = { type: "terrarium.progress", runId: run.runId, cwd: run.originalCwd ?? run.cwd, task: run.task, text, at: new Date().toISOString(), channel: channel ?? null };
@@ -749,7 +774,27 @@ export async function readMetadata(runId) {
   return JSON.parse(await readFile(metadataPath(runId), "utf8"));
 }
 
+export async function recordCloudTerminal(result) {
+  if (!result?.runId || !result.cloud) return null;
+  const current = await readMetadataIfPresent(result.runId);
+  if (!current || current.status !== "running") return current;
+  const next = {
+    ...current,
+    ok: result.ok === true,
+    status: result.status,
+    exitCode: result.exitCode ?? null,
+    taskContractStatus: result.taskContractStatus ?? current.taskContractStatus,
+    taskResultSummary: result.taskResultSummary ?? null,
+    reason: result.reason ?? null,
+    finishedAt: new Date().toISOString(),
+  };
+  delete next.taskContract;
+  await writeMetadata(next);
+  return next;
+}
+
 export async function reconcileRun(meta, { staleMs = 30000 } = {}) {
+  if (meta?.cloud === true) return meta;
   // An `accepted` record is a durable pre-launch receipt (runId persisted before
   // the slow launch handshake, so a timed-out spawn RPC is still recoverable). If
   // a spawn crashed between accept and launch, the record would otherwise linger
