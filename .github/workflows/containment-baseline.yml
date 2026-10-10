@@ -25,9 +25,15 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
 
       - name: Verify product tests
         run: npm test
+        env:
+          TERRARIUM_TEST_CONCURRENCY: "1"
 
       - name: Prepare artifact directory
         run: mkdir -p artifacts/probes artifacts/fixture
