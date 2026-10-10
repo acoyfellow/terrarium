@@ -116,6 +116,50 @@ test("Effect CloudClient preserves bearer auth, one idempotency key, and correla
   assert.equal(new URL(requests[2].url).pathname, `/api/runs/${runId}/status`);
 });
 
+function deployedStatus(runId, terminalStatus, taskContractStatus, fingerprint = "fingerprint-1") {
+  return {
+    ok: true,
+    status: {
+      runId,
+      ownerId: "owner-1",
+      status: terminalStatus,
+      taskFingerprint: fingerprint,
+      terminal: { status: terminalStatus, ok: terminalStatus === "done", exitCode: 0, taskContractStatus, taskResultSummary: "hello", reason: "verified-receipt" },
+    },
+  };
+}
+
+async function spawnAgainstDeployedStatus(runId, statusBody) {
+  const scripted = [
+    response(202, { runId, contract: contract(runId), executionRef: "exec-1" }),
+    response(200, statusBody),
+  ];
+  return effectCloudSpawn({ task: "reply with OK" }, { env, pollMs: 0, maxPolls: 1, retryDelayMs: 0, fetchImpl: async () => scripted.shift() });
+}
+
+test("a deployed instance's server-verified terminal status resolves the foreground spawn", async () => {
+  const runId = "ter_deployed01_cafe";
+  const result = await spawnAgainstDeployedStatus(runId, deployedStatus(runId, "done", "verified"));
+  assert.equal(result.ok, true);
+  assert.equal(result.status, "done");
+  assert.equal(result.taskContractStatus, "verified");
+  assert.equal(result.taskResultSummary, "hello");
+});
+
+test("a deployed instance's unverified terminal status never resolves as success", async () => {
+  const runId = "ter_deployed02_cafe";
+  const result = await spawnAgainstDeployedStatus(runId, deployedStatus(runId, "done", "missing"));
+  assert.equal(result.ok, false);
+  assert.equal(result.taskContractStatus, "missing");
+});
+
+test("a deployed terminal status for a different task fingerprint stays ambiguous", async () => {
+  const runId = "ter_deployed03_cafe";
+  const result = await spawnAgainstDeployedStatus(runId, deployedStatus(runId, "done", "verified", "other-fingerprint"));
+  assert.equal(result.ok, false);
+  assert.equal(result.status, "ambiguous-effect-result");
+});
+
 test("a definite pre-admission rejection stays rejected without creating a run", async () => {
   const requests = [];
   const result = await effectCloudSpawn(

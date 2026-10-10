@@ -81,6 +81,26 @@ function validReceipt(receipt, contract, runId) {
     receipt.nonce === contract.nonce;
 }
 
+function isMalformedTerminalReceipt(error) {
+  return error?._tag === "CloudResponseMalformed" && error.operation === "poll status";
+}
+
+const SERVER_TERMINAL_STATUSES = new Set(["done", "failed", "cancelled", "inconclusive", "error"]);
+
+function serverVerdictTerminal(body, contract, runId) {
+  const status = body?.status;
+  const terminal = status?.terminal;
+  if (!status || typeof status !== "object" || !terminal || typeof terminal !== "object") return null;
+  if (status.runId !== runId || status.taskFingerprint !== contract.taskFingerprint) return null;
+  if (!SERVER_TERMINAL_STATUSES.has(status.status) || typeof terminal.taskContractStatus !== "string") return null;
+  const verified = terminal.taskContractStatus === "verified";
+  return {
+    serverVerdict: true,
+    status: status.status,
+    terminal: { ...terminal, ok: verified && terminal.ok !== false },
+  };
+}
+
 function correlation(idempotencyKey, runId = null) {
   return { idempotencyKey, runId };
 }
@@ -506,9 +526,11 @@ export async function effectCloudSpawn(args = {}, options = {}) {
   try {
     polled = await pollAdmittedRun(runId, { config, fetchImpl, pollMs, maxPolls, retryAttempts, retryDelayMs, signal });
   } catch (error) {
-    return admittedFailure(failureMessage(error), idempotencyKey, runId);
+    if (!isMalformedTerminalReceipt(error)) return admittedFailure(failureMessage(error), idempotencyKey, runId);
+    polled = serverVerdictTerminal(error.body, contract, runId);
+    if (!polled) return admittedFailure(failureMessage(error), idempotencyKey, runId);
   }
-  if (!validReceipt(polled.terminal, contract, runId)) {
+  if (!polled.serverVerdict && !validReceipt(polled.terminal, contract, runId)) {
     return admittedFailure("terminal receipt is malformed or does not match the admitted contract", idempotencyKey, runId);
   }
   return {
