@@ -637,12 +637,11 @@ async function emitCompletionEvent(result) {
     // The callback is still only a notification, but this handle lets operators
     // reconstruct delivery/routing state without trusting child prose.
     try {
-      const path = metadataPath(result.runId);
-      const current = JSON.parse(await readFile(path, "utf8"));
-      await writeFile(path, `${JSON.stringify({
+      const current = await readMetadata(result.runId);
+      await writeMetadata({
         ...current,
         terminalCallback: { eventId: routed.eventId, delivered: routed.delivered, duplicate: routed.duplicate === true },
-      }, null, 2)}\n`);
+      });
     } catch {}
     return routed;
 }
