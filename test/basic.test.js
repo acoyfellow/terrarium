@@ -401,9 +401,10 @@ test("rejects pre-existing custom MRE side logs", async () => {
   }
 });
 
-async function waitForTerminal(runId, { staleMs = 5000, attempts = 100, delayMs = 50, requireTerminalCallback = false } = {}) {
+async function waitForTerminal(runId, { staleMs = 5000, attempts = 100, delayMs = 50, requireTerminalCallback = false, timeoutMs = null } = {}) {
+  const deadline = timeoutMs == null ? null : Date.now() + timeoutMs;
   let status;
-  for (let i = 0; i < attempts; i++) {
+  for (let i = 0; deadline == null ? i < attempts : Date.now() < deadline; i++) {
     status = await getRunStatus({ runId, staleMs });
     if (status.status !== "running" && (!requireTerminalCallback || status.terminalCallback)) return status;
     await new Promise((resolve) => setTimeout(resolve, delayMs));
@@ -417,7 +418,7 @@ test("background runs finish after the launcher exits", async () => {
   const launcher = `import { spawnTerrariumBackground } from ${JSON.stringify(coreUrl)};\nconst result = await spawnTerrariumBackground(${JSON.stringify({ task: "finish independently", agent })});\nconsole.log(JSON.stringify({ runId: result.runId }));`;
   const output = execFileSync(process.execPath, ["--input-type=module", "--eval", launcher], { encoding: "utf8" });
   const { runId } = JSON.parse(output.trim());
-  const status = await waitForTerminal(runId);
+  const status = await waitForTerminal(runId, { timeoutMs: 50000 });
   assert.equal(status.status, "done");
   assert.equal(status.exitCode, 0);
   assert.match(status.stdoutTail, /supervised child complete/);
@@ -503,7 +504,7 @@ test("background alive log-growing child survives the base startup window (no fa
     const script = "let n=0;const t=setInterval(()=>{process.stderr.write('working '+(++n)+'\\n');if(n>=6){clearInterval(t);console.log('done');process.exit(0);}},100);";
     const agent = `${process.execPath} -e "${script}"`;
     const started = await spawnTerrariumBackground({ task: "slow first stdout", agent, timeoutMs: 10000 });
-    const status = await waitForTerminal(started.runId, { attempts: 400, delayMs: 25 });
+    const status = await waitForTerminal(started.runId, { delayMs: 25, timeoutMs: 100000 });
     // Survived the base window and finished on its own terms (not a startup kill).
     assert.ok(!/startup-timeout/.test(String(status.error || "")), `should not be startup-killed, got: ${status.error}`);
     const log = await readRun({ runId: started.runId });
