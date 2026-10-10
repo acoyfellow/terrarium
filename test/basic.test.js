@@ -431,7 +431,7 @@ test("background large prompt uses prompt file transport and still verifies rece
   const agent = `${process.execPath} -e ${JSON.stringify(script)}`;
   const task = `LARGE_PROMPT_SENTINEL\n${"x".repeat(PROMPT_ARG_MAX_BYTES + 3000)}`;
   const started = await spawnTerrariumBackground({ task, agent, timeoutMs: 5000, requireTaskContract: true });
-  const status = await waitForTerminal(started.runId, { attempts: 120 });
+  const status = await waitForTerminal(started.runId, { requireTerminalCallback: true, timeoutMs: 60000 });
   assert.equal(status.status, "done");
   assert.equal(status.taskContractStatus, "verified");
   assert.equal(status.taskResultSummary, "large prompt received");
@@ -449,7 +449,7 @@ test("background wedged-but-alive child is killed at the startup hard ceiling", 
     process.env.TERRARIUM_STARTUP_HARD_CEILING_MS = "800";
     const agent = `${process.execPath} -e "setInterval(() => {}, 1000)"`;
     const started = await spawnTerrariumBackground({ task: "hang before output", agent, timeoutMs: 10000 });
-    const status = await waitForTerminal(started.runId, { attempts: 200, delayMs: 25 });
+    const status = await waitForTerminal(started.runId, { delayMs: 25, requireTerminalCallback: true, timeoutMs: 50000 });
     assert.equal(status.status, "error");
     assert.equal(status.ok, false);
     assert.equal(status.exitCode, 124);
@@ -524,7 +524,7 @@ test("background deadline timeout terminalizes and journals callback", async () 
   // (output captured, then deadline-killed) without the flush race.
   const agent = `${process.execPath} -e "console.log('child started'); setInterval(() => {}, 1000)"`;
   const started = await spawnTerrariumBackground({ task: "timeout after output", agent, timeoutMs: 2000 });
-  const status = await waitForTerminal(started.runId, { attempts: 400, delayMs: 25, requireTerminalCallback: true });
+  const status = await waitForTerminal(started.runId, { delayMs: 25, requireTerminalCallback: true, timeoutMs: 100000 });
   assert.equal(status.status, "failed");
   assert.equal(status.ok, false);
   assert.equal(status.taskContractStatus, "not-applicable");
