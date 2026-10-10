@@ -103,19 +103,23 @@ function parsePrincipalDirectory(raw) {
     const id = typeof row.id === "string" ? row.id : "";
     const token = typeof row.token === "string" ? row.token : "";
     const previous = typeof row.previous === "string" ? row.previous : "";
+    const pulseToken = typeof row.pulseToken === "string" ? row.pulseToken : "";
+    const pulsePrevious = typeof row.pulsePrevious === "string" ? row.pulsePrevious : "";
     if (!PRINCIPAL_ID_RE.test(id) || !token) return { ok: false, status: 401, error: "unauthorized" };
-    entries.push({ id, token, previous });
+    entries.push({ id, token, previous, pulseToken, pulsePrevious });
   }
   return { ok: true, entries };
 }
 
-function authenticateFromDirectory(request, directory) {
+function authenticateFromDirectory(request, directory, { tokenKey = "token", previousKey = "previous" } = {}) {
   const presented = extractBearer(request);
   if (!presented) return { ok: false, status: 401, error: "unauthorized" };
   let matchedId = "";
   let matches = 0;
   for (const entry of directory.entries) {
-    const hit = constantTimeEqualStr(presented, entry.token) || (entry.previous ? constantTimeEqualStr(presented, entry.previous) : false);
+    const current = entry[tokenKey];
+    const previous = entry[previousKey];
+    const hit = (current ? constantTimeEqualStr(presented, current) : false) || (previous ? constantTimeEqualStr(presented, previous) : false);
     if (hit) {
       matches += 1;
       matchedId = entry.id;
@@ -145,6 +149,13 @@ export function authenticatePrincipal(request, env) {
  * migrate to TERRARIUM_PULSE_TOKEN_CURRENT.
  */
 export function authenticatePulseRequest(request, env) {
+  const directory = parsePrincipalDirectory(env?.TERRARIUM_PRINCIPALS);
+  if (directory?.ok === true && directory.entries.some((entry) => entry.pulseToken)) {
+    if (env?.PULSE_TOKEN && constantTimeEqualStr(extractBearer(request) ?? "", env.PULSE_TOKEN)) {
+      return { ok: false, status: 401, error: "unauthorized" };
+    }
+    return authenticateFromDirectory(request, directory, { tokenKey: "pulseToken", previousKey: "pulsePrevious" });
+  }
   return authenticateWithTokens(request, env,
     "TERRARIUM_PULSE_TOKEN_CURRENT",
     "TERRARIUM_PULSE_TOKEN_PREVIOUS",
