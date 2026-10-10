@@ -36,15 +36,24 @@ export function writeMcpServer(url, env = process.env) {
   return path;
 }
 
-export function linkCallbackExtension(env = process.env) {
-  const source = join(repoRoot, "pi-extension", "terrarium-autocontinue.ts");
-  const dir = join(piAgentDir(env), "extensions");
-  const target = join(dir, "terrarium-autocontinue.ts");
-  mkdirSync(dir, { recursive: true });
+const EXTENSION_LINK = "terrarium";
+const LEGACY_EXTENSION_FILE = "terrarium-autocontinue.ts";
+
+function clearExtensionPath(env, path, name) {
   let existing = null;
-  try { existing = lstatSync(target); } catch { existing = null; }
-  if (existing?.isSymbolicLink()) unlinkSync(target);
-  else if (existing) renameSync(target, backupPath(env, "terrarium-autocontinue.ts"));
+  try { existing = lstatSync(path); } catch { existing = null; }
+  if (!existing) return;
+  if (existing.isSymbolicLink()) unlinkSync(path);
+  else renameSync(path, backupPath(env, name));
+}
+
+export function linkCallbackExtension(env = process.env) {
+  const source = join(repoRoot, "pi-extension");
+  const dir = join(piAgentDir(env), "extensions");
+  const target = join(dir, EXTENSION_LINK);
+  mkdirSync(dir, { recursive: true });
+  clearExtensionPath(env, join(dir, LEGACY_EXTENSION_FILE), LEGACY_EXTENSION_FILE);
+  clearExtensionPath(env, target, EXTENSION_LINK);
   symlinkSync(source, target);
   return target;
 }
