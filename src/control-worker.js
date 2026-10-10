@@ -192,6 +192,10 @@ const legacyWorker = {
     if (["/pulse", "/claim", "/ack", "/status"].includes(url.pathname)) {
       return pulseWorker.fetch(request, env);
     }
+    if (url.pathname === "/api/whoami" && request.method === "GET") {
+      const { describeCaller } = await import("./cloud/whoami.js");
+      return describeCaller(request, env);
+    }
     // Cloud Terrarium production /api/runs + /api/models surface.
     if (url.pathname.startsWith("/api/runs") || url.pathname === "/api/models") {
       const routed = await handleApiRuns(request, env);

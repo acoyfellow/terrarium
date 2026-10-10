@@ -9,7 +9,7 @@ import {
   admitCloudRun,
   pollCloudRun,
 } from "terrarium-effect";
-import { cloudConfig, detectFilesystemDependency } from "./cloud-client.js";
+import { bearerHeader, cloudConfig, detectFilesystemDependency } from "./cloud-client.js";
 import { recordCloudAdmission, recordCloudTerminal } from "./core.js";
 import { validateBatchShape } from "./batch.js";
 
@@ -297,7 +297,7 @@ function effectTransportLayer(config, fetchImpl, signal) {
       try: async () => {
         const response = await fetchImpl(`${config.url}${request.path}`, {
           method: request.method,
-          headers: { ...request.headers, ...config.accessHeaders, authorization: `Bearer ${config.token}` },
+          headers: { ...request.headers, ...config.accessHeaders, ...bearerHeader(config.token) },
           body: request.body === undefined ? undefined : JSON.stringify(request.body),
           signal,
         });
@@ -331,7 +331,7 @@ async function submitEffectCloudAdmission(args, {
   signal,
 }, background) {
   const config = cloudConfig(env);
-  if (!config.configured) throw new Error("effect cloud spawn requires TERRARIUM_URL and TERRARIUM_CONTROL_TOKEN (or TERRARIUM_TOKEN_FILE)");
+  if (!config.configured) throw new Error("effect cloud spawn requires TERRARIUM_URL and either terra login or TERRARIUM_CONTROL_TOKEN");
   assertEffectCloudForegroundCapability(args, { env });
   if (typeof fetchImpl !== "function") throw new Error("effect cloud client requires fetch");
 

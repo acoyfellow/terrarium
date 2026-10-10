@@ -20,6 +20,7 @@
 //   TERRARIUM_PRINCIPAL_ID — existing owner identity a valid session maps to.
 
 import { authenticatePrincipal } from "./principal-auth.js";
+import { authenticateAccessUser } from "./access-identity.js";
 
 const SESSION_COOKIE = "terra_session";
 const STATE_COOKIE = "terra_oauth_state";
@@ -128,6 +129,8 @@ export async function verifyWebSession(request, env) {
  * { ok, principalId } or { ok:false, status, error }.
  */
 export async function authenticateOwner(request, env) {
+  const accessUser = await authenticateAccessUser(request, env);
+  if (accessUser) return { ok: true, principalId: accessUser.principalId };
   const bearer = authenticatePrincipal(request, env);
   if (bearer.ok) return bearer;
   const session = await verifyWebSession(request, env);

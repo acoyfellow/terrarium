@@ -27,6 +27,7 @@ import { randomUUID } from "node:crypto";
 import { decide, validateBatchShape, BATCH_STRATEGIES } from "./batch.js";
 import { recordCloudAdmission } from "./core.js";
 import { cloudboxEnabled, cloudboxRun } from "./cloudbox-client.js";
+import { accessUserHeaders } from "./access-login.js";
 
 // Read ~/.terrarium/config.json (or $TERRARIUM_HOME/config.json) synchronously.
 // Returns {} on any absence/parse error so config resolution never throws.
@@ -52,7 +53,19 @@ export function cloudConfig(env = process.env) {
     try { token = readFileSync(tokenFile, "utf8").trim(); } catch { /* leave empty */ }
   }
   if (!token && typeof file.controlToken === "string") token = file.controlToken;
-  return { url, token, accessHeaders: accessServiceTokenHeaders(env, file), configured: Boolean(url && token) };
+  const userHeaders = accessLoginEnabled(env, file) ? accessUserHeaders(url) : {};
+  const signedIn = Object.keys(userHeaders).length > 0;
+  const accessHeaders = signedIn ? userHeaders : accessServiceTokenHeaders(env, file);
+  return { url, token, accessHeaders, signedIn, configured: Boolean(url && (token || signedIn)) };
+}
+
+function accessLoginEnabled(env, file) {
+  if (env.TERRARIUM_ACCESS_LOGIN === "0") return false;
+  return env.TERRARIUM_ACCESS_LOGIN === "1" || file.accessLogin === true;
+}
+
+export function bearerHeader(token) {
+  return token ? { authorization: `Bearer ${token}` } : {};
 }
 
 function readSecretFile(path) {
@@ -80,7 +93,7 @@ export function isCloudRunId(runId) {
 }
 
 async function api(path, { method = "GET", body, config } = {}) {
-  const headers = { ...config.accessHeaders, authorization: `Bearer ${config.token}` };
+  const headers = { ...config.accessHeaders, ...bearerHeader(config.token) };
   if (body !== undefined) { headers["content-type"] = "application/json"; headers["idempotency-key"] = randomUUID(); }
   const res = await fetch(`${config.url}${path}`, { method, headers, body: body !== undefined ? JSON.stringify(body) : undefined });
   const text = await res.text();
@@ -326,19 +339,19 @@ function isTerminalStatus(s) { return ["done", "failed", "cancelled", "inconclus
 // the local FS router the extension uses today.
 
 export function pulseConfig(env = process.env) {
-  const { url, accessHeaders } = cloudConfig(env);
+  const { url, accessHeaders, signedIn } = cloudConfig(env);
   let token = typeof env.TERRARIUM_PULSE_TOKEN === "string" ? env.TERRARIUM_PULSE_TOKEN : "";
   if (!token && env.TERRARIUM_PULSE_TOKEN_FILE) {
     try { token = readFileSync(env.TERRARIUM_PULSE_TOKEN_FILE, "utf8").trim(); } catch { /* empty */ }
   }
-  return { url, token, accessHeaders, configured: Boolean(url && token) };
+  return { url, token, accessHeaders, signedIn, configured: Boolean(url && (token || signedIn)) };
 }
 export function pulseEnabled(env = process.env) { return pulseConfig(env).configured; }
 
 async function pulseApi(path, body, config) {
   const res = await fetch(`${config.url}${path}`, {
     method: "POST",
-    headers: { ...config.accessHeaders, authorization: `Bearer ${config.token}`, "content-type": "application/json" },
+    headers: { ...config.accessHeaders, ...bearerHeader(config.token), "content-type": "application/json" },
     body: JSON.stringify(body),
   });
   const text = await res.text();

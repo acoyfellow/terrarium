@@ -25,6 +25,7 @@
 
 import { PulseRouter } from './do.js';
 import { authenticatePulseRequest } from '../cloud/principal-auth.js';
+import { authenticateAccessUser } from '../cloud/access-identity.js';
 
 export { PulseRouter };
 
@@ -117,7 +118,7 @@ export default {
     // wrong credential; legacy PULSE_TOKEN alone MUST NOT authorize (the
     // authenticatePulseRequest helper rejects a bearer that matches the
     // legacy secret so a rotation cannot accidentally re-enable it).
-    const auth = authenticatePulseRequest(request, env);
+    const auth = (await authenticateAccessUser(request, env)) ?? authenticatePulseRequest(request, env);
     if (!auth.ok) {
       return withCors(Response.json({ ok: false, error: auth.error }, { status: auth.status }), request);
     }

@@ -167,6 +167,8 @@ else if (cmd === "plan") {
   const out = { task, agent: opts.agent || "opencode run", args: [], cwd: opts.cwd || ".", requireReceipt: true, initialState: initialRunState({ requireReceipt: true }), core: "typescript" };
   console.log(opts.json ? JSON.stringify(out, null, 2) : `${out.agent} (${out.core}) :: ${out.task}`);
 }
+else if (cmd === "login") runLogin(rest[0]).catch((e) => { console.error(`terrarium: ${e.message}`); process.exit(1); });
+else if (cmd === "whoami") runWhoami().catch((e) => { console.error(`terrarium: ${e.message}`); process.exit(1); });
 else if (cmd === "status" && rest[0]?.startsWith("ter_")) getRunStatus({ runId: rest[0] }).then((r) => console.log(opts.json ? JSON.stringify(r, null, 2) : formatRunStatus(r)));
 else if (cmd === "status") listRuns({ limit: Number(rest[0] || 20) }).then((r) => console.log(opts.json ? JSON.stringify(r, null, 2) : formatRunList(r)));
 else if (cmd === "read") readRun({ runId: rest[0], tailBytes: Number(rest[1] === "mre" ? rest[2] || 20000 : rest[1] || 20000), kind: rest[1] === "mre" ? "mre" : "terrarium" }).then((r) => console.log(r.text));
@@ -226,3 +228,29 @@ else runTerrarium({ ...opts, task: opts.task.join(" ").trim(), stream: !opts.jso
   if (opts.json) console.log(JSON.stringify(result, null, 2));
   process.exit(result.exitCode ?? (result.ok ? 0 : 1));
 }).catch((e) => { console.error(`terrarium: ${e.message}`); process.exit(1); });
+
+async function runLogin(urlArgument) {
+  const { loginWithAccess } = await import("./access-login.js");
+  const { saveCloudLogin } = await import("./login-config.js");
+  const { cloudConfig } = await import("./cloud-client.js");
+  const url = (urlArgument || cloudConfig().url || "").replace(/\/$/, "");
+  const session = loginWithAccess(url);
+  await saveCloudLogin(url);
+  const identity = await fetchIdentity();
+  console.log(`Signed in to ${session.url} as ${identity.email ?? "unknown"} (owner ${identity.principalId ?? "unknown"}); session valid until ${session.expiresAt}.`);
+}
+
+async function runWhoami() {
+  const identity = await fetchIdentity();
+  console.log(JSON.stringify(identity, null, 2));
+}
+
+async function fetchIdentity() {
+  const { cloudConfig, bearerHeader } = await import("./cloud-client.js");
+  const config = cloudConfig({ ...process.env, TERRARIUM_ACCESS_LOGIN: process.env.TERRARIUM_ACCESS_LOGIN ?? "1" });
+  if (!config.url) throw new Error("no cloud URL configured");
+  const response = await fetch(`${config.url}/api/whoami`, { headers: { ...config.accessHeaders, ...bearerHeader(config.signedIn ? "" : config.token) } });
+  const body = await response.json().catch(() => ({}));
+  if (!response.ok) throw new Error(`whoami failed: HTTP ${response.status} ${body.error ?? ""}`.trim());
+  return body;
+}
