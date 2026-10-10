@@ -59,7 +59,13 @@ Add the Terrarium MCP server to your agent. For Pi, add this to `~/.pi/agent/mcp
 }
 ```
 
-Reload the agent. `terrarium_spawn` now runs tasks on the shared instance as you, and returns a verified receipt.
+For Pi, also install the callback extension. It brings each background run's result back into your session when the run finishes, so you don't have to poll:
+
+```sh
+./pi-extension/install.sh
+```
+
+Reload the agent. `terrarium_spawn` now runs tasks on the shared instance as you and returns a verified receipt. A background spawn's result arrives in your session as a "Terrarium completion event" message.
 
 ## What is scoped to you
 
@@ -83,3 +89,4 @@ Something that can't open a browser, such as CI, uses an Access service token an
 | `whoami failed: HTTP 401` | Run `terra login` again; the session expired. |
 | A Cloudflare "nothing here" page in tool output | The agent is running old code or an old URL. Reload the agent. |
 | Login opens no browser | Copy the URL that `terra login` printed into your browser. |
+| Background runs finish but no completion event arrives | Run `./pi-extension/install.sh` and reload Pi. |
