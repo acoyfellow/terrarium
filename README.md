@@ -46,6 +46,8 @@ The bundled `terrarium-effect@1.0.0` package, on `effect@4.0.0-beta.107`, handle
 
 ## Quick start
 
+**Joining a team instance?** Run `terra login <url>` and you're done; see [Use a shared Terrarium instance](docs/USE-A-SHARED-INSTANCE.md).
+
 **Deploy your instance, then run in the cloud.** You need Node 22+, Docker running locally (wrangler builds the execution-cell image), and `wrangler login`. The checked-in `wrangler.jsonc` is the maintainer's deployment, so make your own copy first. See [Deploy your own](#deploy-your-own) for the full steps, including teardown.
 
 ```sh
