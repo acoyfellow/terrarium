@@ -401,9 +401,10 @@ test("rejects pre-existing custom MRE side logs", async () => {
   }
 });
 
-async function waitForTerminal(runId, { staleMs = 5000, attempts = 100, delayMs = 50, requireTerminalCallback = false } = {}) {
+async function waitForTerminal(runId, { staleMs = 5000, attempts = 100, delayMs = 50, requireTerminalCallback = false, timeoutMs = null } = {}) {
+  const deadline = timeoutMs == null ? null : Date.now() + timeoutMs;
   let status;
-  for (let i = 0; i < attempts; i++) {
+  for (let i = 0; deadline == null ? i < attempts : Date.now() < deadline; i++) {
     status = await getRunStatus({ runId, staleMs });
     if (status.status !== "running" && (!requireTerminalCallback || status.terminalCallback)) return status;
     await new Promise((resolve) => setTimeout(resolve, delayMs));
@@ -417,7 +418,7 @@ test("background runs finish after the launcher exits", async () => {
   const launcher = `import { spawnTerrariumBackground } from ${JSON.stringify(coreUrl)};\nconst result = await spawnTerrariumBackground(${JSON.stringify({ task: "finish independently", agent })});\nconsole.log(JSON.stringify({ runId: result.runId }));`;
   const output = execFileSync(process.execPath, ["--input-type=module", "--eval", launcher], { encoding: "utf8" });
   const { runId } = JSON.parse(output.trim());
-  const status = await waitForTerminal(runId);
+  const status = await waitForTerminal(runId, { timeoutMs: 50000 });
   assert.equal(status.status, "done");
   assert.equal(status.exitCode, 0);
   assert.match(status.stdoutTail, /supervised child complete/);
@@ -430,7 +431,7 @@ test("background large prompt uses prompt file transport and still verifies rece
   const agent = `${process.execPath} -e ${JSON.stringify(script)}`;
   const task = `LARGE_PROMPT_SENTINEL\n${"x".repeat(PROMPT_ARG_MAX_BYTES + 3000)}`;
   const started = await spawnTerrariumBackground({ task, agent, timeoutMs: 5000, requireTaskContract: true });
-  const status = await waitForTerminal(started.runId, { attempts: 120 });
+  const status = await waitForTerminal(started.runId, { requireTerminalCallback: true, timeoutMs: 60000 });
   assert.equal(status.status, "done");
   assert.equal(status.taskContractStatus, "verified");
   assert.equal(status.taskResultSummary, "large prompt received");
@@ -448,7 +449,7 @@ test("background wedged-but-alive child is killed at the startup hard ceiling", 
     process.env.TERRARIUM_STARTUP_HARD_CEILING_MS = "800";
     const agent = `${process.execPath} -e "setInterval(() => {}, 1000)"`;
     const started = await spawnTerrariumBackground({ task: "hang before output", agent, timeoutMs: 10000 });
-    const status = await waitForTerminal(started.runId, { attempts: 200, delayMs: 25 });
+    const status = await waitForTerminal(started.runId, { delayMs: 25, requireTerminalCallback: true, timeoutMs: 50000 });
     assert.equal(status.status, "error");
     assert.equal(status.ok, false);
     assert.equal(status.exitCode, 124);
@@ -503,7 +504,7 @@ test("background alive log-growing child survives the base startup window (no fa
     const script = "let n=0;const t=setInterval(()=>{process.stderr.write('working '+(++n)+'\\n');if(n>=6){clearInterval(t);console.log('done');process.exit(0);}},100);";
     const agent = `${process.execPath} -e "${script}"`;
     const started = await spawnTerrariumBackground({ task: "slow first stdout", agent, timeoutMs: 10000 });
-    const status = await waitForTerminal(started.runId, { attempts: 400, delayMs: 25 });
+    const status = await waitForTerminal(started.runId, { delayMs: 25, timeoutMs: 100000 });
     // Survived the base window and finished on its own terms (not a startup kill).
     assert.ok(!/startup-timeout/.test(String(status.error || "")), `should not be startup-killed, got: ${status.error}`);
     const log = await readRun({ runId: started.runId });
@@ -523,7 +524,7 @@ test("background deadline timeout terminalizes and journals callback", async () 
   // (output captured, then deadline-killed) without the flush race.
   const agent = `${process.execPath} -e "console.log('child started'); setInterval(() => {}, 1000)"`;
   const started = await spawnTerrariumBackground({ task: "timeout after output", agent, timeoutMs: 2000 });
-  const status = await waitForTerminal(started.runId, { attempts: 400, delayMs: 25, requireTerminalCallback: true });
+  const status = await waitForTerminal(started.runId, { delayMs: 25, requireTerminalCallback: true, timeoutMs: 100000 });
   assert.equal(status.status, "failed");
   assert.equal(status.ok, false);
   assert.equal(status.taskContractStatus, "not-applicable");

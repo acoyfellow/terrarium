@@ -272,6 +272,16 @@ async function gitInfo(cwd) {
   return { root, head, status };
 }
 
+async function readMetadataIfPresent(runId) {
+  try { return await readMetadata(runId); } catch { return null; }
+}
+
+async function writeRunningMetadata(meta) {
+  const current = await readMetadataIfPresent(meta.runId);
+  if (current && current.status !== "running" && current.status !== "accepted") return;
+  await writeMetadata(meta);
+}
+
 async function writeMetadata(meta) {
   await mkdir(LOG_DIR, { recursive: true });
   const target = metadataPath(meta.runId);
@@ -582,7 +592,7 @@ async function emitProgressEvent(run, text, { activity = true } = {}) {
   try {
     if (activity) {
       const current = await readMetadata(run.runId);
-      if (current.status === "running") await writeMetadata({ ...current, lastActivityAt: new Date().toISOString(), progressText: String(text).slice(-300) });
+      if (current.status === "running") await writeRunningMetadata({ ...current, lastActivityAt: new Date().toISOString(), progressText: String(text).slice(-300) });
     }
     const channel = run.channel ?? process.env.TERRARIUM_EVENT_CHANNEL;
     const event = { type: "terrarium.progress", runId: run.runId, cwd: run.originalCwd ?? run.cwd, task: run.task, text, at: new Date().toISOString(), channel: channel ?? null };
@@ -637,12 +647,11 @@ async function emitCompletionEvent(result) {
     // The callback is still only a notification, but this handle lets operators
     // reconstruct delivery/routing state without trusting child prose.
     try {
-      const path = metadataPath(result.runId);
-      const current = JSON.parse(await readFile(path, "utf8"));
-      await writeFile(path, `${JSON.stringify({
+      const current = await readMetadata(result.runId);
+      await writeMetadata({
         ...current,
         terminalCallback: { eventId: routed.eventId, delivered: routed.delivered, duplicate: routed.duplicate === true },
-      }, null, 2)}\n`);
+      });
     } catch {}
     return routed;
 }
@@ -1152,7 +1161,7 @@ export async function runTerrarium(opts = {}) {
     let settled = false;
     const env = childEnvironment(run, transport);
     const child = spawn(parts[0], [...parts.slice(1), transport.promptArg], { stdio: ["inherit", "pipe", "pipe"], env, cwd: run.cwd, detached: true });
-    void writeMetadata({ ...base, status: "running", pid: child.pid, childPid: child.pid, lastSeenAt: new Date().toISOString() });
+    const runningWritten = writeRunningMetadata({ ...base, status: "running", pid: child.pid, childPid: child.pid, lastSeenAt: new Date().toISOString() });
     const timer = run.timeoutMs > 0 ? setTimeout(() => signalProcessGroup(child.pid, "SIGTERM"), run.timeoutMs) : null;
 
     child.stdout.on("data", async (d) => { const s = String(d); stdout += s; if (run.stream) process.stdout.write(d); await log(run.logPath, s); });
@@ -1163,6 +1172,7 @@ export async function runTerrarium(opts = {}) {
       if (timer) clearTimeout(timer);
       await log(run.logPath, `\nerror: ${e.message}\n`);
       const ws = await finalizeWorkspace(workspace, base);
+      await runningWritten.catch(() => {});
       resolve(await finishRun(base, { ok: false, status: "error", exitCode: 127, error: e.message, stdoutTail: tail(stdout), stderrTail: tail(stderr), contractOutput: stdout, ...ws }));
     });
     child.on("close", async (code, signal) => {
@@ -1173,6 +1183,7 @@ export async function runTerrarium(opts = {}) {
       const cancelled = existsSync(cancelMarkerPath(run.runId));
       await log(run.logPath, `\nexit: ${exitCode}${signal ? ` signal: ${signal}` : ""}${cancelled ? " cancelled" : ""}\n`);
       const ws = await finalizeWorkspace(workspace, base);
+      await runningWritten.catch(() => {});
       resolve(await finishRun(base, { ok: cancelled ? false : exitCode === 0, status: cancelled ? "cancelled" : exitCode === 0 ? "done" : "failed", exitCode, signal, stdoutTail: tail(stdout), stderrTail: tail(stderr), contractOutput: stdout, ...ws }));
       if (cancelled) await rm(cancelMarkerPath(run.runId), { force: true });
     });
