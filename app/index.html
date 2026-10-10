@@ -56,6 +56,13 @@
   </script>
 
   <script type="module" src="/src/main.js"></script>
+  <script>
+    (function () {
+      var choice = localStorage.getItem('terrarium-theme');
+      var dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      document.documentElement.dataset.theme = choice === 'light' || choice === 'dark' ? choice : (dark ? 'dark' : 'light');
+    })();
+  </script>
 </head>
 <body>
   <main id="app"></main>

@@ -7,9 +7,8 @@
       title: 'Run your first task',
       lead: 'About two minutes. Sign in with your Cloudflare login and run one task in the cloud.',
       blocks: [
-        ['If your team runs Terrarium', 'brew install cloudflared\ngit clone https://github.com/acoyfellow/terrarium ~/terrarium\ncd ~/terrarium && npm ci && npm install -g .\nterra login https://terrarium.<your-team-domain>', 'code'],
-        ['Then', 'Sign in in the browser, reload your agent, and ask it: Use terrarium_spawn to run "Reply with exactly: hello". You get back status done and taskContractStatus verified.', 'text'],
-        ['Or try it on your laptop', 'No cloud needed. The steps below run a task locally with an agent you already have.', 'text'],
+        ['If your team runs Terrarium', 'Follow the Your team page instead: install, terra login, reload Pi. About two minutes.', 'text'],
+        ['Otherwise, try it on your laptop', 'No cloud needed. These steps run a task locally with an agent you already have.', 'text'],
         ['Where does this run? Locally.', 'This tutorial is the local CLI. terra runs on YOUR machine — it spawns a coding agent you already have (Pi, OpenCode…) as a child process, in your filesystem, with your network and API keys. Nothing is sent to any cloud. "Running on the edge" is a separate, optional service you deploy yourself (step 5); the CLI never phones home.', 'text'],
         ['1. Install from source', 'git clone https://github.com/acoyfellow/terrarium\ncd terrarium && npm install -g .', 'code'],
         ['2. Dry-run one bounded task', 'terra --dry-run "summarize README.md and list any stale claims"', 'code'],
@@ -18,6 +17,34 @@
         ['What you just got', 'One bounded task ran as one isolated child ON YOUR MACHINE and returned one correlated receipt: the run ID, its status, and a verified result you can trust or reject. The check does not depend on prose or on the cloud.', 'text'],
         ['5. (optional) Run on your own Cloudflare edge instead', 'wrangler deploy   # deploys a Worker to YOUR Cloudflare account, at your own URL', 'code'],
         ['When to use the cloud path', 'Deploy the cloud service when you want to submit a task over HTTP (POST /api/runs), close your laptop, and pull the proof back later. Execution then runs on Cloudflare instead of your machine. It is fully self-hosted: it runs in the Cloudflare account where you deploy the Worker. There is no hosted Terrarium instance; you deploy your own. The CLI uses the instance configured in TERRARIUM_URL.', 'text'],
+      ],
+    },
+    {
+      id: 'team', label: 'Your team', kind: 'Join',
+      title: "Use your team's Terrarium",
+      lead: 'Your team already runs Terrarium. Sign in with your Cloudflare login and you are set up in about two minutes. Your runs are visible only to you.',
+      blocks: [
+        ['You need', 'Node 22 or newer, Pi, and the Terrarium URL from your team. You can paste this page into your coding agent and tell it to follow along.', 'text'],
+        ['1. Install and sign in', 'brew install cloudflared\ngit clone https://github.com/acoyfellow/terrarium ~/terrarium\ncd ~/terrarium && npm ci && npm install -g .\nterra login https://terrarium.<your-team-domain>', 'code'],
+        ['What terra login does', 'It opens your browser. Sign in and approve. It prints who you are, adds the Terrarium tools to Pi, and installs the callback extension. You do not copy any tokens.', 'text'],
+        ['2. Reload Pi', 'That is the whole setup.', 'text'],
+        ['3. Try it', 'Ask your agent: Use terrarium_spawn to run "Reply with exactly: hello". You get back status done and taskContractStatus verified. Add background: true to keep working; the result shows up in your session when it is done.', 'text'],
+        ['Good to know', [
+          ['Question', 'Answer'],
+          ['Who sees my runs?', 'Only you. Runs, logs, receipts and completion events belong to your email.'],
+          ['How long does my login last?', 'About a day. When tools say unauthorized, run terra login again.'],
+          ['Can a cloud run see my files?', 'No. It knows only what you put in the task text.'],
+          ['Does verified mean correct?', 'No. It means the answer came from your task. Check answers that matter.'],
+          ['Who am I signed in as?', 'Run terra whoami.'],
+        ], 'table'],
+        ['If something is off', [
+          ['You see', 'Fix'],
+          ['unauthorized or HTTP 401', 'Run terra login again.'],
+          ['A Cloudflare "nothing here" page', 'Reload Pi.'],
+          ['The login page never opens', 'Copy the URL terra login printed into your browser.'],
+          ['No completion event for a background run', 'Run terra login again, then reload Pi.'],
+          ['terra: command not found', 'Rerun npm install -g . in ~/terrarium.'],
+        ], 'table'],
       ],
     },
     {
@@ -69,6 +96,21 @@
       ],
     },
   ];
+
+  const THEME_KEY = 'terrarium-theme';
+  const THEME_ORDER = ['system', 'light', 'dark'];
+  const systemDark = window.matchMedia('(prefers-color-scheme: dark)');
+  let themeChoice = $state(localStorage.getItem(THEME_KEY) || 'system');
+  let systemPrefersDark = $state(systemDark.matches);
+  systemDark.addEventListener('change', (event) => { systemPrefersDark = event.matches; });
+  const resolvedTheme = () => themeChoice === 'system' ? (systemPrefersDark ? 'dark' : 'light') : themeChoice;
+  $effect(() => { document.documentElement.dataset.theme = resolvedTheme(); });
+  function cycleTheme() {
+    themeChoice = THEME_ORDER[(THEME_ORDER.indexOf(themeChoice) + 1) % THEME_ORDER.length];
+    if (themeChoice === 'system') localStorage.removeItem(THEME_KEY);
+    else localStorage.setItem(THEME_KEY, themeChoice);
+  }
+  const themeLabel = () => `Theme: ${themeChoice}. Click to change.`;
 
   let changelog = $state([]);
   let path = $state(location.pathname);
@@ -161,6 +203,15 @@
       <a href="/docs" onclick={(e) => navigate('/docs', e)}>Docs</a>
       <a href="/changelog" onclick={(e) => navigate('/changelog', e)}>Changelog</a>
       <a href="https://github.com/acoyfellow/terrarium">GitHub</a>
+      <button class="theme-toggle" type="button" onclick={cycleTheme} aria-label={themeLabel()} title={themeLabel()}>
+        {#if themeChoice === 'light'}
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="4" /><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4" /></svg>
+        {:else if themeChoice === 'dark'}
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z" /></svg>
+        {:else}
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2" /><path d="M8 20h8M12 16v4" /></svg>
+        {/if}
+      </button>
       <a class="cta" href="/docs?page=tutorial" onclick={(e) => navigate('/docs?page=tutorial', e)}>Get started</a>
     </nav>
   </header>
@@ -172,7 +223,7 @@
           <h1 class="calm">Hand a task to an agent in the cloud.<br />Get the answer back with a receipt.</h1>
           <p class="sub">You ask your coding agent to run something. It runs on Cloudflare, not your laptop. You get the answer plus a run ID that shows exactly which task produced it.</p>
           <div class="hero-actions">
-            <a class="btn btn-primary" href="/docs?page=tutorial" onclick={(e) => navigate('/docs?page=tutorial', e)}>Try it</a>
+            <a class="btn btn-primary" href="/docs?page=team" onclick={(e) => navigate('/docs?page=team', e)}>Try it</a>
             <a class="btn" href="https://github.com/acoyfellow/terrarium">Read the code</a>
           </div>
         </div>
@@ -221,7 +272,7 @@
       <div class="closing-inner" data-reveal>
         <p><strong>Setup takes about two minutes:</strong> install, <code>terra login</code>, reload your agent.</p>
         <div class="hero-actions">
-          <a class="btn btn-primary" href="/docs?page=tutorial" onclick={(e) => navigate('/docs?page=tutorial', e)}>Try it</a>
+          <a class="btn btn-primary" href="/docs?page=team" onclick={(e) => navigate('/docs?page=team', e)}>Try it</a>
           <a class="btn" href="https://github.com/acoyfellow/terrarium">Read the code</a>
         </div>
       </div>
