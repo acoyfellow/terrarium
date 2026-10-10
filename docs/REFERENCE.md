@@ -185,7 +185,7 @@ Exit 0 alone is never success. A missing, mismatched, or malformed receipt settl
 | Claimed tests, commits, run IDs, on-disk envelope | Evidence | The artifacts the receipt points at (P0) | A receipt substitute |
 | `terra status`, `terra doctor`, logs | Diagnostic | Liveness/process facts (P1) | Task success |
 | Callbacks and Groups roll-ups | Notification | A run *finished* (P1) | Independent success |
-| The public run ledger + `CHANGELOG.md` | Presentation | A restatement of receipts (P2) | Per-run proof |
+| The public run ledger | Presentation | A restatement of receipts (P2) | Per-run proof |
 
 When you are unsure, trust the run-correlated receipt and the tests it claims to have passed. That receipt is the authority.
 
@@ -238,7 +238,7 @@ Terrarium does not auto-load its Pi host extension. It stays out of unrelated Pi
 
 ## Website and docs
 
-Each deployment serves a Svelte SPA from its Hono control worker. It shows structured docs (Tutorial, How-to, Reference, Explanation) and a changelog rendered from [CHANGELOG.md](../CHANGELOG.md). The site is a presentation layer. Receipts, run IDs, tests, and commits are the evidence.
+Each deployment serves a Svelte SPA from its Hono control worker. It shows structured docs (Tutorial, Your team, How-to, Reference, Explanation). The site is a presentation layer. Receipts, run IDs, tests, and commits are the evidence.
 
 ```sh
 npm run demo:dev      # local site with hot reload (Vite)

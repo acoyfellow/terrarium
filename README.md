@@ -80,4 +80,3 @@ The CLI does the same: `terra "task"`, `terra batch`, `terra status`, `terra rea
 - [Reference](./docs/REFERENCE.md): every guarantee, flag, API route and limit, in full.
 - [Use your team's Terrarium](./docs/USE-A-SHARED-INSTANCE.md): the two-minute setup.
 - [Threat model](./THREAT_MODEL.md) and [architecture](./docs/ARCHITECTURE.md).
-- [Changelog](./CHANGELOG.md).

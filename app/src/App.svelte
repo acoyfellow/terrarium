@@ -53,7 +53,7 @@
       lead: 'Use these commands to run, cancel, and deploy tasks.',
       blocks: [
         ['Run in an isolated copy', 'terra --isolation copy --agent "pi -p --no-session" \\\n  "fix the failing callback test and run test/router.test.js"', 'code'],
-        ['Fan out several tasks in parallel', 'terra batch --concurrency 8 --strategy allSettled \\\n  "lint src" "run test/router.test.js" "update CHANGELOG"', 'code'],
+        ['Fan out several tasks in parallel', 'terra batch --concurrency 8 --strategy allSettled \\\n  "lint src" "run test/router.test.js" "update the docs"', 'code'],
         ['Cancel a run', 'terra cancel <runId>', 'code'],
         ['Self-heal stuck durable state', 'terra doctor --repair --apply --verify', 'code'],
         ['Deploy your own cloud instance', '# runs on YOUR Cloudflare account — your Worker, your data\nwrangler deploy            # -> https://terrarium-control.<you>.workers.dev\nwrangler secret put TERRARIUM_CONTROL_TOKEN_CURRENT', 'code'],
@@ -112,12 +112,11 @@
   }
   const themeLabel = () => `Theme: ${themeChoice}. Click to change.`;
 
-  let changelog = $state([]);
   let path = $state(location.pathname);
   let hash = $state(location.hash);
   let selectedDoc = $state(new URLSearchParams(location.search).get('page') || 'tutorial');
 
-  const route = () => path === '/docs' ? 'docs' : (path === '/changelog' || hash === '#changelog') ? 'changelog' : 'home';
+  const route = () => path === '/docs' ? 'docs' : 'home';
 
   const currentDoc = () => docs.find((d) => d.id === selectedDoc) || docs[0];
 
@@ -129,30 +128,10 @@
     scrollTo(0, 0);
   }
 
-  // Parse CHANGELOG.md into { date, title, items[] } entries for clean rendering.
-  function parseChangelog(md) {
-    const out = [];
-    let cur = null;
-    for (const raw of md.split('\n')) {
-      const h = raw.match(/^##\s+(.+)/);
-      if (h) { cur = { heading: h[1].trim(), items: [] }; out.push(cur); continue; }
-      const li = raw.match(/^\s*[-*]\s+(.+)/);
-      if (li && cur) cur.items.push(li[1].replace(/\*\*/g, '').trim());
-    }
-    return out.filter((e) => e.items.length).slice(0, 12);
-  }
-
-  async function load() {
-    try {
-      const res = await fetch('/CHANGELOG.md');
-      changelog = parseChangelog(await res.text());
-    } catch { changelog = []; }
-  }
   addEventListener('popstate', () => {
     path = location.pathname; hash = location.hash;
     selectedDoc = new URLSearchParams(location.search).get('page') || 'tutorial';
   });
-  load();
 
   // Scroll-reveal: sections assemble as they enter, like a loading screen
   // booting into view. Re-runs on every route change (SPA nav does NOT re-fire
@@ -201,7 +180,6 @@
     <a class="brand" href="/" onclick={(e) => navigate('/', e)}><span class="mark"></span>Terrarium</a>
     <nav class="topbar-nav">
       <a href="/docs" onclick={(e) => navigate('/docs', e)}>Docs</a>
-      <a href="/changelog" onclick={(e) => navigate('/changelog', e)}>Changelog</a>
       <a href="https://github.com/acoyfellow/terrarium">GitHub</a>
       <button class="theme-toggle" type="button" onclick={cycleTheme} aria-label={themeLabel()} title={themeLabel()}>
         {#if themeChoice === 'light'}
@@ -302,22 +280,6 @@
       </div>
     </section>
 
-  {:else}
-    <section class="log-shell">
-      <div class="log-head">
-        <div class="eyebrow">Changelog</div>
-        <h1>What shipped.</h1>
-        <p class="lead">Product, API, and safety changes, most recent first.</p>
-      </div>
-      <div class="log">
-        {#each changelog as entry}
-          <div class="log-entry">
-            <h3>{entry.heading}</h3>
-            <ul>{#each entry.items as item}<li>{item}</li>{/each}</ul>
-          </div>
-        {/each}
-      </div>
-    </section>
   {/if}
 
   <footer class="foot">

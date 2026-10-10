@@ -131,13 +131,7 @@ test('public campaign receipt links resolve to exact-schema summaries and legacy
   }
 });
 
-test('published changelog is an exact mirror of the repository changelog', async () => {
-  const [source, published] = await Promise.all([
-    readFile(new URL('../CHANGELOG.md', import.meta.url), 'utf8'),
-    readFile(new URL('../app/public/CHANGELOG.md', import.meta.url), 'utf8'),
-  ]);
-  assert.equal(published, source);
-});
+
 
 test('dry run evaluates health without writing receipts', async () => {
   const result = await createIterationReceipt({ dryRun: true });
