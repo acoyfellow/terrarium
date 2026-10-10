@@ -46,19 +46,22 @@ The bundled `terrarium-effect@1.0.0` package, on `effect@4.0.0-beta.107`, handle
 
 ## Quick start
 
-**Deploy your instance, then run in the cloud:**
+**Deploy your instance, then run in the cloud.** You need Node 22+, Docker running locally (wrangler builds the execution-cell image), and `wrangler login`. The checked-in `wrangler.jsonc` is the maintainer's deployment, so make your own copy first. See [Deploy your own](#deploy-your-own) for the full steps, including teardown.
 
 ```sh
-git clone https://github.com/acoyfellow/terrarium
-cd terrarium && npm install -g .
-wrangler deploy                                   # your Worker on your Cloudflare account
-wrangler secret put TERRARIUM_CONTROL_TOKEN_CURRENT
+git clone https://github.com/acoyfellow/terrarium && cd terrarium
+npm ci && npx vite build
+cp wrangler.jsonc wrangler.mine.jsonc            # then edit it: see "Deploy your own"
+npx wrangler deploy -c wrangler.mine.jsonc       # -> https://<name>.<you>.workers.dev
+openssl rand -hex 32 > .control-token
+npx wrangler secret put TERRARIUM_CONTROL_TOKEN_CURRENT -c wrangler.mine.jsonc < .control-token
+printf 'me' | npx wrangler secret put TERRARIUM_PRINCIPAL_ID -c wrangler.mine.jsonc
 
-# Point the MCP (or curl) at it and spawn — runs on Cloudflare, returns a verified receipt:
-export TERRARIUM_URL=https://terrarium-control.<you>.workers.dev
+export TERRARIUM_URL=https://<name>.<you>.workers.dev TOKEN=$(cat .control-token)
 curl -X POST $TERRARIUM_URL/api/runs -H "authorization: Bearer $TOKEN" \
   -H "idempotency-key: $(uuidgen)" -H 'content-type: application/json' \
   -d '{"task":"reply with: hello"}'            # -> 202 { runId, contract }
+curl $TERRARIUM_URL/api/runs/<runId>/status -H "authorization: Bearer $TOKEN"   # -> status "done", taskContractStatus "verified"
 ```
 
 **Or run locally for a quick cooperative dig** (`terra` CLI is always local; needs a coding agent you already have):
@@ -71,6 +74,38 @@ terra batch --concurrency 8 --strategy allSettled "lint src" "run tests"   # fan
 ```
 
 ---
+
+## Deploy your own
+
+These steps were checked end to end from a fresh clone on a personal account: deploy, one verified cloud run, then teardown.
+
+1. **Make your own config.** Copy `wrangler.jsonc` to `wrangler.mine.jsonc` (add it to your local git excludes). In the copy:
+   - set `name` to your Worker name and `account_id` to your account (`npx wrangler whoami`);
+   - delete the `routes` block (it is the maintainer's custom domain) and set `"workers_dev": true`;
+   - create your own storage and paste the ids and names in:
+     ```sh
+     npx wrangler kv namespace create <name>-ledger    # -> TERRARIUM_LEDGER id
+     npx wrangler kv namespace create <name>-policy    # -> TERRARIUM_POLICY id
+     npx wrangler r2 bucket create <name>-artifacts    # -> TERRARIUM_ARTIFACTS bucket_name
+     ```
+   - rename the workflow (`terrarium-campaign`) to something unique such as `<name>-campaign`;
+   - set `"TERRARIUM_AI_GATEWAY_ID": ""` unless your account has AI Gateway unified billing credits. With `"default"` and no credits, every model call fails with `2021: Insufficient unified billing credits`, and runs end `failed` / `receipt-missing`.
+2. **Build and deploy:** `npm ci && npx vite build && npx wrangler deploy -c wrangler.mine.jsonc`. The first deploy builds and pushes the container image, which takes a few minutes.
+3. **Set both required secrets.** `/api/runs` answers `401 unauthorized` until both exist:
+   - `TERRARIUM_CONTROL_TOKEN_CURRENT`: the bearer token you will send;
+   - `TERRARIUM_PRINCIPAL_ID`: your owner identity (letters, digits, `._:-`).
+4. **Run once and check the receipt.** `POST /api/runs` returns a `contract` with `runId`, `taskFingerprint` and `nonce`. Poll `GET /api/runs/<runId>/status` until `status.status` is no longer `running` (the first run includes a container cold start of one to three minutes). A good run ends `done` with `taskContractStatus: "verified"`. The `TERRARIUM_RESULT=` line in `GET /api/runs/<runId>/logs` carries the same three values as the contract.
+5. **Tear down.** `wrangler delete` removes only the Worker. The container application and the workflow outlive it, so remove them too:
+   ```sh
+   npx wrangler delete --name <name> --force
+   npx wrangler containers list                       # delete the <name>-terrariumsandbox row:
+   npx wrangler containers delete <container-id>
+   npx wrangler workflows delete <name>-campaign
+   npx wrangler kv namespace delete --namespace-id <ledger-id>
+   npx wrangler kv namespace delete --namespace-id <policy-id>
+   npx wrangler r2 bucket delete <name>-artifacts
+   ```
+   Then check: `workers.dev` returns 404, and `kv namespace list`, `r2 bucket list`, `containers list` and `workflows list` no longer show `<name>`.
 
 ## What you get
 
