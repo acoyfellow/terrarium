@@ -139,10 +139,26 @@ export async function listSubscribers() {
 // fs router and the cloudflare backend share one implementation.
 export const matches = matchesShared;
 
+async function holdsValidCallback(dir, file, state) {
+  const path = join(dir, file);
+  if (!existsSync(path)) return false;
+  try { return isValidCallbackEvent(JSON.parse(await readFile(path, 'utf8')), file.slice(0, -5), { state }); }
+  catch { return false; }
+}
+
+async function quarantineMalformedAck(dirs, file) {
+  const path = join(dirs.acked, file);
+  if (!existsSync(path) || await holdsValidCallback(dirs.acked, file, 'claimed')) return;
+  await mkdir(dirs.dead, { recursive: true });
+  await rename(path, join(dirs.dead, `malformed-ack-${file}`)).catch(() => {});
+}
+
 async function enqueueEvent(subscriberId, event) {
   const dirs = mailboxDirs(subscriberId);
   const file = `${event.eventId}.json`;
-  if ([dirs.pending, dirs.inflight, dirs.acked].some((dir) => existsSync(join(dir, file)))) return false;
+  if (existsSync(join(dirs.pending, file)) || existsSync(join(dirs.inflight, file))) return false;
+  if (await holdsValidCallback(dirs.acked, file, 'claimed')) return false;
+  await quarantineMalformedAck(dirs, file);
   await mkdir(dirs.pending, { recursive: true });
   try { await writeFile(join(dirs.pending, file), `${JSON.stringify(event)}\n`, { flag: 'wx' }); return true; }
   catch (error) { if (error.code === 'EEXIST') return false; throw error; }

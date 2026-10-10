@@ -1,7 +1,5 @@
 # Terrarium
 
-[![Live demo](https://img.shields.io/badge/demo-terrarium.coey.dev-8ff0ad?style=for-the-badge)](https://terrarium.coey.dev)
-
 ![A cozy glass terrarium on a wooden desk. Inside, a single small robot tends a tiny garden of even smaller robots, each working in their own pot.](./assets/social-card.jpg)
 
 **Run agents in parallel. Check every result.**
@@ -38,7 +36,7 @@ With that set, a spawn runs in the cloud and comes back `done` + `verified` with
 | Receipt | Verified, server-minted. No local machine runs the task. | Verified, but the task ran locally. |
 | Use it when | Real work: submit a task, walk away, read the receipt and callbacks later | Cooperative local digs where host access is intended |
 
-`terrarium.coey.dev` is the maintainer's reference deployment. It is not a shared backend. You deploy your own with `wrangler deploy` and point `TERRARIUM_URL` at it.
+There is no hosted Terrarium instance. You deploy your own with `wrangler deploy` and point `TERRARIUM_URL` at it.
 
 ### Limited Effect 4 migration
 
@@ -116,7 +114,7 @@ These steps were checked end to end from a fresh clone on a personal account: de
 | Move noisy work into a child and keep the parent context clean | `terra "task"` · MCP `terrarium_spawn` | Stable |
 | Fan out independent jobs with explicit join semantics | `terra batch` · MCP `terrarium_spawn_batch` | `all` / `allSettled` / `race` / `any` / `quorum` |
 | Observe durable runs, groups, callbacks, attention | `terra status` · `terra group` · `terra doctor` | Implemented |
-| Deliver a finished run's wake event across closes, sessions, machines | [Pulse](./docs/PULSE.md) durable edge transport | Live on `terrarium.coey.dev` |
+| Deliver a finished run's wake event across closes, sessions, machines | [Pulse](./docs/PULSE.md) durable edge transport | Runs on your own deployment |
 | Submit a task to your own cloud edge and pull the proof back later | `POST /api/runs` on your Worker | C0, self-hosted |
 | Run repository work inside a hardened Docker profile | `terra secure "run the tests"` | [secure-v1](./docs/SECURE_V1.md), opt-in |
 | Test declared containment boundaries in Docker | `terra probe <scenario>` | Implemented, opt-in |
@@ -127,7 +125,7 @@ An ordinary child inherits the host authority and environment. Use a child for c
 
 ## Cloud: submit, close your laptop, pull the receipt
 
-Terrarium ships a cloud execution service. You **deploy it to your own Cloudflare account**. There is no shared tenancy. `terrarium.coey.dev` is the maintainer's reference deployment. Substitute your own URL everywhere.
+Terrarium ships a cloud execution service. You **deploy it to your own Cloudflare account**. There is no shared tenancy and no hosted instance. Use your own deployment's URL everywhere.
 
 ```sh
 wrangler deploy                              # -> https://terrarium-control.<you>.workers.dev
@@ -252,7 +250,7 @@ Terrarium does not auto-load its Pi host extension. It stays out of unrelated Pi
 
 ## Website and docs
 
-[`terrarium.coey.dev`](https://terrarium.coey.dev) is a Svelte SPA. The Hono control worker serves it. It shows structured docs (Tutorial, How-to, Reference, Explanation) and a changelog rendered from [CHANGELOG.md](./CHANGELOG.md). The site is a presentation layer. Receipts, run IDs, tests, and commits are the evidence.
+Each deployment serves a Svelte SPA from its Hono control worker. It shows structured docs (Tutorial, How-to, Reference, Explanation) and a changelog rendered from [CHANGELOG.md](./CHANGELOG.md). The site is a presentation layer. Receipts, run IDs, tests, and commits are the evidence.
 
 ```sh
 npm run demo:dev      # local site with hot reload (Vite)
