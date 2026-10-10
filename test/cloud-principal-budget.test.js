@@ -59,7 +59,12 @@ function makeState() {
   return {
     storage: { sql },
     waitUntil(p) { pending.push(Promise.resolve(p)); },
-    async drain() { await Promise.allSettled(pending.splice(0)); },
+    async drain() {
+      while (pending.length) {
+        await Promise.allSettled(pending.splice(0));
+        await new Promise((resolve) => setImmediate(resolve));
+      }
+    },
   };
 }
 
