@@ -238,6 +238,10 @@ async function runLogin(urlArgument) {
   await saveCloudLogin(url);
   const identity = await fetchIdentity();
   console.log(`Signed in to ${session.url} as ${identity.email ?? "unknown"} (owner ${identity.principalId ?? "unknown"}); session valid until ${session.expiresAt}.`);
+  if (process.env.TERRARIUM_SKIP_PI_SETUP === "1") return;
+  const { connectPi } = await import("./connect-pi.js");
+  const connected = connectPi(session.url);
+  console.log(`Connected Pi: MCP server in ${connected.mcpConfig}, callback extension at ${connected.extension}. Reload Pi to start using Terrarium.`);
 }
 
 async function runWhoami() {
