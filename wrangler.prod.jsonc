@@ -36,9 +36,7 @@
       "bucket_name": "terrarium-control-artifacts"
     }
   ],
-  "routes": [
-    { "pattern": "terrarium.coey.dev", "custom_domain": true }
-  ],
+  // No custom domain: there is no hosted instance. Add your own route to deploy one.
   "observability": { "enabled": true },
   "ai": { "binding": "AI" },
   "durable_objects": {
