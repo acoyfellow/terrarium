@@ -1,4 +1,5 @@
 <script>
+  import Loops from './Loops.svelte';
   // Docs shaped by purpose: Tutorial (learning), How-to (tasks), Reference (facts),
   // Explanation (understanding). Kept short and plain on purpose.
   const docs = [
@@ -116,7 +117,7 @@
   let hash = $state(location.hash);
   let selectedDoc = $state(new URLSearchParams(location.search).get('page') || 'tutorial');
 
-  const route = () => path === '/docs' ? 'docs' : 'home';
+  const route = () => path === '/docs' ? 'docs' : path === '/loops' ? 'loops' : 'home';
 
   const currentDoc = () => docs.find((d) => d.id === selectedDoc) || docs[0];
 
@@ -256,6 +257,8 @@
       </div>
     </section>
 
+  {:else if route() === 'loops'}
+    <Loops />
   {:else if route() === 'docs'}
     <section class="docs-shell">
       <div class="docs-layout">
