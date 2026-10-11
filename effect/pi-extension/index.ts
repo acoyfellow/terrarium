@@ -8,10 +8,6 @@ interface ToolResultEvent {
   readonly content: ReadonlyArray<{ readonly type: string; readonly text?: string }>;
 }
 
-interface Context {
-  readonly sessionManager: { readonly getSessionId: () => string };
-}
-
 interface Pi {
   readonly on: (event: "tool_result", handler: (event: ToolResultEvent) => void) => void;
   readonly sendUserMessage: (content: string, options: { readonly deliverAs: "followUp" }) => void;
