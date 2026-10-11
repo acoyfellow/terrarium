@@ -1,0 +1,20 @@
+{
+  "name": "terrarium-effect-v4",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test --experimental-strip-types test/*.test.ts",
+    "typecheck": "tsc --noEmit",
+    "lint": "oxlint -c oxlint.config.ts src test"
+  },
+  "dependencies": {
+    "effect": "4.0.3"
+  },
+  "devDependencies": {
+    "@oxlint/plugins": "1.87.0",
+    "@types/node": "^26.6.5",
+    "oxlint": "1.87.0",
+    "typescript": "^5.9.0",
+    "wrangler": "^4.98.0"
+  }
+}

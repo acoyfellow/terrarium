@@ -63,3 +63,6 @@ docs/evidence/
 
 # Machine-local deploy config with the employee-only custom domain.
 wrangler.ax.local.jsonc
+effect/node_modules/
+effect/.wrangler/
+effect/wrangler.ax.local.jsonc

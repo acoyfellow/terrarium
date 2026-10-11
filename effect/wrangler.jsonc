@@ -1,0 +1,8 @@
+{
+  "name": "terrarium-effect",
+  "main": "src/worker.ts",
+  "compatibility_date": "2026-06-05",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "preview_urls": false
+}
