@@ -72,3 +72,18 @@ export class Owner extends Context.Service<Owner, { readonly id: OwnerId; readon
 export class Clock extends Context.Service<Clock, { readonly nowMs: Effect.Effect<number> }>()("terrarium/Clock") {}
 
 export class Ids extends Context.Service<Ids, { readonly runId: Effect.Effect<RunId>; readonly loopId: Effect.Effect<LoopId>; readonly nonce: Effect.Effect<string> }>()("terrarium/Ids") {}
+
+export const AdmitInput = Schema.Struct({
+  task: Schema.String,
+  channel: Schema.NullOr(Schema.String),
+  idempotencyKey: Schema.String,
+});
+
+export type AdmitInput = typeof AdmitInput.Type;
+
+export class Runs extends Context.Service<Runs, {
+  readonly admit: (input: AdmitInput) => Effect.Effect<RunRecord, BadRequest | Conflict | RateLimited | Upstream, Owner>;
+  readonly get: (runId: RunId) => Effect.Effect<RunRecord, NotFound | Upstream, Owner>;
+  readonly cancel: (runId: RunId) => Effect.Effect<RunRecord, NotFound | Upstream, Owner>;
+  readonly list: (channel: string | null, limit: number) => Effect.Effect<ReadonlyArray<RunRecord>, Upstream, Owner>;
+}>()("terrarium/Runs") {}
