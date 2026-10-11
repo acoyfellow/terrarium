@@ -24,8 +24,8 @@
     return () => clearInterval(timer);
   });
 
-  const outcomeOf = (loop) => loop.workflow?.output?.outcome ?? loop.workflow?.status ?? 'unknown';
-  const attemptsOf = (loop) => loop.workflow?.output?.attempts ?? [];
+  const outcomeOf = (loop) => loop.output?.decision?.outcome ?? loop.status ?? 'unknown';
+  const attemptsOf = (loop) => loop.output?.attempts ?? [];
   const cleanAnswer = (text) => String(text ?? '').split('\n').filter((l) => !/^(TASK_RECEIVED|TASK_ENDED|TERRARIUM_RESULT=)/.test(l.trim())).join('\n').trim();
 </script>
 
@@ -51,18 +51,18 @@
         <dt>Task</dt><dd>{loop.contract.task}</dd>
         <dt>Done when the answer contains</dt><dd><code>{loop.contract.expect}</code></dd>
         <dt>Attempts allowed</dt><dd>{loop.contract.maxAttempts}</dd>
-        <dt>Locked</dt><dd>{new Date(loop.lockedAt).toLocaleString()}</dd>
-        {#if loop.workflow?.output?.reason}<dt>Why it stopped</dt><dd>{loop.workflow.output.reason}</dd>{/if}
-        {#if loop.workflow?.error}<dt>Workflow error</dt><dd>{JSON.stringify(loop.workflow.error)}</dd>{/if}
+        <dt>Locked</dt><dd>{new Date(loop.createdAt).toLocaleString()}</dd>
+        {#if loop.output?.decision?.reason}<dt>Why it stopped</dt><dd>{loop.output.decision.reason}</dd>{/if}
+        {#if loop.error}<dt>Workflow error</dt><dd>{JSON.stringify(loop.error)}</dd>{/if}
       </dl>
       {#if attemptsOf(loop).length}
         <ol class="loop-attempts">
-          {#each attemptsOf(loop) as a}
+          {#each attemptsOf(loop) as a, i}
             <li data-passed={a.gate.passed}>
-              <strong>Attempt {a.attempt}</strong>
+              <strong>Attempt {i + 1}</strong>
               <span>{a.gate.passed ? 'passed' : 'did not pass'}: {a.gate.reason}</span>
               <span>run <code>{a.runId}</code>, receipt {a.verified ? 'verified' : 'not verified'}</span>
-              {#if cleanAnswer(a.answer)}<pre>{cleanAnswer(a.answer)}</pre>{/if}
+              {#if cleanAnswer(a.logs)}<pre>{cleanAnswer(a.logs)}</pre>{/if}
             </li>
           {/each}
         </ol>

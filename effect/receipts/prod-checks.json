@@ -1,6 +1,6 @@
 {
   "base": "<deployed effect worker>",
-  "at": "2026-10-11T18:10:01.953Z",
+  "at": "2026-10-11T18:17:08.218Z",
   "ok": true,
   "checks": [
     {
@@ -30,15 +30,15 @@
       "pass": true,
       "detail": {
         "status": 202,
-        "runId": "ter_mv4508wo_52f5a01da488"
+        "runId": "ter_mv459jf9_60614328466e"
       }
     },
     {
       "name": "same key returns same run",
       "pass": true,
       "detail": {
-        "first": "ter_mv4508wo_52f5a01da488",
-        "second": "ter_mv4508wo_52f5a01da488"
+        "first": "ter_mv459jf9_60614328466e",
+        "second": "ter_mv459jf9_60614328466e"
       }
     },
     {
@@ -61,7 +61,7 @@
       "name": "loop that should pass passes",
       "pass": true,
       "detail": {
-        "loopId": "loop_5d20427e8c004456a9839f32ba161bf6",
+        "loopId": "loop_b1b3167662c442688e00293ae7774675",
         "status": 202,
         "outcome": "passed"
       }
@@ -70,7 +70,7 @@
       "name": "loop that cannot pass gives up",
       "pass": true,
       "detail": {
-        "loopId": "loop_831a1770652243adb18d3b1160799d59",
+        "loopId": "loop_146c8b1b48f94fdda3c441558132edb8",
         "outcome": "exhausted"
       }
     },
