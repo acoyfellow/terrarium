@@ -4,46 +4,20 @@
   "description": "Execution, status, receipts, cancellation, and callbacks for bounded delegated agent tasks.",
   "type": "module",
   "bin": {
-    "terrarium": "./src/cli.js",
-    "terra": "./src/cli.js",
-    "terrarium-mcp": "./src/mcp.js"
+    "terra": "./effect/bin/terra-effect.mjs"
   },
   "scripts": {
-    "start": "node src/cli.js",
-    "test": "node scripts/test-isolated.mjs",
-    "demo": "node src/cli.js \"write a haiku about delegated context\" --dry-run",
-    "demo:fanout": "node scripts/demo-fanout.mjs",
-    "probe": "node src/cli.js probe filesystem-write-outside-workspace --json",
-    "probe:all": "node src/cli.js probe filesystem-write-outside-workspace --json && node src/cli.js probe environment-canary --json && node src/cli.js probe network-disabled --json && node src/cli.js probe filesystem-read-canary --json && node src/cli.js probe process-persistence --json",
-    "attack:dry": "node src/cli.js attack environment-canary --agent \"node -e \\\"console.log('TERRARIUM_ATTACK_RESULT={' + String.fromCharCode(34) + 'run' + String.fromCharCode(34) + ':true,' + String.fromCharCode(34) + 'reason' + String.fromCharCode(34) + ':' + String.fromCharCode(34) + 'bounded-detector' + String.fromCharCode(34) + '}')\\\"\" --json",
-    "fixture:escape": "node src/cli.js fixture escape",
-    "fix:validate": "node scripts/validate-fix.mjs",
-    "hardening:verify": "node src/cli.js hardening verify",
-    "secure:benchmark": "node scripts/benchmark-secure.mjs",
-    "control:dev": "wrangler dev",
+    "test": "npm --prefix effect test",
+    "gate:effect": "node effect/scripts/gate.mjs",
     "demo:dev": "vite --host 127.0.0.1 --port 5178",
     "demo:build": "vite build",
-    "demo:smoke": "node scripts/smoke-demo.mjs",
-    "product-loop:once": "node scripts/product-loop.mjs",
-    "product-loop:dry-run": "node scripts/product-loop.mjs --dry-run",
-    "product-loop:check": "node scripts/product-loop.mjs check",
-    "product-loop:validate": "node --test test/product-loop.test.js",
-    "deploy": "vite build && wrangler deploy",
-    "gate:effect": "node effect/scripts/gate.mjs"
+    "deploy": "vite build && npx wrangler deploy -c effect/wrangler.jsonc"
   },
   "files": [
-    "src",
-    "vendor/terrarium-effect",
-    "docs/SECURE_V1.md",
-    "docs/ARCHITECTURE.md",
-    "docs/SECURE_AGENT_PROOF.md",
-    "docs/SECURE_AGENT_LANDSCAPE.md",
-    "docs/CONCURRENCY_ISOLATION.md",
-    "docs/PI_SUBAGENTS_COMPARISON.md",
-    "docs/CORE_PRODUCT_DECISION.md",
-    "docs/RUN_SCHEDULES.md",
-    "fixtures/secure-agent-parser",
-    "fixtures/run-schedules"
+    "effect/bin",
+    "effect/src",
+    "effect/pi-extension",
+    "effect/package.json"
   ],
   "bundleDependencies": [
     "terrarium-effect"

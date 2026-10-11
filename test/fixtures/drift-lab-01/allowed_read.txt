@@ -1,1 +1,0 @@
-The only required change is appending `ok` to target.txt.
