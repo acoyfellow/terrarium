@@ -198,6 +198,10 @@ const legacyWorker = {
       const { describeCaller } = await import("./cloud/whoami.js");
       return describeCaller(request, env);
     }
+    if (url.pathname === "/api/egress-probe" && request.method === "GET") {
+      const { handleEgressProbe } = await import("./cloud/egress-probe.js");
+      return handleEgressProbe(request, env);
+    }
     // Cloud Terrarium production /api/runs + /api/models surface.
     if (url.pathname.startsWith("/api/runs") || url.pathname === "/api/models") {
       const routed = await handleApiRuns(request, env);
