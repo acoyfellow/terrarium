@@ -63,3 +63,8 @@ test("replay of the same recorded attempts gives the same decisions every time",
   assert.deepEqual(first.at(-1), { action: "stop", outcome: "passed", reason: "attempt 3 passed the gate" });
   assert.deepEqual(replay(contract, [wrong, wrong, wrong]).at(-1), { action: "stop", outcome: "exhausted", reason: "3 of 3 attempts used, none passed" });
 });
+
+test("the expected text may appear anywhere in the answer, not only at the start", () => {
+  const prose = attempt("done", true, "TASK_RECEIVED\nThe answer is 391.\nTASK_ENDED");
+  assert.equal(gateAttempt(contract, prose).passed, true);
+});

@@ -1,0 +1,98 @@
+{
+  "killed": 14,
+  "applicable": 14,
+  "score": 1,
+  "results": [
+    {
+      "file": "src/receipt.ts",
+      "from": "!==",
+      "to": "===",
+      "status": "killed"
+    },
+    {
+      "file": "src/receipt.ts",
+      "from": "> 1",
+      "to": "> 2",
+      "status": "killed"
+    },
+    {
+      "file": "src/receipt.ts",
+      "from": "\"verified\"",
+      "to": "\"missing\"",
+      "status": "killed"
+    },
+    {
+      "file": "src/loop-decide.ts",
+      "from": ">=",
+      "to": ">",
+      "status": "killed"
+    },
+    {
+      "file": "src/loop-decide.ts",
+      "from": "includes(",
+      "to": "startsWith(",
+      "status": "killed"
+    },
+    {
+      "file": "src/loop-decide.ts",
+      "from": "!attempt.verified",
+      "to": "attempt.verified",
+      "status": "killed"
+    },
+    {
+      "file": "src/identity.ts",
+      "from": "payload.exp <= nowSeconds",
+      "to": "payload.exp < 0",
+      "status": "killed"
+    },
+    {
+      "file": "src/identity.ts",
+      "from": "!audiences.includes(config.aud)",
+      "to": "false",
+      "status": "killed"
+    },
+    {
+      "file": "src/identity.ts",
+      "from": "payload.iss !== ",
+      "to": "false && payload.iss !== ",
+      "status": "killed"
+    },
+    {
+      "file": "src/identity.ts",
+      "from": "difference === 0",
+      "to": "true",
+      "status": "killed"
+    },
+    {
+      "file": "src/identity.ts",
+      "from": "if (!payload.email)",
+      "to": "if (false)",
+      "status": "killed"
+    },
+    {
+      "file": "src/owner-store.ts",
+      "from": "insert or ignore",
+      "to": "insert",
+      "status": "equivalent",
+      "reason": "finish() only records a terminal when record.terminal is null, and a Durable Object runs the update and the insert in one synchronous turn, so a second insert for the same event cannot happen; or-ignore is defence in depth"
+    },
+    {
+      "file": "src/owner-store.ts",
+      "from": ">=",
+      "to": ">",
+      "status": "killed"
+    },
+    {
+      "file": "src/runs.ts",
+      "from": "terminal !== null",
+      "to": "terminal === null",
+      "status": "killed"
+    },
+    {
+      "file": "src/loops-api.ts",
+      "from": "indexKey(ownerId)",
+      "to": "indexKey(\"shared\")",
+      "status": "killed"
+    }
+  ]
+}
