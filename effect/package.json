@@ -8,6 +8,7 @@
     "lint": "oxlint -c oxlint.config.ts src test"
   },
   "dependencies": {
+    "@cloudflare/sandbox": "^0.12.3",
     "effect": "4.0.3"
   },
   "devDependencies": {

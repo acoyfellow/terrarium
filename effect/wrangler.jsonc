@@ -4,5 +4,31 @@
   "compatibility_date": "2026-06-05",
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": false,
-  "preview_urls": false
+  "preview_urls": false,
+  "assets": {
+    "directory": "../app/dist",
+    "binding": "ASSETS",
+    "run_worker_first": ["/api/*", "/health", "/claim", "/ack"]
+  },
+  "ai": { "binding": "AI" },
+  "durable_objects": {
+    "bindings": [
+      { "name": "OWNER", "class_name": "OwnerDO" },
+      { "name": "TERRARIUM_SANDBOX", "class_name": "TerrariumSandbox" }
+    ]
+  },
+  "containers": [
+    {
+      "class_name": "TerrariumSandbox",
+      "image": "../Dockerfile.pi",
+      "image_build_context": "..",
+      "max_instances": 20
+    }
+  ],
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["OwnerDO", "TerrariumSandbox"] }],
+  "workflows": [
+    { "name": "terrarium-effect-run", "binding": "RUN_WORKFLOW", "class_name": "RunWorkflow" },
+    { "name": "terrarium-effect-loop", "binding": "LOOP_WORKFLOW", "class_name": "LoopWorkflow" }
+  ],
+  "kv_namespaces": [{ "binding": "LOOPS_KV", "id": "REPLACE_KV_ID" }]
 }
