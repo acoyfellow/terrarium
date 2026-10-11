@@ -11,8 +11,6 @@ export const CallbackEvent = Schema.Struct({ eventId: Schema.String, runId: Sche
 
 export type CallbackEvent = typeof CallbackEvent.Type;
 
-const Claimed = Schema.fromJsonString(Schema.Struct({ events: Schema.Array(CallbackEvent) }));
-
 export class CloudError extends Schema.TaggedError<CloudError>()("CloudError", { detail: Schema.String }) {}
 
 export const cloudUrl = () =>
