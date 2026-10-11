@@ -1,5 +1,6 @@
 <script>
   import Loops from './Loops.svelte';
+  import Architecture from './Architecture.svelte';
   // Docs shaped by purpose: Tutorial (learning), How-to (tasks), Reference (facts),
   // Explanation (understanding). Kept short and plain on purpose.
   const docs = [
@@ -117,7 +118,7 @@
   let hash = $state(location.hash);
   let selectedDoc = $state(new URLSearchParams(location.search).get('page') || 'tutorial');
 
-  const route = () => path === '/docs' ? 'docs' : path === '/loops' ? 'loops' : 'home';
+  const route = () => path === '/docs' ? 'docs' : path === '/loops' ? 'loops' : path === '/how-it-works' ? 'arch' : 'home';
 
   const currentDoc = () => docs.find((d) => d.id === selectedDoc) || docs[0];
 
@@ -181,6 +182,7 @@
     <a class="brand" href="/" onclick={(e) => navigate('/', e)}><span class="mark"></span>Terrarium</a>
     <nav class="topbar-nav">
       <a href="/docs" onclick={(e) => navigate('/docs', e)}>Docs</a>
+      <a href="/how-it-works" onclick={(e) => navigate('/how-it-works', e)}>How it works</a>
       <a href="https://github.com/acoyfellow/terrarium">GitHub</a>
       <button class="theme-toggle" type="button" onclick={cycleTheme} aria-label={themeLabel()} title={themeLabel()}>
         {#if themeChoice === 'light'}
@@ -259,6 +261,8 @@
 
   {:else if route() === 'loops'}
     <Loops />
+  {:else if route() === 'arch'}
+    <Architecture />
   {:else if route() === 'docs'}
     <section class="docs-shell">
       <div class="docs-layout">
