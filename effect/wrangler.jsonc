@@ -31,5 +31,5 @@
     { "name": "terrarium-effect-run", "binding": "RUN_WORKFLOW", "class_name": "RunWorkflow" },
     { "name": "terrarium-effect-loop", "binding": "LOOP_WORKFLOW", "class_name": "LoopWorkflow" }
   ],
-  "kv_namespaces": [{ "binding": "LOOPS_KV", "id": "REPLACE_KV_ID" }]
+  "kv_namespaces": [{ "binding": "LOOPS_KV", "id": "SET-IN-YOUR-LOCAL-CONFIG" }]
 }

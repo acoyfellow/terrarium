@@ -1,102 +1,12 @@
 <script>
   import Loops from './Loops.svelte';
   import Architecture from './Architecture.svelte';
-  // Docs shaped by purpose: Tutorial (learning), How-to (tasks), Reference (facts),
-  // Explanation (understanding). Kept short and plain on purpose.
   const docs = [
-    {
-      id: 'tutorial', label: 'Tutorial', kind: 'Learn',
-      title: 'Run your first task',
-      lead: 'About two minutes. Sign in with your Cloudflare login and run one task in the cloud.',
-      blocks: [
-        ['If your team runs Terrarium', 'Follow the Your team page instead: install, terra login, reload Pi. About two minutes.', 'text'],
-        ['Otherwise, try it on your laptop', 'No cloud needed. These steps run a task locally with an agent you already have.', 'text'],
-        ['Where does this run? Locally.', 'This tutorial is the local CLI. terra runs on YOUR machine — it spawns a coding agent you already have (Pi, OpenCode…) as a child process, in your filesystem, with your network and API keys. Nothing is sent to any cloud. "Running on the edge" is a separate, optional service you deploy yourself (step 5); the CLI never phones home.', 'text'],
-        ['1. Install from source', 'git clone https://github.com/acoyfellow/terrarium\ncd terrarium && npm install -g .', 'code'],
-        ['2. Dry-run one bounded task', 'terra --dry-run "summarize README.md and list any stale claims"', 'code'],
-        ['3. Run it for real', 'terra --agent "pi -p --no-session" "summarize README.md"', 'code'],
-        ['4. Read the receipt', 'terra status <runId>\nterra read <runId>', 'code'],
-        ['What you just got', 'One bounded task ran as one isolated child ON YOUR MACHINE and returned one correlated receipt: the run ID, its status, and a verified result you can trust or reject. The check does not depend on prose or on the cloud.', 'text'],
-        ['5. (optional) Run on your own Cloudflare edge instead', 'wrangler deploy   # deploys a Worker to YOUR Cloudflare account, at your own URL', 'code'],
-        ['When to use the cloud path', 'Deploy the cloud service when you want to submit a task over HTTP (POST /api/runs), close your laptop, and pull the proof back later. Execution then runs on Cloudflare instead of your machine. It is fully self-hosted: it runs in the Cloudflare account where you deploy the Worker. There is no hosted Terrarium instance; you deploy your own. The CLI uses the instance configured in TERRARIUM_URL.', 'text'],
-      ],
-    },
-    {
-      id: 'team', label: 'Your team', kind: 'Join',
-      title: "Use your team's Terrarium",
-      lead: 'Your team already runs Terrarium. Sign in with your Cloudflare login and you are set up in about two minutes. Your runs are visible only to you.',
-      blocks: [
-        ['You need', 'Node 22 or newer, Pi, and the Terrarium URL from your team. You can paste this page into your coding agent and tell it to follow along.', 'text'],
-        ['1. Install and sign in', 'brew install cloudflared\ngit clone https://github.com/acoyfellow/terrarium ~/terrarium\ncd ~/terrarium && npm ci && npm install -g .\nterra login https://terrarium.<your-team-domain>', 'code'],
-        ['What terra login does', 'It opens your browser. Sign in and approve. It prints who you are, adds the Terrarium tools to Pi, and installs the callback extension. You do not copy any tokens.', 'text'],
-        ['2. Reload Pi', 'That is the whole setup.', 'text'],
-        ['3. Try it', 'Ask your agent: Use terrarium_spawn to run "Reply with exactly: hello". You get back status done and taskContractStatus verified. Add background: true to keep working; the result shows up in your session when it is done.', 'text'],
-        ['Good to know', [
-          ['Question', 'Answer'],
-          ['Who sees my runs?', 'Only you. Runs, logs, receipts and completion events belong to your email.'],
-          ['How long does my login last?', 'About a day. When tools say unauthorized, run terra login again.'],
-          ['Can a cloud run see my files?', 'No. It knows only what you put in the task text.'],
-          ['Does verified mean correct?', 'No. It means the answer came from your task. Check answers that matter.'],
-          ['Who am I signed in as?', 'Run terra whoami.'],
-        ], 'table'],
-        ['If something is off', [
-          ['You see', 'Fix'],
-          ['unauthorized or HTTP 401', 'Run terra login again.'],
-          ['A Cloudflare "nothing here" page', 'Reload Pi.'],
-          ['The login page never opens', 'Copy the URL terra login printed into your browser.'],
-          ['No completion event for a background run', 'Run terra login again, then reload Pi.'],
-          ['terra: command not found', 'Rerun npm install -g . in ~/terrarium.'],
-        ], 'table'],
-      ],
-    },
-    {
-      id: 'howto', label: 'How-to', kind: 'Do',
-      title: 'Get a specific job done',
-      lead: 'Use these commands to run, cancel, and deploy tasks.',
-      blocks: [
-        ['Run in an isolated copy', 'terra --isolation copy --agent "pi -p --no-session" \\\n  "fix the failing callback test and run test/router.test.js"', 'code'],
-        ['Fan out several tasks in parallel', 'terra batch --concurrency 8 --strategy allSettled \\\n  "lint src" "run test/router.test.js" "update the docs"', 'code'],
-        ['Cancel a run', 'terra cancel <runId>', 'code'],
-        ['Self-heal stuck durable state', 'terra doctor --repair --apply --verify', 'code'],
-        ['Deploy your own cloud instance', '# runs on YOUR Cloudflare account — your Worker, your data\nwrangler deploy            # -> https://terrarium-control.<you>.workers.dev\nwrangler secret put TERRARIUM_CONTROL_TOKEN_CURRENT', 'code'],
-        ['Run a task on your instance', 'export TERRARIUM_URL=https://terrarium-control.<you>.workers.dev\ncurl -X POST $TERRARIUM_URL/api/runs \\\n  -H "authorization: Bearer $TOKEN" \\\n  -H "idempotency-key: $(uuidgen)" \\\n  -H "content-type: application/json" \\\n  -d \'{"task":"reply with: hello"}\'', 'code'],
-      ],
-    },
-    {
-      id: 'reference', label: 'Reference', kind: 'Look up',
-      title: 'API and commands',
-      lead: 'The exact surface. You deploy your own instance (wrangler deploy); every cloud route is auth-gated and owner-scoped to you.',
-      blocks: [
-        ['CLI', 'terra [--agent <cmd>] "task"   run one bounded task\nterra --dry-run "task"          plan only, no agent needed\nterra status <runId>           inspect status + receipt\nterra read <runId>             read logs\nterra cancel <runId>           cancel a run\nterra batch <tasks...>         fan out in parallel\nterra doctor --repair          heal durable state', 'code'],
-        ['Cloud API', 'POST /api/runs               admit a task -> 202 { runId, contract }\nGET  /api/runs               list your runs (channel/status/since)\nPOST /api/batches            admit N tasks as one batch (windowed)\nGET  /api/batches/:id        aggregate (failure-truth, child runIds)\nGET  /api/runs/:id/status    terminal + contract status\nGET  /api/runs/:id/logs      durable logs (+ R2 overflow refs)\nGET  /api/runs/:id/graded    trust grade + re-verifiable receipt\nPOST /api/runs/:id/cancel    cancel\nGET  /api/models             owner-scoped model catalog', 'code'],
-        ['MCP tools', [
-          ['Tool', 'What it does'],
-          ['terrarium_spawn', 'One bounded child. Synchronous unless background: true.'],
-          ['terrarium_spawn_batch', 'Fan-out with all / allSettled / race / any / quorum. Prefer isolation copy or worktree.'],
-          ['terrarium_status', 'One run by id, or list recent runs.'],
-          ['terrarium_read', 'Recorded log. kind: mre for the side log.'],
-          ['terrarium_cancel', 'Cancel one run and its process group.'],
-          ['terrarium_group', 'Roll up already-started runs. Group ok only if every member is done and ok.'],
-          ['terrarium_callbacks', 'Pull terminal events. A callback is not proof the task succeeded.'],
-          ['terrarium_doctor', 'Read-only diagnostics. CLI --repair is opt-in.'],
-          ['terrarium_report_failure', 'Deduped bug report from a terminal failure.'],
-        ], 'table'],
-        ['A receipt', 'runId · taskFingerprint · nonce · summary — a task succeeded only when all three correlate.', 'text'],
-      ],
-    },
-    {
-      id: 'explain', label: 'Explanation', kind: 'Understand',
-      title: 'Why checking results is the bottleneck',
-      lead: 'Bounded agent tasks run in parallel on Cloudflare. Each run returns a receipt you can check.',
-      blocks: [
-        ['The bottleneck', 'Running agents in parallel is easy. Checking the results is the slow part. Agent output and process signals do not prove that a task ran: not a "done" message, not an exit code of 0, not a callback. So people run one agent, watch it by hand, and stop there.', 'text'],
-        ['What a receipt changes', 'Each run carries its own receipt. One run and a thousand runs check the same way: one receipt at a time.', 'text'],
-        ['The primitive', 'one bounded task -> one isolated run -> one correlated receipt', 'code'],
-        ['What counts as success', 'A run succeeds when its run ID, task fingerprint, and nonce match the task Terrarium handed out. Logs, callbacks, and model prose are signals, not the status. The nonce is server-minted, so a run cannot forge its own success.', 'text'],
-        ['Provenance and correctness are separate', 'A verified receipt proves the task ran and correlated. It does not prove the answer is correct. Terrarium adds an advisory trust grade from cross-model agreement; more independent runs raise the grade. The grade annotates a receipt. It never changes a receipt from failed to verified.', 'text'],
-        ['Why Cloudflare', 'Admission, execution, logs, the model route, and the wake callback all run on Cloudflare. Submit a task, close your laptop, and read the receipt later. State and delivery do not depend on a machine you own, so you can leave a thousand parallel runs and come back to their receipts.', 'text'],
-      ],
-    },
+    {"id": "tutorial", "label": "Tutorial", "kind": "Learn", "title": "Run your first task", "lead": "About two minutes. Sign in with your Cloudflare login and run one task in the cloud.", "blocks": [["1. Install and sign in", "brew install cloudflared\ngit clone https://github.com/acoyfellow/terrarium ~/terrarium\ncd ~/terrarium/effect && npm ci && cd .. && npm install -g .\nterra login https://terrarium.<your-team-domain>", "code"], ["2. Reload Pi", "terra login added the Terrarium tools and the callback extension to Pi.", "text"], ["3. Run a task", "Ask your agent: Use terrarium_spawn to run \"What is 17 multiplied by 23? Reply with just the number.\"", "text"], ["What you get back", "{ \"runId\": \"ter_…\", \"status\": \"done\", \"contractStatus\": \"verified\", \"summary\": \"391\" }", "code"], ["4. Run one in the background", "Ask for background: true and keep working. When the run finishes, a \"Terrarium run … finished\" message shows up in your session.", "text"], ["5. Start a loop", "Ask your agent: Use terrarium_loop_start with goal \"multiply\", task \"What is 17 times 23?\", expect \"391\". Watch it on the Loops page.", "text"]]},
+    {"id": "team", "label": "Your team", "kind": "Join", "title": "Use your team's Terrarium", "lead": "Your team already runs Terrarium. Sign in with your Cloudflare login and you are set up in about two minutes. Your runs are visible only to you.", "blocks": [["You need", "Node 22 or newer, Pi, and the Terrarium URL from your team. You can paste this page into your coding agent and tell it to follow along.", "text"], ["1. Install and sign in", "brew install cloudflared\ngit clone https://github.com/acoyfellow/terrarium ~/terrarium\ncd ~/terrarium/effect && npm ci && cd .. && npm install -g .\nterra login https://terrarium.<your-team-domain>", "code"], ["What terra login does", "It opens your browser. Sign in and approve. It prints who you are, adds the Terrarium tools to ~/.pi/agent/mcp.json, and links the callback extension. You do not copy any tokens.", "text"], ["2. Reload Pi", "That is the whole setup.", "text"], ["Good to know", [["Question", "Answer"], ["Who sees my runs?", "Only you. Runs, logs and loops belong to your email."], ["How long does my login last?", "About a day. When tools say unauthorized, run terra login again."], ["Can a run see my files or the internet?", "No. It knows only what you put in the task text, and its only route is to the model."], ["Does verified mean correct?", "No. It means the answer came from your task. Check answers that matter."], ["Who am I signed in as?", "Run terra whoami."]], "table"], ["If something is off", [["You see", "Fix"], ["unauthorized or HTTP 401", "Run terra login again."], ["The login page never opens", "Copy the URL cloudflared printed into your browser."], ["No finished message for a background run", "Reload Pi, then check terrarium_status for the run."], ["terra: command not found", "Rerun npm install -g . in ~/terrarium."]], "table"]]},
+    {"id": "howto", "label": "How-to", "kind": "Do", "title": "Get a specific job done", "lead": "Call the API directly, cancel work, or deploy your own instance.", "blocks": [["Start a run over HTTP", "TOKEN=$(cloudflared access token -app=$TERRARIUM_URL)\ncurl -X POST $TERRARIUM_URL/api/runs \\\n  -H \"cf-access-token: $TOKEN\" \\\n  -H \"idempotency-key: $(uuidgen)\" \\\n  -H \"content-type: application/json\" \\\n  -d '{\"task\":\"Reply with: hello\"}'", "code"], ["Check it", "curl -H \"cf-access-token: $TOKEN\" $TERRARIUM_URL/api/runs/<runId>/status", "code"], ["Cancel a run", "curl -X POST -H \"cf-access-token: $TOKEN\" $TERRARIUM_URL/api/runs/<runId>/cancel", "code"], ["Deploy your own", "cd effect\ncp wrangler.jsonc wrangler.mine.local.jsonc\nnpx wrangler deploy -c wrangler.mine.local.jsonc", "code"], ["Before you deploy", "In your local copy, set the KV namespace ID, your hostname and the Access vars, and put the hostname behind a Cloudflare Access app. The checked-in wrangler.jsonc has no hostname and no Access settings, so it cannot replace a working deploy by mistake.", "text"]]},
+    {"id": "reference", "label": "Reference", "kind": "Look up", "title": "API and tools", "lead": "Every route needs your Access login or a machine token, and only ever shows your own runs.", "blocks": [["API", "POST /api/runs              start a run -> { runId, contract }\nGET  /api/runs              your runs (channel, status, limit)\nGET  /api/runs/:id/status   status and receipt\nGET  /api/runs/:id/logs     full output\nPOST /api/runs/:id/cancel   cancel\nPOST /api/loops             start a loop { goal, task, expect, maxAttempts }\nGET  /api/loops             your loops\nGET  /api/whoami            who you are", "code"], ["MCP tools", [["Tool", "What it does"], ["terrarium_spawn", "Run one task. Waits up to 10 minutes unless background: true."], ["terrarium_status", "Status of one run."], ["terrarium_read", "Logs of one run."], ["terrarium_cancel", "Cancel one run."], ["terrarium_list", "Your runs, newest first."], ["terrarium_loop_start", "Retry a task until its answer contains expect, up to 5 attempts."], ["terrarium_loop_status", "One loop or all of them."]], "table"], ["Limits", "8 live runs per person · 30 new runs per minute · loops up to 5 attempts", "text"], ["A receipt", "runId · taskFingerprint · nonce · summary. A run is verified only when all three values match what the server handed out.", "text"]]},
+    {"id": "explain", "label": "Explanation", "kind": "Understand", "title": "Why checking results is the bottleneck", "lead": "Running agents in parallel is easy. Knowing which answer came from which task is the hard part.", "blocks": [["The bottleneck", "A \"done\" message, an exit code of 0 or a callback does not prove a task ran. So people run one agent, watch it by hand, and stop there.", "text"], ["What a receipt changes", "Each run carries its own receipt. One run and a thousand runs check the same way: one receipt at a time.", "text"], ["What counts as success", "A run is verified when its run ID, task fingerprint and one-time code match what Terrarium handed out. The code comes from the server, so a run cannot make up its own success.", "text"], ["Verified is not correct", "Verified proves the right run answered. It does not prove the answer is true. Pi runs with tools off today, so an agent asked to run a command can only describe made-up output, and the run is still verified. Check anything that matters with a command you run yourself.", "text"], ["Why Cloudflare", "Sign-in, runs, loops, the model and the history all live on Cloudflare. Start a task, close your laptop, and read the result later. See How it works for the parts.", "text"]]},
   ];
 
   const THEME_KEY = 'terrarium-theme';
@@ -209,13 +119,13 @@
           </div>
         </div>
         <pre class="hero-code"><code>{`> Use terrarium_spawn to run
-  "Reply with exactly: hello".
+  "What is 17 times 23? Just the number."
 
 {
-  "ok": true,
-  "runId": "ter_mv2qdrha_9f5a3a434d2a",
+  "runId": "ter_mv44zm3a_5723d13c1abb",
   "status": "done",
-  "taskContractStatus": "verified"
+  "contractStatus": "verified",
+  "summary": "391"
 }`}</code></pre>
         <p class="sub">That's a real run. Ask for <code>background: true</code> and keep working; the result shows up in your session when it's done.</p>
       </div>

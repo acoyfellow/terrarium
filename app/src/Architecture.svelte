@@ -6,7 +6,7 @@
     ['Durable Object (one per person)', 'The small amount of state that must be exact: which idempotency key made which run, how many runs you have live, your run list, and your completion inbox.'],
     ['Container', 'Where the agent actually runs. It gets only the task text and a one-time code. It has no internet except one route to the model.'],
     ['Workers AI', 'The model. The Worker adds the credential on the way out, so the container never holds a key.'],
-    ['KV and R2', 'Loop records and large logs. Plain storage, nothing clever.'],
+    ['KV', 'The loop index the Loops page reads. Plain storage, nothing clever.'],
   ];
   const steps = [
     'You ask your agent to start a run. It calls the API with your Access login.',
@@ -15,7 +15,7 @@
     'The agent in the container calls the model through the Worker, which adds the credential.',
     'The agent prints its answer and a receipt line containing the nonce.',
     'The Workflow checks the receipt: exactly one line, the right nonce, this run. Only then is the run verified.',
-    'The result is recorded once, and a completion event lands in your inbox. Your Pi session picks it up by itself.',
+    'The result is recorded once in your Durable Object. The Pi extension sees the run finish and puts the result into your session.',
   ];
 </script>
 
@@ -63,8 +63,8 @@
 
       <g class="arch-node">
         <rect x="430" y="150" width="170" height="56" rx="10" />
-        <text x="515" y="174">KV · R2</text>
-        <text x="515" y="192" class="arch-sub">loops · big logs</text>
+        <text x="515" y="174">KV</text>
+        <text x="515" y="192" class="arch-sub">loop index</text>
       </g>
 
       <g class="arch-node arch-cell">
@@ -128,7 +128,7 @@
       <text x="26" y="658" class="arch-legend-line">5 · one receipt line with the</text>
       <text x="26" y="678" class="arch-legend-line">    one-time code it was given</text>
       <text x="26" y="702" class="arch-legend-line">6 · right code · this run · once</text>
-      <text x="26" y="726" class="arch-legend-line">7 · result lands in your inbox</text>
+      <text x="26" y="726" class="arch-legend-line">7 · result lands in your session</text>
     </svg>
   </figure>
 
@@ -144,6 +144,15 @@
 
   <h2>Loops</h2>
   <p>A loop is one more Workflow. It starts a run, waits for it, checks the answer against the exact text in your plan, then stops or tries again. Plain code makes every decision, so the same results always lead to the same decisions. The <a href="/loops">Loops</a> page only reads what the Workflow recorded.</p>
+
+  <h2>Built with Effect 4</h2>
+  <p>The service is about 900 lines of Effect 4 TypeScript. Every failure is a typed value, async code exists only where Workers requires it, and lint runs with strict anti-slop rules. 68 tests run in about a second, and mutation testing checks that they catch deliberate bugs.</p>
+
+  <h2>What verified does not prove</h2>
+  <p>Verified means the right run answered. It does not mean the answer is true. Pi runs with tools off today, so an agent asked to run a command can only describe made-up output, and that run is still verified. Check anything that matters with a command you run yourself.</p>
+
+  <h2>How long a run takes</h2>
+  <p>A one-word task takes about 20 seconds end to end. Starting a fresh container takes 4 to 5 seconds of that, and starting Pi inside it takes 2 to 18. Keeping a few containers warm is the next speed-up to try.</p>
 
   <h2>What we deliberately did not build</h2>
   <ul>

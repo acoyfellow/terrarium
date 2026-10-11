@@ -1,103 +1,61 @@
-# Terrarium architecture
+# How Terrarium works
 
-Terrarium's current core is durable execution and callbacks, with additive coordination and security profiles:
+Terrarium is a small Worker that hands each job to the Cloudflare product built for it. The service is about 900 lines of Effect 4 TypeScript in [`effect/src`](../effect/src). The same picture, drawn, is on the site at `/how-it-works`.
 
-```text
-terra "task"             one cooperative run (stable compatibility surface)
-terra batch ...           explicit fan-out into independent ordinary runs
-terra schedule replay ... deterministic terminal-semantics replay
-terra secure "task"      hostile/untrusted secure-v1 validation profile
+```
+ Your agent (Pi)                Cloudflare, behind Access
+ ┌──────────────┐  1 start   ┌──────────┐   2 reserve   ┌────────────────┐
+ │ MCP client + │──────────► │  Worker  │─────────────► │ Durable Object │
+ │ callback ext │            │ site·API │               │ one per person │
+ └──────▲───────┘            └────┬─────┘               └────────────────┘
+        │                         │ 3 start Workflow
+        │                    ┌────▼─────┐   loops   ┌────┐
+        │  7 result          │ Workflow │ ────────► │ KV │
+        │                    │ per run  │           └────┘
+        │                    └────┬─────┘
+        │                         │ 4 run task + one-time code
+        │                    ┌────▼──────┐  5 model call  ┌────────────┐
+        └─────────────────── │ Container │ ─────────────► │ Workers AI │
+                             │no internet│  via Worker    └────────────┘
+                             └───────────┘
 ```
 
-## Ordinary-run isolation
+## The parts
 
-Parallel top-level runs keep separate metadata/logs and may execute concurrently. Each child receives a lineage-scoped capability policy: minimal/max-depth-one runs have no recursive spawn and self-only status/read; explicitly nested runs may see descendants but not siblings. MCP results require a run/task-correlated receipt, so process success is not automatically task success. See [CONCURRENCY_ISOLATION.md](./CONCURRENCY_ISOLATION.md).
-
-## Core run lifecycle
-
-One ordinary run owns one child process, metadata/log receipts, and at most one terminal result plus one deterministic terminal callback event. Terminal events are durably journaled before secondary in-process observers, even when no subscriber is online. Concrete late subscriptions replay matching journal entries without redelivering acknowledged events. Detached background runs feed observed process, cancellation, deadline, and receipt facts into the pure transition core in `src/run-machine.js`; the supervisor executes returned decisions using real processes, clocks, metadata, and the callback router. Versioned fixtures in `fixtures/run-schedules/` replay bounded classification facts only and never become a second persisted run record.
-
-MCP callback subscriptions are a durable pull primitive and do not wake a host by themselves. The Pi extension is the host-delivery adapter: after a background spawn result it adds the concrete run ID to that session's durable subscription, claims only terminal events for those concrete runs, injects a visible follow-up with Pi's `triggerTurn: true`, and acknowledges only after injection succeeds. It does not subscribe Pi sessions as wildcard channel listeners; sibling Pi sessions in the same cwd/channel must not receive runs they did not spawn. Pi starts immediately if idle or drains the follow-up after its active turn; offline sessions replay subscribed runs on resume. Other MCP hosts must claim/ack callbacks or inspect status themselves.
-
-Explicit batch fan-out in `src/batch.js` creates independent background runs, stores their run IDs in one durable group, and applies `all`, `allSettled`, `race`, `any`, or `quorum` join semantics. Winner-picking strategies cancel remaining ordinary runs through the same cancellation primitive.
-
-## Historical campaign model
-
-```text
-PLAN → RUN → CHECK → REPLAY → FIX → RECHECK → MERGE
-```
-
-- **Planner:** proposes bounded attacks; never decides success.
-- **Runner:** Docker or Lab fresh environment.
-- **Checker:** scenario-owned deterministic detector outside attacker authority.
-- **Evidence:** private receipt plus allowlisted public summary.
-- **Fixer:** issue-scoped worktree; no publish/merge authority.
-- **Patch gate:** protects detectors, workflows, evidence policy, dependencies.
-- **Replay gate:** same payload, same detector, fresh environment.
-- **Merger:** serial trusted controller after tests and replay.
-
-## Historical campaign state machine
-
-```text
-planned
-→ detector_started
-→ detector_finished
-→ [contained | replay_started]
-→ replay_finished
-→ [not_reproduced | finding_classified]
-→ finding_published
-→ fix_started
-→ [patch_rejected | patch_accepted]
-→ tests_passed
-→ post_fix_replay_contained
-→ merged
-→ stopped
-```
-
-Every public event is allowlisted and bounded. Callback subscriptions can filter by run, channel, workflow, and event type. Events receive deterministic IDs; duplicate routing is suppressed. Consumers atomically move callbacks from pending to inflight and explicitly acknowledge them, preventing duplicate injection in one consumer. Raw model transcripts, private prompts, credentials, local paths, and private model identity remain private.
-
-## Artifacts
-
-| Artifact | Authority | Visibility |
+| Part | Job | Code |
 |---|---|---|
-| attack plan | model | private until summarized |
-| detector receipt | trusted runner | private |
-| evidence digest | controller | public |
-| public turn | template + allowlist | public |
-| issue / PR / commit | GitHub | public |
-| raw Pi trace | local owner | private |
-| trace event stream | controller | public |
+| Cloudflare Access | Signs you in. The Worker checks the signed token on every request; your email owns everything you start. | `identity.ts` |
+| Worker | Serves the site and API, checks who you are, starts Workflows. Holds no state. | `worker.ts`, `app.ts` |
+| Durable Object, one per person | The state that must be exact: idempotency keys, live-run count, rate limit, run list, completion events. SQLite. | `owner-do.ts`, `owner-store.ts` |
+| Run Workflow | One instance per run. Starts the container, checks the receipt, records the result once. | `run-workflow.ts`, `receipt.ts` |
+| Loop Workflow | One instance per loop. Starts runs until one passes the gate or attempts run out. The next step is a pure function of past attempts. | `loop-workflow.ts`, `loop-decide.ts` |
+| Container | Runs Pi with the task and a one-time code. No internet; its only route is the model, through the Worker. | `sandbox.ts`, `pi-child.ts`, `Dockerfile.pi` |
+| Workers AI | The model. The Worker calls it through its binding, so the container never holds a key. | `sandbox.ts` |
+| KV | The loop index for the `/loops` page. | `loops-api.ts` |
 
-## Release gate
+## One run, start to finish
 
-`terra hardening verify` executes the permanent attack corpus against one Git revision. A release is hardened only when every known product-defect regression is contained. Boundary clarifications are documented but do not fail the gate.
+1. Your agent calls `POST /api/runs` with an idempotency key, signed in through Access.
+2. The Worker reserves a slot in your Durable Object: the same key returns the same run, at most 8 runs live, 30 per minute.
+3. The Worker starts a Run Workflow. The run ID, task fingerprint and one-time code are fixed now, by the server.
+4. The Workflow starts a container with the task and the code.
+5. Pi in the container asks the model. The request leaves through the Worker, which calls Workers AI.
+6. Pi prints its answer and one `TERRARIUM_RESULT=` line. The Workflow checks it: exactly one line, the right code, this run, this task. Only then is the run `verified`.
+7. The result is recorded once in the Durable Object. The Pi extension sees the run finish and puts the result into your session.
 
-## Concurrency
+A one-word task takes about 20 seconds end to end. Starting a fresh container takes 4 to 5 seconds of that, and starting Pi inside it takes 2 to 18.
 
-Independent runs may execute concurrently; each run still owns one child and one receipt. Parents can register existing run IDs in a durable group, or explicitly use `terrarium_spawn_batch` to launch 1–256 jobs and create the group in one call. `concurrency` bounds simultaneously active runs (each slot held until its run is terminal) and is required once a batch exceeds 32 jobs, so the queued-job ceiling can grow without unbounding active children. Cancellation records durable intent, keeps the supervisor alive through launch handoff, and targets the child's Unix process group so descendants are torn down together. Strategy rounds are separated by a memory barrier. Fixes may be generated concurrently but merge serially; every stale fix must replay against the current head.
+## What "verified" proves
 
-## Secure agent composition
+It proves the right run answered: the receipt carries the server's one-time code for this run and this task. It does not prove the answer is true. Pi runs with tools off today, so an agent asked to run a command can only describe made-up output, and that run is still verified. Anything that needs the truth should be checked by a command Terrarium runs itself, not by the agent's words.
 
-```text
-Pi (model transport; no built-in host tools)
-  → run-scoped MCP: search + execute + finish
-  → QuickJS code-mode orchestration
-  → allowlisted Terrarium workspace capabilities
-  → disposable secure-v1 Docker workspace
-  → tests + diff + receipt + teardown
-```
+## Loops
 
-Terrarium remains the wrapper and capability broker; Pi remains the agent. Model credentials never enter Docker.
+A loop is a contract: a goal, a task, the text the answer must contain, and at most 5 attempts. The Loop Workflow runs attempts as ordinary runs. After each one, `decideNext` looks only at the contract and the attempts so far, and says continue or stop. Replaying the same attempts always gives the same decision. The `/loops` page reads what the Workflow recorded and adds nothing of its own.
 
-## Engine decision
+## Why it's built this way
 
-The production engine is TypeScript. The prior Go-core migration sketch is retained as internal architecture research/conformance material, not an operator-facing engine choice. Terrarium must not present an experimental engine flag to users; a future Go engine would need to become the normal path with the same receipt, callback, MCP, doctor, and Pi guarantees. See [ENGINE_DECISION.md](./ENGINE_DECISION.md).
-
-## Current limits
-
-The public campaign/state-machine sections above document frozen historical provenance. See [CORE_PRODUCT_DECISION.md](./CORE_PRODUCT_DECISION.md); they are not the current product roadmap.
-
-- secure-agent is proven on one dependency-free Node bug-fix fixture, not broad coding workloads yet.
-- Docker/Lab provide the execution boundary; copy/worktree alone do not.
-- GitHub required-check integration still needs a dedicated publisher identity.
-- Public traces are safe event streams, never raw chain-of-thought.
+- **Each job goes to a Cloudflare product.** Workflows keep steps, retries and history. Durable Objects keep exact counters. Access does sign-in. Less of our own code to trust.
+- **Errors are values.** Effect 4 types every failure; `oxlint` with anti-slop rules runs at error level. Async code exists only at the Workers boundary.
+- **Tests and mutation testing.** 68 tests run in about a second, and `effect/scripts/mutate.mjs` checks that they catch deliberate bugs.
+- **The gate.** `npm run gate:effect` runs tests, types, lint, mutation score, the prod-check receipt and the size benchmark.
