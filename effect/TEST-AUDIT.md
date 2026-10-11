@@ -110,8 +110,8 @@ Scope: every `test/*.test.js` file (102). KEEP = re-express against the Effect 4
 ## Counts
 
 - Files: 102
-- KEEP: 40
-- DROP: 62
+- KEEP: 33
+- DROP: 69
 
 ## KEEP behaviour not yet on the SPEC list (raise to user)
 
