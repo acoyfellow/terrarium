@@ -12,11 +12,13 @@ import pulseWorker, { PulseRouter } from "./pulse/worker.js";
 import { RunControlDO } from "./cloud/run-control-do.js";
 import { handleApiRuns } from "./cloud/api-runs.js";
 import { handleApiBatches } from "./cloud/api-batches.js";
+import { handleApiLoops } from "./cloud/api-loops.js";
+import { TerrariumLoopWorkflow } from "./cloud/loop-workflow.js";
 
 import { TerrariumSandbox } from "./cloud/terrarium-sandbox.js";
 import { PrincipalBudgetDO } from "./cloud/principal-budget-do.js";
 
-export { PulseRouter, RunControlDO, TerrariumSandbox, PrincipalBudgetDO };
+export { PulseRouter, RunControlDO, TerrariumSandbox, PrincipalBudgetDO, TerrariumLoopWorkflow };
 
 const DEFAULT_POLICY = {
   paused: false,
@@ -199,6 +201,10 @@ const legacyWorker = {
     // Cloud Terrarium production /api/runs + /api/models surface.
     if (url.pathname.startsWith("/api/runs") || url.pathname === "/api/models") {
       const routed = await handleApiRuns(request, env);
+      if (routed) return routed;
+    }
+    if (url.pathname.startsWith("/api/loops")) {
+      const routed = await handleApiLoops(request, env);
       if (routed) return routed;
     }
     if (url.pathname.startsWith("/api/batches")) {
