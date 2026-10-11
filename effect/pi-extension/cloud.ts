@@ -29,18 +29,16 @@ const authHeader = (url: string) => {
   });
 };
 
-const post = (url: string, path: string, body: string) => Effect.gen(function* () {
+const RunStatus = Schema.fromJsonString(Schema.Struct({ runId: Schema.String, terminal: Schema.NullOr(Schema.Struct({ status: Schema.String, contractStatus: Schema.String, summary: Schema.NullOr(Schema.String) })) }));
+
+export const terminalOf = (url: string, runId: string) => Effect.gen(function* () {
   const headers = yield* authHeader(url);
-  const response = yield* Effect.tryPromise({ try: () => fetch(new URL(path, url), { method: "POST", headers: { ...headers, "content-type": "application/json" }, body }), catch: (cause) => new CloudError({ detail: String(cause) }) });
+  const response = yield* Effect.tryPromise({ try: () => fetch(new URL(`/api/runs/${encodeURIComponent(runId)}/status`, url), { headers }), catch: (cause) => new CloudError({ detail: String(cause) }) });
   const text = yield* Effect.tryPromise({ try: () => response.text(), catch: (cause) => new CloudError({ detail: String(cause) }) });
+  const status = yield* Schema.decodeUnknownEffect(RunStatus)(text).pipe(Effect.mapError((error) => new CloudError({ detail: error.message })));
 
-  return response.ok ? text : yield* new CloudError({ detail: `${path} ${response.status} ${text}` });
+  return status.terminal === null ? Option.none<CallbackEvent>() : Option.some<CallbackEvent>({ eventId: `evt_${runId}`, runId, ...status.terminal });
 });
-
-export const claim = (url: string, subscriberId: string) =>
-  post(url, "/claim", JSON.stringify({ subscriberId, limit: 20 })).pipe(Effect.flatMap((text) => Schema.decodeUnknownEffect(Claimed)(text).pipe(Effect.mapError((error) => new CloudError({ detail: error.message })))), Effect.map((claimed) => claimed.events));
-
-export const ack = (url: string, subscriberId: string, eventId: string) => post(url, "/ack", JSON.stringify({ subscriberId, eventId }));
 
 export const runIdsIn = (text: string) => text.match(/ter_[a-z0-9]{6,12}_[a-f0-9]{12}/g) ?? [];
 

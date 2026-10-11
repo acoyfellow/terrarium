@@ -1,6 +1,6 @@
-import { Effect } from "effect";
+import { Effect, Option } from "effect";
 
-import { ack, claim, cloudUrl, followUp, runIdsIn } from "./cloud.ts";
+import { cloudUrl, followUp, runIdsIn, terminalOf } from "./cloud.ts";
 
 interface ToolResultEvent {
   readonly toolName: string;
@@ -13,7 +13,7 @@ interface Context {
 }
 
 interface Pi {
-  readonly on: (event: "tool_result", handler: (event: ToolResultEvent, ctx: Context) => void) => void;
+  readonly on: (event: "tool_result", handler: (event: ToolResultEvent) => void) => void;
   readonly sendUserMessage: (content: string, options: { readonly deliverAs: "followUp" }) => void;
 }
 
@@ -21,18 +21,12 @@ const POLL_MS = 15_000;
 
 const isSpawnTool = (name: string) => name === "terrarium_spawn" || name.endsWith("_terrarium_spawn");
 
-const awaitRun = (pi: Pi, url: string, subscriberId: string, runId: string) => {
-  const sweep = Effect.gen(function* () {
-    const events = yield* claim(url, subscriberId);
-    const event = events.find((candidate) => candidate.runId === runId);
-
-    if (event === undefined) return false;
-
-    yield* Effect.sync(() => pi.sendUserMessage(followUp(event), { deliverAs: "followUp" }));
-    yield* ack(url, subscriberId, event.eventId);
-
-    return true;
-  }).pipe(Effect.catch(() => Effect.succeed(false)));
+const awaitRun = (pi: Pi, url: string, runId: string) => {
+  const sweep = terminalOf(url, runId).pipe(
+    Effect.tap(Option.match({ onNone: () => Effect.void, onSome: (event) => Effect.sync(() => pi.sendUserMessage(followUp(event), { deliverAs: "followUp" })) })),
+    Effect.map(Option.isSome),
+    Effect.catch(() => Effect.succeed(false)),
+  );
 
   const loop: Effect.Effect<void> = Effect.sleep(POLL_MS).pipe(Effect.andThen(sweep), Effect.flatMap((done) => (done ? Effect.void : loop)));
 
@@ -40,7 +34,7 @@ const awaitRun = (pi: Pi, url: string, subscriberId: string, runId: string) => {
 };
 
 export default function terrariumEffect(pi: Pi) {
-  pi.on("tool_result", (event, ctx) => {
+  pi.on("tool_result", (event) => {
     if (!isSpawnTool(event.toolName) || event.input.background !== true) return;
 
     const url = cloudUrl();
@@ -48,6 +42,6 @@ export default function terrariumEffect(pi: Pi) {
 
     if (url.length === 0) return;
 
-    new Set(runIdsIn(text)).forEach((runId) => awaitRun(pi, url, `pi-${ctx.sessionManager.getSessionId()}`, runId));
+    new Set(runIdsIn(text)).forEach((runId) => awaitRun(pi, url, runId));
   });
 }
