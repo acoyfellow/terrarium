@@ -140,3 +140,5 @@ Scope: every `test/*.test.js` file (102). KEEP = re-express against the Effect 4
 - cloud-correctness-annotation / cloud-trust-calibration "advisory, never claims authority words" tests: string-absence checks that pass for any output lacking those words.
 - mcp_concise.test.js "concise is meaningfully smaller than verbose": a size comparison that holds for nearly any projection.
 - cloud-run-index.test.js "never throws / put failure swallowed": would pass with a no-op implementation.
+
+Approved by the user: 2026-10-11, drop list accepted as written.
