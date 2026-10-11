@@ -43,9 +43,21 @@ Rules for the build:
 
 ## B5 Client and Pi
 
+- B5.0 A Pi child process always gets its prompt as a file (`pi -p ... @<path>`), never as a command-line argument. Pi kills itself with SIGKILL when an argument is longer than about 1,000 characters. A test spawns a real `pi` with a prompt over 2,000 characters and asserts it is not SIGKILLed.
+
 - B5.1 `terra login <url>` signs in with `cloudflared access login`, writes the Pi MCP entry and links the Pi extension folder.
 - B5.2 The MCP server exposes spawn, status, read, cancel, list and batch, backed by the HTTP API.
 - B5.3 The Pi extension claims terminal callbacks for the session and injects one follow-up per event.
+
+## Added from the test audit
+
+- B1.5 Two tokens per machine principal (current and previous) both work, for rotation. Shared legacy tokens never authorize.
+- B2.9 A task over 16 KB is a 413 and no run starts.
+- B2.10 `verified` means the receipt is correlated to this run. It does not mean the answer is correct.
+- B3.4 Unknown subscriber, unknown event and another owner's event all return the same 404.
+- B3.5 The same terminal event emitted twice is stored once. Events that finished before anyone subscribed are still delivered.
+- B3.6 After N failed deliveries an event is quarantined instead of retried forever.
+- B3.7 Owner ids in request bodies are ignored; the owner comes only from identity.
 
 ## Out of scope (deleted, not ported)
 
