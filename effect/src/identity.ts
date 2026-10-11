@@ -123,11 +123,13 @@ const verifyBearer = (token: string) =>
   });
 
 export const authenticate = (request: Request): Effect.Effect<Identity, Unauthorized, AccessConfig> => {
-  const jwt = request.headers.get("cf-access-jwt-assertion") ?? request.headers.get("cf-access-token");
-
-  if (jwt) return verifyAccessJwt(jwt);
-
+  const userJwt = request.headers.get("cf-access-token");
+  const edgeJwt = request.headers.get("cf-access-jwt-assertion");
   const bearer = /^Bearer\s+(.+)$/i.exec(request.headers.get("authorization") ?? "")?.[1]?.trim();
 
-  return bearer ? verifyBearer(bearer) : Effect.fail(deny("no credentials"));
+  if (userJwt) return verifyAccessJwt(userJwt);
+
+  if (bearer) return verifyBearer(bearer);
+
+  return edgeJwt ? verifyAccessJwt(edgeJwt) : Effect.fail(deny("no credentials"));
 };

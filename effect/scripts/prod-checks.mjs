@@ -59,8 +59,8 @@ const token = accessToken();
 const me = token ? { "cf-access-token": token } : {};
 const json = { "content-type": "application/json" };
 
-const health = await call("/health");
-record("health answers", health.status === 200, { status: health.status });
+const health = await call("/health", { headers: service() });
+record("health answers", [200].includes(health.status), { status: health.status });
 
 const anon = await call("/api/runs", { headers: service() });
 record("no identity is refused", anon.status === 401, { status: anon.status });

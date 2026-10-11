@@ -75,3 +75,14 @@ test("valid bearer", async () => {
 test("wrong bearer", async () => rejects({ authorization: `Bearer ${crypto.randomUUID()}` }, "unknown bearer"));
 
 test("no credentials", async () => rejects({}, "no credentials"));
+
+test("a machine bearer behind a service-token Access edge is the bearer principal, not the service", async () => {
+  const edge = await sign({ ...validClaims, email: undefined });
+  assert.deepEqual(await run({ "cf-access-jwt-assertion": edge, authorization: `Bearer ${machineToken}` }), Exit.succeed({ id: "ci-bot", method: "bearer", email: null }));
+});
+
+test("an explicit user token wins over a bearer", async () => {
+  const exit = await run({ "cf-access-token": await sign(validClaims), authorization: `Bearer ${machineToken}` });
+  assert.ok(Exit.isSuccess(exit));
+  assert.equal(exit.value.method, "access-user");
+});
