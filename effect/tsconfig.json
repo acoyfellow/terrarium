@@ -14,6 +14,7 @@
   },
   "include": [
     "src",
-    "test"
+    "test",
+    "pi-extension"
   ]
 }
