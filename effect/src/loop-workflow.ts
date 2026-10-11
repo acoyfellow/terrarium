@@ -4,6 +4,7 @@ import { Effect, Layer } from "effect";
 import { Owner, Runs } from "./shared.ts";
 import type { OwnerId, RunRecord } from "./shared.ts";
 import { decideNext, gateAttempt } from "./loop-decide.ts";
+import { runsLayer } from "./app.ts";
 import type { Decision, Gate, LoopContract, RecordedAttempt } from "./loop-decide.ts";
 
 export interface LoopParams {
@@ -75,3 +76,5 @@ export const makeLoopWorkflow = <E>(runsLayer: (env: E) => Layer.Layer<Runs>) =>
       return { runId, status: "timeout", verified: false, logs: "" };
     }
   };
+
+export const LoopWorkflow = makeLoopWorkflow(runsLayer);

@@ -2,7 +2,6 @@ import { Context, Effect, Layer, Schema } from "effect";
 
 import { fromReply } from "./owner-store.ts";
 import type { Admission, AdmitReservation, CallbackEvent, ClaimRequest, Reply, StoreError } from "./owner-store.ts";
-import type { OwnerDO } from "./owner-do.ts";
 import { BadRequest, Clock, Ids, NotFound, Owner, Runs, Upstream } from "./shared.ts";
 import type { Conflict, OwnerId, RateLimited, RunContract, RunId, RunRecord, RunTerminal } from "./shared.ts";
 
@@ -127,9 +126,21 @@ export const CallbacksLive = Layer.effect(Callbacks, Effect.gen(function* () {
   return Callbacks.of({ claim, ack });
 }));
 
+export interface OwnerRpc {
+  readonly admitReserve: (reservation: AdmitReservation) => Promise<Reply<Admission>>;
+  readonly get: (runId: string) => Promise<Reply<RunRecord>>;
+  readonly finish: (runId: string, terminal: RunTerminal, logs: string) => Promise<Reply<RunRecord>>;
+  readonly list: (channel: string | null, limit: number) => Promise<Reply<ReadonlyArray<RunRecord>>>;
+  readonly claim: (request: ClaimRequest) => Promise<Reply<ReadonlyArray<CallbackEvent>>>;
+  readonly ack: (subscriberId: string, eventId: string) => Promise<Reply<string>>;
+}
+
 export interface RunsEnv {
-  readonly OWNER: DurableObjectNamespace<OwnerDO>;
-  readonly RUN_WORKFLOW: Workflow<RunParams>;
+  readonly OWNER: { readonly getByName: (name: string) => OwnerRpc };
+  readonly RUN_WORKFLOW: {
+    readonly create: (options: { readonly id: string; readonly params: RunParams }) => Promise<{ readonly id: string }>;
+    readonly get: (id: string) => Promise<{ readonly terminate: () => Promise<void> }>;
+  };
 }
 
 const rpc = <A>(call: () => Promise<Reply<A>>): Effect.Effect<A, StoreError | Upstream> =>
