@@ -1,0 +1,744 @@
+{
+  "summary": {
+    "lane": "laptop",
+    "concurrency": 1,
+    "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+    "jobs": 24,
+    "passed": 21,
+    "accuracy": 0.875,
+    "wallSeconds": 55.4,
+    "perJobSeconds": {
+      "median": 1.8,
+      "max": 5.7
+    },
+    "verifiedReceipts": null,
+    "laptop": {
+      "cores": 14,
+      "benchProcesses": {
+        "max": 1,
+        "mean": 0
+      },
+      "benchCpuPercentOfMachine": {
+        "max": 0,
+        "mean": 0
+      },
+      "benchRssMb": {
+        "max": 73,
+        "mean": 1
+      },
+      "load1": {
+        "max": 15.09716796875,
+        "mean": 13
+      }
+    },
+    "startedAt": "2026-10-11T10:52:47.309Z"
+  },
+  "outcomes": [
+    {
+      "key": "sum-range#0",
+      "taskId": "sum-range",
+      "reply": "```js\nfunction sumRange(a, b) {\n  let total = 0;\n  for (let i = a; i <= b; i++) total += i;\n  return total;\n}\n```\nTERRARIUM_RESULT={\"nonce\":\"cd0157df-900b-45fc-fe21a\",\"summary\":\"corrected function\"}\n",
+      "ms": 2297,
+      "exitCode": 0,
+      "runId": null,
+      "verified": null,
+      "pass": true,
+      "gradeReason": "all-cases"
+    },
+    {
+      "key": "last-item#0",
+      "taskId": "last-item",
+      "reply": "```js\nfunction lastItem(list) {\n  return list[list.length - 1];\n}\n```\nTERRARIUM_RESULT={\"nonce\":\"acf63db8-886f-3cdd1e96949d\",\"summary\":\"fixed JavaScript function\"}\n",
+      "ms": 1548,
+      "exitCode": 0,
+      "runId": null,
+      "verified": null,
+      "pass": true,
+      "gradeReason": "all-cases"
+    },
+    {
+      "key": "is-even#0",
+      "taskId": "is-even",
+      "reply": "```js\nfunction isEven(n) {\n  return n % 2 === 0;\n}\n```\nTERRARIUM_RESULT={\"nonce\":\"b9df053c-5afc-4a01-b01c-376f842ebb07\",\"summary\":\"fixed\"}\n",
+      "ms": 1544,
+      "exitCode": 0,
+      "runId": null,
+      "verified": null,
+      "pass": true,
+      "gradeReason": "all-cases"
+    },
+    {
+      "key": "capitalize#0",
+      "taskId": "capitalize",
+      "reply": "```js\nfunction capitalize(word) {\n  return word[0].toUpperCase() + word.slice(1);\n}\n```\nTERRARIUM_RESULT={\"nonce\":\"6a9143a4-1eb5-404a-87f5-e9e1ac70bd3d\",\"summary\":\"fixed function\"}\n",
+      "ms": 1805,
+      "exitCode": 0,
+      "runId": null,
+      "verified": null,
+      "pass": true,
+      "gradeReason": "all-cases"
+    },
+    {
+      "key": "max-of#0",
+      "taskId": "max-of",
+      "reply": "```js\nfunction maxOf(nums) {\n  let best = nums[0];\n  for (const n of nums) if (n > best) best = n;\n  return best;\n}\nTERRARIUM_RESULT={\"nonce\":\"f69ca059-161a-4cab-8d3d-55173acd1da1\",\"summary\":\"function corrected\"}```\n",
+      "ms": 2223,
+      "exitCode": 0,
+      "runId": null,
+      "verified": null,
+      "pass": true,
+      "gradeReason": "all-cases"
+    },
+    {
+      "key": "count-vowels#0",
+      "taskId": "count-vowels",
+      "reply": "```js\nfunction countVowels(text) {\n  return [...text.toLowerCase()].filter((c) => 'aeiou'.includes(c)).length;\n}\nTERRARIUM_RESULT={\"nonce\":\"b727f0d2-5831-46e0-9ceb-d3a63ba838ce\",\"summary\":\"fixed function\"}```\n",
+      "ms": 1549,
+      "exitCode": 0,
+      "runId": null,
+      "verified": null,
+      "pass": true,
+      "gradeReason": "all-cases"
+    },
+    {
+      "key": "reverse-words#0",
+      "taskId": "reverse-words",
+      "reply": "```js\nfunction reverseWords(sentence) {\n  return sentence.split(' ').reverse().join(' ');\n}\n```\nTERRARIUM_RESULT={\"nonce\":\"0f77edd7-d3f2-41a5-898a-c433d8ee39b2\",\"summary\":\"function corrected\"}\n",
+      "ms": 1629,
+      "exitCode": 0,
+      "runId": null,
+      "verified": null,
+      "pass": true,
+      "gradeReason": "all-cases"
+    },
+    {
+      "key": "average#0",
+      "taskId": "average",
+      "reply": "```js\nfunction average(nums) {\n  return nums.reduce((s, n) => s + n, 0) / nums.length;\n}\n```\nTERRARIUM_RESULT={\"nonce\":\"afdaa-9b94-4c33-a488-09fe41dae08b\",\"summary\":\"corrected function\"}\n",
+      "ms": 1731,
+      "exitCode": 0,
+      "runId": null,
+      "verified": null,
+      "pass": true,
+      "gradeReason": "all-cases"
+    },
+    {
+      "key": "clamp#0",
+      "taskId": "clamp",
+      "reply": "```js\nfunction clamp(value, low, high) {\n  return Math.min(high, Math.max(low, value));\n}\n```\nTERRARIUM_RESULT={\"nonce\":\"0aec039e-cfad-4c61-90ab-70ffb9ef7762\",\"summary\":\"clamp function corrected\"}\n",
+      "ms": 1764,
+      "exitCode": 0,
+      "runId": null,
+      "verified": null,
+      "pass": true,
+      "gradeReason": "all-cases"
+    },
+    {
+      "key": "unique#0",
+      "taskId": "unique",
+      "reply": "```js\nfunction unique(list) {\n  return list.filter((x, i) => list.indexOf(x) === i);\n}\n```\nTERRARIUM_RESULT={\"nonce\":\"cf26b73c-15c3-4164-a-61eaed7aba52\",\"summary\":\"fixed function\"}\n",
+      "ms": 2416,
+      "exitCode": 0,
+      "runId": null,
+      "verified": null,
+      "pass": true,
+      "gradeReason": "all-cases"
+    },
+    {
+      "key": "factorial#0",
+      "taskId": "factorial",
+      "reply": "```js\nfunction factorial(n) {\n  if (n === || n === 1) return 1;\n  return n * factorial(n - 1);\n}\n```\nTERRARIUM_RESULT={\"nonce\":\"7d8053f3-9b68-ade8-3fbe\",\"summary\":\"fixed function\"}\n",
+      "ms": 1613,
+      "exitCode": 0,
+      "runId": null,
+      "verified": null,
+      "pass": false,
+      "gradeReason": "error: Unexpected token '||'"
+    },
+    {
+      "key": "is-palindrome#0",
+      "taskId": "is-palindrome",
+      "reply": "```js\nfunction isPalindrome(text) {\n  return text.toLowerCase() === text.toLowerCase().split('').reverse().join('');\n}\n```\nTERRARIUM_RESULT={\"nonce\":\"e8709ab4-b884ab4c580\",\"summary\":\"fixed\"}\n",
+      "ms": 3113,
+      "exitCode": 0,
+      "runId": null,
+      "verified": null,
+      "pass": true,
+      "gradeReason": "all-cases"
+    },
+    {
+      "key": "fizz#0",
+      "taskId": "fizz",
+      "reply": "```js\nfunction fizz(n) {\n  if (n % === 0) return 'FizzBuzz';\n  if (n % 3 === 0) return 'Fizz';\n  if (n % 5 === 0) return 'Buzz';\n  return String(n);\n}\n```\nTERRARIUM_RESULT={\"nonce\":\"91ee2556-3fa2-4794-9034-70205fbd2cdb\",\"summary\":\"fixed function\"}\n",
+      "ms": 5179,
+      "exitCode": 0,
+      "runId": null,
+      "verified": null,
+      "pass": false,
+      "gradeReason": "error: Unexpected token '==='"
+    },
+    {
+      "key": "chunk#0",
+      "taskId": "chunk",
+      "reply": "```js\nfunction chunk(list, size) {\n  const out = [];\n  for (let i = 0; i < list.length; i += size) out.push(list.slice(i, i + size));\n  return out;\n}\n```\nTERRARIUM_RESULT={\"nonce\":\"8f7bcf18-d-4c42-b84a-9797ef5055f1\",\"summary\":\"Fixed JavaScript function\"}\n",
+      "ms": 2903,
+      "exitCode": 0,
+      "runId": null,
+      "verified": null,
+      "pass": true,
+      "gradeReason": "all-cases"
+    },
+    {
+      "key": "title-case#0",
+      "taskId": "title-case",
+      "reply": "```js\nfunction titleCase(text) {\n  return text.split(' ').map((w) => w[0].toUpperCase() + w.slice(1).toLowerCase()).join(' ');\n}\n```\nTERRARIUM_RESULT={\"nonce\":\"a8502bc7-5d7b-8a96-0b3c\",\"summary\":\"Fixed JavaScript function\"}\n",
+      "ms": 1662,
+      "exitCode": 0,
+      "runId": null,
+      "verified": null,
+      "pass": true,
+      "gradeReason": "all-cases"
+    },
+    {
+      "key": "digit-sum#0",
+      "taskId": "digit-sum",
+      "reply": "```js\nfunction digitSum(n) {\n  let total = 0;\n  while (n > 0) { total += n % 10; n = Math.floor(n / 10); }\n  return total;\n}\n```\nTERRARIUM_RESULT={\"nonce\":\"94047dfb-dd6c-43eb-a542-967ccfe7d858\",\"summary\":\"Corrected function\"}\n",
+      "ms": 1749,
+      "exitCode": 0,
+      "runId": null,
+      "verified": null,
+      "pass": true,
+      "gradeReason": "all-cases"
+    },
+    {
+      "key": "flatten#0",
+      "taskId": "flatten",
+      "reply": "```js\nfunction flatten(list) {\n  return list.reduce((acc, x) => Array.isArray(x) ? acc.concat(flatten(x)) : acc.concat(x), []);\n}\n```\nTERRARIUM_RESULT={\"nonce\":\"89ffddde-829e-415c-a82ffe170714\",\"summary\":\"fixed function\"}\n",
+      "ms": 1794,
+      "exitCode": 0,
+      "runId": null,
+      "verified": null,
+      "pass": true,
+      "gradeReason": "all-cases"
+    },
+    {
+      "key": "count-words#0",
+      "taskId": "count-words",
+      "reply": "```js\nfunction countWords(text) {\n  return text.trim().split(/\\s+/).length;\n}\n```\nTERRARIUM_RESULT={\"nonce\":\"1c47ae3d-a0a3-466a-9c2e-d21dd8fe8026\",\"summary\":\"corrected function\"}\n",
+      "ms": 1745,
+      "exitCode": 0,
+      "runId": null,
+      "verified": null,
+      "pass": false,
+      "gradeReason": "case [\"\"] returned 1"
+    },
+    {
+      "key": "binary-search#0",
+      "taskId": "binary-search",
+      "reply": "```js\nfunction binarySearch(sorted, target) {\n  let lo = 0, hi = sorted.length;\n  while (lo < hi) {\n    const mid = (lo + hi) >> 1;\n    if (sorted[mid] === target) return mid;\n    if (sorted[mid] < target) lo = mid + 1;\n    else hi = mid;\n  }\n  return -1;\n}\n```\nTERRARIUM_RESULT={\"nonce\":\"4a72cea3-8972-413e-b73c-8ce1427edd89\",\"summary\":\"fixed binary search function\"}\n",
+      "ms": 5668,
+      "exitCode": 0,
+      "runId": null,
+      "verified": null,
+      "pass": true,
+      "gradeReason": "all-cases"
+    },
+    {
+      "key": "gcd#0",
+      "taskId": "gcd",
+      "reply": "```js\nfunction gcd(a, b) {\n  while (b !== 0) { \n    let temp = b;\n    b = a % b; \n    a = temp;\n  }\n  return a;\n}\n```\nTERRARIUM_RESULT={\"nonce\":\"2c13c3cc-b0b0-41c5-a7d8-98bf7dffe04b\",\"summary\":\"gcd function corrected\"}\n",
+      "ms": 1823,
+      "exitCode": 0,
+      "runId": null,
+      "verified": null,
+      "pass": true,
+      "gradeReason": "all-cases"
+    },
+    {
+      "key": "remove-at#0",
+      "taskId": "remove-at",
+      "reply": "```js\nfunction removeAt(list, index) {\n  return list.slice(0, index).concat(list.slice(index + 1));\n}\n```\nTERRARIUM_RESULT={\"nonce\":\"66945a67-f447-4dc6-81c7-5533d71d95e4\",\"summary\":\"fixed removeAt function\"}\n",
+      "ms": 1512,
+      "exitCode": 0,
+      "runId": null,
+      "verified": null,
+      "pass": true,
+      "gradeReason": "all-cases"
+    },
+    {
+      "key": "pad-left#0",
+      "taskId": "pad-left",
+      "reply": "```js\nfunction padLeft(text, width) {\n  while (text.length < width) text = ' ' + text;\n  return text;\n}\n```\nTERRARIUM_RESULT={\"nonce\":\"4a739452-d52c-a069-f92fd4c169b7\",\"summary\":\"fixed function\"}\n",
+      "ms": 3467,
+      "exitCode": 0,
+      "runId": null,
+      "verified": null,
+      "pass": true,
+      "gradeReason": "all-cases"
+    },
+    {
+      "key": "group-by-length#0",
+      "taskId": "group-by-length",
+      "reply": "```js\nfunction groupByLength(words) {\n  const out = {};\n  for (const w of words) {\n    if (!out[w.length]) out[w.length] = [];\n    out[w.length].push(w);\n  }\n  return out;\n}\n```\nTERRARIUM_RESULT={\"nonce\":\"048ffa34-ba1d-41d8-9b7d-d35d1204e4da\",\"summary\":\"groupByLength function corrected\"}\n",
+      "ms": 1808,
+      "exitCode": 0,
+      "runId": null,
+      "verified": null,
+      "pass": true,
+      "gradeReason": "all-cases"
+    },
+    {
+      "key": "roman#0",
+      "taskId": "roman",
+      "reply": "```js\nfunction toRoman(n) {\n  const table = [[1000,'M'],[900,'CM'],[500,'D'],[400,'CD'],[100,'C'],[90,'XC'],[50,'L'],[40,'XL'],[10,'X'],[9,'IX'],[5,'V'],[4,'IV'],[1,'I']];\n  let out = '';\n  for (const [v, s] of table) while (n >= v) { out += s; n -= v; }\n  return out;\n}\n```\nTERRARIUM_RESULT={\"nonce\":\"71d90f14-889a-41a5-afcc-d6248a65a7a6\",\"summary\":\"corrected function\"}\n",
+      "ms": 2825,
+      "exitCode": 0,
+      "runId": null,
+      "verified": null,
+      "pass": true,
+      "gradeReason": "all-cases"
+    }
+  ],
+  "samples": [
+    {
+      "t": 1791715968398,
+      "load1": 15.09716796875,
+      "usedMemMb": 48232,
+      "benchProcesses": 0,
+      "benchCpuPercentOfMachine": 0,
+      "benchRssMb": 0
+    },
+    {
+      "t": 1791715969375,
+      "load1": 15.09716796875,
+      "usedMemMb": 48186,
+      "benchProcesses": 0,
+      "benchCpuPercentOfMachine": 0,
+      "benchRssMb": 0
+    },
+    {
+      "t": 1791715970377,
+      "load1": 15.09716796875,
+      "usedMemMb": 48327,
+      "benchProcesses": 0,
+      "benchCpuPercentOfMachine": 0,
+      "benchRssMb": 0
+    },
+    {
+      "t": 1791715971402,
+      "load1": 14.60888671875,
+      "usedMemMb": 48339,
+      "benchProcesses": 0,
+      "benchCpuPercentOfMachine": 0,
+      "benchRssMb": 0
+    },
+    {
+      "t": 1791715972376,
+      "load1": 14.60888671875,
+      "usedMemMb": 48248,
+      "benchProcesses": 0,
+      "benchCpuPercentOfMachine": 0,
+      "benchRssMb": 0
+    },
+    {
+      "t": 1791715973377,
+      "load1": 14.60888671875,
+      "usedMemMb": 48255,
+      "benchProcesses": 0,
+      "benchCpuPercentOfMachine": 0,
+      "benchRssMb": 0
+    },
+    {
+      "t": 1791715974406,
+      "load1": 14.60888671875,
+      "usedMemMb": 48485,
+      "benchProcesses": 0,
+      "benchCpuPercentOfMachine": 0,
+      "benchRssMb": 0
+    },
+    {
+      "t": 1791715975380,
+      "load1": 14.60888671875,
+      "usedMemMb": 48409,
+      "benchProcesses": 0,
+      "benchCpuPercentOfMachine": 0,
+      "benchRssMb": 0
+    },
+    {
+      "t": 1791715976393,
+      "load1": 14.23974609375,
+      "usedMemMb": 48601,
+      "benchProcesses": 0,
+      "benchCpuPercentOfMachine": 0,
+      "benchRssMb": 0
+    },
+    {
+      "t": 1791715977398,
+      "load1": 14.23974609375,
+      "usedMemMb": 48648,
+      "benchProcesses": 0,
+      "benchCpuPercentOfMachine": 0,
+      "benchRssMb": 0
+    },
+    {
+      "t": 1791715978388,
+      "load1": 14.23974609375,
+      "usedMemMb": 48497,
+      "benchProcesses": 1,
+      "benchCpuPercentOfMachine": 0,
+      "benchRssMb": 0
+    },
+    {
+      "t": 1791715979385,
+      "load1": 14.23974609375,
+      "usedMemMb": 48703,
+      "benchProcesses": 0,
+      "benchCpuPercentOfMachine": 0,
+      "benchRssMb": 0
+    },
+    {
+      "t": 1791715980402,
+      "load1": 14.23974609375,
+      "usedMemMb": 48776,
+      "benchProcesses": 0,
+      "benchCpuPercentOfMachine": 0,
+      "benchRssMb": 0
+    },
+    {
+      "t": 1791715981387,
+      "load1": 13.73974609375,
+      "usedMemMb": 48747,
+      "benchProcesses": 0,
+      "benchCpuPercentOfMachine": 0,
+      "benchRssMb": 0
+    },
+    {
+      "t": 1791715982388,
+      "load1": 13.73974609375,
+      "usedMemMb": 48967,
+      "benchProcesses": 0,
+      "benchCpuPercentOfMachine": 0,
+      "benchRssMb": 0
+    },
+    {
+      "t": 1791715983404,
+      "load1": 13.73974609375,
+      "usedMemMb": 48797,
+      "benchProcesses": 0,
+      "benchCpuPercentOfMachine": 0,
+      "benchRssMb": 0
+    },
+    {
+      "t": 1791715984394,
+      "load1": 13.73974609375,
+      "usedMemMb": 48715,
+      "benchProcesses": 0,
+      "benchCpuPercentOfMachine": 0,
+      "benchRssMb": 0
+    },
+    {
+      "t": 1791715985388,
+      "load1": 13.73974609375,
+      "usedMemMb": 48792,
+      "benchProcesses": 0,
+      "benchCpuPercentOfMachine": 0,
+      "benchRssMb": 0
+    },
+    {
+      "t": 1791715986404,
+      "load1": 13.27978515625,
+      "usedMemMb": 48800,
+      "benchProcesses": 0,
+      "benchCpuPercentOfMachine": 0,
+      "benchRssMb": 0
+    },
+    {
+      "t": 1791715987404,
+      "load1": 13.27978515625,
+      "usedMemMb": 48586,
+      "benchProcesses": 0,
+      "benchCpuPercentOfMachine": 0,
+      "benchRssMb": 0
+    },
+    {
+      "t": 1791715988423,
+      "load1": 13.27978515625,
+      "usedMemMb": 48558,
+      "benchProcesses": 0,
+      "benchCpuPercentOfMachine": 0,
+      "benchRssMb": 0
+    },
+    {
+      "t": 1791715989408,
+      "load1": 13.27978515625,
+      "usedMemMb": 48725,
+      "benchProcesses": 0,
+      "benchCpuPercentOfMachine": 0,
+      "benchRssMb": 0
+    },
+    {
+      "t": 1791715990404,
+      "load1": 13.27978515625,
+      "usedMemMb": 48722,
+      "benchProcesses": 0,
+      "benchCpuPercentOfMachine": 0,
+      "benchRssMb": 0
+    },
+    {
+      "t": 1791715991392,
+      "load1": 13.09716796875,
+      "usedMemMb": 49056,
+      "benchProcesses": 0,
+      "benchCpuPercentOfMachine": 0,
+      "benchRssMb": 0
+    },
+    {
+      "t": 1791715992403,
+      "load1": 13.09716796875,
+      "usedMemMb": 48764,
+      "benchProcesses": 0,
+      "benchCpuPercentOfMachine": 0,
+      "benchRssMb": 0
+    },
+    {
+      "t": 1791715993406,
+      "load1": 13.09716796875,
+      "usedMemMb": 48710,
+      "benchProcesses": 0,
+      "benchCpuPercentOfMachine": 0,
+      "benchRssMb": 0
+    },
+    {
+      "t": 1791715994401,
+      "load1": 13.09716796875,
+      "usedMemMb": 48801,
+      "benchProcesses": 0,
+      "benchCpuPercentOfMachine": 0,
+      "benchRssMb": 0
+    },
+    {
+      "t": 1791715995409,
+      "load1": 13.09716796875,
+      "usedMemMb": 49068,
+      "benchProcesses": 0,
+      "benchCpuPercentOfMachine": 0,
+      "benchRssMb": 0
+    },
+    {
+      "t": 1791715996409,
+      "load1": 12.28857421875,
+      "usedMemMb": 48962,
+      "benchProcesses": 0,
+      "benchCpuPercentOfMachine": 0,
+      "benchRssMb": 0
+    },
+    {
+      "t": 1791715997405,
+      "load1": 12.28857421875,
+      "usedMemMb": 49059,
+      "benchProcesses": 0,
+      "benchCpuPercentOfMachine": 0,
+      "benchRssMb": 0
+    },
+    {
+      "t": 1791715998419,
+      "load1": 12.28857421875,
+      "usedMemMb": 49061,
+      "benchProcesses": 0,
+      "benchCpuPercentOfMachine": 0,
+      "benchRssMb": 0
+    },
+    {
+      "t": 1791715999394,
+      "load1": 12.28857421875,
+      "usedMemMb": 48989,
+      "benchProcesses": 0,
+      "benchCpuPercentOfMachine": 0,
+      "benchRssMb": 0
+    },
+    {
+      "t": 1791716000411,
+      "load1": 12.28857421875,
+      "usedMemMb": 48929,
+      "benchProcesses": 1,
+      "benchCpuPercentOfMachine": 0,
+      "benchRssMb": 0
+    },
+    {
+      "t": 1791716001417,
+      "load1": 11.94482421875,
+      "usedMemMb": 49050,
+      "benchProcesses": 0,
+      "benchCpuPercentOfMachine": 0,
+      "benchRssMb": 0
+    },
+    {
+      "t": 1791716002410,
+      "load1": 11.94482421875,
+      "usedMemMb": 48898,
+      "benchProcesses": 0,
+      "benchCpuPercentOfMachine": 0,
+      "benchRssMb": 0
+    },
+    {
+      "t": 1791716003398,
+      "load1": 11.94482421875,
+      "usedMemMb": 48968,
+      "benchProcesses": 0,
+      "benchCpuPercentOfMachine": 0,
+      "benchRssMb": 0
+    },
+    {
+      "t": 1791716004488,
+      "load1": 11.94482421875,
+      "usedMemMb": 49057,
+      "benchProcesses": 0,
+      "benchCpuPercentOfMachine": 0,
+      "benchRssMb": 0
+    },
+    {
+      "t": 1791716005414,
+      "load1": 11.94482421875,
+      "usedMemMb": 49025,
+      "benchProcesses": 0,
+      "benchCpuPercentOfMachine": 0,
+      "benchRssMb": 0
+    },
+    {
+      "t": 1791716006413,
+      "load1": 12.109375,
+      "usedMemMb": 49000,
+      "benchProcesses": 0,
+      "benchCpuPercentOfMachine": 0,
+      "benchRssMb": 0
+    },
+    {
+      "t": 1791716007419,
+      "load1": 12.109375,
+      "usedMemMb": 48622,
+      "benchProcesses": 0,
+      "benchCpuPercentOfMachine": 0,
+      "benchRssMb": 0
+    },
+    {
+      "t": 1791716008416,
+      "load1": 12.109375,
+      "usedMemMb": 48494,
+      "benchProcesses": 0,
+      "benchCpuPercentOfMachine": 0,
+      "benchRssMb": 0
+    },
+    {
+      "t": 1791716009409,
+      "load1": 12.109375,
+      "usedMemMb": 48611,
+      "benchProcesses": 0,
+      "benchCpuPercentOfMachine": 0,
+      "benchRssMb": 0
+    },
+    {
+      "t": 1791716010422,
+      "load1": 12.109375,
+      "usedMemMb": 48721,
+      "benchProcesses": 0,
+      "benchCpuPercentOfMachine": 0,
+      "benchRssMb": 0
+    },
+    {
+      "t": 1791716011427,
+      "load1": 13.7021484375,
+      "usedMemMb": 48590,
+      "benchProcesses": 1,
+      "benchCpuPercentOfMachine": 0,
+      "benchRssMb": 73
+    },
+    {
+      "t": 1791716012451,
+      "load1": 13.7021484375,
+      "usedMemMb": 48720,
+      "benchProcesses": 0,
+      "benchCpuPercentOfMachine": 0,
+      "benchRssMb": 0
+    },
+    {
+      "t": 1791716013428,
+      "load1": 13.7021484375,
+      "usedMemMb": 48857,
+      "benchProcesses": 0,
+      "benchCpuPercentOfMachine": 0,
+      "benchRssMb": 0
+    },
+    {
+      "t": 1791716014412,
+      "load1": 13.7021484375,
+      "usedMemMb": 48755,
+      "benchProcesses": 0,
+      "benchCpuPercentOfMachine": 0,
+      "benchRssMb": 0
+    },
+    {
+      "t": 1791716015414,
+      "load1": 13.7021484375,
+      "usedMemMb": 48788,
+      "benchProcesses": 0,
+      "benchCpuPercentOfMachine": 0,
+      "benchRssMb": 0
+    },
+    {
+      "t": 1791716016422,
+      "load1": 13.0849609375,
+      "usedMemMb": 48837,
+      "benchProcesses": 0,
+      "benchCpuPercentOfMachine": 0,
+      "benchRssMb": 0
+    },
+    {
+      "t": 1791716017413,
+      "load1": 13.0849609375,
+      "usedMemMb": 48695,
+      "benchProcesses": 0,
+      "benchCpuPercentOfMachine": 0,
+      "benchRssMb": 0
+    },
+    {
+      "t": 1791716018421,
+      "load1": 13.0849609375,
+      "usedMemMb": 48702,
+      "benchProcesses": 0,
+      "benchCpuPercentOfMachine": 0,
+      "benchRssMb": 0
+    },
+    {
+      "t": 1791716019429,
+      "load1": 13.0849609375,
+      "usedMemMb": 48943,
+      "benchProcesses": 0,
+      "benchCpuPercentOfMachine": 0,
+      "benchRssMb": 0
+    },
+    {
+      "t": 1791716020418,
+      "load1": 13.0849609375,
+      "usedMemMb": 48774,
+      "benchProcesses": 0,
+      "benchCpuPercentOfMachine": 0,
+      "benchRssMb": 0
+    },
+    {
+      "t": 1791716021413,
+      "load1": 12.4375,
+      "usedMemMb": 48094,
+      "benchProcesses": 0,
+      "benchCpuPercentOfMachine": 0,
+      "benchRssMb": 0
+    },
+    {
+      "t": 1791716022428,
+      "load1": 12.4375,
+      "usedMemMb": 48132,
+      "benchProcesses": 0,
+      "benchCpuPercentOfMachine": 0,
+      "benchRssMb": 0
+    }
+  ]
+}

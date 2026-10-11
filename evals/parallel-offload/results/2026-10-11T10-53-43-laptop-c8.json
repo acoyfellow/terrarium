@@ -1,0 +1,368 @@
+{
+  "summary": {
+    "lane": "laptop",
+    "concurrency": 8,
+    "model": "@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+    "jobs": 24,
+    "passed": 22,
+    "accuracy": 0.917,
+    "wallSeconds": 8.8,
+    "perJobSeconds": {
+      "median": 2.1,
+      "max": 4.6
+    },
+    "verifiedReceipts": null,
+    "laptop": {
+      "cores": 14,
+      "benchProcesses": {
+        "max": 1,
+        "mean": 0
+      },
+      "benchCpuPercentOfMachine": {
+        "max": 0,
+        "mean": 0
+      },
+      "benchRssMb": {
+        "max": 84,
+        "mean": 11
+      },
+      "load1": {
+        "max": 12.4375,
+        "mean": 12
+      }
+    },
+    "startedAt": "2026-10-11T10:53:43.899Z"
+  },
+  "outcomes": [
+    {
+      "key": "sum-range#0",
+      "taskId": "sum-range",
+      "reply": "```js\nfunction sumRange(a, b) {\n  let total = 0;\n  for (let i = a; i <= b; i++) total += i;\n  return total;\n}\n```\nTERRARIUM_RESULT={\"nonce\":\"3e75f2bd-4b24-aeee-b2ba36a23332\",\"summary\":\"corrected function\"}\n",
+      "ms": 1791,
+      "exitCode": 0,
+      "runId": null,
+      "verified": null,
+      "pass": true,
+      "gradeReason": "all-cases"
+    },
+    {
+      "key": "last-item#0",
+      "taskId": "last-item",
+      "reply": "```js\nfunction lastItem(list) {\n  return list[list.length - 1];\n}\n```\nTERRARIUM_RESULT={\"nonce\":\"0ec8946e-e087-4de6-aed0-88ec8bef509c\",\"summary\":\"fixed function\"}\n",
+      "ms": 3921,
+      "exitCode": 0,
+      "runId": null,
+      "verified": null,
+      "pass": true,
+      "gradeReason": "all-cases"
+    },
+    {
+      "key": "is-even#0",
+      "taskId": "is-even",
+      "reply": "```js\nfunction isEven(n) {\n  return n % 2 === 0;\n}\n```\nTERRARIUM_RESULT={\"nonce\":\"c0b0f1a8-0a10-4917-ae9c-d56713d374a2\",\"summary\":\"fixed isEven function\"}\n",
+      "ms": 2617,
+      "exitCode": 0,
+      "runId": null,
+      "verified": null,
+      "pass": true,
+      "gradeReason": "all-cases"
+    },
+    {
+      "key": "capitalize#0",
+      "taskId": "capitalize",
+      "reply": "```js\nfunction capitalize(word) {\n  return word[0].toUpperCase() + word.slice(1);\n}\n```\nTERRARIUM_RESULT={\"nonce\":\"ed338f0b-4357-43c9-8992-86f3e6181914\",\"summary\":\"function corrected\"}\n",
+      "ms": 1748,
+      "exitCode": 0,
+      "runId": null,
+      "verified": null,
+      "pass": true,
+      "gradeReason": "all-cases"
+    },
+    {
+      "key": "max-of#0",
+      "taskId": "max-of",
+      "reply": "```js\nfunction maxOf(nums) {\n  let best = nums[0];\n  for (const n of nums) if (n > best) best = n;\n  return best;\n}\n```\nTERRARIUM_RESULT={\"nonce\":\"5be9523d-8bc0-4945-99d9-5dee\",\"summary\":\"function corrected\"}\n",
+      "ms": 1907,
+      "exitCode": 0,
+      "runId": null,
+      "verified": null,
+      "pass": true,
+      "gradeReason": "all-cases"
+    },
+    {
+      "key": "count-vowels#0",
+      "taskId": "count-vowels",
+      "reply": "```js\nfunction countVowels(text) {\n  return [...text.toLowerCase()].filter((c) => 'aeiou'.includes(c)).length;\n}\nTERRARIUM_RESULT={\"nonce\":\"320125c7-642b-44df-8ee7-e13d63496a9a\",\"summary\":\"Fixed function to count vowels ignoring case\"}```\n",
+      "ms": 2231,
+      "exitCode": 0,
+      "runId": null,
+      "verified": null,
+      "pass": true,
+      "gradeReason": "all-cases"
+    },
+    {
+      "key": "reverse-words#0",
+      "taskId": "reverse-words",
+      "reply": "```js\nfunction reverseWords(sentence) {\n  return sentence.split(' ').reverse().join(' ');\n}\n```\nTERRARIUM_RESULT={\"nonce\":\"e296f71a-8887-4ea0-a2a653c0f3\",\"summary\":\"reversed words function fixed\"}\n",
+      "ms": 1428,
+      "exitCode": 0,
+      "runId": null,
+      "verified": null,
+      "pass": true,
+      "gradeReason": "all-cases"
+    },
+    {
+      "key": "average#0",
+      "taskId": "average",
+      "reply": "```js\nfunction average(nums) {\n  return nums.reduce((s, n) => s + n, 0) / nums.length;\n}\n```\nTERRARIUM_RESULT={\"nonce\":\"ad7fc590-cf40-4a2a-a34e-7af5ba158960\",\"summary\":\"average function corrected\"}\n",
+      "ms": 2273,
+      "exitCode": 0,
+      "runId": null,
+      "verified": null,
+      "pass": true,
+      "gradeReason": "all-cases"
+    },
+    {
+      "key": "clamp#0",
+      "taskId": "clamp",
+      "reply": "```js\nfunction clamp(value, low, high) {\n  return Math.min(high, Math.max(low, value));\n}\n```\nTERRARIUM_RESULT={\"nonce\":\"da5f8f25-e90b-4429-bf8d-9bf3c992d46e\",\"summary\":\"clamp function corrected\"}\n",
+      "ms": 2096,
+      "exitCode": 0,
+      "runId": null,
+      "verified": null,
+      "pass": true,
+      "gradeReason": "all-cases"
+    },
+    {
+      "key": "unique#0",
+      "taskId": "unique",
+      "reply": "```js\nfunction unique(list) {\n  return list.filter((x, i) => list.indexOf(x) === i);\n}\n```\nTERRARIUM_RESULT={\"nonce\":\"93b44a0f-0eb3-45f6-bd32-c3169aa13c87\",\"summary\":\"fixed function\"}\n",
+      "ms": 1911,
+      "exitCode": 0,
+      "runId": null,
+      "verified": null,
+      "pass": true,
+      "gradeReason": "all-cases"
+    },
+    {
+      "key": "factorial#0",
+      "taskId": "factorial",
+      "reply": "```js\nfunction factorial(n) {\n  if (n === || n === 1) return 1;\n  return n * factorial(n - 1);\n}\n```\nTERRARIUM_RESULT={\"nonce\":\"6339270d-447d-b16e-d7d04447b888\",\"summary\":\"corrected function\"}\n",
+      "ms": 2560,
+      "exitCode": 0,
+      "runId": null,
+      "verified": null,
+      "pass": false,
+      "gradeReason": "error: Unexpected token '||'"
+    },
+    {
+      "key": "is-palindrome#0",
+      "taskId": "is-palindrome",
+      "reply": "```js\nfunction isPalindrome(text) {\n  return text.toLowerCase() === text.toLowerCase().split('').reverse().join('');\n}\n```\nTERRARIUM_RESULT={\"nonce\":\"4ae03926-1d71-4e6d-b82a-0e7dadaa5e1f\",\"summary\":\"fixed\"}\n",
+      "ms": 1975,
+      "exitCode": 0,
+      "runId": null,
+      "verified": null,
+      "pass": true,
+      "gradeReason": "all-cases"
+    },
+    {
+      "key": "fizz#0",
+      "taskId": "fizz",
+      "reply": "```js\nfunction fizz(n) {\n  if (n % === 0) return 'FizzBuzz';\n  if (n % 3 === 0) return 'Fizz';\n  if (n % 5 === 0) return 'Buzz';\n  return String(n);\n}\n```\nTERRARIUM_RESULT={\"nonce\":\"4e0afe12-fcf7-4170-8257-e70a48ae9871\",\"summary\":\"fizz function corrected\"}\n",
+      "ms": 2348,
+      "exitCode": 0,
+      "runId": null,
+      "verified": null,
+      "pass": false,
+      "gradeReason": "error: Unexpected token '==='"
+    },
+    {
+      "key": "chunk#0",
+      "taskId": "chunk",
+      "reply": "```js\nfunction chunk(list, size) {\n  const out = [];\n  for (let i = 0; i < list.length; i += size) out.push(list.slice(i, i + size));\n  return out;\n}\n```\nTERRARIUM_RESULT={\"nonce\":\"9d0b83b7-4d23-9f69-267a54b55552\",\"summary\":\"corrected function\"}\n",
+      "ms": 1861,
+      "exitCode": 0,
+      "runId": null,
+      "verified": null,
+      "pass": true,
+      "gradeReason": "all-cases"
+    },
+    {
+      "key": "title-case#0",
+      "taskId": "title-case",
+      "reply": "```js\nfunction titleCase(text) {\n  return text.split(' ').map((w) => w[0].toUpperCase() + w.slice(1).toLowerCase()).join(' ');\n}\n```\nTERRARIUM_RESULT={\"nonce\":\"1c6d36a9-fef4-b377-52b7662b59c6\",\"summary\":\"fixed titleCase function\"}\n",
+      "ms": 2149,
+      "exitCode": 0,
+      "runId": null,
+      "verified": null,
+      "pass": true,
+      "gradeReason": "all-cases"
+    },
+    {
+      "key": "digit-sum#0",
+      "taskId": "digit-sum",
+      "reply": "```js\nfunction digitSum(n) {\n  let total = 0;\n  while (n > 0) { total += n % 10; n = Math.floor(n / 10); }\n  return total;\n}\n```\nTERRARIUM_RESULT={\"nonce\":\"a903b4be-0b19-4562-a3c6-1cfc3\",\"summary\":\"Corrected function\"}\n",
+      "ms": 1934,
+      "exitCode": 0,
+      "runId": null,
+      "verified": null,
+      "pass": true,
+      "gradeReason": "all-cases"
+    },
+    {
+      "key": "flatten#0",
+      "taskId": "flatten",
+      "reply": "```js\nfunction flatten(list) {\n  return list.reduce((acc, x) => acc.concat(Array.isArray(x) ? flatten(x) : x), []);\n}\n```\nTERRARIUM_RESULT={\"nonce\":\"565b1816-f130-47a4-f75769515c7e\",\"summary\":\"function corrected\"}\n",
+      "ms": 1785,
+      "exitCode": 0,
+      "runId": null,
+      "verified": null,
+      "pass": true,
+      "gradeReason": "all-cases"
+    },
+    {
+      "key": "count-words#0",
+      "taskId": "count-words",
+      "reply": "```js\nfunction countWords(text) {\n  return text.trim().split(/\\s+/).filter(word => word !== '').length;\n}\n```\nTERRARIUM_RESULT={\"nonce\":\"901e48b2-8a6b-4b6b-8c85da25609\",\"summary\":\"countWords function corrected\"}\n",
+      "ms": 2082,
+      "exitCode": 0,
+      "runId": null,
+      "verified": null,
+      "pass": true,
+      "gradeReason": "all-cases"
+    },
+    {
+      "key": "binary-search#0",
+      "taskId": "binary-search",
+      "reply": "```js\nfunction binarySearch(sorted, target) {\n  let lo = 0, hi = sorted.length;\n  while (lo < hi) {\n    const mid = (lo + hi) >> 1;\n    if (sorted[mid] === target) return mid;\n    if (sorted[mid] < target) lo = mid + 1;\n    else hi = mid;\n  }\n  return -1;\n}\n```\nTERRARIUM_RESULT={\"nonce\":\"ba155-f296-4ac4-b67e-626fda3c749d\",\"summary\":\"binarySearch function corrected\"}\n",
+      "ms": 4621,
+      "exitCode": 0,
+      "runId": null,
+      "verified": null,
+      "pass": true,
+      "gradeReason": "all-cases"
+    },
+    {
+      "key": "gcd#0",
+      "taskId": "gcd",
+      "reply": "```js\nfunction gcd(a, b) {\n  while (b !== 0) { \n    let temp = b;\n    b = a % b; \n    a = temp;\n  }\n  return a;\n}\n```\nTERRARIUM_RESULT={\"nonce\":\"45cd594e-96fa-493b-a898-c46e588eb3ad\",\"summary\":\"gcd function corrected\"}\n",
+      "ms": 1895,
+      "exitCode": 0,
+      "runId": null,
+      "verified": null,
+      "pass": true,
+      "gradeReason": "all-cases"
+    },
+    {
+      "key": "remove-at#0",
+      "taskId": "remove-at",
+      "reply": "```js\nfunction removeAt(list, index) {\n  return list.slice(0, index).concat(list.slice(index + 1));\n}\n```\nTERRARIUM_RESULT={\"nonce\":\"d90dc4cd-825e-4a41-95c8-42d7696c1131\",\"summary\":\"fixed\"}\n",
+      "ms": 3396,
+      "exitCode": 0,
+      "runId": null,
+      "verified": null,
+      "pass": true,
+      "gradeReason": "all-cases"
+    },
+    {
+      "key": "pad-left#0",
+      "taskId": "pad-left",
+      "reply": "```js\nfunction padLeft(text, width) {\n  while (text.length < width) text = ' ' + text;\n  return text;\n}\n```\nTERRARIUM_RESULT={\"nonce\":\"0d2f7739-926d-4824-b469-4526d1616a4c\",\"summary\":\"bug fixed\"}\n",
+      "ms": 1900,
+      "exitCode": 0,
+      "runId": null,
+      "verified": null,
+      "pass": true,
+      "gradeReason": "all-cases"
+    },
+    {
+      "key": "group-by-length#0",
+      "taskId": "group-by-length",
+      "reply": "```js\nfunction groupByLength(words) {\n  const out = {};\n  for (const w of words) {\n    if (!out[w.length]) out[w.length] = [];\n    out[w.length].push(w);\n  }\n  return out;\n}\n```\nTERRARIUM_RESULT={\"nonce\":\"35b7f79e-2b19-4e60-a14f-9a30f22e9214\",\"summary\":\"groupByLength function corrected\"}\n",
+      "ms": 2308,
+      "exitCode": 0,
+      "runId": null,
+      "verified": null,
+      "pass": true,
+      "gradeReason": "all-cases"
+    },
+    {
+      "key": "roman#0",
+      "taskId": "roman",
+      "reply": "```js\nfunction toRoman(n) {\n  const table = [[1000,'M'],[900,'CM'],[500,'D'],[400,'CD'],[100,'C'],[90,'XC'],[50,'L'],[40,'XL'],[10,'X'],[9,'IX'],[5,'V'],[4,'IV'],[1,'I']];\n  let out = '';\n  for (const [v, s] of table) while (n >= v) { out += s; n -= v; }\n  return out;\n}\n```\nTERRARIUM_RESULT={\"nonce\":\"1b43c80c-2944-415a-8a87-c1a7c9961458\",\"summary\":\"function corrected\"}\n",
+      "ms": 3337,
+      "exitCode": 0,
+      "runId": null,
+      "verified": null,
+      "pass": true,
+      "gradeReason": "all-cases"
+    }
+  ],
+  "samples": [
+    {
+      "t": 1791716024988,
+      "load1": 12.4375,
+      "usedMemMb": 49037,
+      "benchProcesses": 0,
+      "benchCpuPercentOfMachine": 0,
+      "benchRssMb": 0
+    },
+    {
+      "t": 1791716025969,
+      "load1": 12.4375,
+      "usedMemMb": 48482,
+      "benchProcesses": 1,
+      "benchCpuPercentOfMachine": 0,
+      "benchRssMb": 84
+    },
+    {
+      "t": 1791716026975,
+      "load1": 12.322265625,
+      "usedMemMb": 48679,
+      "benchProcesses": 0,
+      "benchCpuPercentOfMachine": 0,
+      "benchRssMb": 0
+    },
+    {
+      "t": 1791716027976,
+      "load1": 12.322265625,
+      "usedMemMb": 48465,
+      "benchProcesses": 0,
+      "benchCpuPercentOfMachine": 0,
+      "benchRssMb": 0
+    },
+    {
+      "t": 1791716028969,
+      "load1": 12.322265625,
+      "usedMemMb": 48820,
+      "benchProcesses": 0,
+      "benchCpuPercentOfMachine": 0,
+      "benchRssMb": 0
+    },
+    {
+      "t": 1791716029971,
+      "load1": 12.322265625,
+      "usedMemMb": 48715,
+      "benchProcesses": 0,
+      "benchCpuPercentOfMachine": 0,
+      "benchRssMb": 0
+    },
+    {
+      "t": 1791716030986,
+      "load1": 12.322265625,
+      "usedMemMb": 47977,
+      "benchProcesses": 0,
+      "benchCpuPercentOfMachine": 0,
+      "benchRssMb": 0
+    },
+    {
+      "t": 1791716031969,
+      "load1": 11.89599609375,
+      "usedMemMb": 48094,
+      "benchProcesses": 0,
+      "benchCpuPercentOfMachine": 0,
+      "benchRssMb": 0
+    }
+  ]
+}
