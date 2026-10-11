@@ -1,0 +1,30 @@
+{
+  "at": "2026-10-11T16:07:17.002Z",
+  "current": {
+    "sourceFiles": 80,
+    "sourceLines": 13955,
+    "testFiles": 102,
+    "tests": {
+      "pass": 849,
+      "fail": 0,
+      "seconds": 28.2
+    }
+  },
+  "effect": {
+    "sourceFiles": 15,
+    "sourceLines": 881,
+    "testFiles": 7,
+    "tests": {
+      "pass": 49,
+      "fail": 0,
+      "seconds": 0.6
+    },
+    "mutationScore": 1,
+    "prodChecks": {
+      "ok": true,
+      "passed": 11,
+      "total": 11
+    }
+  },
+  "linesRatio": 15.8
+}

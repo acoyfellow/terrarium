@@ -1,0 +1,92 @@
+{
+  "base": "<deployed effect worker>",
+  "at": "2026-10-11T16:06:34.200Z",
+  "ok": true,
+  "checks": [
+    {
+      "name": "health answers",
+      "pass": true,
+      "detail": {
+        "status": 200
+      }
+    },
+    {
+      "name": "no identity is refused",
+      "pass": true,
+      "detail": {
+        "status": 401
+      }
+    },
+    {
+      "name": "access login identifies me",
+      "pass": true,
+      "detail": {
+        "status": 200,
+        "owner": "user:jcoeyman:cloudflare.com"
+      }
+    },
+    {
+      "name": "run admitted",
+      "pass": true,
+      "detail": {
+        "status": 202,
+        "runId": "ter_mv40kuva_889f5d4f2e6e"
+      }
+    },
+    {
+      "name": "same key returns same run",
+      "pass": true,
+      "detail": {
+        "first": "ter_mv40kuva_889f5d4f2e6e",
+        "second": "ter_mv40kuva_889f5d4f2e6e"
+      }
+    },
+    {
+      "name": "run finishes done and verified",
+      "pass": true,
+      "detail": {
+        "status": "done",
+        "contractStatus": "verified",
+        "summary": "391"
+      }
+    },
+    {
+      "name": "another person cannot read my run",
+      "pass": true,
+      "detail": {
+        "status": 404
+      }
+    },
+    {
+      "name": "loop that should pass passes",
+      "pass": true,
+      "detail": {
+        "loopId": "loop_6f897a46fb864e5d8395ac8007c9d103",
+        "status": 202,
+        "outcome": "passed"
+      }
+    },
+    {
+      "name": "loop that cannot pass gives up",
+      "pass": true,
+      "detail": {
+        "loopId": "loop_97b5b5a9b44f41c489fcbbaa52bde89e",
+        "outcome": "exhausted"
+      }
+    },
+    {
+      "name": "another person cannot read my loop",
+      "pass": true,
+      "detail": {
+        "status": 404
+      }
+    },
+    {
+      "name": "a loop without an expected answer is refused",
+      "pass": true,
+      "detail": {
+        "status": 400
+      }
+    }
+  ]
+}
