@@ -11,7 +11,8 @@ const CURL_SECONDS = 8;
 
 export function egressProbeCommand(targets = EGRESS_PROBE_TARGETS) {
   const curls = targets.map((url) => `printf '%s %s\\n' '${url}' "$(curl -s -m ${CURL_SECONDS} -o /dev/null -w '%{http_code}' '${url}' || true)"`);
-  return [...curls, "env | cut -d= -f1 | grep -iE 'token|secret|key|auth|pass' | sed 's/^/envname /' || true"].join("; ");
+  const piStartup = "s=$(date +%s%N); pi --version >/dev/null 2>&1; echo pistartms $(( ($(date +%s%N) - s) / 1000000 ))";
+  return [...curls, piStartup, "env | cut -d= -f1 | grep -iE 'token|secret|key|auth|pass' | sed 's/^/envname /' || true"].join("; ");
 }
 
 export function parseEgressProbeOutput(stdout) {
@@ -20,6 +21,7 @@ export function parseEgressProbeOutput(stdout) {
   for (const line of String(stdout || "").split("\n")) {
     const [kind, value] = line.trim().split(" ");
     if (kind === "envname" && value) secretEnvNames.push(value);
+    else if (kind === "pistartms") reachable.piStartupMs = Number(value);
     else if (kind?.startsWith("https://")) reachable[kind] = value || "000";
   }
   return { reachable, secretEnvNames };
