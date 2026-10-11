@@ -985,12 +985,19 @@ export async function cancelRun({ runId, requesterRunId, scope } = {}) {
   return { runId, status: "cancel-requested", cancelled: true, requestedAt: new Date().toISOString() };
 }
 
+export function isPiAgent(agent) {
+  const first = String(agent ?? "").trim().split(/\s+/)[0] ?? "";
+  return first === "pi" || first.endsWith("/pi");
+}
+
 export async function materializePromptTransport(run, prompt) {
-  if (Buffer.byteLength(prompt, "utf8") <= PROMPT_ARG_MAX_BYTES) return { promptTransport: "argv", promptArg: prompt, promptPath: null };
+  const pi = isPiAgent(run.agent);
+  if (!pi && Buffer.byteLength(prompt, "utf8") <= PROMPT_ARG_MAX_BYTES) return { promptTransport: "argv", promptArg: prompt, promptPath: null };
   await mkdir(LOG_DIR, { recursive: true });
   const promptPath = join(LOG_DIR, `${assertRunId(run.runId)}.prompt`);
   await writeFile(promptPath, prompt, { encoding: "utf8", mode: 0o600, flag: "wx" });
-  return { promptTransport: "file", promptArg: "Read the complete task from TERRARIUM_PROMPT_FILE.", promptPath };
+  const promptArg = pi ? `@${promptPath}` : "Read the complete task from TERRARIUM_PROMPT_FILE.";
+  return { promptTransport: "file", promptArg, promptPath };
 }
 
 function childEnvironment(run, transport = null) {

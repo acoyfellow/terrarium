@@ -27,6 +27,19 @@ test("large child prompts are materialized to a file instead of argv", async () 
   }
 });
 
+test("pi children always get the prompt as an @file, because pi dies on argv over about 1000 chars", async () => {
+  const run = { runId: `ter_prompt_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`, agent: "pi -p --no-session --provider p --model m" };
+  const prompt = "short task";
+  const transport = await materializePromptTransport(run, prompt);
+  try {
+    assert.equal(transport.promptTransport, "file");
+    assert.equal(transport.promptArg, `@${transport.promptPath}`);
+    assert.equal(readFileSync(transport.promptPath, "utf8"), prompt);
+  } finally {
+    if (transport.promptPath) rmSync(transport.promptPath, { force: true });
+  }
+});
+
 test("task receipt validation classifies non-object JSON as malformed", () => {
   const expected = { runId: "run-1", taskFingerprint: "fingerprint", nonce: "nonce" };
   for (const value of ["null", "[]", '"receipt"', "42"]) {
