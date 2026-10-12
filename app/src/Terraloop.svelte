@@ -53,7 +53,6 @@
     ['Terrarium', 'Runs child agents in the cloud with receipts. This site.', 'https://github.com/acoyfellow/terrarium'],
     ['Pi', 'The coding agent everything plugs into.', 'https://github.com/earendil-works/pi'],
     ['cloudflared', 'Signs you in to Terrarium through Cloudflare Access.', 'https://developers.cloudflare.com/cloudflare-one/connections/connect-networks/downloads/'],
-    ['odds (optional)', 'Second opinion on the gate: does the proof output really show the gate holds?', 'https://github.com/acoyfellow/odds'],
   ];
 
   const skills = [
