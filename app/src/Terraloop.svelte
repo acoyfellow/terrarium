@@ -1,5 +1,7 @@
 <script>
-  const origin = typeof location === 'undefined' ? 'https://terrarium.<your-team-domain>' : location.origin;
+  const PUBLIC = import.meta.env.VITE_PUBLIC_SITE === '1';
+  const origin = PUBLIC || typeof location === 'undefined' ? 'https://<your-team-terrarium>' : location.origin;
+  const pageUrl = typeof location === 'undefined' ? '/terraloop' : `${location.origin}/terraloop`;
 
   const repo = ['https:', '', 'github.com', 'acoyfellow', 'terrarium'].join('/');
 
@@ -18,7 +20,7 @@
    skills: terraloop, terraloop-review (they ship inside terraloop-mode)
 4. Prove it: run terrarium_spawn with task "Reply with exactly: ready".
    Report the runId, status and contractStatus.
-5. Load the terraloop skill and its protocol.md, read ${origin}/terraloop,
+5. Load the terraloop skill and its protocol.md, read ${pageUrl},
    and summarize the five steps back to me.
 6. Remind me: after any loop, ask for /skill:terraloop-review.`;
 
@@ -89,44 +91,65 @@
   </header>
 
   <figure class="tl-figure">
-    <svg viewBox="0 0 960 300" class="tl-svg tl-svg-wide" role="img" aria-labelledby="tl-t tl-d">
-      <title id="tl-t">The terraloop process</title>
-      <desc id="tl-d">Arm, then contract with your go, then driver, then work, then the gate. A failing proof goes back to work. Exit 0 ends the loop.</desc>
+    <svg viewBox="0 0 960 380" class="tl-svg tl-svg-wide" role="img" aria-labelledby="tl-t tl-d">
+      <title id="tl-t">A terraloop</title>
+      <desc id="tl-d">Inside a contract you approve, the agent does the work. A heartbeat wakes it when it goes idle. It may spawn Terrarium children for a reason and gets a callback with a receipt. When it thinks it is done it calls the gate, which runs the proof command. Exit 0 ends the loop; a failure sends it back to work.</desc>
       <defs>
         <marker id="tl-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="tl-head" /></marker>
       </defs>
-      {#each steps as step, i}
-        {@const x = 20 + i * 188}
-        <g class="tl-node" class:tl-key={step.name === 'Contract' || step.name === 'Gate'}>
-          <rect x={x} y="70" width="160" height="92" rx="14" />
-          <text x={x + 22} y="102" class="tl-num">{step.n}</text>
-          <text x={x + 80} y="124" class="tl-name">{step.name}</text>
-          <text x={x + 80} y="146" class="tl-who">{step.who}</text>
-        </g>
-        {#if i < steps.length - 1}<path d={`M${x + 160},116 L${x + 186},116`} class="tl-line" marker-end="url(#tl-arrow)" />{/if}
-      {/each}
-      <text x="290" y="56" class="tl-tag">you reply "go"</text>
-      <path d="M856,162 C856,240 668,240 668,166" class="tl-line tl-loop" marker-end="url(#tl-arrow)" />
-      <text x="762" y="256" class="tl-tag tl-tag-bad">proof fails · keep working</text>
-      <path d="M940,116 L956,116" class="tl-line" />
-      <text x="856" y="56" class="tl-tag tl-tag-ok">exit 0 · done</text>
-      <rect x="20" y="276" width="920" height="1" class="tl-rule" />
+
+      <rect x="16" y="16" width="928" height="300" rx="18" class="tl-frame" />
+      <text x="36" y="44" class="tl-frame-label">contract · goal · gate · scope · proof · you said "go"</text>
+
+      <g class="tl-node tl-key"><rect x="370" y="80" width="220" height="96" rx="14" /><text x="480" y="124" class="tl-name">agent</text><text x="480" y="148" class="tl-who">does the work</text></g>
+      <g class="tl-node"><rect x="710" y="80" width="210" height="96" rx="14" /><text x="815" y="124" class="tl-name">terrarium</text><text x="815" y="148" class="tl-who">optional children</text></g>
+      <g class="tl-node tl-key"><rect x="40" y="80" width="210" height="96" rx="14" /><text x="145" y="124" class="tl-name">gate</text><text x="145" y="148" class="tl-who">tool runs the proof</text></g>
+      <g class="tl-node"><rect x="370" y="210" width="220" height="80" rx="14" /><text x="480" y="248" class="tl-name">heartbeat</text><text x="480" y="270" class="tl-who">loops_task</text></g>
+
+      <path d="M590,108 L706,108" class="tl-line" marker-end="url(#tl-arrow)" />
+      <text x="650" y="98" class="tl-tag">spawn · if needed</text>
+      <path d="M710,150 L594,150" class="tl-line" marker-end="url(#tl-arrow)" />
+      <text x="650" y="170" class="tl-tag">callback + receipt</text>
+
+      <path d="M370,108 L254,108" class="tl-line" marker-end="url(#tl-arrow)" />
+      <text x="310" y="98" class="tl-tag">"done?"</text>
+      <path d="M250,150 L366,150" class="tl-line tl-loop" marker-end="url(#tl-arrow)" />
+      <text x="310" y="170" class="tl-tag tl-tag-bad">fails · keep going</text>
+
+      <path d="M480,210 L480,180" class="tl-line" marker-end="url(#tl-arrow)" />
+      <text x="420" y="198" class="tl-tag">wakes it</text>
+      <path d="M590,236 C640,236 640,268 594,268" class="tl-line" marker-end="url(#tl-arrow)" />
+      <text x="680" y="256" class="tl-tag">when idle</text>
+
+      <path d="M145,176 L145,346" class="tl-line tl-done" marker-end="url(#tl-arrow)" />
+      <text x="160" y="364" class="tl-tag tl-tag-ok tl-start">exit 0 · loop ends</text>
     </svg>
 
-    <svg viewBox="0 0 320 640" class="tl-svg tl-svg-tall" role="img" aria-labelledby="tl-t2">
-      <title id="tl-t2">The terraloop process, top to bottom</title>
-      {#each steps as step, i}
-        {@const y = 16 + i * 122}
-        <g class="tl-node" class:tl-key={step.name === 'Contract' || step.name === 'Gate'}>
-          <rect x="40" y={y} width="240" height="84" rx="14" />
-          <text x="62" y={y + 32} class="tl-num">{step.n}</text>
-          <text x="170" y={y + 38} class="tl-name">{step.name}</text>
-          <text x="170" y={y + 60} class="tl-who">{step.who}</text>
-        </g>
-        {#if i < steps.length - 1}<path d={`M160,${y + 84} L160,${y + 120}`} class="tl-line" marker-end="url(#tl-arrow)" />{/if}
-      {/each}
-      <path d="M280,546 C316,546 316,424 280,424" class="tl-line tl-loop" marker-end="url(#tl-arrow)" />
-      <text x="300" y="490" class="tl-tag tl-tag-bad" transform="rotate(90 300 490)">proof fails</text>
+    <svg viewBox="0 0 340 760" class="tl-svg tl-svg-tall" role="img" aria-labelledby="tl-t2">
+      <title id="tl-t2">A terraloop, top to bottom</title>
+      <rect x="10" y="10" width="320" height="640" rx="18" class="tl-frame" />
+      <text x="26" y="36" class="tl-frame-label">contract · you said "go"</text>
+
+      <g class="tl-node tl-key"><rect x="70" y="60" width="200" height="84" rx="14" /><text x="170" y="98" class="tl-name">gate</text><text x="170" y="122" class="tl-who">tool runs the proof</text></g>
+      <g class="tl-node tl-key"><rect x="70" y="236" width="200" height="84" rx="14" /><text x="170" y="274" class="tl-name">agent</text><text x="170" y="298" class="tl-who">does the work</text></g>
+      <g class="tl-node"><rect x="70" y="412" width="200" height="84" rx="14" /><text x="170" y="450" class="tl-name">terrarium</text><text x="170" y="474" class="tl-who">optional children</text></g>
+      <g class="tl-node"><rect x="70" y="552" width="200" height="72" rx="14" /><text x="170" y="586" class="tl-name">heartbeat</text><text x="170" y="608" class="tl-who">loops_task</text></g>
+
+      <path d="M140,236 L140,148" class="tl-line" marker-end="url(#tl-arrow)" />
+      <text x="132" y="196" class="tl-tag tl-end">"done?"</text>
+      <path d="M200,144 L200,232" class="tl-line tl-loop" marker-end="url(#tl-arrow)" />
+      <text x="208" y="196" class="tl-tag tl-tag-bad tl-start">fails</text>
+
+      <path d="M140,320 L140,408" class="tl-line" marker-end="url(#tl-arrow)" />
+      <text x="132" y="370" class="tl-tag tl-end">spawn</text>
+      <path d="M200,412 L200,324" class="tl-line" marker-end="url(#tl-arrow)" />
+      <text x="208" y="370" class="tl-tag tl-start">receipt</text>
+
+      <path d="M70,588 C30,588 30,278 66,278" class="tl-line" marker-end="url(#tl-arrow)" />
+      <text x="24" y="440" class="tl-tag" transform="rotate(-90 24 440)">wakes it when idle</text>
+
+      <path d="M270,102 L316,102 L316,690" class="tl-line tl-done" marker-end="url(#tl-arrow)" />
+      <text x="170" y="720" class="tl-tag tl-tag-ok">exit 0 · loop ends</text>
     </svg>
   </figure>
 

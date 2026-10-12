@@ -8,7 +8,7 @@ const attempt = (passed, answer, n) => ({
   gate: { passed, reason: passed ? 'answer contains the expected text' : 'answer does not contain the expected text' },
 });
 
-const seed = () => {
+export const seed = () => {
   const now = Date.now();
   const made = (goal, task, expect, maxAttempts, ageMs, shape) => ({ loopId: `loop_dev${Math.random().toString(16).slice(2, 14)}`, contract: { goal, task, expect, maxAttempts }, createdAt: new Date(now - ageMs).toISOString(), shape, startedMs: now - ageMs });
 
@@ -27,7 +27,7 @@ const seed = () => {
   ];
 };
 
-const view = (loop) => {
+export const view = (loop) => {
   const { shape } = loop;
   const elapsed = Date.now() - loop.startedMs;
   const script = shape.script ?? [...shape.answers, 'still working', loop.contract.expect];

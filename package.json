@@ -11,7 +11,8 @@
     "gate:effect": "node effect/scripts/gate.mjs",
     "demo:dev": "vite --host 127.0.0.1 --port 5178",
     "demo:build": "vite build",
-    "deploy": "vite build && npx wrangler deploy -c effect/wrangler.jsonc"
+    "deploy": "vite build && npx wrangler deploy -c effect/wrangler.jsonc",
+    "build:public": "VITE_PUBLIC_SITE=1 vite build --outDir dist-public"
   },
   "files": [
     "effect/bin",

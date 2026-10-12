@@ -906,3 +906,11 @@ img { max-width: 100%; display: block; }
 .tl-invoke { display: flex; align-items: center; justify-content: space-between; gap: .6rem; width: 100%; padding: .5rem .7rem; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--code); color: var(--text); font: inherit; cursor: pointer; }
 .tl-invoke span { font: 600 .72rem var(--font-mono); color: var(--muted); }
 @container tl (max-width: 40rem) { .tl-skills { grid-template-columns: 1fr; } }
+.tl-frame { fill: none; stroke: var(--mint); stroke-width: 1.5; stroke-dasharray: 8 6; opacity: .7; }
+.tl-frame-label { font: 600 13px var(--font-mono); fill: var(--mint); }
+.tl-done { stroke: var(--mint); }
+.tl-start { text-anchor: start; }
+.tl-end { text-anchor: end; }
+.cp-demo { font: 600 .72rem/1 var(--font-mono); color: var(--amber); border: 1px dashed var(--amber); border-radius: 999px; padding: .45rem .7rem; }
+.cp-public .cp-row-actions, .cp-public .cp-detail-actions { opacity: .35; pointer-events: none; }
+.cockpit .btn:disabled { opacity: .5; cursor: not-allowed; transform: none; }

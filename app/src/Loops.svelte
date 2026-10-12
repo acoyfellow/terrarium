@@ -1,4 +1,8 @@
 <script>
+  import { seed, view } from '../dev-loops-mock.js';
+
+  const PUBLIC = import.meta.env.VITE_PUBLIC_SITE === '1';
+  const demoLoops = PUBLIC ? seed() : [];
   const REFRESH_MS = 3000;
   const ACTIVE = new Set(['running', 'queued', 'waiting', 'waitingForPause', 'paused']);
 
@@ -23,7 +27,7 @@
 
   async function refresh() {
     try {
-      loops = (await api('/api/loops')).loops;
+      loops = PUBLIC ? demoLoops.map(view) : (await api('/api/loops')).loops;
       error = '';
       lastSync = Date.now();
     } catch (e) {
@@ -95,6 +99,7 @@
 
   async function createLoop(event) {
     event.preventDefault();
+    if (PUBLIC) return;
     busy = 'create';
     try {
       const created = await api('/api/loops', { method: 'POST', body: JSON.stringify({ ...draft, maxAttempts: Number(draft.maxAttempts) }) });
@@ -110,6 +115,7 @@
   }
 
   async function act(loop, action) {
+    if (PUBLIC) return;
     if (action === 'delete' && !confirm(`Delete "${loop.contract.goal}"? This stops it if it is running.`)) return;
     busy = `${action}:${loop.loopId}`;
     try {
@@ -133,18 +139,19 @@
   }
 </script>
 
-<section class="cockpit">
+<section class="cockpit" class:cp-public={PUBLIC}>
   <header class="cp-top">
     <div>
       <div class="eyebrow">Loops</div>
       <h1>Cockpit</h1>
     </div>
     <div class="cp-top-right">
+      {#if PUBLIC}<span class="cp-demo">Demo data · sign in to your team's Terrarium for real loops</span>{/if}
       <span class="cp-sync" class:cp-sync-bad={error}>
         <span class="cp-dot" data-state={error ? 'errored' : 'live'}></span>
         {error ? 'Sync failed' : lastSync ? `Live · synced ${Math.max(0, Math.round((now - lastSync) / 1000))}s ago` : 'Connecting…'}
       </span>
-      <button class="btn btn-primary" onclick={() => { draft = { goal: '', task: '', expect: '', maxAttempts: 3 }; composing = true; }}>+ New loop</button>
+      <button class="btn btn-primary" disabled={PUBLIC} title={PUBLIC ? 'Available on your team\'s Terrarium' : undefined} onclick={() => { draft = { goal: '', task: '', expect: '', maxAttempts: 3 }; composing = true; }}>+ New loop</button>
     </div>
   </header>
 
