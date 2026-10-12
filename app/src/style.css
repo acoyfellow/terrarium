@@ -899,3 +899,10 @@ img { max-width: 100%; display: block; }
   .tl-table td { display: block; width: auto !important; border: 0; padding: .2rem 0; }
   .tl-table tr { display: block; padding: .5rem 0; border-bottom: 1px solid var(--border); }
 }
+.tl-skills { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .8rem; }
+.tl-skills article { border: 1px solid var(--mint); border-radius: var(--radius-lg); padding: 1.1rem 1.2rem; background: var(--mint-soft); display: flex; flex-direction: column; gap: .5rem; min-width: 0; }
+.tl-skills h3 a { color: var(--mint); text-decoration: none; font-family: var(--font-mono); }
+.tl-skills p { margin: 0; font-size: .9rem; flex: 1; }
+.tl-invoke { display: flex; align-items: center; justify-content: space-between; gap: .6rem; width: 100%; padding: .5rem .7rem; border: 1px solid var(--border-strong); border-radius: var(--radius-sm); background: var(--code); color: var(--text); font: inherit; cursor: pointer; }
+.tl-invoke span { font: 600 .72rem var(--font-mono); color: var(--muted); }
+@container tl (max-width: 40rem) { .tl-skills { grid-template-columns: 1fr; } }

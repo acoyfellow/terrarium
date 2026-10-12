@@ -13,11 +13,14 @@
    git clone ${repo} ~/terrarium
    cd ~/terrarium/effect && npm ci && cd .. && npm install -g .
    terra login ${origin}
-3. Tell me to run /reload, then confirm these tools exist:
-   terraloop_control, loops_task, mcp__terrarium__terrarium_spawn
+3. Tell me to run /reload, then confirm these exist:
+   tools: terraloop_control, loops_task, mcp__terrarium__terrarium_spawn
+   skills: terraloop, terraloop-review (they ship inside terraloop-mode)
 4. Prove it: run terrarium_spawn with task "Reply with exactly: ready".
    Report the runId, status and contractStatus.
-5. Read ${origin}/terraloop and summarize the five steps back to me.`;
+5. Load the terraloop skill and its protocol.md, read ${origin}/terraloop,
+   and summarize the five steps back to me.
+6. Remind me: after any loop, ask for /skill:terraloop-review.`;
 
   const firstLoop = `Run a terraloop: <what you want done, one line>.`;
 
@@ -53,10 +56,16 @@
     ['odds (optional)', 'Second opinion on the gate: does the proof output really show the gate holds?', 'https://github.com/acoyfellow/odds'],
   ];
 
+  const skills = [
+    ['terraloop', 'The protocol itself. The agent loads it whenever a loop is asked for or the gate is armed: how to draft the contract, when a child is allowed, how to reach the gate. Its protocol.md is the full rulebook.', '/skill:terraloop', 'https://github.com/acoyfellow/terraloop-mode/tree/main/skills/terraloop'],
+    ['terraloop-review', 'An adversarial review of the loop that just ended. It asks whether the gate was the right one, whether the proof really proved it, what was missed, and whether another loop is worth it. It never starts a loop and always ends with one best next step.', '/skill:terraloop-review', 'https://github.com/acoyfellow/terraloop-mode/tree/main/skills/terraloop-review'],
+  ];
+
   const commands = [
     ['/terraloop <north star>', 'Arm the gate.'],
     ['/terraloop-status', 'Phase, contract, overrides, settle ticks.'],
     ['/terraloop-off', 'Leave terraloop mode and stop its drivers. Only you can do this.'],
+    ['/skill:terraloop-review', 'Review the loop that just ended. Run it after every loop.'],
     ['terraloop_control action=status', 'The agent checks where it is.'],
     ['terraloop_control action=override reason="…"', 'A rare exception for a path the contract missed. 20 per loop.'],
   ];
@@ -160,6 +169,18 @@
     <pre>{firstLoop}</pre>
   </div>
   <p class="tl-note">Loops that run tasks on Terrarium itself show up live on the <a href="/loops">Loops cockpit</a>, and you can start, cancel and rerun them from there.</p>
+
+  <h2>Skills</h2>
+  <p>Both ship inside terraloop-mode, so the install above adds them. Use them as a pair: one to run a loop, one to question it afterwards.</p>
+  <div class="tl-skills">
+    {#each skills as [name, what, invoke, href]}
+      <article>
+        <h3><a href={href}>{name}</a></h3>
+        <p>{what}</p>
+        <button class="tl-invoke" onclick={() => copy(name, invoke)}><code>{invoke}</code><span>{copied === name ? 'Copied ✓' : 'Copy'}</span></button>
+      </article>
+    {/each}
+  </div>
 
   <h2>Commands</h2>
   <table class="tl-table"><tbody>{#each commands as [cmd, what]}<tr><td><code>{cmd}</code></td><td>{what}</td></tr>{/each}</tbody></table>
