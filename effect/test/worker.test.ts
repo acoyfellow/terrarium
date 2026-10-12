@@ -4,11 +4,16 @@ import test from "node:test";
 import { Schema } from "effect";
 
 import { handleRequest } from "../src/app.ts";
+import type { ProbeBox } from "../src/egress.ts";
 import { fakeEnv, principals } from "./fake-env.ts";
 
 const [alice, bob] = principals;
 
-const call = (env: ReturnType<typeof fakeEnv>, path: string, init: RequestInit = {}) => handleRequest(new Request(`https://t${path}`, init), env);
+const probeBox: ProbeBox = { exec: () => Promise.resolve({ stdout: "reach https://example.com/ 520\nreach https://m/_terrarium_model/v1/models 404\npistartms 1200\n", exitCode: 0 }), destroy: () => Promise.resolve() };
+
+const probeBoxes = { modelHost: "m", fresh: () => probeBox };
+
+const call = (env: ReturnType<typeof fakeEnv>, path: string, init: RequestInit = {}) => handleRequest(new Request(`https://t${path}`, init), env, probeBoxes);
 
 const bearer = (token: string, extra: Record<string, string> = {}) => ({ authorization: `Bearer ${token}`, ...extra });
 
@@ -39,4 +44,11 @@ test("a bearer principal admits a run and reads its status; another principal ge
 test("POST /api/loops with a bad contract is 400", async () => {
   const response = await call(fakeEnv(), "/api/loops", { method: "POST", headers: bearer(alice.token), body: JSON.stringify({ goal: "g", task: "t", expect: "e", maxAttempts: 9 }) });
   assert.equal(response.status, 400);
+});
+
+test("the egress probe needs a login and reports what the box could reach", async () => {
+  assert.equal((await call(fakeEnv(), "/api/egress-probe")).status, 401);
+  const report = await call(fakeEnv(), "/api/egress-probe", { headers: bearer(alice.token) });
+  assert.equal(report.status, 200);
+  assert.deepEqual(Schema.decodeUnknownSync(Schema.Struct({ reachable: Schema.Record(Schema.String, Schema.String), piStartupMs: Schema.Number }))(await report.json()), { reachable: { "https://example.com/": "520", "https://m/_terrarium_model/v1/models": "404" }, piStartupMs: 1200 });
 });

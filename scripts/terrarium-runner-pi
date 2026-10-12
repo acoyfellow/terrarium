@@ -46,6 +46,7 @@ json_field() {
 }
 
 echo "TASK_RECEIVED"
+RUNNER_START_MS=$(date +%s%3N)
 
 if [ ! -f "$CONTRACT" ] || [ ! -f "$TASK" ]; then
   echo "[terrarium:runner] missing task or contract file"
@@ -160,6 +161,7 @@ timeout --signal=TERM --kill-after=5s "${AGENT_TIMEOUT_SECONDS}s" \
   "@${PROMPT_FILE}" >"$TMP_OUT" 2>&1
 AGENT_EXIT=$?
 set -e
+echo "TERRARIUM_TIMING runner_start_ms=${RUNNER_START_MS} agent_end_ms=$(date +%s%3N)"
 
 # --- Stream logs WITHOUT candidate marker lines ----------------------------
 grep -av '^TERRARIUM_RESULT=' "$TMP_OUT" || true

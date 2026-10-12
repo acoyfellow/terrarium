@@ -1,0 +1,43 @@
+{
+  "at": "2026-10-12T11:26:29.540Z",
+  "ok": true,
+  "checks": [
+    {
+      "name": "probe answered",
+      "pass": true
+    },
+    {
+      "name": "blocked https://example.com/",
+      "pass": true,
+      "code": "403"
+    },
+    {
+      "name": "blocked https://api.cloudflare.com/client/v4/user",
+      "pass": true,
+      "code": "403"
+    },
+    {
+      "name": "blocked https://registry.npmjs.org/",
+      "pass": true,
+      "code": "403"
+    },
+    {
+      "name": "model host answers through the Worker",
+      "pass": true,
+      "code": "200"
+    },
+    {
+      "name": "no secret-looking env names",
+      "pass": true
+    }
+  ],
+  "reachable": {
+    "https://example.com/": "403",
+    "https://api.cloudflare.com/client/v4/user": "403",
+    "https://registry.npmjs.org/": "403",
+    "http://example.com/": "403",
+    "model-host": "200"
+  },
+  "piStartupMs": 1690,
+  "totalMs": 3876
+}

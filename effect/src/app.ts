@@ -1,5 +1,6 @@
 import { Effect, Layer, Schema } from "effect";
 
+import { ProbeBoxes, runProbe } from "./egress.ts";
 import { accessConfigLayer, authenticate, fetchJwks } from "./identity.ts";
 import { createLoop, getLoop, listLoops } from "./loops-api.ts";
 import type { LoopsEnv } from "./loops-api.ts";
@@ -38,11 +39,13 @@ const accessLayer = (env: AppEnv) =>
 
 const whoami = Effect.map(Owner, (owner) => Response.json({ ok: true, method: owner.method, owner: owner.id, email: owner.email ?? undefined }));
 
-const route = (request: Request, env: AppEnv): Effect.Effect<Response, HttpFailure, Owner> => {
+const route = (request: Request, env: AppEnv): Effect.Effect<Response, HttpFailure, Owner | ProbeBoxes> => {
   const url = new URL(request.url);
   const key = `${request.method} ${url.pathname}`;
 
   if (key === "GET /api/whoami") return whoami;
+
+  if (key === "GET /api/egress-probe") return Effect.map(runProbe, (report) => Response.json(report));
 
   if (key === "POST /api/loops") return createLoop(request, env);
 
@@ -55,7 +58,7 @@ const route = (request: Request, env: AppEnv): Effect.Effect<Response, HttpFailu
   return Effect.fail(new NotFound({ what: "route" }));
 };
 
-const authenticated = (request: Request, env: AppEnv): Effect.Effect<Response, HttpFailure> =>
+const authenticated = (request: Request, env: AppEnv): Effect.Effect<Response, HttpFailure, ProbeBoxes> =>
   Effect.gen(function* () {
     const access = yield* accessLayer(env);
     const identity = yield* authenticate(request).pipe(Effect.provide(access));
@@ -65,12 +68,12 @@ const authenticated = (request: Request, env: AppEnv): Effect.Effect<Response, H
 
 const isApiPath = (pathname: string) => pathname.startsWith("/api/") || pathname === "/claim" || pathname === "/ack";
 
-export const handleRequest = (request: Request, env: AppEnv): Promise<Response> => {
+export const handleRequest = (request: Request, env: AppEnv, probeBoxes: typeof ProbeBoxes.Service): Promise<Response> => {
   const { pathname } = new URL(request.url);
 
   if (pathname === "/health") return Promise.resolve(Response.json({ ok: true }));
 
   if (!isApiPath(pathname)) return env.ASSETS.fetch(request);
 
-  return Effect.runPromise(authenticated(request, env).pipe(Effect.catch((error) => Effect.succeed(errorResponse(error)))));
+  return Effect.runPromise(authenticated(request, env).pipe(Effect.provideService(ProbeBoxes, probeBoxes), Effect.catch((error) => Effect.succeed(errorResponse(error)))));
 };

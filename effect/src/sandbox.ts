@@ -1,8 +1,9 @@
 import { Sandbox as SdkSandbox, getSandbox } from "@cloudflare/sandbox";
-import { Context, Effect, Layer, Schema } from "effect";
+import { Context, Duration, Effect, Layer, Schema } from "effect";
 
 import { Upstream } from "./shared.ts";
 import type { RunContract } from "./shared.ts";
+import { timingLine } from "./timing.ts";
 
 export interface SandboxResult {
   readonly output: string;
@@ -66,6 +67,9 @@ export const answerModel = (request: Request, ai: Ai): Effect.Effect<Response> =
     Effect.flatMap((body) => Schema.decodeUnknownEffect(ChatRequest)(body).pipe(Effect.mapError(() => "invalid messages"))),
     Effect.flatMap((chat) =>
       Effect.tryPromise({ try: () => ai.run(MODEL, { messages: chat.messages.map((message) => ({ role: message.role, content: textOf(message.content) })) }), catch: () => "model request failed" }).pipe(
+        Effect.timed,
+        Effect.tap(([duration]) => Effect.logInfo(`terrarium model_ms=${Duration.toMillis(duration)}`)),
+        Effect.map(([, output]) => output),
         Effect.flatMap((output) => Schema.decodeUnknownEffect(ModelReply)(output).pipe(Effect.mapError(() => "unsupported model output"))),
         Effect.map((reply) => completion(reply.response, chat.stream === true)),
         Effect.mapError((message) => modelError(502, message)),
@@ -104,10 +108,13 @@ const labelStderr = (stderr: string) => stderr.split("\n").filter((line) => line
 export const sandboxLayer = (env: SandboxEnv) => Layer.succeed(Sandbox, Sandbox.of({
   run: (task, contract) => Effect.gen(function* () {
     const box = getSandbox(env.TERRARIUM_SANDBOX, contract.runId);
+    const startMs = Date.now();
     yield* sandboxCall(() => box.writeFile("/workspace/terrarium-task.txt", task));
+    const boxReadyMs = Date.now();
     yield* sandboxCall(() => box.writeFile("/workspace/terrarium-contract.json", JSON.stringify(contract)));
     const result = yield* sandboxCall(() => box.exec("/usr/local/bin/terrarium-runner", { timeout: RUN_TIMEOUT_MS, env: containerEnv(env.TERRARIUM_MODEL_HOST) }));
+    const timing = timingLine({ startMs, boxReadyMs, endMs: Date.now(), runnerOutput: result.stdout });
 
-    return { output: [result.stdout, labelStderr(result.stderr)].filter((part) => part.length > 0).join("\n"), exitCode: result.exitCode };
+    return { output: [result.stdout, labelStderr(result.stderr), timing].filter((part) => part.length > 0).join("\n"), exitCode: result.exitCode };
   }).pipe(Effect.ensuring(Effect.ignore(sandboxCall(() => getSandbox(env.TERRARIUM_SANDBOX, contract.runId).destroy())))),
 }));

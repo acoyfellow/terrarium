@@ -43,7 +43,15 @@ Terrarium is a small Worker that hands each job to the Cloudflare product built 
 6. Pi prints its answer and one `TERRARIUM_RESULT=` line. The Workflow checks it: exactly one line, the right code, this run, this task. Only then is the run `verified`.
 7. The result is recorded once in the Durable Object. The Pi extension sees the run finish and puts the result into your session.
 
-A one-word task takes about 20 seconds end to end. Starting a fresh container takes 4 to 5 seconds of that, and starting Pi inside it takes 2 to 18.
+A one-word task takes about 20 seconds end to end. Starting a fresh container takes 4 to 5 seconds of that, and starting Pi inside it takes 2 to 18. Each run's log ends with a `TERRARIUM_PHASES` line that splits its time into box start, wait for the runner, agent, and tail.
+
+## The internet block
+
+The container has `enableInternet = false` and `interceptHttps = true`, so every request it makes, HTTP or HTTPS, goes to the Worker's `outbound` handler. That handler answers one route, a POST to the model path on the model host, and sends every other request a 403 `egress denied`.
+
+`GET /api/egress-probe` checks this live. It starts a fresh sandbox, runs a fixed list of requests (callers can't add their own), and removes the sandbox. `node effect/scripts/egress-check.mjs` calls it and saves `effect/receipts/egress.json`. Today example.com, api.cloudflare.com and registry.npmjs.org all get 403, a model call gets 200, and the box has no secret-looking environment names.
+
+The old JavaScript service saw 520 instead of 403 for blocked sites. It also set `allowedHosts` to the model host, and in `@cloudflare/containers` the `allowedHosts` check runs before any handler: a host not on the list gets `520 Origin is disallowed` straight from the library, so `denyAllEgress` never ran. The Effect version sets no `allowedHosts`, so our own 403 handler answers. Either way nothing got out.
 
 ## What "verified" proves
 
