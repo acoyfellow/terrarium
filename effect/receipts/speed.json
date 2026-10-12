@@ -1,0 +1,151 @@
+{
+  "baselineMs": 20000,
+  "experiments": [
+    {
+      "label": "baseline",
+      "at": "2026-10-12T11:29:57.985Z",
+      "runs": 6,
+      "done": 6,
+      "medianWallMs": 7385,
+      "medianPhases": {
+        "box_ms": 1764,
+        "runner_wait_ms": 39,
+        "agent_ms": 3023,
+        "tail_ms": 989,
+        "total_ms": 5330
+      },
+      "samples": [
+        {
+          "runId": "ter_mv565zwb_f5e22c4ee1c4",
+          "wallMs": 10071,
+          "status": "done",
+          "phases": {
+            "box_ms": 2840,
+            "total_ms": 7100
+          }
+        },
+        {
+          "runId": "ter_mv5667lh_cb5be6e6c24d",
+          "wallMs": 9442,
+          "status": "done",
+          "phases": {
+            "box_ms": 1147,
+            "runner_wait_ms": 30,
+            "agent_ms": 2956,
+            "tail_ms": 116,
+            "total_ms": 4249
+          }
+        },
+        {
+          "runId": "ter_mv566evx_5d0cfb375ba5",
+          "wallMs": 7319,
+          "status": "done",
+          "phases": {
+            "box_ms": 1764,
+            "total_ms": 4418
+          }
+        },
+        {
+          "runId": "ter_mv566kj6_9d3f00c828a6",
+          "wallMs": 5981,
+          "status": "done",
+          "phases": {
+            "box_ms": 1443,
+            "total_ms": 3887
+          }
+        },
+        {
+          "runId": "ter_mv566p5a_711cbf1ea40d",
+          "wallMs": 7385,
+          "status": "done",
+          "phases": {
+            "box_ms": 2060,
+            "total_ms": 5733
+          }
+        },
+        {
+          "runId": "ter_mv566uug_1e1567a05603",
+          "wallMs": 7087,
+          "status": "done",
+          "phases": {
+            "box_ms": 1279,
+            "runner_wait_ms": 39,
+            "agent_ms": 3023,
+            "tail_ms": 989,
+            "total_ms": 5330
+          }
+        }
+      ]
+    },
+    {
+      "label": "warm-box",
+      "method": "Same fixed probe command in a fresh sandbox vs one sandbox kept alive (GET /api/egress-probe, temporary ?warm flag, not committed).",
+      "fresh": {
+        "medianExecMs": 5557.0,
+        "medianPiStartupMs": 2152.0,
+        "samples": [
+          {
+            "wallMs": 6031,
+            "piStartupMs": 1871,
+            "execMs": 5785
+          },
+          {
+            "wallMs": 4855,
+            "piStartupMs": 1557,
+            "execMs": 4782
+          },
+          {
+            "wallMs": 5401,
+            "piStartupMs": 2433,
+            "execMs": 5329
+          },
+          {
+            "wallMs": 7760,
+            "piStartupMs": 3478,
+            "execMs": 7604
+          }
+        ]
+      },
+      "warm": {
+        "medianExecMs": 1403,
+        "medianPiStartupMs": 1013,
+        "samples": [
+          {
+            "wallMs": 3193,
+            "piStartupMs": 1502,
+            "execMs": 3125
+          },
+          {
+            "wallMs": 1371,
+            "piStartupMs": 1012,
+            "execMs": 1299
+          },
+          {
+            "wallMs": 1742,
+            "piStartupMs": 1013,
+            "execMs": 1666
+          },
+          {
+            "wallMs": 1480,
+            "piStartupMs": 1039,
+            "execMs": 1403
+          },
+          {
+            "wallMs": 1459,
+            "piStartupMs": 992,
+            "execMs": 1382
+          }
+        ]
+      },
+      "savedMs": 4154.0,
+      "verdict": "Helps. A warm box saves about 4 s per run and halves Pi startup. Worth building as a small pool; each warm box keeps a container running."
+    },
+    {
+      "label": "snapshot-after-pi",
+      "tried": false,
+      "reason": "@cloudflare/sandbox 0.12.3 does not expose snapshots. It needs the raw Container API (ctx.container.snapshotContainer and containerSnapshot on start), which means dropping the Sandbox SDK for this class. Box start is about 1.5 s of a 7 s run, so a snapshot can save at most that, and a warm box already removes it.",
+      "verdict": "Not worth it now."
+    }
+  ],
+  "baselineNote": "The 20 s baseline came from the old service. Effect runs measured here."
+}

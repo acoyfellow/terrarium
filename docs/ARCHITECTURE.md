@@ -43,7 +43,7 @@ Terrarium is a small Worker that hands each job to the Cloudflare product built 
 6. Pi prints its answer and one `TERRARIUM_RESULT=` line. The Workflow checks it: exactly one line, the right code, this run, this task. Only then is the run `verified`.
 7. The result is recorded once in the Durable Object. The Pi extension sees the run finish and puts the result into your session.
 
-A one-word task takes about 20 seconds end to end. Starting a fresh container takes 4 to 5 seconds of that, and starting Pi inside it takes 2 to 18. Each run's log ends with a `TERRARIUM_PHASES` line that splits its time into box start, wait for the runner, agent, and tail.
+A one-word task takes about 7 seconds end to end (median of 6 runs, `effect/receipts/speed.json`): about 1.5 s to start the box, 3 s for Pi and the model, and the rest is polling and recording. A box kept warm answered the same probe in 1.4 s instead of 5.4 s, so a small warm pool is the next speed-up. Snapshots aren't exposed by the Sandbox SDK yet. Each run's log ends with a `TERRARIUM_PHASES` line that splits its time into box start, wait for the runner, agent, and tail.
 
 ## The internet block
 

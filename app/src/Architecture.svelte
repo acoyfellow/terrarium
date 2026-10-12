@@ -152,7 +152,7 @@
   <p>Verified means the right run answered. It does not mean the answer is true. Pi runs with tools off today, so an agent asked to run a command can only describe made-up output, and that run is still verified. Check anything that matters with a command you run yourself.</p>
 
   <h2>How long a run takes</h2>
-  <p>A one-word task takes about 20 seconds end to end. Starting a fresh container takes 4 to 5 seconds of that, and starting Pi inside it takes 2 to 18. Keeping a few containers warm is the next speed-up to try.</p>
+  <p>A one-word task takes about 7 seconds end to end: about 1.5 s to start the container and 3 s for Pi and the model. A container kept warm answered in 1.4 s instead of 5.4 s, so a small warm pool is the next speed-up.</p>
 
   <h2>What we deliberately did not build</h2>
   <ul>
