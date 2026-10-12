@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite';
 import { svelte } from '@sveltejs/vite-plugin-svelte';
+import { devLoopsMock } from './app/dev-loops-mock.js';
 
 // Stamp the service worker cache name with a per-build ID so every deploy gets a
 // fresh cache and the SW's activate() purges the previous one. No human ever
@@ -28,6 +29,6 @@ function stampServiceWorker() {
 export default defineConfig({
   root: 'app',
   publicDir: 'public',
-  plugins: [svelte(), stampServiceWorker()],
+  plugins: [svelte(), stampServiceWorker(), devLoopsMock()],
   build: { outDir: 'dist', emptyOutDir: true },
 });

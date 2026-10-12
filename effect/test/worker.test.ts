@@ -52,3 +52,16 @@ test("the egress probe needs a login and reports what the box could reach", asyn
   assert.equal(report.status, 200);
   assert.deepEqual(Schema.decodeUnknownSync(Schema.Struct({ reachable: Schema.Record(Schema.String, Schema.String), piStartupMs: Schema.Number }))(await report.json()), { reachable: { "https://example.com/": "520", "https://m/_terrarium_model/v1/models": "404" }, piStartupMs: 1200 });
 });
+
+const LoopCreated = Schema.Struct({ loopId: Schema.String });
+
+test("a loop can be created, cancelled and deleted by its owner only", async () => {
+  const env = fakeEnv();
+  const created = await call(env, "/api/loops", { method: "POST", headers: bearer(alice.token), body: JSON.stringify({ goal: "g", task: "t", expect: "e" }) });
+  assert.equal(created.status, 202);
+  const { loopId } = Schema.decodeUnknownSync(LoopCreated)(await created.json());
+  assert.equal((await call(env, `/api/loops/${loopId}/cancel`, { method: "POST", headers: bearer(bob.token) })).status, 404);
+  assert.equal((await call(env, `/api/loops/${loopId}/cancel`, { method: "POST", headers: bearer(alice.token) })).status, 200);
+  assert.equal((await call(env, `/api/loops/${loopId}`, { method: "DELETE", headers: bearer(alice.token) })).status, 200);
+  assert.equal((await call(env, `/api/loops/${loopId}`, { headers: bearer(alice.token) })).status, 404);
+});

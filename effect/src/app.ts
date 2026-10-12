@@ -2,7 +2,7 @@ import { Effect, Layer, Schema } from "effect";
 
 import { ProbeBoxes, runProbe } from "./egress.ts";
 import { accessConfigLayer, authenticate, fetchJwks } from "./identity.ts";
-import { createLoop, getLoop, listLoops } from "./loops-api.ts";
+import { cancelLoop, createLoop, deleteLoop, getLoop, listLoops } from "./loops-api.ts";
 import type { LoopsEnv } from "./loops-api.ts";
 import { CallbacksLive, RunsLive, cloudflareLayer } from "./runs.ts";
 import type { RunsEnv } from "./runs.ts";
@@ -52,6 +52,10 @@ const route = (request: Request, env: AppEnv): Effect.Effect<Response, HttpFailu
   if (key === "GET /api/loops") return listLoops(request, env);
 
   if (request.method === "GET" && /^\/api\/loops\/[^/]+$/.test(url.pathname)) return getLoop(request, env);
+
+  if (request.method === "POST" && /^\/api\/loops\/[^/]+\/cancel$/.test(url.pathname)) return cancelLoop(request, env);
+
+  if (request.method === "DELETE" && /^\/api\/loops\/[^/]+$/.test(url.pathname)) return deleteLoop(request, env);
 
   if (url.pathname.startsWith("/api/runs") || key === "POST /claim" || key === "POST /ack") return handleRuns(request).pipe(Effect.provide(runsLayer(env)));
 

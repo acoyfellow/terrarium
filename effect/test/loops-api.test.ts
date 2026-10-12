@@ -14,7 +14,7 @@ const makeEnv = (): LoopsEnv => {
     LOOPS_KV: { get: (key) => Promise.resolve(kv.get(key) ?? null), put: (key, value) => Promise.resolve(void kv.set(key, value)) },
     LOOP_WORKFLOW: {
       create: (options) => Promise.resolve(void instances.add(options.id)).then(() => ({ id: options.id })),
-      get: (id) => (instances.has(id) ? Promise.resolve({ status: () => Promise.resolve(status) }) : Promise.reject(new Error("no instance"))),
+      get: (id) => (instances.has(id) ? Promise.resolve({ status: () => Promise.resolve(status), terminate: () => Promise.resolve() }) : Promise.reject(new Error("no instance"))),
     },
   };
 };

@@ -49,7 +49,7 @@ export const fakeEnv = (): AppEnv & { readonly started: Array<RunParams> } => {
     LOOPS_KV: { get: (key) => Promise.resolve(kv.get(key) ?? null), put: (key, value) => Promise.resolve(void kv.set(key, value)) },
     LOOP_WORKFLOW: {
       create: (options) => Promise.resolve({ id: options.id }),
-      get: () => Promise.resolve({ status: () => Promise.resolve({ status: "running" }) }),
+      get: () => Promise.resolve({ status: () => Promise.resolve({ status: "running" }), terminate: () => Promise.resolve() }),
     },
     ASSETS: { fetch: () => Promise.resolve(new Response("asset")) },
     TERRARIUM_ACCESS_TEAM_DOMAIN: "team.cloudflareaccess.com",
