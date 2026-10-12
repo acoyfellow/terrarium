@@ -850,9 +850,9 @@ img { max-width: 100%; display: block; }
 .tl-num { font: 700 24px var(--font-mono); fill: var(--mint); }
 .tl-name { font: 700 22px var(--font-sans); fill: var(--text); text-anchor: middle; }
 .tl-who { font: 500 13px var(--font-mono); fill: var(--muted); text-anchor: middle; }
-.tl-line { fill: none; stroke: var(--border-strong); stroke-width: 2; }
+.tl-line { fill: none; stroke: var(--muted); stroke-width: 2; opacity: .8; }
 .tl-loop { stroke: var(--amber); stroke-dasharray: 6 5; }
-.tl-head { fill: var(--border-strong); }
+.tl-head { fill: var(--muted); }
 .tl-tag { font: 600 14px var(--font-mono); fill: var(--muted); text-anchor: middle; }
 .tl-tag-ok { fill: var(--mint); }
 .tl-tag-bad { fill: var(--amber); }

@@ -98,31 +98,31 @@
         <marker id="tl-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" class="tl-head" /></marker>
       </defs>
 
-      <rect x="16" y="16" width="928" height="300" rx="18" class="tl-frame" />
+      <rect x="12" y="16" width="936" height="306" rx="18" class="tl-frame" />
       <text x="36" y="44" class="tl-frame-label">contract · goal · gate · scope · proof · you said "go"</text>
 
-      <g class="tl-node tl-key"><rect x="370" y="80" width="220" height="96" rx="14" /><text x="480" y="124" class="tl-name">agent</text><text x="480" y="148" class="tl-who">does the work</text></g>
-      <g class="tl-node"><rect x="710" y="80" width="210" height="96" rx="14" /><text x="815" y="124" class="tl-name">terrarium</text><text x="815" y="148" class="tl-who">optional children</text></g>
-      <g class="tl-node tl-key"><rect x="40" y="80" width="210" height="96" rx="14" /><text x="145" y="124" class="tl-name">gate</text><text x="145" y="148" class="tl-who">tool runs the proof</text></g>
-      <g class="tl-node"><rect x="370" y="210" width="220" height="80" rx="14" /><text x="480" y="248" class="tl-name">heartbeat</text><text x="480" y="270" class="tl-who">loops_task</text></g>
+      <g class="tl-node tl-key"><rect x="390" y="84" width="180" height="96" rx="14" /><text x="480" y="128" class="tl-name">agent</text><text x="480" y="152" class="tl-who">does the work</text></g>
+      <g class="tl-node"><rect x="750" y="84" width="180" height="96" rx="14" /><text x="840" y="128" class="tl-name">terrarium</text><text x="840" y="152" class="tl-who">optional children</text></g>
+      <g class="tl-node tl-key"><rect x="30" y="84" width="180" height="96" rx="14" /><text x="120" y="128" class="tl-name">gate</text><text x="120" y="152" class="tl-who">tool runs the proof</text></g>
+      <g class="tl-node"><rect x="390" y="222" width="180" height="76" rx="14" /><text x="480" y="258" class="tl-name">heartbeat</text><text x="480" y="280" class="tl-who">loops_task</text></g>
 
-      <path d="M590,108 L706,108" class="tl-line" marker-end="url(#tl-arrow)" />
-      <text x="650" y="98" class="tl-tag">spawn · if needed</text>
-      <path d="M710,150 L594,150" class="tl-line" marker-end="url(#tl-arrow)" />
-      <text x="650" y="170" class="tl-tag">callback + receipt</text>
+      <path d="M574,114 L746,114" class="tl-line" marker-end="url(#tl-arrow)" />
+      <text x="660" y="104" class="tl-tag">spawn · if needed</text>
+      <path d="M746,150 L574,150" class="tl-line" marker-end="url(#tl-arrow)" />
+      <text x="660" y="172" class="tl-tag">callback + receipt</text>
 
-      <path d="M370,108 L254,108" class="tl-line" marker-end="url(#tl-arrow)" />
-      <text x="310" y="98" class="tl-tag">"done?"</text>
-      <path d="M250,150 L366,150" class="tl-line tl-loop" marker-end="url(#tl-arrow)" />
-      <text x="310" y="170" class="tl-tag tl-tag-bad">fails · keep going</text>
+      <path d="M386,114 L214,114" class="tl-line" marker-end="url(#tl-arrow)" />
+      <text x="300" y="104" class="tl-tag">"done?"</text>
+      <path d="M214,150 L386,150" class="tl-line tl-loop" marker-end="url(#tl-arrow)" />
+      <text x="300" y="172" class="tl-tag tl-tag-bad">fails · keep going</text>
 
-      <path d="M480,210 L480,180" class="tl-line" marker-end="url(#tl-arrow)" />
-      <text x="420" y="198" class="tl-tag">wakes it</text>
-      <path d="M590,236 C640,236 640,268 594,268" class="tl-line" marker-end="url(#tl-arrow)" />
-      <text x="680" y="256" class="tl-tag">when idle</text>
+      <path d="M480,222 L480,184" class="tl-line" marker-end="url(#tl-arrow)" />
+      <text x="470" y="208" class="tl-tag tl-end">wakes it</text>
+      <path d="M570,246 C620,246 620,276 574,276" class="tl-line" marker-end="url(#tl-arrow)" />
+      <text x="630" y="266" class="tl-tag tl-start">when idle</text>
 
-      <path d="M145,176 L145,346" class="tl-line tl-done" marker-end="url(#tl-arrow)" />
-      <text x="160" y="364" class="tl-tag tl-tag-ok tl-start">exit 0 · loop ends</text>
+      <path d="M120,180 L120,346" class="tl-line tl-done" marker-end="url(#tl-arrow)" />
+      <text x="134" y="364" class="tl-tag tl-tag-ok tl-start">exit 0 · loop ends</text>
     </svg>
 
     <svg viewBox="0 0 340 760" class="tl-svg tl-svg-tall" role="img" aria-labelledby="tl-t2">
