@@ -1,6 +1,7 @@
 <script>
   import Loops from './Loops.svelte';
   import Architecture from './Architecture.svelte';
+  import Terraloop from './Terraloop.svelte';
   const docs = [
     {"id": "tutorial", "label": "Tutorial", "kind": "Learn", "title": "Run your first task", "lead": "About two minutes. Sign in with your Cloudflare login and run one task in the cloud.", "blocks": [["1. Install and sign in", "brew install cloudflared\ngit clone https://github.com/acoyfellow/terrarium ~/terrarium\ncd ~/terrarium/effect && npm ci && cd .. && npm install -g .\nterra login https://terrarium.<your-team-domain>", "code"], ["2. Reload Pi", "terra login added the Terrarium tools and the callback extension to Pi.", "text"], ["3. Run a task", "Ask your agent: Use terrarium_spawn to run \"What is 17 multiplied by 23? Reply with just the number.\"", "text"], ["What you get back", "{ \"runId\": \"ter_…\", \"status\": \"done\", \"contractStatus\": \"verified\", \"summary\": \"391\" }", "code"], ["4. Run one in the background", "Ask for background: true and keep working. When the run finishes, a \"Terrarium run … finished\" message shows up in your session.", "text"], ["5. Start a loop", "Ask your agent: Use terrarium_loop_start with goal \"multiply\", task \"What is 17 times 23?\", expect \"391\". Watch it on the Loops page.", "text"]]},
     {"id": "team", "label": "Your team", "kind": "Join", "title": "Use your team's Terrarium", "lead": "Your team already runs Terrarium. Sign in with your Cloudflare login and you are set up in about two minutes. Your runs are visible only to you.", "blocks": [["You need", "Node 22 or newer, Pi, and the Terrarium URL from your team. You can paste this page into your coding agent and tell it to follow along.", "text"], ["1. Install and sign in", "brew install cloudflared\ngit clone https://github.com/acoyfellow/terrarium ~/terrarium\ncd ~/terrarium/effect && npm ci && cd .. && npm install -g .\nterra login https://terrarium.<your-team-domain>", "code"], ["What terra login does", "It opens your browser. Sign in and approve. It prints who you are, adds the Terrarium tools to ~/.pi/agent/mcp.json, and links the callback extension. You do not copy any tokens.", "text"], ["2. Reload Pi", "That is the whole setup.", "text"], ["Good to know", [["Question", "Answer"], ["Who sees my runs?", "Only you. Runs, logs and loops belong to your email."], ["How long does my login last?", "About a day. When tools say unauthorized, run terra login again."], ["Can a run see my files or the internet?", "No. It knows only what you put in the task text, and its only route is to the model."], ["Does verified mean correct?", "No. It means the answer came from your task. Check answers that matter."], ["Who am I signed in as?", "Run terra whoami."]], "table"], ["If something is off", [["You see", "Fix"], ["unauthorized or HTTP 401", "Run terra login again."], ["The login page never opens", "Copy the URL cloudflared printed into your browser."], ["No finished message for a background run", "Reload Pi, then check terrarium_status for the run."], ["terra: command not found", "Rerun npm install -g . in ~/terrarium."]], "table"]]},
@@ -28,7 +29,7 @@
   let hash = $state(location.hash);
   let selectedDoc = $state(new URLSearchParams(location.search).get('page') || 'tutorial');
 
-  const route = () => path === '/docs' ? 'docs' : path === '/loops' ? 'loops' : path === '/how-it-works' ? 'arch' : 'home';
+  const route = () => path === '/docs' ? 'docs' : path === '/loops' ? 'loops' : path === '/how-it-works' ? 'arch' : path === '/terraloop' ? 'terraloop' : 'home';
 
   const currentDoc = () => docs.find((d) => d.id === selectedDoc) || docs[0];
 
@@ -91,8 +92,10 @@
   <header class="topbar">
     <a class="brand" href="/" onclick={(e) => navigate('/', e)}><span class="mark"></span>Terrarium</a>
     <nav class="topbar-nav">
-      <a href="/docs" onclick={(e) => navigate('/docs', e)}>Docs</a>
-      <a href="/how-it-works" onclick={(e) => navigate('/how-it-works', e)}>How it works</a>
+      <a href="/docs" aria-current={path === '/docs' ? 'page' : undefined} onclick={(e) => navigate('/docs', e)}>Docs</a>
+      <a href="/how-it-works" aria-current={path === '/how-it-works' ? 'page' : undefined} onclick={(e) => navigate('/how-it-works', e)}>How it works</a>
+      <a href="/terraloop" aria-current={path === '/terraloop' ? 'page' : undefined} onclick={(e) => navigate('/terraloop', e)}>Terraloop</a>
+      <a href="/loops" aria-current={path === '/loops' ? 'page' : undefined} onclick={(e) => navigate('/loops', e)}>Loops</a>
       <a href="https://github.com/acoyfellow/terrarium">GitHub</a>
       <button class="theme-toggle" type="button" onclick={cycleTheme} aria-label={themeLabel()} title={themeLabel()}>
         {#if themeChoice === 'light'}
@@ -173,6 +176,8 @@
     <Loops />
   {:else if route() === 'arch'}
     <Architecture />
+  {:else if route() === 'terraloop'}
+    <Terraloop />
   {:else if route() === 'docs'}
     <section class="docs-shell">
       <div class="docs-layout">
