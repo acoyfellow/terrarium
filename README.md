@@ -16,8 +16,21 @@ You get back:
 {
   "runId": "ter_mv44zm3a_5723d13c1abb",
   "status": "done",
-  "contractStatus": "verified",
+  "provenance": "this-run",
   "summary": "391"
+}
+```
+
+Give a proof to check the work. Terrarium runs it in the box after the agent finishes:
+
+> Use terrarium_spawn to run "Create add.js exporting add(a,b)" with proof `node -e "process.exit(require('./add.js').add(2,3)===5?0:1)"`
+
+```json
+{
+  "runId": "ter_…",
+  "status": "done",
+  "provenance": "this-run",
+  "proof": { "command": "node -e \"process.exit(require('./add.js').add(2,3)===5?0:1)\"", "exitCode": 0, "output": "" }
 }
 ```
 
@@ -40,19 +53,19 @@ Sign in with your normal Cloudflare login, reload Pi, and you're done. The full 
 
 ## What you can check
 
-Every run gets three values from the server: a run ID, a fingerprint of the task, and a one-time code. The agent must print all three back on one receipt line. If any is missing or wrong, the run is not verified, however confident the agent sounds.
+Every run gets three values from the server: a run ID, a fingerprint of the task, and a one-time code. The agent must print all three back on one receipt line. If any is missing or wrong, the run does not get provenance `this-run`, however confident the agent sounds.
 
 | You want to know | Look at |
 |---|---|
-| Did it finish? | `status: done` and `contractStatus: verified` |
+| Did it finish? | `status: done` (receipt from this run, and proof exit 0 if you gave one) |
 | Which task produced this answer? | The run ID and task fingerprint |
 | What did it say? | `terrarium_read`, or `GET /api/runs/<id>/logs` |
 | Can anyone else see my runs? | No. Runs, logs and loops belong to your login. |
 
 ## What it doesn't do
 
-- **It doesn't check that the answer is right.** "Verified" means the answer came from your task. An agent that can't run a command can still describe made-up output, and the run is still verified. Check answers that matter.
-- **Runs can't see your files.** A task knows only what you put in the task text.
+- **Provenance alone doesn't check the answer.** It means the answer came from your task. Give a proof to check the work. A proof only checks what it tests.
+- **Runs can't see your files.** The box starts empty with only the task text. The agent can write files inside the box, and they are deleted when the run ends.
 - **Runs can't reach the internet.** The container's only route is to the model.
 
 ## Tools
@@ -64,7 +77,7 @@ Every run gets three values from the server: a run ID, a fingerprint of the task
 | `terrarium_read` | Read a run's log. |
 | `terrarium_cancel` | Stop a run. |
 | `terrarium_list` | List your runs, newest first. |
-| `terrarium_loop_start` | Retry a task until its answer contains what you expect. |
+| `terrarium_loop_start` | Retry a task until its proof exits 0 and/or its answer contains what you expect. |
 | `terrarium_loop_status` | See one loop or all of them. Also on the `/loops` page. |
 
 The CLI: `terra login <url>`, `terra whoami`, `terra mcp`.
@@ -74,4 +87,5 @@ The CLI: `terra login <url>`, `terra whoami`, `terra mcp`.
 - [How it works](./docs/ARCHITECTURE.md): the parts, the path of one run, and why it's built this way.
 - [Reference](./docs/REFERENCE.md): API routes, limits, deploy steps.
 - [Use your team's Terrarium](./docs/USE-A-SHARED-INSTANCE.md): the two-minute setup.
+- When to use something else: see the Compare page on the site (`/compare`).
 - [Rollback](./docs/ROLLBACK.md) and [threat model](./THREAT_MODEL.md).

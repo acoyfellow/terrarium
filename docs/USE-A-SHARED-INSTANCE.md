@@ -29,7 +29,7 @@ Ask your agent:
 
 > Use terrarium_spawn to run "Reply with exactly: hello".
 
-You get back `"status": "done"` and `"contractStatus": "verified"`.
+You get back `"status": "done"` and `"provenance": "this-run"`.
 
 For a background run, ask for `background: true`. When the run finishes, a "Terrarium run … finished" message shows up in your Pi session. There's nothing to poll.
 

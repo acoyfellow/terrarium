@@ -90,7 +90,7 @@ const claim = (subscriberId: string) => Effect.flatMap(Callbacks, (callbacks) =>
 
 const ack = (subscriberId: string, eventId: string) => Effect.flatMap(Callbacks, (callbacks) => callbacks.ack(subscriberId, eventId));
 
-const done: RunTerminal = { status: "done", contractStatus: "verified", summary: "ok", exitCode: 0, finishedAt: "2026-01-01T00:00:01.000Z" };
+const done: RunTerminal = { status: "done", provenance: "this-run", summary: "ok", exitCode: 0, finishedAt: "2026-01-01T00:00:01.000Z" };
 
 const value = <A, E>(exit: Exit.Exit<A, E>): A => {
   assert.ok(Exit.isSuccess(exit), `expected success, got ${String(exit)}`);
@@ -145,7 +145,7 @@ test("terminal status never changes once recorded", async () => {
   const h = harness();
   const run = value(await h.run("alice", admit("t1")));
   await h.finish("alice", run.runId, done);
-  await h.finish("alice", run.runId, { ...done, status: "failed", contractStatus: "missing" });
+  await h.finish("alice", run.runId, { ...done, status: "failed", provenance: "missing" });
   assert.equal(value(await h.run("alice", getRun(run.runId))).terminal?.status, "done");
 });
 
@@ -198,4 +198,27 @@ test("one owner can never claim or ack another owner's events", async () => {
   assert.deepEqual(value(await h.run("bob", claim("sub"))), []);
   assert.match(failureTag(await h.run("bob", ack("sub", `evt_${run.runId}`))), /NotFound/);
   assert.equal(value(await h.run("alice", claim("sub"))).length, 1);
+});
+
+const admitWithProof = (task: string, proof: string | null) => Effect.flatMap(Runs, (runs) => runs.admit({ task, proof, channel: null, idempotencyKey: `key-${task}-proof` }));
+
+test("a proof is trimmed, stored on the record and passed to the workflow", async () => {
+  const h = harness();
+  const record = value(await h.run("alice", admitWithProof("p1", "  npm test  ")));
+
+  assert.equal(record.proof, "npm test");
+  assert.equal(h.started[0].proof, "npm test");
+});
+
+test("a blank proof is no proof", async () => {
+  const h = harness();
+
+  assert.equal(value(await h.run("alice", admitWithProof("p2", "   "))).proof, null);
+});
+
+test("an oversized proof is BadRequest and starts nothing", async () => {
+  const h = harness();
+
+  assert.match(failureTag(await h.run("alice", admitWithProof("p3", "x".repeat(2001)))), /BadRequest/);
+  assert.equal(h.started.length, 0);
 });

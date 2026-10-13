@@ -1,0 +1,13 @@
+{
+  "checkedAt": "2026-10-13T14:02:23Z",
+  "command": "npm run deploy:own -- --name selfhost-test --host <host> --team <team> --aud <aud>",
+  "seconds": 43,
+  "note": "Fresh account and Worker name; Docker layers were cached locally, so a first-ever build will be slower.",
+  "checks": [
+    { "name": "health answers", "pass": true, "code": 200 },
+    { "name": "API refuses an unsigned request", "pass": true, "code": 401 },
+    { "name": "app served", "pass": true, "code": 200 }
+  ],
+  "notTested": "Runs on the self-hosted copy need a real Access application; the test account has no Zero Trust organization.",
+  "ok": true
+}

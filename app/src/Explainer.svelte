@@ -35,8 +35,8 @@
     {
       id: 'honest',
       kicker: 'What it doesn\u2019t do',
-      title: 'Verified isn\u2019t correct.',
-      body: '\u201cVerified\u201d proves which run answered, not that the answer is true. An agent with no tools once made up a curl result and still came back verified. That is why a loop\u2019s gate runs your command, not the agent\u2019s word.',
+      title: 'Provenance isn\u2019t correctness.',
+      body: 'Provenance proves which run answered. A made-up answer still has it. So runs and loops take a proof command that Terrarium runs itself, and a false claim fails.',
     },
   ];
 
@@ -99,7 +99,7 @@
           {:else if current.id === 'proof'}
             <div class="ex-stats">{#each stats as [n, label]}<div><b>{n}</b><span>{label}</span></div>{/each}</div>
           {:else}
-            <div class="ex-chat"><span class="ex-bubble">contractStatus: verified</span><code class="ex-term">answer: made up · proof: <b class="ex-ok">your command</b></code></div>
+            <div class="ex-chat"><span class="ex-bubble">provenance: this-run</span><code class="ex-term">claim: all tests pass · proof: <b class="ex-bad">exit 1</b> → failed</code></div>
           {/if}
         </div>
         <div class="ex-copy">

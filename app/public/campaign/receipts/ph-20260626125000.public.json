@@ -1,8 +1,0 @@
-{
-  "iterationId": "ph-20260626125000",
-  "contentKind": "product-summary",
-  "evidenceClaim": true,
-  "evidenceRef": "terrarium-run:ter_20260626124639782_lb1v89",
-  "title": "Run 2 integrated lineage, mailbox, and settlement hardening",
-  "summary": "Parallel attackers found three clean hardening changes: group tools bypassed child lineage, controller prune crossed child mailbox ownership, and batch allSettled conflated terminal settlement with success."
-}

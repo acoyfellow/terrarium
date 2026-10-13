@@ -1,25 +1,26 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { Schema } from "effect";
-import { LoopContract, decideNext, gateAttempt, replay, answerText } from "../src/loop-decide.ts";
+import { Option, Schema } from "effect";
+import { LoopContract, decideNext, hasCheck, gateAttempt, replay, answerText } from "../src/loop-decide.ts";
 import type { RecordedAttempt } from "../src/loop-decide.ts";
 
 const contract: LoopContract = { goal: "multiply", task: "What is 17*23? Reply with just the number.", expect: "391", maxAttempts: 3 };
 
-const attempt = (status: RecordedAttempt["status"], verified: boolean, logs: string): RecordedAttempt => ({ runId: null, status, verified, logs });
+const attempt = (status: RecordedAttempt["status"], fromThisRun: boolean, logs: string): RecordedAttempt => ({ runId: null, status, fromThisRun, logs });
 
 const pass = attempt("done", true, "TASK_RECEIVED\n391\nTASK_ENDED");
 
 const wrong = attempt("done", true, "TASK_RECEIVED\n401\nTASK_ENDED");
 
-const unverified = attempt("done", false, "391");
+const notFromThisRun = attempt("done", false, "391");
 
 const failed = attempt("failed", false, "");
 
 const decode = Schema.decodeUnknownOption(LoopContract);
 
-test("LoopContract refuses a contract without an exact expected answer", () => {
-  assert.equal(decode({ goal: "g", task: "t" })._tag, "None");
+test("LoopContract accepts expect, proof, or both, and hasCheck rejects neither", () => {
+  assert.equal(hasCheck(Option.getOrThrow(decode({ goal: "g", task: "t" }))), false);
+  assert.equal(hasCheck(Option.getOrThrow(decode({ goal: "g", task: "t", proof: "npm test" }))), true);
   assert.equal(decode({ ...contract, maxAttempts: 9 })._tag, "None");
   assert.equal(decode(contract)._tag, "Some");
 });
@@ -37,7 +38,7 @@ test("LoopContract edge cases", () => {
 test("gateAttempt ignores harness lines so a receipt echo cannot pass the gate", () => {
   assert.equal(gateAttempt(contract, pass).passed, true);
   assert.equal(gateAttempt(contract, wrong).passed, false);
-  assert.equal(gateAttempt(contract, unverified).passed, false);
+  assert.equal(gateAttempt(contract, notFromThisRun).passed, false);
   assert.equal(gateAttempt(contract, failed).passed, false);
   assert.equal(gateAttempt(contract, attempt("done", true, 'TERRARIUM_RESULT={"summary":"391"}')).passed, false);
   assert.equal(gateAttempt(contract, attempt("done", true, "[terrarium:receipt] 391\n  TERRARIUM_RESULT=391")).passed, false);
@@ -67,4 +68,28 @@ test("replay of the same recorded attempts gives the same decisions every time",
 test("the expected text may appear anywhere in the answer, not only at the start", () => {
   const prose = attempt("done", true, "TASK_RECEIVED\nThe answer is 391.\nTASK_ENDED");
   assert.equal(gateAttempt(contract, prose).passed, true);
+});
+
+const proofContract: LoopContract = { goal: "fix", task: "make the test pass", proof: "npm test", maxAttempts: 3 };
+
+const withProof = (proofExit: number | null, claim: string): RecordedAttempt => ({ runId: null, status: "done", fromThisRun: true, proofExit, logs: claim });
+
+test("a proof gate fails a confident claim when the proof exits nonzero", () => {
+  const gate = gateAttempt(proofContract, withProof(1, "All tests pass. Done."));
+
+  assert.deepEqual(gate, { passed: false, reason: "proof exited 1" });
+});
+
+test("a proof gate passes only on proof exit 0", () => {
+  assert.equal(gateAttempt(proofContract, withProof(0, "anything")).passed, true);
+  assert.equal(gateAttempt(proofContract, withProof(null, "anything")).reason, "proof did not run");
+  assert.equal(gateAttempt(proofContract, attempt("done", true, "no proof field")).reason, "proof did not run");
+});
+
+test("proof and expect together need both", () => {
+  const both: LoopContract = { ...proofContract, expect: "391" };
+
+  assert.equal(gateAttempt(both, withProof(0, "401")).passed, false);
+  assert.equal(gateAttempt(both, withProof(0, "391")).passed, true);
+  assert.equal(gateAttempt(both, withProof(2, "391")).passed, false);
 });

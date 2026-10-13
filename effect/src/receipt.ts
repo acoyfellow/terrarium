@@ -1,6 +1,6 @@
 import { Result, Schema } from "effect";
 
-import type { ContractStatus, RunContract } from "./shared.ts";
+import type { Provenance, RunContract } from "./shared.ts";
 
 const RECEIPT_PREFIX = "TERRARIUM_RESULT=";
 
@@ -16,11 +16,11 @@ const ReceiptJson = Schema.fromJsonString(Schema.Struct({
 const decodeReceipt = Schema.decodeUnknownResult(ReceiptJson, { onExcessProperty: "error" });
 
 export interface ReceiptVerdict {
-  readonly contractStatus: ContractStatus;
+  readonly provenance: Provenance;
   readonly summary: string | null;
 }
 
-const rejected = (contractStatus: ContractStatus): ReceiptVerdict => ({ contractStatus, summary: null });
+const rejected = (provenance: Provenance): ReceiptVerdict => ({ provenance, summary: null });
 
 const echoMatches = (echoed: string | undefined, expected: string): boolean => echoed === undefined || echoed === expected;
 
@@ -46,7 +46,7 @@ export const verifyReceipt = (output: string, contract: RunContract): ReceiptVer
 
       if (!summaryFits(receipt.summary)) return rejected("malformed");
 
-      return { contractStatus: "verified", summary: receipt.summary };
+      return { provenance: "this-run", summary: receipt.summary };
     },
   });
 };

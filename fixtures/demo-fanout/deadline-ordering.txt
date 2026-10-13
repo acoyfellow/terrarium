@@ -1,2 +1,0 @@
-demo_fact=intent-wins
-A committed cancellation or deadline intent cannot be upgraded by a late successful-looking receipt.

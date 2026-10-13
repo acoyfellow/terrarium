@@ -69,7 +69,7 @@
   const passRate = $derived(finished === 0 ? null : Math.round((counts.passed / finished) * 100));
   const attemptStats = $derived.by(() => {
     const all = loops.flatMap(attemptsOf);
-    return { total: all.length, passed: all.filter((a) => a.gate?.passed).length, verified: all.filter((a) => a.verified).length };
+    return { total: all.length, passed: all.filter((a) => a.gate?.passed).length, verified: all.filter((a) => (a.fromThisRun ?? a.verified)).length };
   });
   const timeline = $derived.by(() => {
     const buckets = Array.from({ length: 14 }, (_, i) => ({ day: new Date(now - (13 - i) * 86400000).toISOString().slice(0, 10), passed: 0, failed: 0, running: 0 }));
@@ -190,7 +190,7 @@
       <span class="cp-stat-label">Attempts</span>
       <span class="cp-stat-value">{attemptStats.total}</span>
       <div class="cp-bar"><span style:width={`${attemptStats.total ? (attemptStats.passed / attemptStats.total) * 100 : 0}%`}></span></div>
-      <span class="cp-stat-sub">{attemptStats.passed} passed the gate · {attemptStats.verified} verified receipts</span>
+      <span class="cp-stat-sub">{attemptStats.passed} passed the gate · {attemptStats.verified} from this run</span>
     </article>
 
     <article class="cp-stat cp-chart-card">
@@ -289,7 +289,7 @@
               <span class="cp-tl-dot"></span>
               <div>
                 <strong>Attempt {i + 1} · {a.gate?.passed ? 'passed' : 'did not pass'}</strong>
-                <span class="cp-tl-meta">{a.gate?.reason} · receipt {a.verified ? 'verified' : 'not verified'} · <code>{a.runId}</code></span>
+                <span class="cp-tl-meta">{a.gate?.reason} · {(a.fromThisRun ?? a.verified) ? "from this run" : "not from this run"} · <code>{a.runId}</code></span>
                 {#if cleanAnswer(a.logs)}<pre>{cleanAnswer(a.logs)}</pre>{/if}
               </div>
             </li>

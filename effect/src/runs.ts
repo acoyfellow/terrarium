@@ -3,9 +3,9 @@ import { Context, Effect, Layer, Schema } from "effect";
 import { fromReply } from "./owner-store.ts";
 import type { Admission, AdmitReservation, CallbackEvent, ClaimRequest, Reply, StoreError } from "./owner-store.ts";
 import { BadRequest, Clock, Ids, NotFound, Owner, Runs, Upstream } from "./shared.ts";
-import type { Conflict, OwnerId, RateLimited, RunContract, RunId, RunRecord, RunTerminal } from "./shared.ts";
+import type { AdmitInput, Conflict, OwnerId, RateLimited, RunContract, RunId, RunRecord, RunTerminal } from "./shared.ts";
 
-export const RunParams = Schema.Struct({ ownerId: Schema.String, runId: Schema.String, task: Schema.String, contract: Schema.Struct({ runId: Schema.String, taskFingerprint: Schema.String, nonce: Schema.String }) });
+export const RunParams = Schema.Struct({ ownerId: Schema.String, runId: Schema.String, task: Schema.String, proof: Schema.optionalKey(Schema.NullOr(Schema.String)), contract: Schema.Struct({ runId: Schema.String, taskFingerprint: Schema.String, nonce: Schema.String }) });
 
 export type RunParams = typeof RunParams.Type;
 
@@ -42,6 +42,14 @@ const admissionOnly = <A>(effect: Effect.Effect<A, StoreError | Upstream>): Effe
 
 const noStoreError = <A>(effect: Effect.Effect<A, StoreError | Upstream>): Effect.Effect<A, Upstream> => effect.pipe(Effect.catchTags({ BadRequest: (error) => Effect.fail(unexpected(error)), Conflict: (error) => Effect.fail(unexpected(error)), NotFound: (error) => Effect.fail(unexpected(error)), RateLimited: (error) => Effect.fail(unexpected(error)) }));
 
+const MAX_PROOF_LENGTH = 2000;
+
+const normalizedProof = (proof: string | null | undefined): string | null => {
+  const trimmed = proof?.trim() ?? "";
+
+  return trimmed.length === 0 ? null : trimmed;
+};
+
 const hex = (bytes: ArrayBuffer): string => Array.from(new Uint8Array(bytes), (byte) => byte.toString(16).padStart(2, "0")).join("");
 
 export const sha256 = (text: string): Effect.Effect<string> => Effect.promise(() => crypto.subtle.digest("SHA-256", new TextEncoder().encode(text))).pipe(Effect.map(hex));
@@ -52,7 +60,7 @@ const isoFrom = (clock: typeof Clock.Service) => clock.nowMs.pipe(Effect.map((ms
 
 const failStart = (nowIso: Effect.Effect<string>, store: OwnerStore, record: RunRecord, error: Upstream) =>
   nowIso.pipe(
-    Effect.flatMap((finishedAt) => store.finish(record.runId, { status: "failed", contractStatus: "missing", summary: null, exitCode: null, finishedAt }, error.detail)),
+    Effect.flatMap((finishedAt) => store.finish(record.runId, { status: "failed", provenance: "missing", summary: null, exitCode: null, finishedAt }, error.detail)),
     Effect.ignore,
     Effect.andThen(Effect.fail(error)),
   );
@@ -64,8 +72,12 @@ export const RunsLive = Layer.effect(Runs, Effect.gen(function* () {
   const ownerStore = ownerStoreFrom(yield* OwnerStores);
   const nowIso = isoFrom(clock);
 
-  const admit = Effect.fn("Runs.admit")(function* (input: { readonly task: string; readonly channel: string | null; readonly idempotencyKey: string }) {
+  const admit = Effect.fn("Runs.admit")(function* (input: AdmitInput) {
     if (input.task.trim().length === 0) return yield* new BadRequest({ problems: ["task must not be empty"] });
+
+    const proof = normalizedProof(input.proof);
+
+    if (proof !== null && proof.length > MAX_PROOF_LENGTH) return yield* new BadRequest({ problems: [`proof must be at most ${MAX_PROOF_LENGTH} characters`] });
 
     const owner = yield* Owner;
     const store = yield* ownerStore;
@@ -73,13 +85,13 @@ export const RunsLive = Layer.effect(Runs, Effect.gen(function* () {
     const runId = yield* ids.runId;
     const nowMs = yield* clock.nowMs;
     const contract: RunContract = { runId, taskFingerprint: yield* sha256(input.task), nonce: yield* ids.nonce };
-    const record: RunRecord = { runId, ownerId: owner.id, task: input.task, channel: input.channel, contract, createdAt: new Date(nowMs).toISOString(), terminal: null, logs: "" };
-    const request = yield* sha256(JSON.stringify([input.task, input.channel]));
+    const record: RunRecord = { runId, ownerId: owner.id, task: input.task, proof, channel: input.channel, contract, createdAt: new Date(nowMs).toISOString(), terminal: null, logs: "" };
+    const request = yield* sha256(JSON.stringify([input.task, input.channel, proof]));
     const admission = yield* admissionOnly(store.admitReserve({ idempotencyKey: input.idempotencyKey, request, record, nowMs, maxLive: limits.maxLive, perMinute: limits.perMinute }));
 
     if (!admission.created) return admission.record;
 
-    yield* workflows.start({ ownerId: owner.id, runId, task: input.task, contract }).pipe(Effect.catch((error) => failStart(nowIso, store, record, error)));
+    yield* workflows.start({ ownerId: owner.id, runId, task: input.task, proof, contract }).pipe(Effect.catch((error) => failStart(nowIso, store, record, error)));
 
     return admission.record;
   });
@@ -93,7 +105,7 @@ export const RunsLive = Layer.effect(Runs, Effect.gen(function* () {
     if (record.terminal !== null) return record;
 
     const finishedAt = yield* nowIso;
-    const cancelled = yield* notFoundOnly(store.finish(runId, { status: "cancelled", contractStatus: "missing", summary: null, exitCode: null, finishedAt }, record.logs));
+    const cancelled = yield* notFoundOnly(store.finish(runId, { status: "cancelled", provenance: "missing", summary: null, exitCode: null, finishedAt }, record.logs));
     yield* workflows.stop(runId);
 
     return cancelled;

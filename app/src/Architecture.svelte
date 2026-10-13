@@ -14,7 +14,7 @@
     'The Workflow starts a container with the task and a one-time code (the nonce).',
     'The agent in the container calls the model through the Worker, which adds the credential.',
     'The agent prints its answer and a receipt line containing the nonce.',
-    'The Workflow checks the receipt: exactly one line, the right nonce, this run. Only then is the run verified.',
+    'The Workflow checks the receipt: exactly one line, the right nonce, this run. Only then does the run have provenance this-run. If you gave a proof, Terrarium runs it in the box, and done needs exit 0.',
     'The result is recorded once in your Durable Object. The Pi extension sees the run finish and puts the result into your session.',
   ];
 </script>
@@ -94,10 +94,10 @@
 
       <g class="arch-legend">
         <rect x="20" y="340" width="600" height="110" rx="12" class="arch-zone" />
-        <text x="40" y="368" class="arch-legend-title">What makes a run verified</text>
+        <text x="40" y="368" class="arch-legend-title">What gives a run provenance</text>
         <text x="40" y="392" class="arch-legend-line">5 · the agent prints one receipt line with the one-time code it was given</text>
         <text x="40" y="414" class="arch-legend-line">6 · the Workflow checks: exactly one line · right code · this run</text>
-        <text x="40" y="436" class="arch-legend-line">verified = it came from this run · it does not mean the answer is right</text>
+        <text x="40" y="436" class="arch-legend-line">this-run = it came from this run · a proof checks the work</text>
       </g>
     </svg>
   </figure>
@@ -124,7 +124,7 @@
       <path d="M170,482 L170,512" class="arch-line" marker-end="url(#arch-arrow-m)" /><text x="180" y="497" class="arch-edge">4</text>
       <g class="arch-node"><rect x="70" y="514" width="200" height="56" rx="10" /><text x="170" y="536">Workers AI</text><text x="170" y="555" class="arch-sub">key added on the way</text></g>
       <rect x="12" y="604" width="316" height="140" rx="12" class="arch-zone" />
-      <text x="26" y="630" class="arch-legend-title">What makes a run verified</text>
+      <text x="26" y="630" class="arch-legend-title">What gives a run provenance</text>
       <text x="26" y="658" class="arch-legend-line">5 · one receipt line with the</text>
       <text x="26" y="678" class="arch-legend-line">    one-time code it was given</text>
       <text x="26" y="702" class="arch-legend-line">6 · right code · this run · once</text>
@@ -146,10 +146,10 @@
   <p>A loop is one more Workflow. It starts a run, waits for it, checks the answer against the exact text in your plan, then stops or tries again. Plain code makes every decision, so the same results always lead to the same decisions. The <a href="/loops">Loops</a> page only reads what the Workflow recorded.</p>
 
   <h2>Built with Effect 4</h2>
-  <p>The service is about 900 lines of Effect 4 TypeScript. Every failure is a typed value, async code exists only where Workers requires it, and lint runs with strict anti-slop rules. 68 tests run in about a second, and mutation testing checks that they catch deliberate bugs.</p>
+  <p>The service is about 900 lines of Effect 4 TypeScript. Every failure is a typed value, async code exists only where Workers requires it, and lint runs with strict anti-slop rules. 87 tests run in about a second, and mutation testing checks that they catch deliberate bugs.</p>
 
-  <h2>What verified does not prove</h2>
-  <p>Verified means the right run answered. It does not mean the answer is true. Pi runs with tools off today, so an agent asked to run a command can only describe made-up output, and that run is still verified. Check anything that matters with a command you run yourself.</p>
+  <h2>What provenance proves, and what the proof adds</h2>
+  <p>Provenance this-run means the right run answered. It does not mean the answer is true. Pi has tools in the box now, but a made-up answer still has provenance this-run. A proof catches it: Terrarium runs your command in the box after the agent finishes, and the run is done only if it exits 0. A proof only checks what it tests.</p>
 
   <h2>How long a run takes</h2>
   <p>A one-word task takes about 7 seconds end to end: about 1.5 s to start the container and 3 s for Pi and the model. A container kept warm answered in 1.4 s instead of 5.4 s, so a small warm pool is the next speed-up.</p>

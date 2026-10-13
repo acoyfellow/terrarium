@@ -7,7 +7,7 @@ import { Effect, Option, Schema } from "effect";
 
 const Config = Schema.fromJsonString(Schema.Struct({ cloudUrl: Schema.String }));
 
-export const CallbackEvent = Schema.Struct({ eventId: Schema.String, runId: Schema.String, status: Schema.String, contractStatus: Schema.String, summary: Schema.NullOr(Schema.String) });
+export const CallbackEvent = Schema.Struct({ eventId: Schema.String, runId: Schema.String, status: Schema.String, provenance: Schema.String, summary: Schema.NullOr(Schema.String) });
 
 export type CallbackEvent = typeof CallbackEvent.Type;
 
@@ -27,7 +27,7 @@ const authHeader = (url: string) => {
   });
 };
 
-const RunStatus = Schema.fromJsonString(Schema.Struct({ runId: Schema.String, terminal: Schema.NullOr(Schema.Struct({ status: Schema.String, contractStatus: Schema.String, summary: Schema.NullOr(Schema.String) })) }));
+const RunStatus = Schema.fromJsonString(Schema.Struct({ runId: Schema.String, terminal: Schema.NullOr(Schema.Struct({ status: Schema.String, provenance: Schema.String, summary: Schema.NullOr(Schema.String) })) }));
 
 export const terminalOf = (url: string, runId: string) => Effect.gen(function* () {
   const headers = yield* authHeader(url);
@@ -41,4 +41,4 @@ export const terminalOf = (url: string, runId: string) => Effect.gen(function* (
 export const runIdsIn = (text: string) => text.match(/ter_[a-z0-9]{6,12}_[a-f0-9]{12}/g) ?? [];
 
 export const followUp = (event: CallbackEvent) =>
-  `Terrarium run ${event.runId} finished: ${event.status} (receipt ${event.contractStatus}).\n\n${event.summary ?? "(no summary)"}\n\nRead the result, integrate it if appropriate, and continue.`;
+  `Terrarium run ${event.runId} finished: ${event.status} (receipt ${event.provenance}).\n\n${event.summary ?? "(no summary)"}\n\nRead the result, integrate it if appropriate, and continue.`;

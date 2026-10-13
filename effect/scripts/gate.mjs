@@ -76,6 +76,33 @@ step("4 prod checks on AX", () => {
   return `${prod.checks.length}/${prod.checks.length} at ${prod.at}`;
 });
 
+const FRESH_MS = 7 * 24 * 60 * 60 * 1000;
+
+const freshPassing = (name, stampKey) => {
+  if (!existsSync(join(root, "receipts", name))) throw new Error(`run the check that writes receipts/${name} first`);
+
+  const data = receipt(name);
+  const ageMs = Date.now() - Date.parse(data[stampKey]);
+
+  if (!data.ok) throw new Error(`${name} is not ok`);
+
+  if (!(ageMs < FRESH_MS)) throw new Error(`${name} is older than 7 days`);
+
+  return data;
+};
+
+step("4b sealed box: outside sites blocked, model reachable, no secrets", () => {
+  const egress = freshPassing("egress.json", "at");
+
+  return `${egress.checks.length}/${egress.checks.length} at ${egress.at}`;
+});
+
+step("4c proof runs: honest work passes, a false claim fails", () => {
+  const proofRun = freshPassing("proof-run.json", "checkedAt");
+
+  return proofRun.results.map((result) => `${result.ok ? "ok" : "FAIL"} ${result.name}`).join("; ");
+});
+
 step("5 benchmark committed", () => {
   const bench = receipt("bench.json");
 

@@ -40,8 +40,9 @@ Terrarium is a small Worker that hands each job to the Cloudflare product built 
 3. The Worker starts a Run Workflow. The run ID, task fingerprint and one-time code are fixed now, by the server.
 4. The Workflow starts a container with the task and the code.
 5. Pi in the container asks the model. The request leaves through the Worker, which calls Workers AI.
-6. Pi prints its answer and one `TERRARIUM_RESULT=` line. The Workflow checks it: exactly one line, the right code, this run, this task. Only then is the run `verified`.
-7. The result is recorded once in the Durable Object. The Pi extension sees the run finish and puts the result into your session.
+6. Pi prints its answer and one `TERRARIUM_RESULT=` line. The Workflow checks it: exactly one line, the right code, this run, this task. Only then does the run get provenance `this-run`.
+7. If the run has a `proof`, the Workflow runs it in `/workspace` in the box. The run is `done` only if it exits 0. The command, exit code and output go in `terminal.proof`.
+8. The result is recorded once in the Durable Object. The Pi extension sees the run finish and puts the result into your session.
 
 A one-word task takes about 7 seconds end to end (median of 6 runs, `effect/receipts/speed.json`): about 1.5 s to start the box, 3 s for Pi and the model, and the rest is polling and recording. A box kept warm answered the same probe in 1.4 s instead of 5.4 s, so a small warm pool is the next speed-up. Snapshots aren't exposed by the Sandbox SDK yet. Each run's log ends with a `TERRARIUM_PHASES` line that splits its time into box start, wait for the runner, agent, and tail.
 
@@ -53,17 +54,19 @@ The container has `enableInternet = false` and `interceptHttps = true`, so every
 
 The old JavaScript service saw 520 instead of 403 for blocked sites. It also set `allowedHosts` to the model host, and in `@cloudflare/containers` the `allowedHosts` check runs before any handler: a host not on the list gets `520 Origin is disallowed` straight from the library, so `denyAllEgress` never ran. The Effect version sets no `allowedHosts`, so our own 403 handler answers. Either way nothing got out.
 
-## What "verified" proves
+## What provenance proves, and what the proof adds
 
-It proves the right run answered: the receipt carries the server's one-time code for this run and this task. It does not prove the answer is true. Pi runs with tools off today, so an agent asked to run a command can only describe made-up output, and that run is still verified. Anything that needs the truth should be checked by a command Terrarium runs itself, not by the agent's words.
+Provenance `this-run` proves the right run answered: the receipt carries the server's one-time code for this run and this task. It does not prove the answer is true. Pi has read, write, edit and bash tools in the box now, but an agent can still claim work it didn't do, and that answer still has provenance `this-run`.
+
+A proof catches it. Terrarium runs your command in the box after the agent finishes, and the run is `done` only if it exits 0. `effect/scripts/proof-run-check.mjs` checks this live: an agent's confident false claim fails its proof. A proof only checks what it tests.
 
 ## Loops
 
-A loop is a contract: a goal, a task, the text the answer must contain, and at most 5 attempts. The Loop Workflow runs attempts as ordinary runs. After each one, `decideNext` looks only at the contract and the attempts so far, and says continue or stop. Replaying the same attempts always gives the same decision. The `/loops` page reads what the Workflow recorded and adds nothing of its own.
+A loop is a contract: a goal, a task, a proof command and/or the text the answer must contain, and at most 5 attempts. An attempt passes only when the proof exits 0 (if given) and the answer contains the text (if given). The Loop Workflow runs attempts as ordinary runs. After each one, `decideNext` looks only at the contract and the attempts so far, and says continue or stop. Replaying the same attempts always gives the same decision. The `/loops` page reads what the Workflow recorded and adds nothing of its own.
 
 ## Why it's built this way
 
 - **Each job goes to a Cloudflare product.** Workflows keep steps, retries and history. Durable Objects keep exact counters. Access does sign-in. Less of our own code to trust.
 - **Errors are values.** Effect 4 types every failure; `oxlint` with anti-slop rules runs at error level. Async code exists only at the Workers boundary.
-- **Tests and mutation testing.** 68 tests run in about a second, and `effect/scripts/mutate.mjs` checks that they catch deliberate bugs.
+- **Tests and mutation testing.** 87 tests run in about a second, and `effect/scripts/mutate.mjs` checks that they catch deliberate bugs.
 - **The gate.** `npm run gate:effect` runs tests, types, lint, mutation score, the prod-check receipt and the size benchmark.

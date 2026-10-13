@@ -1,6 +1,6 @@
 {
-  "killed": 14,
-  "applicable": 14,
+  "killed": 20,
+  "applicable": 20,
   "score": 1,
   "results": [
     {
@@ -17,7 +17,7 @@
     },
     {
       "file": "src/receipt.ts",
-      "from": "\"verified\"",
+      "from": "\"this-run\"",
       "to": "\"missing\"",
       "status": "killed"
     },
@@ -35,8 +35,44 @@
     },
     {
       "file": "src/loop-decide.ts",
-      "from": "!attempt.verified",
-      "to": "attempt.verified",
+      "from": "!attempt.fromThisRun",
+      "to": "attempt.fromThisRun",
+      "status": "killed"
+    },
+    {
+      "file": "src/loop-decide.ts",
+      "from": "attempt.proofExit === 0",
+      "to": "true",
+      "status": "killed"
+    },
+    {
+      "file": "src/run-workflow-terminal.ts",
+      "from": "result.proof.exitCode === 0",
+      "to": "true",
+      "status": "killed"
+    },
+    {
+      "file": "src/run-workflow-terminal.ts",
+      "from": "&& proofPassed(result)",
+      "to": "",
+      "status": "killed"
+    },
+    {
+      "file": "src/runs.ts",
+      "from": "proof.length > MAX_PROOF_LENGTH",
+      "to": "false",
+      "status": "killed"
+    },
+    {
+      "file": "src/loops-api.ts",
+      "from": "!hasCheck(contract)",
+      "to": "false",
+      "status": "killed"
+    },
+    {
+      "file": "src/model-route.ts",
+      "from": "chat.tools.length > 0",
+      "to": "false",
       "status": "killed"
     },
     {

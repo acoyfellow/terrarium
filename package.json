@@ -12,7 +12,11 @@
     "demo:dev": "vite --host 127.0.0.1 --port 5178",
     "demo:build": "vite build",
     "deploy": "vite build && npx wrangler deploy -c effect/wrangler.jsonc",
-    "build:public": "VITE_PUBLIC_SITE=1 vite build --outDir dist-public"
+    "build:public": "VITE_PUBLIC_SITE=1 vite build --outDir dist-public",
+    "build": "vite build",
+    "deploy:own": "node effect/scripts/deploy-own.mjs",
+    "check:proof-run": "node effect/scripts/proof-run-check.mjs",
+    "check:egress": "node effect/scripts/egress-check.mjs"
   },
   "files": [
     "effect/bin",

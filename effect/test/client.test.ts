@@ -15,7 +15,7 @@ interface Seen {
 
 const RUN_ID = "ter_abc123_0123456789ab";
 
-const terminal = { status: "done", contractStatus: "verified", summary: "hi", exitCode: 0, finishedAt: "2026-01-01T00:00:00Z" };
+const terminal = { status: "done", provenance: "this-run", summary: "hi", exitCode: 0, finishedAt: "2026-01-01T00:00:00Z" };
 
 const view = { ok: true, runId: RUN_ID, channel: null, createdAt: "2026-01-01T00:00:00Z", status: "done", terminal };
 
@@ -42,12 +42,12 @@ const harness = (status: number, reply: Schema.Json) => {
 
 const cases: ReadonlyArray<readonly [string, Schema.Json, (client: typeof TerrariumClient.Service) => Effect.Effect<unknown, unknown>, string, string, string | null]> = [
   ["whoami", { ok: true, method: "access-user", owner: "user:a:b.com", email: "a@b.com" }, (client) => client.whoami, "GET", "/api/whoami", null],
-  ["spawn", { ok: true, runId: RUN_ID, contract: { runId: RUN_ID, taskFingerprint: "f", nonce: "n" } }, (client) => client.spawn("do it", "c1"), "POST", "/api/runs", JSON.stringify({ task: "do it", channel: "c1" })],
+  ["spawn", { ok: true, runId: RUN_ID, contract: { runId: RUN_ID, taskFingerprint: "f", nonce: "n" } }, (client) => client.spawn("do it", "c1"), "POST", "/api/runs", JSON.stringify({ task: "do it", channel: "c1", proof: null })],
   ["list", { ok: true, runs: [view] }, (client) => client.list({ channel: "c1", status: "done", limit: 5 }), "GET", "/api/runs?channel=c1&status=done&limit=5", null],
   ["status", view, (client) => client.status(RUN_ID), "GET", `/api/runs/${RUN_ID}/status`, null],
   ["logs", { ok: true, runId: RUN_ID, logs: "L" }, (client) => client.logs(RUN_ID), "GET", `/api/runs/${RUN_ID}/logs`, null],
   ["cancel", view, (client) => client.cancel(RUN_ID), "POST", `/api/runs/${RUN_ID}/cancel`, null],
-  ["claim", { ok: true, events: [{ eventId: `evt_${RUN_ID}`, runId: RUN_ID, status: "done", contractStatus: "verified", summary: "hi", finishedAt: "x" }] }, (client) => client.claim("pi-1", 10), "POST", "/claim", JSON.stringify({ subscriberId: "pi-1", limit: 10 })],
+  ["claim", { ok: true, events: [{ eventId: `evt_${RUN_ID}`, runId: RUN_ID, status: "done", provenance: "this-run", summary: "hi", finishedAt: "x" }] }, (client) => client.claim("pi-1", 10), "POST", "/claim", JSON.stringify({ subscriberId: "pi-1", limit: 10 })],
   ["ack", { ok: true, eventId: "evt_1" }, (client) => client.ack("pi-1", "evt_1"), "POST", "/ack", JSON.stringify({ subscriberId: "pi-1", eventId: "evt_1" })],
   ["startLoop", { loopId: "loop_abcdefgh", contract }, (client) => client.startLoop({ goal: "g", task: "t", expect: "e" }), "POST", "/api/loops", JSON.stringify({ maxAttempts: 3, goal: "g", task: "t", expect: "e" })],
   ["loops", { loops: [loop] }, (client) => client.loops, "GET", "/api/loops", null],

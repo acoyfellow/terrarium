@@ -1,6 +1,6 @@
 import { Effect, Schema } from "effect";
 
-import { BadRequest, Conflict, NotFound, RateLimited, RunRecord, RunId, ContractStatus, TerminalStatus } from "./shared.ts";
+import { BadRequest, Conflict, NotFound, RateLimited, RunRecord, RunId, Provenance, TerminalStatus } from "./shared.ts";
 import type { RunTerminal } from "./shared.ts";
 
 export type SqlValue = string | number | null;
@@ -17,7 +17,7 @@ export const CallbackEvent = Schema.Struct({
   eventId: Schema.String,
   runId: RunId,
   status: TerminalStatus,
-  contractStatus: ContractStatus,
+  provenance: Provenance,
   summary: Schema.NullOr(Schema.String),
   finishedAt: Schema.String,
 });
@@ -61,9 +61,17 @@ const encodeRecord = Schema.encodeSync(RecordJson);
 
 const encodeEvent = Schema.encodeSync(EventJson);
 
-const decodeRecord = Schema.decodeUnknownEffect(RecordJson);
+const LEGACY_PROVENANCE = /"contractStatus":"(verified|missing|mismatch|malformed)"/;
 
-const decodeEvent = Schema.decodeUnknownEffect(EventJson);
+const StoredText = Schema.String;
+
+export const upgradeLegacy = (stored: string): string => stored.replace(LEGACY_PROVENANCE, (_, status: string) => `"provenance":"${status === "verified" ? "this-run" : status}"`);
+
+const upgraded = (stored: SqlValue | undefined) => Schema.decodeUnknownEffect(StoredText)(stored).pipe(Effect.map(upgradeLegacy));
+
+const decodeRecord = (stored: SqlValue | undefined) => upgraded(stored).pipe(Effect.flatMap(Schema.decodeUnknownEffect(RecordJson)));
+
+const decodeEvent = (stored: SqlValue | undefined) => upgraded(stored).pipe(Effect.flatMap(Schema.decodeUnknownEffect(EventJson)));
 
 const DDL = [
   "create table if not exists runs (run_id text primary key, created_ms integer not null, channel text, live integer not null, record text not null)",
@@ -115,7 +123,7 @@ export const admitReserve = (sql: Sql, reservation: AdmitReservation): Effect.Ef
 
 const recordTerminal = (sql: Sql, record: RunRecord, terminal: RunTerminal, logs: string): RunRecord => {
   const finished = { ...record, terminal, logs };
-  const event = { eventId: `evt_${record.runId}`, runId: record.runId, status: terminal.status, contractStatus: terminal.contractStatus, summary: terminal.summary, finishedAt: terminal.finishedAt };
+  const event = { eventId: `evt_${record.runId}`, runId: record.runId, status: terminal.status, provenance: terminal.provenance, summary: terminal.summary, finishedAt: terminal.finishedAt };
   sql.rows("update runs set live = 0, record = ? where run_id = ?", encodeRecord(finished), record.runId);
   sql.rows("insert or ignore into events (event_id, created_ms, event) values (?, ?, ?)", event.eventId, Date.parse(terminal.finishedAt), encodeEvent(event));
 

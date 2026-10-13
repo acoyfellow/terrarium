@@ -118,16 +118,10 @@ fi
 CELL_HOME="${TERRARIUM_CELL_HOME:-/workspace/.pi-home}"
 mkdir -p "$CELL_HOME"
 
-# The bounded task body is read from the task file and delivered to Pi via a
-# prompt FILE (@path), never interpolated into the shell command line. Pi runs
-# with NO tools: a bounded C0 task is a single text turn, so there is no tool
-# loop to diverge (an earlier live run showed Pi calling the model 45+ times in
-# a non-converging read-tool loop). The task text is embedded as data in a
-# prompt file whose path is passed to Pi; the file content is never a program.
 PROMPT_FILE="$(mktemp)"
 trap 'rm -f "$PROMPT_FILE" "${TMP_OUT:-}"' EXIT
 {
-  printf '%s\n\n' "You are a Terrarium bounded worker. Complete exactly the task below in a single reply. Do not ask questions. Do not use tools."
+  printf '%s\n\n' "You are a Terrarium worker in a sealed box with no internet. Your working directory is /workspace. You may use read, write, edit and bash. Complete exactly the task below. Do not ask questions. If the task asks for files or code, create them in /workspace; a proof command may run there after you finish and decides whether you succeeded."
   printf 'Task:\n'
   cat "$TASK"
   printf '\n\n'
@@ -141,21 +135,17 @@ trap 'rm -f "$PROMPT_FILE" "${TMP_OUT:-}"' EXIT
 } > "$PROMPT_FILE"
 
 TMP_OUT=$(mktemp)
-AGENT_TIMEOUT_SECONDS="${TERRARIUM_AGENT_TIMEOUT_SECONDS:-120}"
+AGENT_TIMEOUT_SECONDS="${TERRARIUM_AGENT_TIMEOUT_SECONDS:-420}"
 if ! command -v timeout >/dev/null 2>&1; then
   echo "[terrarium:runner] timeout supervisor is required"
   echo "TASK_ENDED"
   exit 10
 fi
 
-# --- Pi invocation ---------------------------------------------------------
-# Non-interactive (-p), ephemeral (--no-session), ambient discovery disabled
-# (-ne -ns -np -nc), exactly one explicit provider extension (-e), fixed
-# provider/model. Tools restricted to read only for the bounded demo task.
 set +e
 HOME="$CELL_HOME" \
 timeout --signal=TERM --kill-after=5s "${AGENT_TIMEOUT_SECONDS}s" \
-  "$AGENT_BIN" -p --no-session -ne -ns -np -nc --no-tools \
+  "$AGENT_BIN" -p --no-session -ne -ns -np -nc --tools "${TERRARIUM_AGENT_TOOLS:-read,write,edit,bash}" \
   -e "$PROVIDER_EXT" \
   --provider terrarium --model workers-ai \
   "@${PROMPT_FILE}" >"$TMP_OUT" 2>&1

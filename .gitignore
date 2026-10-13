@@ -68,3 +68,5 @@ effect/.wrangler/
 effect/wrangler.ax.local.jsonc
 effect/.children/
 app/dist-public
+
+effect/wrangler.*.local.jsonc

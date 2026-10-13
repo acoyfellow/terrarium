@@ -23,12 +23,12 @@ const pollLimit = 180;
 const toAttempt = (run: RunRecord): RecordedAttempt | null =>
   run.terminal === null
     ? null
-    : { runId: run.runId, status: run.terminal.status, verified: run.terminal.contractStatus === "verified", logs: run.logs };
+    : { runId: run.runId, status: run.terminal.status, fromThisRun: run.terminal.provenance === "this-run", proofExit: run.terminal.proof?.exitCode ?? null, logs: run.logs };
 
 const admitAttempt = (contract: LoopContract, loopId: string, n: number) =>
   Effect.gen(function* () {
     const runs = yield* Runs;
-    const run = yield* runs.admit({ task: contract.task, channel: `loop:${loopId}`, idempotencyKey: `loop-${loopId}-attempt-${n}` });
+    const run = yield* runs.admit({ task: contract.task, proof: contract.proof ?? null, channel: `loop:${loopId}`, idempotencyKey: `loop-${loopId}-attempt-${n}` });
 
     return run.runId;
   });
@@ -73,7 +73,7 @@ export const makeLoopWorkflow = <E>(runsLayer: (env: E) => Layer.Layer<Runs>) =>
         await step.sleep(`attempt-${n}-wait-${poll}`, "10 seconds");
       }
 
-      return { runId, status: "timeout", verified: false, logs: "" };
+      return { runId, status: "timeout", fromThisRun: false, logs: "" };
     }
   };
 

@@ -22,7 +22,7 @@ const startApi = () => {
 
     if (request.url === `/api/runs/${RUN_ID}/status`) {
       statusCalls.count += 1;
-      const terminal = statusCalls.count < 2 ? null : { status: "done", contractStatus: "verified", summary: SUMMARY, exitCode: 0, finishedAt: "x" };
+      const terminal = statusCalls.count < 2 ? null : { status: "done", provenance: "this-run", summary: SUMMARY, exitCode: 0, finishedAt: "x" };
 
       return reply(200, { ok: true, runId: RUN_ID, channel: null, createdAt: "x", status: terminal === null ? "running" : "done", terminal });
     }
@@ -58,7 +58,7 @@ test("MCP server initializes, lists tools and runs a foreground spawn", { timeou
   assert.equal(spawned.id, 3);
   assert.notEqual(spawned.result.isError, true);
   assert.match(spawned.result.content[0].text, new RegExp(SUMMARY));
-  assert.match(spawned.result.content[0].text, /verified/);
+  assert.match(spawned.result.content[0].text, /this-run/);
 
   child.kill();
   api.close();

@@ -5,18 +5,22 @@ const field = (maxLength: number) => Schema.Trim.check(Schema.isNonEmpty(), Sche
 export const LoopContract = Schema.Struct({
   goal: field(300),
   task: field(8000),
-  expect: field(500),
+  expect: Schema.optionalKey(field(500)),
+  proof: Schema.optionalKey(field(2000)),
   maxAttempts: Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 5 })).pipe(Schema.withDecodingDefaultKey(Effect.succeed(3))),
 });
 
 export type LoopContract = typeof LoopContract.Type;
+
+export const hasCheck = (contract: LoopContract): boolean => contract.expect !== undefined || contract.proof !== undefined;
 
 export const AttemptStatus = Schema.Literals(["done", "failed", "cancelled", "timeout"]);
 
 export const RecordedAttempt = Schema.Struct({
   runId: Schema.NullOr(Schema.String),
   status: AttemptStatus,
-  verified: Schema.Boolean,
+  fromThisRun: Schema.Boolean,
+  proofExit: Schema.optionalKey(Schema.NullOr(Schema.Int)),
   logs: Schema.String,
 });
 
@@ -40,14 +44,29 @@ const harnessLine = /^(TASK_RECEIVED|TASK_ENDED|TERRARIUM_RESULT=.*|\[terrarium:
 export const answerText = (logs: string): string =>
   logs.split("\n").filter((line) => !harnessLine.test(line.trim())).join("\n");
 
+const proofGate = (contract: LoopContract, attempt: RecordedAttempt): Gate | null => {
+  if (contract.proof === undefined) return null;
+
+  if (attempt.proofExit === 0) return null;
+
+  return { passed: false, reason: attempt.proofExit === undefined || attempt.proofExit === null ? "proof did not run" : `proof exited ${attempt.proofExit}` };
+};
+
+const passReason = (contract: LoopContract): string =>
+  [contract.proof === undefined ? null : "proof exited 0", contract.expect === undefined ? null : "contains the expected text"].filter((part) => part !== null).join(" and ");
+
 export const gateAttempt = (contract: LoopContract, attempt: RecordedAttempt): Gate => {
+  const failedProof = proofGate(contract, attempt);
+
+  if (failedProof !== null) return failedProof;
+
   if (attempt.status !== "done") return { passed: false, reason: `run ended ${attempt.status}` };
 
-  if (!attempt.verified) return { passed: false, reason: "receipt not verified" };
+  if (!attempt.fromThisRun) return { passed: false, reason: "answer did not come from this run" };
 
-  if (!answerText(attempt.logs).includes(contract.expect)) return { passed: false, reason: "answer does not contain the expected text" };
+  if (contract.expect !== undefined && !answerText(attempt.logs).includes(contract.expect)) return { passed: false, reason: "answer does not contain the expected text" };
 
-  return { passed: true, reason: "verified and contains the expected text" };
+  return { passed: true, reason: `from this run, ${passReason(contract)}` };
 };
 
 export const decideNext = (contract: LoopContract, attempts: ReadonlyArray<GatedAttempt>): Decision => {

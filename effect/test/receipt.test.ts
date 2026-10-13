@@ -7,14 +7,14 @@ const contract = { runId: "ter_20260721_abcdef012345", taskFingerprint: "fp_0011
 
 const output = (receipt: string): string => `working...\ndid the work\nTERRARIUM_RESULT=${receipt}\n`;
 
-const statusOf = (text: string): string => verifyReceipt(text, contract).contractStatus;
+const statusOf = (text: string): string => verifyReceipt(text, contract).provenance;
 
 test("minimal receipt {nonce, summary} is verified with the summary", () => {
-  assert.deepEqual(verifyReceipt(output(JSON.stringify({ nonce: contract.nonce, summary: "done it" })), contract), { contractStatus: "verified", summary: "done it" });
+  assert.deepEqual(verifyReceipt(output(JSON.stringify({ nonce: contract.nonce, summary: "done it" })), contract), { provenance: "this-run", summary: "done it" });
 });
 
 test("full receipt echoing correct framing is verified", () => {
-  assert.equal(statusOf(output(JSON.stringify({ ...contract, summary: "ok" }))), "verified");
+  assert.equal(statusOf(output(JSON.stringify({ ...contract, summary: "ok" }))), "this-run");
 });
 
 test("wrong nonce is mismatch", () => {

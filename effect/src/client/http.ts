@@ -1,7 +1,7 @@
 import { Context, Effect, Layer, Schema } from "effect";
 
 import { CallbackEvent } from "../owner-store.ts";
-import { ContractStatus, NotFound, RunContract, TerminalStatus, Unauthorized, Upstream } from "../shared.ts";
+import { ProofResult, Provenance, NotFound, RunContract, TerminalStatus, Unauthorized, Upstream } from "../shared.ts";
 
 export class TokenSource extends Context.Service<TokenSource, { readonly header: Effect.Effect<{ readonly name: string; readonly value: string }, Unauthorized> }>()("terrarium/client/TokenSource") {}
 
@@ -13,7 +13,7 @@ const Whoami = Schema.Struct({ ok: Schema.Boolean, method: Schema.String, owner:
 
 const Admitted = Schema.Struct({ runId: Schema.String, contract: RunContract });
 
-const Terminal = Schema.Struct({ status: TerminalStatus, contractStatus: ContractStatus, summary: Schema.NullOr(Schema.String), exitCode: Schema.NullOr(Schema.Int), finishedAt: Schema.String });
+const Terminal = Schema.Struct({ status: TerminalStatus, provenance: Provenance, proof: Schema.optionalKey(Schema.NullOr(ProofResult)), summary: Schema.NullOr(Schema.String), exitCode: Schema.NullOr(Schema.Int), finishedAt: Schema.String });
 
 export const RunView = Schema.Struct({ runId: Schema.String, channel: Schema.NullOr(Schema.String), createdAt: Schema.String, status: Schema.String, terminal: Schema.NullOr(Terminal) });
 
@@ -44,13 +44,14 @@ export interface ListQuery {
 export interface LoopInput {
   readonly goal: string;
   readonly task: string;
-  readonly expect: string;
+  readonly expect?: string;
+  readonly proof?: string;
   readonly maxAttempts?: number;
 }
 
 export class TerrariumClient extends Context.Service<TerrariumClient, {
   readonly whoami: Effect.Effect<typeof Whoami.Type, ClientError>;
-  readonly spawn: (task: string, channel?: string) => Effect.Effect<typeof Admitted.Type, ClientError>;
+  readonly spawn: (task: string, channel?: string, proof?: string) => Effect.Effect<typeof Admitted.Type, ClientError>;
   readonly list: (query: ListQuery) => Effect.Effect<typeof RunList.Type, ClientError>;
   readonly status: (runId: string) => Effect.Effect<RunView, ClientError>;
   readonly logs: (runId: string) => Effect.Effect<typeof Logs.Type, ClientError>;
@@ -103,7 +104,7 @@ export const TerrariumClientLive = (baseUrl: string, fetcher: Fetch = fetch) =>
 
     return TerrariumClient.of({
       whoami: call(Whoami, "GET", "/api/whoami"),
-      spawn: (task, channel) => call(Admitted, "POST", "/api/runs", JSON.stringify({ task, channel: channel ?? null }), { "idempotency-key": crypto.randomUUID() }),
+      spawn: (task, channel, proof) => call(Admitted, "POST", "/api/runs", JSON.stringify({ task, channel: channel ?? null, proof: proof ?? null }), { "idempotency-key": crypto.randomUUID() }),
       list: (input) => call(RunList, "GET", `/api/runs?${query(input)}`),
       status: (runId) => call(RunView, "GET", runPath(runId, "status")),
       logs: (runId) => call(Logs, "GET", runPath(runId, "logs")),

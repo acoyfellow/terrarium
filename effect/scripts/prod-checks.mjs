@@ -87,7 +87,7 @@ for (let i = 0; i < 60 && admitted.body.runId; i++) {
   }
 }
 
-record("run finishes done and verified", finalStatus?.status === "done" && finalStatus?.terminal?.contractStatus === "verified", { status: finalStatus?.status, contractStatus: finalStatus?.terminal?.contractStatus, summary: finalStatus?.terminal?.summary });
+record("run finishes done and verified", finalStatus?.status === "done" && finalStatus?.terminal?.provenance === "this-run", { status: finalStatus?.status, provenance: finalStatus?.terminal?.provenance, summary: finalStatus?.terminal?.summary });
 
 const bobToken = JSON.parse(read("ax-principals.json")).find((p) => p.id === "ax-bob")?.token;
 const bob = { ...service(), authorization: `Bearer ${bobToken}` };

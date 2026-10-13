@@ -14,11 +14,11 @@ const CallParams = Schema.Struct({ name: Schema.String, arguments: Schema.option
 
 const RunArgs = Schema.Struct({ runId: Schema.String });
 
-const SpawnArgs = Schema.Struct({ task: Schema.String, channel: Schema.optional(Schema.String), background: Schema.optional(Schema.Boolean) });
+const SpawnArgs = Schema.Struct({ task: Schema.String, proof: Schema.optional(Schema.String), channel: Schema.optional(Schema.String), background: Schema.optional(Schema.Boolean) });
 
 const ListArgs = Schema.Struct({ channel: Schema.optional(Schema.String), limit: Schema.optional(Schema.Int) });
 
-const LoopArgs = Schema.Struct({ goal: Schema.String, task: Schema.String, expect: Schema.String, maxAttempts: Schema.optional(Schema.Int) });
+const LoopArgs = Schema.Struct({ goal: Schema.String, task: Schema.String, expect: Schema.optional(Schema.String), proof: Schema.optional(Schema.String), maxAttempts: Schema.optional(Schema.Int) });
 
 const LoopStatusArgs = Schema.Struct({ loopId: Schema.optional(Schema.String) });
 
@@ -27,12 +27,12 @@ const text = { type: "string" };
 const tool = (name: string, description: string, properties: Record<string, { readonly type: string }>, required: ReadonlyArray<string>) => ({ name, description, inputSchema: { type: "object", properties, required } });
 
 const tools = [
-  tool("terrarium_spawn", "Run one bounded task in a Terrarium cloud sandbox. Foreground waits up to 10 minutes; background returns the runId.", { task: text, channel: text, background: { type: "boolean" } }, ["task"]),
+  tool("terrarium_spawn", "Run one task in a sealed Terrarium cloud box. The agent has read, write, edit, and bash but no internet. Optional proof is a shell command Terrarium runs in /workspace after the agent; done requires proof exit 0. Foreground waits up to 10 minutes; background returns the runId.", { task: text, proof: text, channel: text, background: { type: "boolean" } }, ["task"]),
   tool("terrarium_status", "Status of one run.", { runId: text }, ["runId"]),
   tool("terrarium_read", "Logs of one run.", { runId: text }, ["runId"]),
   tool("terrarium_cancel", "Cancel one run.", { runId: text }, ["runId"]),
   tool("terrarium_list", "List your runs, newest first.", { channel: text, limit: { type: "integer" } }, []),
-  tool("terrarium_loop_start", "Start a terraloop that retries a task until its answer contains expect.", { goal: text, task: text, expect: text, maxAttempts: { type: "integer" } }, ["goal", "task", "expect"]),
+  tool("terrarium_loop_start", "Start a terraloop that retries a task until it passes: proof is a shell command that must exit 0 in the box, expect is text the answer must contain. Give at least one.", { goal: text, task: text, expect: text, proof: text, maxAttempts: { type: "integer" } }, ["goal", "task"]),
   tool("terrarium_loop_status", "One loop by loopId, or all your loops.", { loopId: text }, []),
 ];
 
@@ -50,13 +50,13 @@ const decodeArgs = <S extends Schema.Decoder<unknown>>(schema: S, input: Schema.
 const spawn = (input: Schema.Json | undefined) => Effect.gen(function* () {
   const args = yield* decodeArgs(SpawnArgs, input);
   const client = yield* TerrariumClient;
-  const admitted = yield* client.spawn(args.task, args.channel);
+  const admitted = yield* client.spawn(args.task, args.channel, args.proof);
 
   if (args.background === true) return { runId: admitted.runId, background: true };
 
   const view = yield* waitForTerminal(admitted.runId).pipe(Effect.timeout(WAIT_MS));
 
-  return { runId: view.runId, status: view.status, contractStatus: view.terminal?.contractStatus, summary: view.terminal?.summary };
+  return { runId: view.runId, status: view.status, provenance: view.terminal?.provenance, proof: view.terminal?.proof ?? null, summary: view.terminal?.summary };
 });
 
 const callTool = (name: string, input: Schema.Json | undefined) => Effect.gen(function* () {

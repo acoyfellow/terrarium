@@ -19,7 +19,7 @@
    tools: terraloop_control, loops_task, mcp__terrarium__terrarium_spawn
    skills: terraloop, terraloop-review (they ship inside terraloop-mode)
 4. Prove it: run terrarium_spawn with task "Reply with exactly: ready".
-   Report the runId, status and contractStatus.
+   Report the runId, status and provenance.
 5. Load the terraloop skill and its protocol.md, read ${pageUrl},
    and summarize the five steps back to me.
 6. Remind me: after any loop, ask for /skill:terraloop-review.`;

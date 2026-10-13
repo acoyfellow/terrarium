@@ -298,7 +298,7 @@ img { max-width: 100%; display: block; }
 /* closing band gets the spore-field texture */
 .closing { position: relative; overflow: hidden; }
 .closing::before { content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none;
-  background: url('/campaign/v6/spore-field.jpg') center/cover no-repeat; opacity: .28;
+  background: url('/img/spore-field.jpg') center/cover no-repeat; opacity: .28;
   mask-image: radial-gradient(80% 120% at 50% 100%, #000, transparent 72%); }
 .closing::after { content: ''; position: absolute; inset: 0; z-index: -1; pointer-events: none;
   background: linear-gradient(0deg, transparent, var(--ink) 80%); }
@@ -970,3 +970,19 @@ img { max-width: 100%; display: block; }
 @media (prefers-reduced-motion: reduce) { .ex-slide { animation: none; } }
 .ex-svg .ex-blocked { fill: var(--red); font-weight: 700; }
 .ex-okl { stroke: var(--mint); }
+
+.cmp h2 { margin: 2.6rem 0 1rem; font-size: clamp(1.2rem, 2.4vw, 1.5rem); letter-spacing: -.01em; }
+.cmp-table-wrap { overflow-x: auto; }
+.cmp-table th { text-align: left; font: 600 .72rem var(--font-mono); text-transform: uppercase; letter-spacing: .06em; color: var(--muted); padding: .5rem; border-bottom: 1px solid var(--border-strong); }
+.cmp-table td:first-child { width: 30%; }
+.cmp-note { color: var(--subtle); font-size: .92rem; line-height: 1.6; margin-top: 1rem; }
+.cmp-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+.cmp-card { border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--layer); padding: 1.2rem 1.3rem; }
+.cmp-card h3 { margin: 0 0 .8rem; font-size: 1.05rem; }
+.cmp-ours { border-color: var(--mint); box-shadow: 0 0 0 1px var(--mint-soft); }
+.cmp-card dl { margin: 0; display: grid; gap: .3rem; }
+.cmp-card dt { font: 600 .68rem var(--font-mono); text-transform: uppercase; letter-spacing: .06em; color: var(--mint); margin-top: .5rem; }
+.cmp-card dd { margin: 0; color: var(--subtle); font-size: .9rem; line-height: 1.55; }
+.cmp-list { color: var(--subtle); line-height: 1.7; padding-left: 1.2rem; }
+.cmp-list li { margin-bottom: .6rem; }
+@container tl (max-width: 40rem) { .cmp-grid { grid-template-columns: 1fr; } }

@@ -16,12 +16,12 @@ Every route except `/health` needs one of these, checked in this order:
 
 | Route | What it does |
 |---|---|
-| `POST /api/runs` | Start a run. Body `{ task, channel? }`, header `idempotency-key`. Returns `{ runId, contract }`. The same key returns the same run. |
+| `POST /api/runs` | Start a run. Body `{ task, proof?, channel? }`. `proof` is a shell command run in `/workspace` in the box after the agent finishes, header `idempotency-key`. Returns `{ runId, contract }`. The same key returns the same run. |
 | `GET /api/runs` | List your runs, newest first. Query `channel`, `status`, `limit`. |
 | `GET /api/runs/:id/status` | `{ status, terminal }`. `terminal` is null while the run is going. |
 | `GET /api/runs/:id/logs` | The run's full output. |
 | `POST /api/runs/:id/cancel` | Cancel a run that hasn't finished. |
-| `POST /api/loops` | Start a loop. Body `{ goal, task, expect, maxAttempts? }`; `maxAttempts` is 1 to 5, default 3. |
+| `POST /api/loops` | Start a loop. Body `{ goal, task, expect?, proof?, maxAttempts? }`; give `expect`, `proof` or both. An attempt passes when the proof exits 0 (if given) and the answer contains `expect` (if given). `maxAttempts` is 1 to 5, default 3. |
 | `GET /api/loops` | Your loops, with what each Workflow recorded. |
 | `GET /api/whoami` | `{ owner, method }`. |
 | `POST /claim`, `POST /ack` | Completion events: `{ subscriberId, limit? }` and `{ subscriberId, eventId }`. |
@@ -32,9 +32,26 @@ Every route except `/health` needs one of these, checked in this order:
 | Field | Values |
 |---|---|
 | `status` | `running`, `done`, `failed`, `cancelled` |
-| `terminal.contractStatus` | `verified`, `missing`, `mismatch`, `malformed` |
+| `terminal.provenance` | `this-run`, `missing`, `mismatch`, `malformed` |
+| `terminal.proof` | `{ command, exitCode, output }`, or null when no proof was given |
 
-A run is `done` only when its receipt is `verified`: exactly one `TERRARIUM_RESULT=` line, carrying this run's ID, task fingerprint and one-time code.
+A run is `done` only when its provenance is `this-run` (exactly one `TERRARIUM_RESULT=` line, carrying this run's ID, task fingerprint and one-time code) and, if it has a proof, the proof exits 0.
+
+## The box
+
+Pi in the box has the `read`, `write`, `edit` and `bash` tools. The box has no internet: outside sites get 403. Files the agent writes are deleted when the run ends.
+
+## MCP tools
+
+| Tool | Arguments |
+|---|---|
+| `terrarium_spawn` | `task`, optional `proof`, `channel`, `background` |
+| `terrarium_status` | `runId` |
+| `terrarium_read` | `runId` |
+| `terrarium_cancel` | `runId` |
+| `terrarium_list` | optional `channel`, `limit` |
+| `terrarium_loop_start` | `goal`, `task`, `expect` and/or `proof`, optional `maxAttempts` |
+| `terrarium_loop_status` | optional `loopId` |
 
 ## Limits
 
@@ -48,13 +65,11 @@ A run is `done` only when its receipt is `verified`: exactly one `TERRARIUM_RESU
 
 ## Deploy your own
 
-From `effect/`:
+You need a hostname on Cloudflare, and a Cloudflare Access app for it with its AUD.
 
-1. Copy `wrangler.jsonc` to a gitignored `wrangler.<name>.local.jsonc`. Set the KV namespace ID, your hostname under `routes`, and the vars `TERRARIUM_ACCESS_TEAM_DOMAIN`, `TERRARIUM_ACCESS_AUD` and `TERRARIUM_MODEL_HOST`.
-2. Put the Worker behind a Cloudflare Access app.
-3. `npx wrangler secret put TERRARIUM_PRINCIPALS -c wrangler.<name>.local.jsonc` for machine tokens.
-4. `npx wrangler deploy -c wrangler.<name>.local.jsonc`.
-5. Check it: `TERRARIUM_LOGIN_APP=<url> node scripts/prod-checks.mjs <url>`.
+1. From the repo root: `npm run deploy:own -- --name <name> --host <host> --team <team> --aud <aud>`.
+2. For machine tokens, from `effect/`: `npx wrangler secret put TERRARIUM_PRINCIPALS -c wrangler.<name>.local.jsonc`.
+3. Check it: `TERRARIUM_LOGIN_APP=<url> node scripts/prod-checks.mjs <url>`.
 
 The checked-in `wrangler.jsonc` has no hostname and no Access settings, so it can't replace a working deploy by mistake. See [Rollback](./ROLLBACK.md) to go back to the old service.
 
@@ -62,8 +77,10 @@ The checked-in `wrangler.jsonc` has no hostname and no Access settings, so it ca
 
 | Command | What it runs |
 |---|---|
-| `npm test` in `effect/` | 68 tests, about a second |
+| `npm test` in `effect/` | 87 tests, about a second |
 | `npm run lint` in `effect/` | oxlint with anti-slop rules at error level |
 | `node scripts/mutate.mjs` in `effect/` | Mutation testing |
 | `node scripts/pi-callback-proof.mjs` in `effect/` | A real Pi session gets a background result |
+| `npm run check:proof-run` at the repo root | A live run whose false claim fails its proof |
+| `npm run check:egress` at the repo root | Outside sites get 403 from inside the box |
 | `npm run gate:effect` at the repo root | All of the above plus the prod-check receipt |

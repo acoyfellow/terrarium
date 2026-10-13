@@ -4,7 +4,7 @@ import { Callbacks } from "./runs.ts";
 import { BadRequest, IdempotencyKey, NotFound, Owner, Runs, RunId, TerminalStatus } from "./shared.ts";
 import type { HttpFailure, RunRecord } from "./shared.ts";
 
-const RunBody = Schema.Struct({ task: Schema.String, channel: Schema.optional(Schema.NullOr(Schema.String)) });
+const RunBody = Schema.Struct({ task: Schema.String, proof: Schema.optional(Schema.NullOr(Schema.String)), channel: Schema.optional(Schema.NullOr(Schema.String)) });
 
 const ClaimBody = Schema.Struct({ subscriberId: Schema.String, limit: Schema.optional(Schema.Int) });
 
@@ -36,7 +36,7 @@ const admitRun = (request: Request) => Effect.gen(function* () {
   const idempotencyKey = yield* decodeWith(IdempotencyKey, request.headers.get("idempotency-key"));
   const body = yield* bodyOf(request, RunBody);
   const runs = yield* Runs;
-  const record = yield* runs.admit({ task: body.task, channel: body.channel ?? null, idempotencyKey });
+  const record = yield* runs.admit({ task: body.task, proof: body.proof ?? null, channel: body.channel ?? null, idempotencyKey });
 
   return json(202, { ok: true, runId: record.runId, contract: record.contract });
 });

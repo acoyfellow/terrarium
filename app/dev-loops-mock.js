@@ -3,7 +3,7 @@ const DAY = 86_400_000;
 const attempt = (passed, answer, n) => ({
   runId: `ter_dev${n.toString(36).padStart(4, '0')}_${'a1b2c3d4e5f6'.slice(0, 12)}`,
   status: 'done',
-  verified: true,
+  fromThisRun: true,
   logs: `TASK_RECEIVED\n${answer}\nTASK_ENDED`,
   gate: { passed, reason: passed ? 'answer contains the expected text' : 'answer does not contain the expected text' },
 });

@@ -18,9 +18,17 @@ export const TerminalStatus = Schema.Literals(["done", "failed", "cancelled", "t
 
 export type TerminalStatus = typeof TerminalStatus.Type;
 
-export const ContractStatus = Schema.Literals(["verified", "missing", "mismatch", "malformed"]);
+export const Provenance = Schema.Literals(["this-run", "missing", "mismatch", "malformed"]);
 
-export type ContractStatus = typeof ContractStatus.Type;
+export type Provenance = typeof Provenance.Type;
+
+export const ProofResult = Schema.Struct({
+  command: Schema.String,
+  exitCode: Schema.NullOr(Schema.Int),
+  output: Schema.String,
+});
+
+export type ProofResult = typeof ProofResult.Type;
 
 export const RunContract = Schema.Struct({
   runId: RunId,
@@ -32,7 +40,8 @@ export type RunContract = typeof RunContract.Type;
 
 export const RunTerminal = Schema.Struct({
   status: TerminalStatus,
-  contractStatus: ContractStatus,
+  provenance: Provenance,
+  proof: Schema.optionalKey(Schema.NullOr(ProofResult)),
   summary: Schema.NullOr(Schema.String),
   exitCode: Schema.NullOr(Schema.Int),
   finishedAt: Schema.String,
@@ -44,6 +53,7 @@ export const RunRecord = Schema.Struct({
   runId: RunId,
   ownerId: OwnerId,
   task: Schema.String,
+  proof: Schema.optionalKey(Schema.NullOr(Schema.String)),
   channel: Schema.NullOr(Schema.String),
   contract: RunContract,
   createdAt: Schema.String,
@@ -75,6 +85,7 @@ export class Ids extends Context.Service<Ids, { readonly runId: Effect.Effect<Ru
 
 export const AdmitInput = Schema.Struct({
   task: Schema.String,
+  proof: Schema.optionalKey(Schema.NullOr(Schema.String)),
   channel: Schema.NullOr(Schema.String),
   idempotencyKey: Schema.String,
 });
