@@ -64,9 +64,9 @@ export class TerrariumClient extends Context.Service<TerrariumClient, {
 }>()("terrarium/client/TerrariumClient") {}
 
 const failureFor = (response: Response, path: string, body: string): ClientError => {
-  if (response.status === 401 || response.status === 403) return new Unauthorized({ reason: body });
+  if (response.status === 401 || response.status === 403) return new Unauthorized({ reason: `${response.status} ${body}`.trim() });
 
-  if (response.status === 404) return new NotFound({ what: path });
+  if (response.status === 404) return new NotFound({ what: `${path} (404)` });
 
   return new Upstream({ service: "terrarium", detail: `${response.status} ${body}` });
 };
@@ -88,7 +88,7 @@ export const TerrariumClientLive = (baseUrl: string, fetcher: Fetch = fetch) =>
 
       if (!response.ok) return yield* Effect.fail(failureFor(response, path, text));
 
-      return yield* Schema.decodeUnknownEffect(Schema.fromJsonString(schema))(text).pipe(Effect.mapError(upstream));
+      return yield* Schema.decodeUnknownEffect(Schema.fromJsonString(schema))(text).pipe(Effect.mapError((error) => new Upstream({ service: "terrarium", detail: `${method} ${path} returned ${response.status} with a body this client cannot read: ${error.message}` })));
     });
 
     const runPath = (runId: string, action: string) => `/api/runs/${encodeURIComponent(runId)}/${action}`;

@@ -1,6 +1,6 @@
 import { createInterface } from "node:readline";
 
-import { Effect, Layer, Schema } from "effect";
+import { Effect, Layer, Option, Schema } from "effect";
 
 import { TokenSourceLive } from "./access-token.ts";
 import { TerrariumClient, TerrariumClientLive } from "./http.ts";
@@ -83,10 +83,32 @@ const callTool = (name: string, input: Schema.Json | undefined) => Effect.gen(fu
   return yield* Effect.fail(new Error(`unknown tool ${name}`));
 });
 
+const FailureDetail = Schema.Struct({
+  _tag: Schema.String,
+  reason: Schema.optional(Schema.String),
+  detail: Schema.optional(Schema.String),
+  what: Schema.optional(Schema.String),
+  service: Schema.optional(Schema.String),
+  message: Schema.optional(Schema.String),
+});
+
+const decodeFailure = Schema.decodeUnknownOption(FailureDetail);
+
+export const describeFailure = (error: ClientError | Schema.SchemaError | Error): string =>
+  Option.match(decodeFailure(error), {
+    onNone: () => error.message || error.name,
+    onSome: (failure) => {
+      const explanation = failure.detail ?? failure.reason ?? failure.what ?? failure.message ?? "";
+      const source = failure.service === undefined ? "" : ` from ${failure.service}`;
+
+      return explanation.length === 0 ? `${failure._tag}${source}` : `${failure._tag}${source}: ${explanation}`;
+    },
+  });
+
 const toolResult = (name: string, input: Schema.Json | undefined) =>
   callTool(name, input).pipe(
     Effect.map((result) => ({ content: [{ type: "text", text: JSON.stringify(result, null, 2) }] })),
-    Effect.catch((error) => Effect.succeed({ content: [{ type: "text", text: String(error) }], isError: true })),
+    Effect.catch((error) => Effect.succeed({ content: [{ type: "text", text: describeFailure(error) }], isError: true })),
   );
 
 const resultFor = (method: string, params: Schema.Json | undefined) => Effect.gen(function* () {
