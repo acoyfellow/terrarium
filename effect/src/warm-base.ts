@@ -23,8 +23,8 @@ export const isSetupRequest = (request: Request): boolean => {
 
 const hex = (bytes: ArrayBuffer): string => Array.from(new Uint8Array(bytes), (byte) => byte.toString(16).padStart(2, "0")).join("");
 
-export const baseKey = async (ownerId: string, github: string, ref: string, setup: string): Promise<string> =>
-  `base:${hex(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(JSON.stringify([ownerId, github, ref, setup])))).slice(0, 32)}`;
+export const baseKey = (ownerId: string, github: string, ref: string, setup: string): Promise<string> =>
+  crypto.subtle.digest("SHA-256", new TextEncoder().encode(JSON.stringify([ownerId, github, ref, setup]))).then((digest) => `base:${hex(digest).slice(0, 32)}`);
 
 export const SETUP_ENV = {
   NODE_EXTRA_CA_CERTS: "/etc/cloudflare/certs/cloudflare-containers-ca.crt",

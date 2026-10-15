@@ -69,12 +69,10 @@ const withModelHost = (env: Env): ModelEnv => {
   return { AI: env.AI, TERRARIUM_MODEL_HOST: host, TERRARIUM_SANDBOX: env.TERRARIUM_SANDBOX };
 };
 
-const setupFetch = async (box: DurableObjectStub<TerrariumSandbox>, request: Request): Promise<Response> => {
-  if (!isSetupRequest(request)) return modelError(403, "egress denied");
+const setupFetch = (box: DurableObjectStub<TerrariumSandbox>, request: Request): Promise<Response> => {
+  if (!isSetupRequest(request)) return Promise.resolve(modelError(403, "egress denied"));
 
-  const open = await box.setupOpen().catch(() => false);
-
-  return open ? fetch(request) : modelError(403, "egress denied");
+  return box.setupOpen().catch(() => false).then((open) => (open ? fetch(request) : modelError(403, "egress denied")));
 };
 
 const outbound = (request: Request, generated: Env, ctx: OutboundHandlerContext): Promise<Response> => {
