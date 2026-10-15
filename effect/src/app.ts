@@ -2,7 +2,7 @@ import { Effect, Layer, Schema } from "effect";
 
 import { ProbeBoxes, runProbe } from "./egress.ts";
 import { accessConfigLayer, authenticate, fetchJwks } from "./identity.ts";
-import { cancelLoop, createLoop, deleteLoop, getLoop, hookWake, listLoops, wakeLoop } from "./loops-api.ts";
+import { approveLoop, cancelLoop, createLoop, deleteLoop, getLoop, hookWake, listLoops, wakeLoop } from "./loops-api.ts";
 import type { LoopsEnv } from "./loops-api.ts";
 import { CallbacksLive, RunsLive, cloudflareLayer } from "./runs.ts";
 import type { RunsEnv } from "./runs.ts";
@@ -59,6 +59,8 @@ const route = (request: Request, env: AppEnv): Effect.Effect<Response, HttpFailu
   if (request.method === "POST" && /^\/api\/loops\/[^/]+\/cancel$/.test(url.pathname)) return cancelLoop(request, env);
 
   if (request.method === "POST" && /^\/api\/loops\/[^/]+\/wake$/.test(url.pathname)) return wakeLoop(request, env);
+
+  if (request.method === "POST" && new RegExp("^/api/loops/[^/]+/approval$").test(url.pathname)) return approveLoop(request, env);
 
   if (request.method === "DELETE" && /^\/api\/loops\/[^/]+$/.test(url.pathname)) return deleteLoop(request, env);
 

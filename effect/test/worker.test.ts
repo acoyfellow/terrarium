@@ -113,3 +113,15 @@ test("steer is 202 while a turn runs and 409 when idle", async () => {
   assert.equal((await call(fakeEnv(), "/api/sessions/s1/steer", { method: "POST", headers: bearer(alice.token), body: JSON.stringify({ text: "also do x" }) })).status, 202);
   assert.equal((await call(fakeEnv(), "/api/sessions/s1/steer", { method: "POST", headers: bearer(alice.token), body: JSON.stringify({ text: "idle" }) })).status, 409);
 });
+
+test("approval is owner-only and only for loops that ask for it", async () => {
+  const env = fakeEnv();
+  const asking = Schema.decodeUnknownSync(LoopCreated)(await (await call(env, "/api/loops", { method: "POST", headers: bearer(alice.token), body: JSON.stringify({ goal: "g", task: "t", expect: "e", approve: true }) })).json());
+  const plain = Schema.decodeUnknownSync(LoopCreated)(await (await call(env, "/api/loops", { method: "POST", headers: bearer(alice.token), body: JSON.stringify({ goal: "g", task: "t", expect: "e" }) })).json());
+  const approve = JSON.stringify({ verdict: "approve" });
+
+  assert.equal((await call(env, `/api/loops/${asking.loopId}/approval`, { method: "POST", headers: bearer(alice.token), body: approve })).status, 202);
+  assert.equal((await call(env, `/api/loops/${asking.loopId}/approval`, { method: "POST", headers: bearer(bob.token), body: approve })).status, 404);
+  assert.equal((await call(env, `/api/loops/${plain.loopId}/approval`, { method: "POST", headers: bearer(alice.token), body: approve })).status, 409);
+  assert.equal((await call(env, `/api/loops/${asking.loopId}/approval`, { method: "POST", headers: bearer(alice.token), body: JSON.stringify({ verdict: "maybe" }) })).status, 400);
+});

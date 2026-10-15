@@ -45,6 +45,7 @@
   });
 
   const stateOf = (loop) => {
+    if (loop.pendingApproval && ACTIVE.has(loop.status)) return 'awaiting you';
     if (loop.status === 'terminated') return 'cancelled';
     if (loop.status === 'errored') return 'errored';
     if (ACTIVE.has(loop.status)) return 'running';
@@ -109,6 +110,22 @@
       composing = false;
       draft = { goal: '', task: '', expect: '', maxAttempts: 3 };
       selectedId = created.loopId;
+      await refresh();
+    } catch (e) {
+      error = String(e?.message ?? e);
+    } finally {
+      busy = '';
+    }
+  }
+
+  let approvalNote = $state('');
+
+  async function decide(loop, verdict) {
+    if (PUBLIC) return;
+    busy = `${verdict}:${loop.loopId}`;
+    try {
+      await api(`/api/loops/${loop.loopId}/approval`, { method: 'POST', body: JSON.stringify(approvalNote.trim() ? { verdict, note: approvalNote.trim() } : { verdict }) });
+      approvalNote = '';
       await refresh();
     } catch (e) {
       error = String(e?.message ?? e);
@@ -278,6 +295,18 @@
           </div>
           <button class="cp-icon" title="Close" onclick={() => { selectedId = null; }}>✕</button>
         </header>
+        {#if selected.pendingApproval && state === 'awaiting you'}
+          <section class="cp-approval" aria-label="Approval needed">
+            <h3>Attempt {selected.pendingApproval.attempt} passed its gate. Approve it?</h3>
+            <p class="cp-approval-summary">{selected.pendingApproval.summary ?? '(no summary)'}</p>
+            <code>{selected.pendingApproval.runId}</code>
+            <textarea bind:value={approvalNote} rows="2" placeholder="Note for a retry (optional)" aria-label="Approval note"></textarea>
+            <div class="cp-approval-actions">
+              <button class="btn btn-primary" disabled={busy !== ''} onclick={() => decide(selected, 'approve')}>Approve</button>
+              <button class="btn" disabled={busy !== ''} onclick={() => decide(selected, 'reject')}>Reject and retry</button>
+            </div>
+          </section>
+        {/if}
         <dl class="cp-contract">
           <dt>Task</dt><dd>{selected.contract.task}</dd>
           {#if selected.contract.expect}<dt>Passes when the answer contains</dt><dd><code>{selected.contract.expect}</code></dd>{/if}

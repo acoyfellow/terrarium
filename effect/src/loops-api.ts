@@ -1,8 +1,10 @@
-import { Effect, Schema } from "effect";
-import { BadRequest, NotFound, Owner, Upstream } from "./shared.ts";
+import { Effect, Option, Schema } from "effect";
+import { BadRequest, Conflict, NotFound, Owner, Upstream } from "./shared.ts";
 import type { HttpFailure } from "./shared.ts";
 import { LoopContract, hasCheck, metricConflicts } from "./loop-decide.ts";
 import { MAX_NOTE, WAKE_EVENT, hookSignature, sameText } from "./wake.ts";
+import { APPROVAL_EVENT, ApprovalBody, PendingApproval, pendingKey } from "./approval.ts";
+import type { Approval } from "./approval.ts";
 import type { WakePayload } from "./wake.ts";
 
 export interface LoopsKv {
@@ -18,7 +20,7 @@ export interface LoopInstanceStatus {
 
 export interface LoopWorkflowBinding {
   readonly create: (options: { readonly id: string; readonly params: { readonly loopId: string; readonly ownerId: string; readonly contract: LoopContract } }) => Promise<{ readonly id: string }>;
-  readonly get: (id: string) => Promise<{ readonly status: () => Promise<LoopInstanceStatus>; readonly terminate: () => Promise<void>; readonly sendEvent: (event: { readonly type: string; readonly payload: WakePayload }) => Promise<void> }>;
+  readonly get: (id: string) => Promise<{ readonly status: () => Promise<LoopInstanceStatus>; readonly terminate: () => Promise<void>; readonly sendEvent: (event: { readonly type: string; readonly payload: WakePayload | Approval }) => Promise<void> }>;
 }
 
 export interface LoopsEnv {
@@ -44,9 +46,18 @@ const readIndex = (env: LoopsEnv, ownerId: string) =>
     Effect.flatMap((raw) => (raw === null ? Effect.succeed([]) : Schema.decodeUnknownEffect(LoopIndex)(raw).pipe(Effect.mapError(upstream("kv"))))),
   );
 
+const pendingOf = (env: LoopsEnv, loop: LoopRecord) =>
+  loop.contract.approve !== true
+    ? Effect.succeed(null)
+    : Effect.tryPromise(() => env.LOOPS_KV.get(pendingKey(loop.loopId))).pipe(
+        Effect.map((text) => (text === null ? null : Option.getOrNull(Schema.decodeUnknownOption(Schema.fromJsonString(PendingApproval))(text)))),
+        Effect.orElseSucceed(() => null),
+      );
+
 const witness = (env: LoopsEnv, loop: LoopRecord) =>
   Effect.tryPromise({ try: () => env.LOOP_WORKFLOW.get(loop.loopId).then((instance) => instance.status()), catch: upstream("workflow") }).pipe(
-    Effect.map((instance) => ({ ...loop, status: instance.status, output: instance.output ?? null, error: instance.error ?? null })),
+    Effect.zip(pendingOf(env, loop)),
+    Effect.map(([instance, pending]) => ({ ...loop, status: instance.status, output: instance.output ?? null, error: instance.error ?? null, pendingApproval: pending })),
   );
 
 export const createLoop = (request: Request, env: LoopsEnv): Effect.Effect<Response, HttpFailure, Owner> =>
@@ -149,6 +160,22 @@ export const wakeLoop = (request: Request, env: LoopsEnv): Effect.Effect<Respons
     yield* sendWake(env, loop.loopId, payload);
 
     return json({ ok: true, loopId: loop.loopId, woke: payload }, 202);
+  });
+
+export const approveLoop = (request: Request, env: LoopsEnv): Effect.Effect<Response, HttpFailure, Owner> =>
+  Effect.gen(function* () {
+    const owner = yield* Owner;
+    const { loop } = yield* ownedLoop(request, env, owner.id);
+
+    if (loop.contract.approve !== true) return yield* new Conflict({ reason: "this loop does not ask for approval" });
+
+    const text = yield* Effect.tryPromise({ try: () => request.text(), catch: () => new BadRequest({ problems: ["unreadable body"] }) });
+    const body = yield* Schema.decodeUnknownEffect(Schema.fromJsonString(ApprovalBody))(text).pipe(Effect.mapError((error) => new BadRequest({ problems: [error.message] })));
+    const approval: Approval = body.note === undefined ? { verdict: body.verdict, by: owner.email ?? owner.id } : { verdict: body.verdict, by: owner.email ?? owner.id, note: body.note };
+
+    yield* Effect.tryPromise({ try: () => env.LOOP_WORKFLOW.get(loop.loopId).then((instance) => instance.sendEvent({ type: APPROVAL_EVENT, payload: approval })), catch: upstream("workflow") });
+
+    return json({ ok: true, loopId: loop.loopId, approval }, 202);
   });
 
 export const hookWake = (request: Request, env: LoopsEnv): Effect.Effect<Response, HttpFailure> =>

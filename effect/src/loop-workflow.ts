@@ -6,8 +6,11 @@ import type { OwnerId, RunRecord, RunTerminal } from "./shared.ts";
 import { checkResults } from "./loop-checks.ts";
 import { decideNext, gateAttempt, runProofOf } from "./loop-decide.ts";
 import { runsLayer } from "./app.ts";
+import type { RunsEnv } from "./runs.ts";
 import type { Decision, Gate, LoopContract, RecordedAttempt } from "./loop-decide.ts";
 import { sumUsage } from "./usage.ts";
+import { APPROVAL_EVENT, Approval, DEFAULT_APPROVAL_TIMEOUT, afterApproval, pendingKey, rejectedTask } from "./approval.ts";
+import type { ApprovalBoard, ApprovalOutcome } from "./approval.ts";
 import { DEFAULT_BASELINE_RUNS, IDLE_TASK, baselineOf, metricProof, parseMetric, ratchetStep, ratchetTask, reachedTarget } from "./metric.ts";
 import type { Baseline, Metric, Ratchet } from "./metric.ts";
 import { DEFAULT_EVENT_TIMEOUT, WAKE_EVENT, WakePayload, durationMs, isEventWake, nextTask } from "./wake.ts";
@@ -28,6 +31,7 @@ export interface LoopOutput {
   readonly usage: Usage;
   readonly wakes?: ReadonlyArray<WakePayload | null>;
   readonly metric?: MetricOutput;
+  readonly approvals?: ReadonlyArray<ApprovalOutcome>;
 }
 
 export interface MetricOutput {
@@ -62,7 +66,7 @@ const pollAttempt = (runId: RunRecord["runId"]) =>
     return toAttempt(yield* runs.get(runId));
   });
 
-export const makeLoopWorkflow = <E>(runsLayer: (env: E) => Layer.Layer<Runs>) =>
+export const makeLoopWorkflow = <E>(runsLayer: (env: E) => Layer.Layer<Runs>, boardOf: (env: E) => ApprovalBoard) =>
   class LoopWorkflow extends WorkflowEntrypoint<E, LoopParams> {
     async run(event: Readonly<WorkflowEvent<LoopParams>>, step: WorkflowStep): Promise<LoopOutput> {
       const { loopId, ownerId, contract } = event.payload;
@@ -70,19 +74,22 @@ export const makeLoopWorkflow = <E>(runsLayer: (env: E) => Layer.Layer<Runs>) =>
       const exec = <A>(program: Effect.Effect<A, unknown, Runs | Owner>) => Effect.runPromise(Effect.provide(program, layer));
       const attempts: Array<RecordedAttempt & { readonly gate: Gate }> = [];
       const wakes: Array<WakePayload | null> = [];
+      const approvals: Array<ApprovalOutcome> = [];
+      let rejection: string | null = null;
 
       if (contract.metric !== undefined) return this.metricLoop(step, loopId, contract, contract.metric, exec);
 
       for (;;) {
         const decision = decideNext(contract, attempts);
 
-        if (decision.action === "stop") return { decision, attempts, wakes, usage: sumUsage(attempts.flatMap((attempt) => (attempt.usage === undefined ? [] : [attempt.usage]))) };
+        if (decision.action === "stop") return { decision, attempts, wakes, approvals, usage: sumUsage(attempts.flatMap((attempt) => (attempt.usage === undefined ? [] : [attempt.usage]))) };
 
         const n = decision.attempt;
 
         if (n > 1 && contract.wake !== undefined) wakes.push(await this.sleepUntilWake(step, n, contract.wake));
 
-        const task = contract.wake === undefined ? contract.task : nextTask(contract.task, n, wakes, attempts.at(-1)?.gate.reason ?? null);
+        const baseTask = contract.wake === undefined ? contract.task : nextTask(contract.task, n, wakes, attempts.at(-1)?.gate.reason ?? null);
+        const task = rejection === null ? baseTask : rejectedTask(baseTask, n, rejection);
 
         const runId = await step.do(`attempt-${n}-admit`, () =>
           exec(admitAttempt(contract, loopId, n, task)));
@@ -90,7 +97,32 @@ export const makeLoopWorkflow = <E>(runsLayer: (env: E) => Layer.Layer<Runs>) =>
         const attempt = await this.waitFor(step, `attempt-${n}`, runId, exec);
         const scored = contract.checks === undefined ? attempt : { ...attempt, checks: checkResults(contract.checks, contract.proof, attempt.proofOutput ?? null) };
 
-        attempts.push({ ...scored, gate: gateAttempt(contract, scored) });
+        const gate = gateAttempt(contract, scored);
+
+        if (contract.approve !== true || !gate.passed) {
+          attempts.push({ ...scored, gate });
+          continue;
+        }
+
+        const board = boardOf(this.env);
+
+        await step.do(`approval-${n}-pending`, () => board.put(loopId, { attempt: n, runId: scored.runId, summary: scored.summary ?? null, since: new Date().toISOString() }));
+
+        const approval = await this.waitForApproval(step, n);
+
+        await step.do(`approval-${n}-settled`, () => board.clear(loopId));
+        const next = afterApproval(approval, n, contract.maxAttempts);
+
+        approvals.push({ attempt: n, runId: scored.runId, approval });
+
+        if (next.action === "stop") {
+          attempts.push({ ...scored, gate: { passed: next.outcome === "passed", reason: next.reason } });
+
+          return { decision: { action: "stop", outcome: next.outcome, reason: next.reason }, attempts, wakes, approvals, usage: sumUsage(attempts.flatMap((attempt) => (attempt.usage === undefined ? [] : [attempt.usage]))) };
+        }
+
+        rejection = next.note;
+        attempts.push({ ...scored, gate: { passed: false, reason: `rejected by the owner: ${next.note}` } });
       }
     }
 
@@ -137,6 +169,12 @@ export const makeLoopWorkflow = <E>(runsLayer: (env: E) => Layer.Layer<Runs>) =>
       return finish(ratchet, `${contract.maxAttempts} attempts used; best ${ratchet.best} (baseline ${baseline.median} ± ${baseline.noise})`, ratchet.steps.some((one) => one.accepted) ? "passed" : "exhausted");
     }
 
+    private async waitForApproval(step: WorkflowStep, n: number): Promise<Approval | null> {
+      const received = await step.waitForEvent<Approval>(`approval-${n}`, { type: APPROVAL_EVENT, timeout: durationMs(DEFAULT_APPROVAL_TIMEOUT) }).catch(() => null);
+
+      return received === null ? null : Option.getOrNull(Schema.decodeUnknownOption(Approval)(received.payload));
+    }
+
     private async sleepUntilWake(step: WorkflowStep, n: number, wake: Wake): Promise<WakePayload | null> {
       if (!isEventWake(wake)) {
         await step.sleep(`wake-${n}-timer`, durationMs(wake.every));
@@ -163,4 +201,9 @@ export const makeLoopWorkflow = <E>(runsLayer: (env: E) => Layer.Layer<Runs>) =>
     }
   };
 
-export const LoopWorkflow = makeLoopWorkflow(runsLayer);
+const kvBoard = (env: { readonly LOOPS_KV: KVNamespace }): ApprovalBoard => ({
+  put: (loopId, pending) => env.LOOPS_KV.put(pendingKey(loopId), JSON.stringify(pending), { expirationTtl: 2 * 86_400 }),
+  clear: (loopId) => env.LOOPS_KV.delete(pendingKey(loopId)),
+});
+
+export const LoopWorkflow = makeLoopWorkflow<RunsEnv & { readonly LOOPS_KV: KVNamespace }>(runsLayer, kvBoard);

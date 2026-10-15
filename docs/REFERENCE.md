@@ -22,6 +22,7 @@ Every route except `/health` needs one of these, checked in this order:
 | `GET /api/runs/:id/logs` | The run's full output. |
 | `POST /api/runs/:id/cancel` | Cancel a run that hasn't finished. |
 | `POST /api/loops` | Start a loop. Body `{ goal, task, expect?, proof?, maxAttempts? }`; give `expect`, `proof` or both. An attempt passes when the proof exits 0 (if given) and the answer contains `expect` (if given). `maxAttempts` is 1 to 5, default 3. |
+| `POST /api/loops/:id/approval` | Body `{ verdict: "approve"\|"reject", note? }`. For loops started with `approve: true`: after an attempt passes its gate, the loop waits up to 24 hours for this. Approve stops the loop as passed. Reject starts the next attempt with your note. On `/loops` the loop shows "awaiting you" with Approve and Reject buttons; they work on a phone. |
 | `GET /api/loops` | Your loops, with what each Workflow recorded. |
 | `POST /api/sessions/:name/turn` | Send one turn to your durable Pi session `:name`. Body `{ text }`. The conversation is stored in a Durable Object; tools run in the session's box. |
 | `POST /api/sessions/:name/steer` | Body `{ text }`. While a turn is running, add a message the agent reads before its next step. Returns 202, or 409 when no turn is running. |

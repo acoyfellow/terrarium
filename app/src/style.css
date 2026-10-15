@@ -991,3 +991,12 @@ img { max-width: 100%; display: block; }
 .cmp-list { color: var(--subtle); line-height: 1.7; padding-left: 1.2rem; }
 .cmp-list li { margin-bottom: .6rem; }
 @container tl (max-width: 40rem) { .cmp-grid { grid-template-columns: 1fr; } }
+
+.cp-approval { border: 2px solid #d9a400; border-radius: 10px; padding: 0.75rem; margin: 0.5rem 0 1rem; display: grid; gap: 0.5rem; }
+.cp-approval h3 { margin: 0; font-size: 1rem; }
+.cp-approval-summary { margin: 0; white-space: pre-wrap; }
+.cp-approval textarea { font: inherit; padding: 0.4rem; width: 100%; box-sizing: border-box; }
+.cp-approval-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+.cp-approval-actions .btn { min-height: 44px; flex: 1 1 140px; }
+.cp-badge[data-state='awaiting you'] { color: #b88a00; }
+.cp-light[data-state='awaiting you'] { background: #d9a400; }

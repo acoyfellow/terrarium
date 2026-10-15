@@ -1,0 +1,40 @@
+{
+  "item": 15,
+  "checkedAt": "2026-10-15T08:25:54.340Z",
+  "title": "remote approval: approve:true loops wait for the owner after a passing attempt; approve or reject (with a note) from /loops, phone-sized",
+  "loopId": "loop_93ab30453cff41789b8f3e3ff8cc7cf4",
+  "screenshot": "receipts/borrow/15-phone.png",
+  "ok": true,
+  "results": [
+    {
+      "name": "attempt 1 passed its gate and the loop waited for the owner",
+      "ok": true,
+      "note": "{\"attempt\":1,\"runId\":\"ter_mv99vpt3_fb9515bfed0c\",\"summary\":\"draft\",\"since\":\"2026-10-15T08:24:35.622Z\"}"
+    },
+    {
+      "name": "approval on a loop that does not ask is refused (409)",
+      "ok": true,
+      "note": "status=409"
+    },
+    {
+      "name": "reject sent the owner's note into attempt 2",
+      "ok": true,
+      "note": "the word draft.\n\nThis is attempt 2. The owner reviewed the previous result and rejected it: write final instead of draft"
+    },
+    {
+      "name": "attempt 2 waited for approval again",
+      "ok": true,
+      "note": "{\"attempt\":2,\"runId\":\"ter_mv99w9r8_da68ebcf8086\",\"summary\":\"draft\",\"since\":\"2026-10-15T08:24:50.930Z\"}"
+    },
+    {
+      "name": "approve from the phone view stopped the loop as passed",
+      "ok": true,
+      "note": "attempt 2 passed its gate and was approved by <owner email>"
+    },
+    {
+      "name": "the pending marker is gone after the decision",
+      "ok": true,
+      "note": "pendingApproval=null"
+    }
+  ]
+}
