@@ -1,6 +1,8 @@
-import { Effect, Option } from "effect";
+import { Effect } from "effect";
 
 import { cloudUrl, followUp, runIdsIn, terminalOf } from "./cloud.ts";
+import { watchRun } from "./watch.ts";
+import type { WatchOutcome } from "./watch.ts";
 
 interface ToolResultEvent {
   readonly toolName: string;
@@ -13,20 +15,23 @@ interface Pi {
   readonly sendUserMessage: (content: string, options: { readonly deliverAs: "followUp" }) => void;
 }
 
-const POLL_MS = 15_000;
-
 const isSpawnTool = (name: string) => name === "terrarium_spawn" || name.endsWith("_terrarium_spawn");
 
+const watching = new Set<string>();
+
+const deliver = (pi: Pi, runId: string, outcome: WatchOutcome) =>
+  Effect.sync(() => {
+    watching.delete(runId);
+    const message = outcome.kind === "finished" ? followUp(outcome.event) : `Terrarium stopped watching run ${runId}: ${outcome.reason}. Check it with terrarium_status.`;
+
+    pi.sendUserMessage(message, { deliverAs: "followUp" });
+  });
+
 const awaitRun = (pi: Pi, url: string, runId: string) => {
-  const sweep = terminalOf(url, runId).pipe(
-    Effect.tap(Option.match({ onNone: () => Effect.void, onSome: (event) => Effect.sync(() => pi.sendUserMessage(followUp(event), { deliverAs: "followUp" })) })),
-    Effect.map(Option.isSome),
-    Effect.catch(() => Effect.succeed(false)),
-  );
+  if (watching.has(runId)) return;
 
-  const loop: Effect.Effect<void> = Effect.sleep(POLL_MS).pipe(Effect.andThen(sweep), Effect.flatMap((done) => (done ? Effect.void : loop)));
-
-  Effect.runFork(loop);
+  watching.add(runId);
+  Effect.runFork(watchRun(terminalOf(url, runId)).pipe(Effect.flatMap((outcome) => deliver(pi, runId, outcome))));
 };
 
 export default function terrariumEffect(pi: Pi) {

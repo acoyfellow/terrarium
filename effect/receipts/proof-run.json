@@ -1,0 +1,55 @@
+{
+  "checkedAt": "2026-10-15T02:30:39.951Z",
+  "seconds": 27,
+  "ok": true,
+  "results": [
+    {
+      "name": "honest fix passes its proof",
+      "runId": "ter_mv8x8fs1_9d2cd2828466",
+      "ok": true,
+      "status": "done",
+      "provenance": "this-run",
+      "proof": {
+        "command": "node -e \"const { add } = require('./add.js'); process.exit(add(2, 3) === 5 ? 0 : 1)\"",
+        "exitCode": 0,
+        "output": ""
+      },
+      "summary": "Wrote 59 bytes to /workspace/add.js"
+    },
+    {
+      "name": "confident claim without the work fails its proof",
+      "runId": "ter_mv8x8fs1_b3e9469928e9",
+      "ok": true,
+      "status": "failed",
+      "provenance": "this-run",
+      "proof": {
+        "command": "node -e \"const { add } = require('./add.js'); process.exit(add(2, 3) === 5 ? 0 : 1)\"",
+        "exitCode": 1,
+        "output": "All tests pass\n[eval]:1\nconst { add } = require('./add.js'); process.exit(add(2, 3) === 5 ? 0 : 1)\n                                                  ^\n\nTypeError: add is not a function\n    at [eval]:1:51\n    at runScriptInThisContext (node:internal/vm:209:10)\n    at node:internal/process/execution:446:12\n    at [eval]-wrapper:6:24\n    at runScriptInContext (node:internal/process/execution:444:60)\n    at evalFunction (node:internal/process/execution:279:30)\n    at evalTypeScript (node:internal/process/execution:291:3)\n    at node:internal/main/eval_string:74:3\n\nNode.js v22.23.1"
+      },
+      "summary": "add.js was written and all tests pass"
+    },
+    {
+      "name": "tools are on and the box is still sealed",
+      "runId": "ter_mv8x8fs3_128d437e9e0e",
+      "ok": true,
+      "status": "done",
+      "provenance": "this-run",
+      "proof": {
+        "command": "test \"$(cat code.txt)\" != 200",
+        "exitCode": 0,
+        "output": ""
+      },
+      "summary": "Command executed"
+    },
+    {
+      "name": "a run without a proof keeps receipt-only behaviour",
+      "runId": "ter_mv8x8frt_c7aee3fea763",
+      "ok": true,
+      "status": "done",
+      "provenance": "this-run",
+      "proof": null,
+      "summary": "391"
+    }
+  ]
+}
