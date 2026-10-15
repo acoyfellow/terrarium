@@ -36,6 +36,20 @@ export const authedGet = (url: string, path: string) => Effect.gen(function* () 
   return yield* Effect.tryPromise({ try: () => response.text(), catch: (cause) => new CloudError({ detail: String(cause) }) });
 });
 
+export interface RunAdmission {
+  readonly task: string;
+  readonly proof: string | null;
+  readonly channel: string;
+}
+
+export const authedPost = (url: string, path: string, body: RunAdmission, extra: Readonly<Record<string, string>>) => Effect.gen(function* () {
+  const headers = yield* authHeader(url);
+  const response = yield* Effect.tryPromise({ try: () => fetch(new URL(path, url), { method: "POST", headers: { ...headers, ...extra, "content-type": "application/json" }, body: JSON.stringify(body) }), catch: (cause) => new CloudError({ detail: String(cause) }) });
+  const text = yield* Effect.tryPromise({ try: () => response.text(), catch: (cause) => new CloudError({ detail: String(cause) }) });
+
+  return response.ok ? text : yield* new CloudError({ detail: `POST ${path} ${response.status}: ${text.slice(0, 300)}` });
+});
+
 export const terminalOf = (url: string, runId: string) => Effect.gen(function* () {
   const text = yield* authedGet(url, `/api/runs/${encodeURIComponent(runId)}/status`);
   const status = yield* Schema.decodeUnknownEffect(RunStatus)(text).pipe(Effect.mapError((error) => new CloudError({ detail: error.message })));

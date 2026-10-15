@@ -55,6 +55,10 @@ Pi in the box has the `read`, `write`, `edit` and `bash` tools. A run can add up
 | `terrarium_loop_start` | `goal`, `task`, `expect` and/or `proof`, optional `maxAttempts` |
 | `terrarium_loop_status` | optional `loopId` |
 
+## pi-subagents
+
+The Terrarium Pi extension registers a `terrarium` provider for pi-subagents `external-job` agents. Copy `examples/pi-subagents/boxed.md` to `.pi/agents/` and load both extensions. A `subagent` call to that agent starts a Terrarium run. `runner.options.proof` and `runner.options.channel` go to the run; pi-subagents gets the run's state and its summary and logs as the result.
+
 ## Limits
 
 | Limit | Value |

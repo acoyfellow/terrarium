@@ -1,0 +1,35 @@
+{
+  "item": 11,
+  "checkedAt": "2026-10-15T07:00:05.269Z",
+  "title": "Terrarium as a pi-subagents external-job runner",
+  "subagentRunId": "45dfff06-8b99-4b55-a539-52bb59ffcc18",
+  "terrariumRunId": "ter_mv96uhcq_98edbdeb9f41",
+  "ok": true,
+  "results": [
+    {
+      "name": "pi-subagents recorded a terrarium external-job run",
+      "ok": true,
+      "note": "45dfff06-8b99-4b55-a539-52bb59ffcc18 state=complete"
+    },
+    {
+      "name": "the Terrarium run finished done with this run's receipt",
+      "ok": true,
+      "note": "ter_mv96uhcq_98edbdeb9f41 done/this-run"
+    },
+    {
+      "name": "the agent's proof ran in the box and passed",
+      "ok": true,
+      "note": "{\"command\":\"grep -qx sub1928917568 answer.txt\",\"exitCode\":0,\"output\":\"\",\"source\":\"given\"}"
+    },
+    {
+      "name": "the run carries the pi-subagents channel",
+      "ok": true,
+      "note": "channel borrow-11 comes from the agent's runner.options"
+    },
+    {
+      "name": "the old colon idempotency key is still refused by the API (provider now sanitises it)",
+      "ok": true,
+      "note": "status=400"
+    }
+  ]
+}

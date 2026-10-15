@@ -2,6 +2,7 @@ import { Effect } from "effect";
 
 import { cloudUrl, followUp, runIdsIn, terminalOf } from "./cloud.ts";
 import { liveWidget } from "./live.ts";
+import { registerProvider } from "./subagent-registry.ts";
 import type { WidgetSink } from "./live.ts";
 import { watchRun } from "./watch.ts";
 import type { WatchOutcome } from "./watch.ts";
@@ -43,6 +44,10 @@ const awaitRun = (pi: Pi, url: string, runId: string, ui: WidgetSink | undefined
 };
 
 export default function terrariumEffect(pi: Pi) {
+  const providerUrl = cloudUrl();
+
+  if (providerUrl.length > 0) registerProvider(providerUrl);
+
   pi.on("tool_result", (event, ctx) => {
     if (!isSpawnTool(event.toolName) || event.input.background !== true) return;
 
