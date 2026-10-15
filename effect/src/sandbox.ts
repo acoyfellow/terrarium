@@ -1,6 +1,8 @@
 import { Sandbox as SdkSandbox, getSandbox } from "@cloudflare/sandbox";
 import type { OutboundHandlerContext } from "@cloudflare/containers";
-import { Context, Effect, Layer, Option } from "effect";
+import { Effect, Layer, Option } from "effect";
+
+import { Sandbox } from "./run-once.ts";
 
 import { detectProof } from "./default-proof.ts";
 import { ZERO_USAGE, addCall } from "./usage.ts";
@@ -13,13 +15,7 @@ import { timingLine } from "./timing.ts";
 
 export type { SandboxResult } from "./sandbox-result.ts";
 
-export interface SandboxJob {
-  readonly task: string;
-  readonly contract: RunContract;
-  readonly proof: string | null;
-}
-
-export class Sandbox extends Context.Service<Sandbox, { readonly run: (job: SandboxJob) => Effect.Effect<SandboxResult, Upstream> }>()("terrarium/Sandbox") {}
+export { Sandbox } from "./run-once.ts";
 
 export interface ModelEnv {
   readonly AI: Ai;

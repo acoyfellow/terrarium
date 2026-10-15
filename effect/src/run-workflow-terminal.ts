@@ -23,3 +23,8 @@ export const failedOutcome = (error: Upstream, finishedAt: string): Outcome => (
   logs: `${error.service}: ${error.detail}`,
 });
 
+
+export const refusedRestart = (attempts: number, finishedAt: string): Outcome => ({
+  terminal: { status: "failed", provenance: "missing", summary: null, exitCode: null, finishedAt },
+  logs: `terrarium: this run's agent already started once; start attempt ${attempts} was refused so the agent never runs twice`,
+});

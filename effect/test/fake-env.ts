@@ -19,6 +19,7 @@ const ownerRpc = (): OwnerRpc => {
     admitReserve: (reservation) => Promise.resolve(store.toReply(store.admitReserve(sql, reservation))),
     get: (runId) => Promise.resolve(store.toReply(store.getRun(sql, runId))),
     finish: (runId, terminal, logs) => Promise.resolve(store.toReply(store.finish(sql, runId, terminal, logs))),
+    beginStart: (runId, nowMs) => Promise.resolve(store.toReply(store.beginStart(sql, runId, nowMs))),
     list: (channel, limit) => Promise.resolve(store.toReply(store.listRuns(sql, channel, limit))),
     claim: (request) => Promise.resolve(store.toReply(store.claim(sql, request))),
     ack: (subscriberId, eventId) => Promise.resolve(store.toReply(store.ack(sql, subscriberId, eventId))),

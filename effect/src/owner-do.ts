@@ -1,6 +1,6 @@
 import { DurableObject } from "cloudflare:workers";
 
-import { ack, admitReserve, claim, finish, getRun, listRuns, migrate, toReply } from "./owner-store.ts";
+import { ack, admitReserve, beginStart, claim, finish, getRun, listRuns, migrate, toReply } from "./owner-store.ts";
 import type { AdmitReservation, ClaimRequest, Sql, SqlValue } from "./owner-store.ts";
 import type { RunTerminal } from "./shared.ts";
 
@@ -19,6 +19,10 @@ export class OwnerDO extends DurableObject {
 
   get(runId: string) {
     return toReply(getRun(this.sql, runId));
+  }
+
+  beginStart(runId: string, nowMs: number) {
+    return toReply(beginStart(this.sql, runId, nowMs));
   }
 
   finish(runId: string, terminal: RunTerminal, logs: string) {

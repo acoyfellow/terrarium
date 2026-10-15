@@ -76,6 +76,7 @@ const decodeEvent = (stored: SqlValue | undefined) => upgraded(stored).pipe(Effe
 const DDL = [
   "create table if not exists runs (run_id text primary key, created_ms integer not null, channel text, live integer not null, record text not null)",
   "create table if not exists idem (key text primary key, request text not null, run_id text not null)",
+  "create table if not exists starts (run_id text primary key, first_ms integer not null, attempts integer not null)",
   "create table if not exists events (event_id text primary key, created_ms integer not null, lease_until integer not null default 0, lease_holder text, acked integer not null default 0, event text not null)",
 ];
 
@@ -87,11 +88,29 @@ const single = (sql: Sql, query: string, ...bindings: ReadonlyArray<SqlValue>): 
 
 const count = (sql: Sql, query: string, ...bindings: ReadonlyArray<SqlValue>): number => Number(single(sql, query, ...bindings) ?? 0);
 
+const withStarts = (sql: Sql, record: RunRecord): RunRecord => {
+  const attempts = single(sql, "select attempts as v from starts where run_id = ?", record.runId);
+
+  return attempts === undefined ? record : { ...record, startAttempts: Number(attempts) };
+};
+
 export const getRun = (sql: Sql, runId: string): Effect.Effect<RunRecord, NotFound> => {
   const stored = single(sql, "select record as v from runs where run_id = ?", runId);
 
-  return stored === undefined ? Effect.fail(new NotFound({ what: `run ${runId}` })) : Effect.orDie(decodeRecord(stored));
+  return stored === undefined ? Effect.fail(new NotFound({ what: `run ${runId}` })) : Effect.orDie(decodeRecord(stored)).pipe(Effect.map((record) => withStarts(sql, record)));
 };
+
+export interface StartLease {
+  readonly first: boolean;
+  readonly attempts: number;
+}
+
+export const beginStart = (sql: Sql, runId: string, nowMs: number): Effect.Effect<StartLease, NotFound> =>
+  getRun(sql, runId).pipe(Effect.map(() => {
+    const attempts = Number(single(sql, "insert into starts (run_id, first_ms, attempts) values (?, ?, 1) on conflict(run_id) do update set attempts = attempts + 1 returning attempts as v", runId, nowMs));
+
+    return { first: attempts === 1, attempts };
+  }));
 
 const reserveNew = (sql: Sql, reservation: AdmitReservation): Effect.Effect<Admission, RateLimited> => {
   const live = count(sql, "select count(*) as v from runs where live = 1");

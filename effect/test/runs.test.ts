@@ -29,6 +29,7 @@ const storeOver = (sql: Sql): OwnerStore => ({
   admitReserve: (reservation) => store.admitReserve(sql, reservation),
   get: (runId) => store.getRun(sql, runId),
   finish: (runId, terminal, logs) => store.finish(sql, runId, terminal, logs),
+  beginStart: (runId, nowMs) => store.beginStart(sql, runId, nowMs),
   list: (channel, limit) => store.listRuns(sql, channel, limit),
   claim: (request) => store.claim(sql, request),
   ack: (subscriberId, eventId) => store.ack(sql, subscriberId, eventId),

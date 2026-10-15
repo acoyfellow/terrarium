@@ -1,0 +1,35 @@
+{
+  "item": 3,
+  "checkedAt": "2026-10-15T03:12:34.310Z",
+  "title": "never runs twice: a replayed run step is refused by an at-most-once start lease",
+  "seconds": 25,
+  "runId": "ter_mv8yqdwt_754379282ddc",
+  "ok": true,
+  "results": [
+    {
+      "name": "the first execution finished with a receipt from this run",
+      "ok": true,
+      "note": "done/this-run"
+    },
+    {
+      "name": "Workflows restarted the finished run instance (a real replay of the run step)",
+      "ok": true,
+      "note": "🥷 The instance \"ter_mv8yqdwt_754379282ddc\" from terrarium-effect-run was restarted successfully"
+    },
+    {
+      "name": "the replayed step was refused instead of starting the agent again",
+      "ok": true,
+      "note": "refusal recorded in the step output"
+    },
+    {
+      "name": "the owner store counted two start attempts",
+      "ok": true,
+      "note": "startAttempts=2"
+    },
+    {
+      "name": "the first terminal result was kept, not overwritten by the replay",
+      "ok": true,
+      "note": "done/this-run 2026-10-15T03:12:22.566Z"
+    }
+  ]
+}

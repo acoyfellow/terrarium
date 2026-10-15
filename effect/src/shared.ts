@@ -63,6 +63,7 @@ export const RunRecord = Schema.Struct({
   createdAt: Schema.String,
   terminal: Schema.NullOr(RunTerminal),
   logs: Schema.String,
+  startAttempts: Schema.optionalKey(Schema.Int),
 });
 
 export type RunRecord = typeof RunRecord.Type;

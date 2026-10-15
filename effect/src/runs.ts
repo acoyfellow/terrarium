@@ -1,7 +1,7 @@
 import { Context, Effect, Layer, Schema } from "effect";
 
 import { fromReply } from "./owner-store.ts";
-import type { Admission, AdmitReservation, CallbackEvent, ClaimRequest, Reply, StoreError } from "./owner-store.ts";
+import type { Admission, AdmitReservation, CallbackEvent, ClaimRequest, Reply, StartLease, StoreError } from "./owner-store.ts";
 import { BadRequest, Clock, Ids, NotFound, Owner, Runs, Upstream } from "./shared.ts";
 import type { AdmitInput, Conflict, OwnerId, RateLimited, RunContract, RunId, RunRecord, RunTerminal } from "./shared.ts";
 
@@ -13,6 +13,7 @@ export interface OwnerStore {
   readonly admitReserve: (reservation: AdmitReservation) => Effect.Effect<Admission, StoreError | Upstream>;
   readonly get: (runId: string) => Effect.Effect<RunRecord, StoreError | Upstream>;
   readonly finish: (runId: string, terminal: RunTerminal, logs: string) => Effect.Effect<RunRecord, StoreError | Upstream>;
+  readonly beginStart: (runId: string, nowMs: number) => Effect.Effect<StartLease, StoreError | Upstream>;
   readonly list: (channel: string | null, limit: number) => Effect.Effect<ReadonlyArray<RunRecord>, StoreError | Upstream>;
   readonly claim: (request: ClaimRequest) => Effect.Effect<ReadonlyArray<CallbackEvent>, StoreError | Upstream>;
   readonly ack: (subscriberId: string, eventId: string) => Effect.Effect<string, StoreError | Upstream>;
@@ -142,6 +143,7 @@ export interface OwnerRpc {
   readonly admitReserve: (reservation: AdmitReservation) => Promise<Reply<Admission>>;
   readonly get: (runId: string) => Promise<Reply<RunRecord>>;
   readonly finish: (runId: string, terminal: RunTerminal, logs: string) => Promise<Reply<RunRecord>>;
+  readonly beginStart: (runId: string, nowMs: number) => Promise<Reply<StartLease>>;
   readonly list: (channel: string | null, limit: number) => Promise<Reply<ReadonlyArray<RunRecord>>>;
   readonly claim: (request: ClaimRequest) => Promise<Reply<ReadonlyArray<CallbackEvent>>>;
   readonly ack: (subscriberId: string, eventId: string) => Promise<Reply<string>>;
@@ -165,6 +167,7 @@ export const ownerStoreOf = (env: RunsEnv, ownerId: string): OwnerStore => {
     admitReserve: (reservation) => rpc(() => stub.admitReserve(reservation)),
     get: (runId) => rpc(() => stub.get(runId)),
     finish: (runId, terminal, logs) => rpc(() => stub.finish(runId, terminal, logs)),
+    beginStart: (runId, nowMs) => rpc(() => stub.beginStart(runId, nowMs)),
     list: (channel, limit) => rpc(() => stub.list(channel, limit)),
     claim: (request) => rpc(() => stub.claim(request)),
     ack: (subscriberId, eventId) => rpc(() => stub.ack(subscriberId, eventId)),
