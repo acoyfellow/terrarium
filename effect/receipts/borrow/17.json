@@ -1,0 +1,38 @@
+{
+  "item": 17,
+  "checkedAt": "2026-10-15T06:30:18.205Z",
+  "title": "plugins per run: owner-supplied pi extensions loaded into that run's box only",
+  "seconds": 17,
+  "runs": [
+    "ter_mv95stum_a20eba997401",
+    "ter_mv95subr_0d072b9eb7ef"
+  ],
+  "ok": true,
+  "results": [
+    {
+      "name": "the plugin loaded in the box",
+      "ok": true,
+      "note": "ter_mv95stum_a20eba997401 calls=[\"stamp {}\"]"
+    },
+    {
+      "name": "the plugin tool and hook ran (proof checks files only plugin code writes)",
+      "ok": true,
+      "note": "status=done proof={\"command\":\"grep -qx plug721444 stamp.txt && grep -qx 'hook ran' plugin-hook.txt\",\"exitCode\":0,\"output\":\"\",\"source\":\"given\"}"
+    },
+    {
+      "name": "the same task without the plugin fails its proof",
+      "ok": true,
+      "note": "ter_mv95subr_0d072b9eb7ef status=failed"
+    },
+    {
+      "name": "a plugin name with a path is refused",
+      "ok": true,
+      "note": "status=400"
+    },
+    {
+      "name": "duplicate plugin names are refused",
+      "ok": true,
+      "note": "status=400"
+    }
+  ]
+}

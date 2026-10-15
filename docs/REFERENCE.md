@@ -23,6 +23,8 @@ Every route except `/health` needs one of these, checked in this order:
 | `POST /api/runs/:id/cancel` | Cancel a run that hasn't finished. |
 | `POST /api/loops` | Start a loop. Body `{ goal, task, expect?, proof?, maxAttempts? }`; give `expect`, `proof` or both. An attempt passes when the proof exits 0 (if given) and the answer contains `expect` (if given). `maxAttempts` is 1 to 5, default 3. |
 | `GET /api/loops` | Your loops, with what each Workflow recorded. |
+| `POST /api/sessions/:name/turn` | Send one turn to your durable Pi session `:name`. Body `{ text }`. The conversation is stored in a Durable Object; tools run in the session's box. |
+| `POST /api/sessions/:name/replace-box` | Destroy the session's box and give it a new one. The conversation stays. |
 | `GET /api/whoami` | `{ owner, method }`. |
 | `POST /claim`, `POST /ack` | Completion events: `{ subscriberId, limit? }` and `{ subscriberId, eventId }`. |
 | `GET /health` | `{ ok: true }`. No sign-in. |
@@ -39,7 +41,7 @@ A run is `done` only when its provenance is `this-run` (exactly one `TERRARIUM_R
 
 ## The box
 
-Pi in the box has the `read`, `write`, `edit` and `bash` tools. The box has no internet: outside sites get 403. Files the agent writes are deleted when the run ends.
+Pi in the box has the `read`, `write`, `edit` and `bash` tools. A run can add up to 4 Pi extensions with `plugins: [{ name, source, tools? }]` on `POST /api/runs`. Each `source` is at most 20,000 characters and is loaded only in that run's box. List the tools an extension adds in `tools` so the model may call them. Extensions get the same sealed box: no internet and no credentials. The box has no internet: outside sites get 403. Files the agent writes are deleted when the run ends.
 
 ## MCP tools
 

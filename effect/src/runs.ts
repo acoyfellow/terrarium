@@ -1,12 +1,13 @@
 import { Context, Effect, Layer, Schema } from "effect";
 
 import { fromReply } from "./owner-store.ts";
+import { Plugins, pluginProblems } from "./plugins.ts";
 import { RepoSpec } from "./repo.ts";
 import type { Admission, AdmitReservation, CallbackEvent, ClaimRequest, Reply, StartLease, StoreError } from "./owner-store.ts";
 import { BadRequest, Clock, Ids, NotFound, Owner, Runs, Upstream, WorkspaceSnapshot } from "./shared.ts";
 import type { AdmitInput, Conflict, OwnerId, RateLimited, RunContract, RunId, RunRecord, RunTerminal } from "./shared.ts";
 
-export const RunParams = Schema.Struct({ ownerId: Schema.String, runId: Schema.String, task: Schema.String, proof: Schema.optionalKey(Schema.NullOr(Schema.String)), resume: Schema.optionalKey(Schema.NullOr(WorkspaceSnapshot)), repo: Schema.optionalKey(Schema.NullOr(RepoSpec)), contract: Schema.Struct({ runId: Schema.String, taskFingerprint: Schema.String, nonce: Schema.String }) });
+export const RunParams = Schema.Struct({ ownerId: Schema.String, runId: Schema.String, task: Schema.String, proof: Schema.optionalKey(Schema.NullOr(Schema.String)), resume: Schema.optionalKey(Schema.NullOr(WorkspaceSnapshot)), repo: Schema.optionalKey(Schema.NullOr(RepoSpec)), plugins: Schema.optionalKey(Plugins), contract: Schema.Struct({ runId: Schema.String, taskFingerprint: Schema.String, nonce: Schema.String }) });
 
 export type RunParams = typeof RunParams.Type;
 
@@ -99,6 +100,10 @@ export const RunsLive = Layer.effect(Runs, Effect.gen(function* () {
 
     if (proof !== null && proof.length > MAX_PROOF_LENGTH) return yield* new BadRequest({ problems: [`proof must be at most ${MAX_PROOF_LENGTH} characters`] });
 
+    const plugins = input.plugins ?? [];
+
+    if (pluginProblems(plugins).length > 0) return yield* new BadRequest({ problems: [...pluginProblems(plugins)] });
+
     const owner = yield* Owner;
     const store = yield* ownerStore;
     const resume = yield* resumeSnapshot(store, input.resumeFrom ?? null);
@@ -110,13 +115,14 @@ export const RunsLive = Layer.effect(Runs, Effect.gen(function* () {
     const fresh: RunRecord = { runId, ownerId: owner.id, task: input.task, proof, channel: input.channel, contract, createdAt: new Date(nowMs).toISOString(), terminal: null, logs: "" };
     const repo = input.repo ?? null;
     const resumed: RunRecord = resumeFrom === null ? fresh : { ...fresh, resumeFrom };
-    const record: RunRecord = repo === null ? resumed : { ...resumed, repo };
-    const request = yield* sha256(JSON.stringify([input.task, input.channel, proof, resumeFrom, repo]));
+    const withRepo: RunRecord = repo === null ? resumed : { ...resumed, repo };
+    const record: RunRecord = plugins.length === 0 ? withRepo : { ...withRepo, plugins };
+    const request = yield* sha256(JSON.stringify(plugins.length === 0 ? [input.task, input.channel, proof, resumeFrom, repo] : [input.task, input.channel, proof, resumeFrom, repo, plugins]));
     const admission = yield* admissionOnly(store.admitReserve({ idempotencyKey: input.idempotencyKey, request, record, nowMs, maxLive: limits.maxLive, perMinute: limits.perMinute }));
 
     if (!admission.created) return admission.record;
 
-    yield* workflows.start({ ownerId: owner.id, runId, task: input.task, proof, resume, repo, contract }).pipe(Effect.catch((error) => failStart(nowIso, store, record, error)));
+    yield* workflows.start({ ownerId: owner.id, runId, task: input.task, proof, resume, repo, plugins, contract }).pipe(Effect.catch((error) => failStart(nowIso, store, record, error)));
 
     return admission.record;
   });

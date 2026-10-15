@@ -1,6 +1,7 @@
 import type { ProofResult, RunContract, WorkspaceSnapshot } from "./shared.ts";
 import type { RepoResult, RepoSpec } from "./repo.ts";
 import type { Usage } from "./usage.ts";
+import type { Plugin } from "./plugins.ts";
 
 export interface SandboxResult {
   readonly output: string;
@@ -19,4 +20,5 @@ export interface SandboxJob {
   readonly resume?: WorkspaceSnapshot | null;
   readonly repo?: RepoSpec | null;
   readonly ownerId?: string;
+  readonly plugins?: ReadonlyArray<Plugin>;
 }

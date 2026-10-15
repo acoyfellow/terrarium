@@ -142,11 +142,22 @@ if ! command -v timeout >/dev/null 2>&1; then
   exit 10
 fi
 
+set --
+if [ -n "${TERRARIUM_PLUGINS:-}" ]; then
+  OLD_IFS="$IFS"; IFS=':'
+  for plugin_path in $TERRARIUM_PLUGINS; do
+    case "$plugin_path" in
+      /tmp/terrarium-plugins/*.ts) if [ -r "$plugin_path" ]; then set -- "$@" -e "$plugin_path"; fi ;;
+    esac
+  done
+  IFS="$OLD_IFS"
+fi
+
 set +e
 HOME="$CELL_HOME" \
 timeout --signal=TERM --kill-after=5s "${AGENT_TIMEOUT_SECONDS}s" \
   "$AGENT_BIN" -p --no-session -ne -ns -np -nc --tools "${TERRARIUM_AGENT_TOOLS:-read,write,edit,bash}" \
-  -e "$PROVIDER_EXT" \
+  -e "$PROVIDER_EXT" "$@" \
   --provider terrarium --model workers-ai \
   "@${PROMPT_FILE}" >"$TMP_OUT" 2>&1
 AGENT_EXIT=$?

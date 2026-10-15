@@ -1,5 +1,6 @@
 import { Context, Effect, Schema } from "effect";
 
+import { Plugins } from "./plugins.ts";
 import { RepoResult, RepoSpec } from "./repo.ts";
 import { Usage } from "./usage.ts";
 
@@ -68,6 +69,7 @@ export const RunRecord = Schema.Struct({
   channel: Schema.NullOr(Schema.String),
   resumeFrom: Schema.optionalKey(Schema.NullOr(Schema.String)),
   repo: Schema.optionalKey(Schema.NullOr(RepoSpec)),
+  plugins: Schema.optionalKey(Plugins),
   contract: RunContract,
   createdAt: Schema.String,
   terminal: Schema.NullOr(RunTerminal),
@@ -104,6 +106,7 @@ export const AdmitInput = Schema.Struct({
   idempotencyKey: Schema.String,
   resumeFrom: Schema.optionalKey(Schema.NullOr(Schema.String)),
   repo: Schema.optionalKey(Schema.NullOr(RepoSpec)),
+  plugins: Schema.optionalKey(Plugins),
 });
 
 export type AdmitInput = typeof AdmitInput.Type;

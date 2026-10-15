@@ -19,6 +19,8 @@ import type { SandboxResult } from "./sandbox-result.ts";
 import { Upstream, WorkspaceSnapshot as WorkspaceSnapshotSchema } from "./shared.ts";
 import type { ProofResult, RunContract, WorkspaceSnapshot } from "./shared.ts";
 import { timingLine } from "./timing.ts";
+import { PLUGIN_DIR, agentTools, pluginEnv, pluginLine, pluginPath } from "./plugins.ts";
+import type { Plugin } from "./plugins.ts";
 
 export type { SandboxResult } from "./sandbox-result.ts";
 
@@ -309,6 +311,11 @@ const prepareRepo = (job: PrepareJob): Effect.Effect<Checkout> => {
   }).pipe(Effect.catch((error) => Effect.succeed({ ...NO_CHECKOUT, line: `[terrarium:repo] prepare failed: ${error.detail}` })));
 };
 
+const installPlugins = (box: Box, plugins: ReadonlyArray<Plugin>): Effect.Effect<void, Upstream> =>
+  plugins.length === 0
+    ? Effect.void
+    : sandboxCall(() => box.mkdir(PLUGIN_DIR, { recursive: true })).pipe(Effect.andThen(Effect.forEach(plugins, (plugin) => sandboxCall(() => box.writeFile(pluginPath(plugin), plugin.source)), { discard: true })));
+
 const saveWorkspace = (box: Box, runId: string): Effect.Effect<WorkspaceSnapshot | null> =>
   sandboxCall(() => box.createBackup({ dir: WORKSPACE, name: runId, ttl: SNAPSHOT_TTL_SECONDS, localBucket: true, excludes: ["terrarium-task.txt", "terrarium-contract.json"] })).pipe(
     Effect.map((backup): WorkspaceSnapshot => ({ id: backup.id, dir: backup.dir, localBucket: true, savedAt: new Date().toISOString() })),
@@ -325,17 +332,18 @@ const restoreInto = (box: Box, snapshot: WorkspaceSnapshot | null): Effect.Effec
 };
 
 export const sandboxLayer = (env: SandboxEnv) => Layer.succeed(Sandbox, Sandbox.of({
-  run: ({ task, contract, proof, resume, repo, ownerId }) => Effect.gen(function* () {
+  run: ({ task, contract, proof, resume, repo, ownerId, plugins = [] }) => Effect.gen(function* () {
     const box = getSandbox(env.TERRARIUM_SANDBOX, contract.runId);
     const startMs = Date.now();
     const restoreLine = yield* restoreInto(box, resume ?? null);
     const stubForSetup = env.TERRARIUM_SANDBOX.get(env.TERRARIUM_SANDBOX.idFromName(contract.runId));
     const checkout = yield* prepareRepo({ env, box, stub: stubForSetup, spec: repo ?? null, runId: contract.runId, ownerId: ownerId ?? "" });
+    yield* installPlugins(box, plugins);
     yield* sandboxCall(() => box.writeFile(`${WORKSPACE}/terrarium-task.txt`, task));
     const boxReadyMs = Date.now();
     yield* sandboxCall(() => box.writeFile(`${WORKSPACE}/terrarium-contract.json`, JSON.stringify(contract)));
     const stub = env.TERRARIUM_SANDBOX.get(env.TERRARIUM_SANDBOX.idFromName(contract.runId));
-    const agent = sandboxCall(() => box.exec("/usr/local/bin/terrarium-runner", { timeout: RUN_TIMEOUT_MS, cwd: WORKSPACE, env: containerEnv(env.TERRARIUM_MODEL_HOST) }));
+    const agent = sandboxCall(() => box.exec("/usr/local/bin/terrarium-runner", { timeout: RUN_TIMEOUT_MS, cwd: WORKSPACE, env: { ...containerEnv(env.TERRARIUM_MODEL_HOST), TERRARIUM_PLUGINS: pluginEnv(plugins), TERRARIUM_AGENT_TOOLS: agentTools(plugins) } }));
     const lastActive = Effect.tryPromise(() => stub.lastActive()).pipe(Effect.orElseSucceed(() => null));
     const stall = watchStall(lastActive, Date.now(), stallPolicy(env)).pipe(Effect.map((stalled) => ({ stdout: "", stderr: stallMessage(stalled), exitCode: STALLED_EXIT })));
     const result = yield* Effect.raceFirst(agent, stall);
@@ -345,7 +353,7 @@ export const sandboxLayer = (env: SandboxEnv) => Layer.succeed(Sandbox, Sandbox.
     const repoResult = yield* repoOutcome(box, checkout, contract.runId);
     const workspace = yield* saveWorkspace(box, contract.runId);
 
-    return { repo: repoResult, output: [restoreLine, checkout.line, result.stdout, labelStderr(result.stderr), timing].filter((part) => part.length > 0).join("\n"), exitCode: result.exitCode, proof: proofResult, usage, workspace };
+    return { repo: repoResult, output: [restoreLine, checkout.line, pluginLine(plugins), result.stdout, labelStderr(result.stderr), timing].filter((part) => part.length > 0).join("\n"), exitCode: result.exitCode, proof: proofResult, usage, workspace };
   }).pipe(Effect.ensuring(Effect.ignore(sandboxCall(() => getSandbox(env.TERRARIUM_SANDBOX, contract.runId).destroy())))),
 }));
 
