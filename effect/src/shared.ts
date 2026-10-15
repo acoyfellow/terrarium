@@ -26,6 +26,7 @@ export const ProofResult = Schema.Struct({
   command: Schema.String,
   exitCode: Schema.NullOr(Schema.Int),
   output: Schema.String,
+  source: Schema.optionalKey(Schema.Literals(["given", "detected"])),
 });
 
 export type ProofResult = typeof ProofResult.Type;

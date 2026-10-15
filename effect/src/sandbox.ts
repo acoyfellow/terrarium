@@ -1,6 +1,7 @@
 import { Sandbox as SdkSandbox, getSandbox } from "@cloudflare/sandbox";
-import { Context, Effect, Layer } from "effect";
+import { Context, Effect, Layer, Option } from "effect";
 
+import { detectProof } from "./default-proof.ts";
 import { answerModel, isModelRoute, modelError } from "./model-route.ts";
 import type { SandboxResult } from "./sandbox-result.ts";
 import { Upstream } from "./shared.ts";
@@ -58,11 +59,32 @@ export const clipped = (text: string): string => (text.length <= MAX_PROOF_OUTPU
 
 type Box = ReturnType<typeof getSandbox>;
 
-const runProof = (box: Box, command: string) =>
+const runProof = (box: Box, command: string, source: "given" | "detected") =>
   sandboxCall(() => box.exec(command, { timeout: PROOF_TIMEOUT_MS, cwd: WORKSPACE })).pipe(
-    Effect.map((result): ProofResult => ({ command, exitCode: result.exitCode, output: clipped([result.stdout, result.stderr].filter((part) => part.length > 0).join("\n")) })),
-    Effect.catch((error) => Effect.succeed<ProofResult>({ command, exitCode: null, output: clipped(error.detail) })),
+    Effect.map((result): ProofResult => ({ command, exitCode: result.exitCode, output: clipped([result.stdout, result.stderr].filter((part) => part.length > 0).join("\n")), source })),
+    Effect.catch((error) => Effect.succeed<ProofResult>({ command, exitCode: null, output: clipped(error.detail), source })),
   );
+
+const readOrEmpty = (box: Box, command: string) =>
+  sandboxCall(() => box.exec(command, { timeout: 10_000, cwd: WORKSPACE })).pipe(
+    Effect.map((result) => (result.exitCode === 0 ? result.stdout : "")),
+    Effect.catch(() => Effect.succeed("")),
+  );
+
+const workspaceOf = (box: Box) => Effect.all({
+  files: readOrEmpty(box, "ls -1A").pipe(Effect.map((text) => text.split("\n").map((line) => line.trim()).filter((line) => line.length > 0))),
+  packageJson: readOrEmpty(box, "cat package.json"),
+  makefile: readOrEmpty(box, "cat Makefile"),
+});
+
+const chooseProof = (box: Box, proof: string | null): Effect.Effect<Option.Option<ProofResult>> => {
+  if (proof !== null) return runProof(box, proof, "given").pipe(Effect.map(Option.some));
+
+  return workspaceOf(box).pipe(
+    Effect.map(detectProof),
+    Effect.flatMap(Option.match({ onNone: () => Effect.succeed(Option.none<ProofResult>()), onSome: (command) => runProof(box, command, "detected").pipe(Effect.map(Option.some)) })),
+  );
+};
 
 export const sandboxLayer = (env: SandboxEnv) => Layer.succeed(Sandbox, Sandbox.of({
   run: ({ task, contract, proof }) => Effect.gen(function* () {
@@ -72,7 +94,7 @@ export const sandboxLayer = (env: SandboxEnv) => Layer.succeed(Sandbox, Sandbox.
     const boxReadyMs = Date.now();
     yield* sandboxCall(() => box.writeFile(`${WORKSPACE}/terrarium-contract.json`, JSON.stringify(contract)));
     const result = yield* sandboxCall(() => box.exec("/usr/local/bin/terrarium-runner", { timeout: RUN_TIMEOUT_MS, cwd: WORKSPACE, env: containerEnv(env.TERRARIUM_MODEL_HOST) }));
-    const proofResult = proof === null ? null : yield* runProof(box, proof);
+    const proofResult = Option.getOrNull(yield* chooseProof(box, proof));
     const timing = timingLine({ startMs, boxReadyMs, endMs: Date.now(), runnerOutput: result.stdout });
 
     return { output: [result.stdout, labelStderr(result.stderr), timing].filter((part) => part.length > 0).join("\n"), exitCode: result.exitCode, proof: proofResult };
