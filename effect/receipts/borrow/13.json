@@ -1,0 +1,30 @@
+{
+  "item": 13,
+  "checkedAt": "2026-10-15T07:25:51.253Z",
+  "title": "metric loops: measured baseline and noise, then a ratchet that keeps only real gains and resumes from the best workspace",
+  "loopId": "loop_27b86fdfe43a479196368b4898b6ee10",
+  "seconds": 80,
+  "ok": true,
+  "results": [
+    {
+      "name": "a metric loop is accepted and a metric+proof loop is refused",
+      "ok": true,
+      "note": "loop_27b86fdfe43a479196368b4898b6ee10 create=202 conflict=400"
+    },
+    {
+      "name": "baseline: seed plus repeated idle runs measured the metric",
+      "ok": true,
+      "note": "values=[2000,2000,2000] median=2000 noise=0"
+    },
+    {
+      "name": "the attempt resumed from the best workspace and improved the metric",
+      "ok": true,
+      "note": "resumed=true {\"runId\":\"ter_mv97s4ie_531c3bde7edd\",\"value\":1,\"accepted\":true,\"reason\":\"improved 2000 -> 1\"}"
+    },
+    {
+      "name": "the ratchet stopped at the target",
+      "ok": true,
+      "note": "reached target 200 best=1 bestRun=ter_mv97s4ie_531c3bde7edd"
+    }
+  ]
+}

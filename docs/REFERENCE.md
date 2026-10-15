@@ -63,6 +63,14 @@ The Terrarium Pi extension registers a `terrarium` provider for pi-subagents `ex
 
 The Pi extension adds a `terrarium_batch` tool: `{ tasks, proof?, channel?, mode? }`, up to 8 tasks started in parallel. `mode: "all"` waits for every run. `mode: "first"` returns as soon as one run passes and cancels the others. Codemode scripts call it as `tools.terrarium_batch` when the tool is enabled.
 
+## Metric loops
+
+`POST /api/loops` with `metric: { command, direction: "lower"|"higher", seed?, baselineRuns?, minGain?, target? }` and no `expect`, `proof`, `checks` or `wake`.
+
+1. A seed run (the `seed` task, or no change) and `baselineRuns` (2 to 5, default 3) idle runs measure `command`. The median is the baseline; the spread (max minus min) is the noise.
+2. Each attempt starts from the best workspace so far. A new value is kept only if it beats the best by more than the noise and `minGain`.
+3. The loop stops at `target` or after `maxAttempts`. `output.metric` has the baseline, every step, and the best run.
+
 ## Limits
 
 | Limit | Value |

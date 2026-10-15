@@ -1,6 +1,7 @@
 import { Effect, Schema } from "effect";
 
 import { CheckResult, NamedChecks, checksCommand } from "./loop-checks.ts";
+import { Metric } from "./metric.ts";
 import { Usage } from "./usage.ts";
 import { Wake } from "./wake.ts";
 
@@ -13,12 +14,16 @@ export const LoopContract = Schema.Struct({
   proof: Schema.optionalKey(field(2000)),
   checks: Schema.optionalKey(NamedChecks),
   wake: Schema.optionalKey(Wake),
+  metric: Schema.optionalKey(Metric),
   maxAttempts: Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 5 })).pipe(Schema.withDecodingDefaultKey(Effect.succeed(3))),
 });
 
 export type LoopContract = typeof LoopContract.Type;
 
-export const hasCheck = (contract: LoopContract): boolean => contract.expect !== undefined || contract.proof !== undefined || contract.checks !== undefined;
+export const hasCheck = (contract: LoopContract): boolean => contract.expect !== undefined || contract.proof !== undefined || contract.checks !== undefined || contract.metric !== undefined;
+
+export const metricConflicts = (contract: LoopContract): ReadonlyArray<string> =>
+  contract.metric === undefined ? [] : [contract.expect, contract.proof, contract.checks, contract.wake].some((part) => part !== undefined) ? ["a metric loop cannot also have expect, proof, checks or wake"] : [];
 
 export const runProofOf = (contract: LoopContract): string | null => {
   if (contract.checks !== undefined) return checksCommand(contract.checks, contract.proof);

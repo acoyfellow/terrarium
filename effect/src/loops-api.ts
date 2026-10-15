@@ -1,7 +1,7 @@
 import { Effect, Schema } from "effect";
 import { BadRequest, NotFound, Owner, Upstream } from "./shared.ts";
 import type { HttpFailure } from "./shared.ts";
-import { LoopContract, hasCheck } from "./loop-decide.ts";
+import { LoopContract, hasCheck, metricConflicts } from "./loop-decide.ts";
 import { MAX_NOTE, WAKE_EVENT, hookSignature, sameText } from "./wake.ts";
 import type { WakePayload } from "./wake.ts";
 
@@ -55,7 +55,9 @@ export const createLoop = (request: Request, env: LoopsEnv): Effect.Effect<Respo
     const body = yield* Effect.tryPromise({ try: () => request.json(), catch: () => new BadRequest({ problems: ["body must be JSON"] }) });
     const contract = yield* Schema.decodeUnknownEffect(LoopContract)(body).pipe(Effect.mapError((error) => new BadRequest({ problems: [error.message] })));
 
-    if (!hasCheck(contract)) return yield* new BadRequest({ problems: ["a loop needs expect, proof, or both"] });
+    if (!hasCheck(contract)) return yield* new BadRequest({ problems: ["a loop needs expect, proof, checks or metric"] });
+
+    if (metricConflicts(contract).length > 0) return yield* new BadRequest({ problems: [...metricConflicts(contract)] });
     const loopId = `loop_${crypto.randomUUID().replaceAll("-", "")}`;
     const loops = yield* readIndex(env, owner.id);
     yield* Effect.tryPromise({ try: () => env.LOOP_WORKFLOW.create({ id: loopId, params: { loopId, ownerId: owner.id, contract } }), catch: upstream("workflow") });

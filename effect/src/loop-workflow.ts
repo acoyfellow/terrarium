@@ -8,6 +8,8 @@ import { decideNext, gateAttempt, runProofOf } from "./loop-decide.ts";
 import { runsLayer } from "./app.ts";
 import type { Decision, Gate, LoopContract, RecordedAttempt } from "./loop-decide.ts";
 import { sumUsage } from "./usage.ts";
+import { DEFAULT_BASELINE_RUNS, IDLE_TASK, baselineOf, metricProof, parseMetric, ratchetStep, ratchetTask, reachedTarget } from "./metric.ts";
+import type { Baseline, Metric, Ratchet } from "./metric.ts";
 import { DEFAULT_EVENT_TIMEOUT, WAKE_EVENT, WakePayload, durationMs, isEventWake, nextTask } from "./wake.ts";
 import type { Wake } from "./wake.ts";
 import type { Usage } from "./usage.ts";
@@ -25,6 +27,15 @@ export interface LoopOutput {
   readonly attempts: ReadonlyArray<RecordedAttempt & { readonly gate: Gate }>;
   readonly usage: Usage;
   readonly wakes?: ReadonlyArray<WakePayload | null>;
+  readonly metric?: MetricOutput;
+}
+
+export interface MetricOutput {
+  readonly seedRunId: string;
+  readonly baseline: Baseline;
+  readonly baselineRunIds: ReadonlyArray<string>;
+  readonly ratchet: Ratchet;
+  readonly stoppedBecause: string;
 }
 
 const pollLimit = 180;
@@ -34,10 +45,12 @@ const toAttempt = (run: RunRecord): RecordedAttempt | null =>
     ? null
     : { runId: run.runId, status: run.terminal.status, fromThisRun: run.terminal.provenance === "this-run", proofExit: run.terminal.proof?.exitCode ?? null, summary: run.terminal.summary, ...usageOf(run.terminal), proofOutput: run.terminal.proof?.output ?? null, logs: run.logs };
 
-const admitAttempt = (contract: LoopContract, loopId: string, n: number, task: string) =>
+const admitAttempt = (contract: LoopContract, loopId: string, n: number, task: string) => admitRun(loopId, `attempt-${n}`, task, runProofOf(contract), null);
+
+const admitRun = (loopId: string, label: string, task: string, proof: string | null, resumeFrom: string | null) =>
   Effect.gen(function* () {
     const runs = yield* Runs;
-    const run = yield* runs.admit({ task, proof: runProofOf(contract), channel: `loop:${loopId}`, idempotencyKey: `loop-${loopId}-attempt-${n}` });
+    const run = yield* runs.admit({ task, proof, channel: `loop:${loopId}`, idempotencyKey: `loop-${loopId}-${label}`, resumeFrom });
 
     return run.runId;
   });
@@ -58,6 +71,8 @@ export const makeLoopWorkflow = <E>(runsLayer: (env: E) => Layer.Layer<Runs>) =>
       const attempts: Array<RecordedAttempt & { readonly gate: Gate }> = [];
       const wakes: Array<WakePayload | null> = [];
 
+      if (contract.metric !== undefined) return this.metricLoop(step, loopId, contract, contract.metric, exec);
+
       for (;;) {
         const decision = decideNext(contract, attempts);
 
@@ -72,11 +87,54 @@ export const makeLoopWorkflow = <E>(runsLayer: (env: E) => Layer.Layer<Runs>) =>
         const runId = await step.do(`attempt-${n}-admit`, () =>
           exec(admitAttempt(contract, loopId, n, task)));
 
-        const attempt = await this.waitFor(step, n, runId, exec);
+        const attempt = await this.waitFor(step, `attempt-${n}`, runId, exec);
         const scored = contract.checks === undefined ? attempt : { ...attempt, checks: checkResults(contract.checks, contract.proof, attempt.proofOutput ?? null) };
 
         attempts.push({ ...scored, gate: gateAttempt(contract, scored) });
       }
+    }
+
+    private async measured(step: WorkflowStep, loopId: string, label: string, task: string, metric: Metric, resumeFrom: string | null, exec: <A>(program: Effect.Effect<A, unknown, Runs | Owner>) => Promise<A>): Promise<RecordedAttempt> {
+      const runId = await step.do(`${label}-admit`, () => exec(admitRun(loopId, label, task, metricProof(metric), resumeFrom)));
+
+      return this.waitFor(step, label, runId, exec);
+    }
+
+    private async metricLoop(step: WorkflowStep, loopId: string, contract: LoopContract, metric: Metric, exec: <A>(program: Effect.Effect<A, unknown, Runs | Owner>) => Promise<A>): Promise<LoopOutput> {
+      const seed = await this.measured(step, loopId, "seed", metric.seed ?? IDLE_TASK, metric, null, exec);
+      const seedRunId = seed.runId ?? "";
+      const baselineRuns: Array<RecordedAttempt> = [];
+
+      for (let index = 0; index < (metric.baselineRuns ?? DEFAULT_BASELINE_RUNS); index++) baselineRuns.push(await this.measured(step, loopId, `baseline-${index}`, IDLE_TASK, metric, seedRunId, exec));
+
+      const values = [seed, ...baselineRuns].flatMap((run) => Option.toArray(parseMetric(run.proofOutput ?? null)));
+      const baseline = baselineOf(values);
+      const attempts: Array<RecordedAttempt & { readonly gate: Gate }> = [];
+      const all = [seed, ...baselineRuns];
+
+      const finish = (ratchet: Ratchet, stoppedBecause: string, outcome: "passed" | "exhausted"): LoopOutput => ({
+        decision: { action: "stop", outcome, reason: stoppedBecause },
+        attempts,
+        usage: sumUsage([...all, ...attempts].flatMap((attempt) => (attempt.usage === undefined ? [] : [attempt.usage]))),
+        metric: { seedRunId, baseline, baselineRunIds: baselineRuns.map((run) => run.runId ?? ""), ratchet, stoppedBecause },
+      });
+
+      if (values.length < 2) return finish({ best: Number.NaN, bestRunId: seedRunId, steps: [] }, "baseline did not produce at least 2 numbers", "exhausted");
+
+      let ratchet: Ratchet = { best: baseline.median, bestRunId: seedRunId, steps: [] };
+
+      for (let n = 1; n <= contract.maxAttempts; n++) {
+        const attempt = await this.measured(step, loopId, `attempt-${n}`, ratchetTask(contract.task, ratchet, metric), metric, ratchet.bestRunId, exec);
+        const next = ratchetStep(metric, baseline, ratchet, attempt.runId, parseMetric(attempt.proofOutput ?? null));
+        const kept = next.bestRunId !== ratchet.bestRunId;
+
+        attempts.push({ ...attempt, gate: { passed: kept, reason: next.steps.at(-1)?.reason ?? "" } });
+        ratchet = next;
+
+        if (kept && reachedTarget(metric, ratchet.best)) return finish(ratchet, `reached target ${metric.target}`, "passed");
+      }
+
+      return finish(ratchet, `${contract.maxAttempts} attempts used; best ${ratchet.best} (baseline ${baseline.median} ± ${baseline.noise})`, ratchet.steps.some((one) => one.accepted) ? "passed" : "exhausted");
     }
 
     private async sleepUntilWake(step: WorkflowStep, n: number, wake: Wake): Promise<WakePayload | null> {
@@ -91,14 +149,14 @@ export const makeLoopWorkflow = <E>(runsLayer: (env: E) => Layer.Layer<Runs>) =>
       return received === null ? null : Option.getOrNull(Schema.decodeUnknownOption(WakePayload)(received.payload));
     }
 
-    private async waitFor(step: WorkflowStep, n: number, runId: RunRecord["runId"], exec: <A>(program: Effect.Effect<A, unknown, Runs | Owner>) => Promise<A>): Promise<RecordedAttempt> {
+    private async waitFor(step: WorkflowStep, label: string, runId: RunRecord["runId"], exec: <A>(program: Effect.Effect<A, unknown, Runs | Owner>) => Promise<A>): Promise<RecordedAttempt> {
       for (let poll = 0; poll < pollLimit; poll++) {
-        const attempt = await step.do<RecordedAttempt | null>(`attempt-${n}-poll-${poll}`, () =>
+        const attempt = await step.do<RecordedAttempt | null>(`${label}-poll-${poll}`, () =>
           exec(pollAttempt(runId)));
 
         if (attempt !== null) return attempt;
 
-        await step.sleep(`attempt-${n}-wait-${poll}`, "10 seconds");
+        await step.sleep(`${label}-wait-${poll}`, "10 seconds");
       }
 
       return { runId, status: "timeout", fromThisRun: false, logs: "" };
