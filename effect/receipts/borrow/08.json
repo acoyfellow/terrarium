@@ -1,38 +1,38 @@
 {
   "item": 8,
-  "checkedAt": "2026-10-15T04:08:14.729Z",
+  "checkedAt": "2026-10-15T04:16:27.535Z",
   "title": "warm repo bases: checkout plus setup is snapshotted once per owner/repo/ref/setup; later runs restore it",
-  "seconds": 255,
+  "seconds": 219,
   "repo": {
     "github": "jonschlinkert/is-odd",
     "ref": "master",
-    "setup": "npm install --no-package-lock --ignore-scripts && echo 5c2498c0 > /dev/null"
+    "setup": "npm install --no-package-lock --ignore-scripts && echo 10aad9a7 > /dev/null"
   },
   "runs": [
-    "ter_mv90l1tc_8be2a153f935",
-    "ter_mv90nnix_ea39fcae622b",
-    "ter_mv90ossr_ed51b12140fa"
+    "ter_mv90wdue_d88b62fb2120",
+    "ter_mv910c96_464f42cfdd47",
+    "ter_mv910t7s_c4dc1732ed03"
   ],
   "timings": {
-    "coldSeconds": 122,
-    "warmSeconds": 53
+    "coldSeconds": 185,
+    "warmSeconds": 22
   },
   "ok": true,
   "results": [
     {
       "name": "first run builds the base: checkout, setup with registry access, snapshot",
       "ok": true,
-      "note": "122s setup=59421ms [terrarium:setup] 'npm install --no-package-lock --ignore-scripts && echo 5c2498c0 > /dev/null' took 59421 ms; warm base base:efbeeb5051a59c4e32835848f5e16bb0 saved"
+      "note": "185s setup=97794ms [terrarium:setup] 'npm install --no-package-lock --ignore-scripts && echo 10aad9a7 > /dev/null' took 97794 ms; warm base base:ffec550385552c883dc47f7a45408bf9 saved"
     },
     {
       "name": "second run starts from the warm base with dependencies already installed",
       "ok": true,
-      "note": "53s [terrarium:repo] jonschlinkert/is-odd@master from warm base base:efbeeb5051a59c4e32835848f5e16bb0 on branch terrarium/ter_mv90nnix_ea39fcae622b"
+      "note": "22s [terrarium:repo] jonschlinkert/is-odd@master from warm base base:ffec550385552c883dc47f7a45408bf9 on branch terrarium/ter_mv910c96_464f42cfdd47"
     },
     {
       "name": "the warm start is faster than the cold build",
       "ok": true,
-      "note": "cold 122s vs warm 53s"
+      "note": "cold 185s vs warm 22s"
     },
     {
       "name": "the registry is closed again while the agent works",
