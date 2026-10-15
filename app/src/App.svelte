@@ -37,7 +37,10 @@
 
   const currentDoc = () => docs.find((d) => d.id === selectedDoc) || docs[0];
 
+  let menuOpen = $state(false);
+
   function navigate(to, event) {
+    menuOpen = false;
     if (event) event.preventDefault();
     history.pushState(null, '', to);
     path = location.pathname; hash = location.hash;
@@ -95,7 +98,10 @@
   </div>
   <header class="topbar">
     <a class="brand" href="/" onclick={(e) => navigate('/', e)}><span class="mark"></span>Terrarium</a>
-    <nav class="topbar-nav">
+    <button class="menu-toggle" type="button" aria-expanded={menuOpen} aria-controls="topbar-nav" aria-label={menuOpen ? 'Close menu' : 'Open menu'} onclick={() => (menuOpen = !menuOpen)}>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true">{#if menuOpen}<path d="M6 6l12 12M18 6L6 18" />{:else}<path d="M4 7h16M4 12h16M4 17h16" />{/if}</svg>
+    </button>
+    <nav class="topbar-nav" id="topbar-nav" class:open={menuOpen}>
       <a href="/docs" aria-current={path === '/docs' ? 'page' : undefined} onclick={(e) => navigate('/docs', e)}>Docs</a>
       <a href="/how-it-works" aria-current={path === '/how-it-works' ? 'page' : undefined} onclick={(e) => navigate('/how-it-works', e)}>How it works</a>
       <a href="/terraloop" aria-current={path === '/terraloop' ? 'page' : undefined} onclick={(e) => navigate('/terraloop', e)}>Terraloop</a>

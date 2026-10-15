@@ -1000,3 +1000,14 @@ img { max-width: 100%; display: block; }
 .cp-approval-actions .btn { min-height: 44px; flex: 1 1 140px; }
 .cp-badge[data-state='awaiting you'] { color: #b88a00; }
 .cp-light[data-state='awaiting you'] { background: #d9a400; }
+
+.menu-toggle { display: none; align-items: center; justify-content: center; width: 2.5rem; height: 2.5rem; border: 1px solid var(--border); border-radius: var(--radius-sm); background: transparent; color: var(--text); cursor: pointer; }
+.menu-toggle svg { width: 1.2rem; height: 1.2rem; }
+@media (max-width: 900px) {
+  .menu-toggle { display: inline-flex; }
+  .topbar-nav { display: none; position: absolute; top: 3.75rem; left: 0; right: 0; flex-direction: column; align-items: stretch; gap: 0; padding: .5rem clamp(1rem, 4vw, 2.5rem) 1rem; background: var(--ink); border-bottom: 1px solid var(--border); box-shadow: 0 12px 24px rgb(0 0 0 / .15); }
+  .topbar-nav.open { display: flex; }
+  .topbar-nav a, .topbar-nav a:not(.cta) { font-size: .8rem; padding: .85rem .25rem; border-bottom: 1px solid var(--border); }
+  .topbar-nav a.cta { margin-top: .75rem; text-align: center; border-bottom: 1px solid var(--border-strong); }
+  .topbar-nav .theme-toggle { align-self: flex-start; margin-top: .75rem; }
+}
