@@ -41,6 +41,8 @@ jobs:
           node-version: 22
       - name: Install
         run: npm ci
+      - name: Install effect package
+        run: npm --prefix effect ci
       - name: Full isolated suite
         run: npm test
 
