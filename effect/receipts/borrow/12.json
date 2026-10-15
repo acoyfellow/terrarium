@@ -1,0 +1,40 @@
+{
+  "item": 12,
+  "checkedAt": "2026-10-15T07:11:14.164Z",
+  "title": "codemode orchestration helper: tools.terrarium_batch (all / first-pass with cancel)",
+  "runs": [
+    "ter_mv978qsl_1aefee73e2ac",
+    "ter_mv978qsh_5b0cb13ac063",
+    "ter_mv978qsj_b5935c303b77",
+    "ter_mv979i92_f3b48a6bfdb7",
+    "ter_mv979i94_cef039b1ef87"
+  ],
+  "ok": true,
+  "results": [
+    {
+      "name": "a codemode script called tools.terrarium_batch",
+      "ok": true,
+      "note": "pi codemode, tools codemode,terrarium_batch"
+    },
+    {
+      "name": "the winner is the one run whose proof passes",
+      "ok": true,
+      "note": "ter_mv978qsl_1aefee73e2ac done"
+    },
+    {
+      "name": "the other runs failed their proof in prod",
+      "ok": true,
+      "note": "ter_mv978qsh_5b0cb13ac063 ter_mv978qsj_b5935c303b77"
+    },
+    {
+      "name": "first-pass returned before the slow run finished",
+      "ok": true,
+      "note": "15s winner=ter_mv979i92_f3b48a6bfdb7"
+    },
+    {
+      "name": "the slow run was cancelled",
+      "ok": true,
+      "note": "ter_mv979i94_cef039b1ef87 cancelled"
+    }
+  ]
+}

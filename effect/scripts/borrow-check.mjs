@@ -24,7 +24,7 @@ const rows = items.map((item) => {
   if (rerun && script !== undefined) {
     const status = (() => {
       try {
-        execFileSync("node", [join(checksDir, script)], { stdio: "inherit" });
+        execFileSync("node", ["--experimental-strip-types", join(checksDir, script)], { stdio: "inherit" });
 
         return 0;
       } catch (error) {

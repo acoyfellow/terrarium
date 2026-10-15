@@ -59,6 +59,10 @@ Pi in the box has the `read`, `write`, `edit` and `bash` tools. A run can add up
 
 The Terrarium Pi extension registers a `terrarium` provider for pi-subagents `external-job` agents. Copy `examples/pi-subagents/boxed.md` to `.pi/agents/` and load both extensions. A `subagent` call to that agent starts a Terrarium run. `runner.options.proof` and `runner.options.channel` go to the run; pi-subagents gets the run's state and its summary and logs as the result.
 
+## terrarium_batch
+
+The Pi extension adds a `terrarium_batch` tool: `{ tasks, proof?, channel?, mode? }`, up to 8 tasks started in parallel. `mode: "all"` waits for every run. `mode: "first"` returns as soon as one run passes and cancels the others. Codemode scripts call it as `tools.terrarium_batch` when the tool is enabled.
+
 ## Limits
 
 | Limit | Value |

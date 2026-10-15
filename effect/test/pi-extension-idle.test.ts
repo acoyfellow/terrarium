@@ -14,7 +14,7 @@ const fakePi = () => {
   return {
     handlers,
     messages,
-    pi: { on: (_event: "tool_result", handler: Handler) => void handlers.push(handler), sendUserMessage: (content: string) => void messages.push(content) },
+    pi: { on: (_event: "tool_result", handler: Handler) => void handlers.push(handler), sendUserMessage: (content: string) => void messages.push(content), registerTool: () => undefined },
   };
 };
 
