@@ -1,5 +1,7 @@
 import { Context, Effect, Schema } from "effect";
 
+import { Usage } from "./usage.ts";
+
 export const OwnerId = Schema.String.check(Schema.isPattern(/^(user:[^:\s]+:[^:\s]+|[A-Za-z0-9._-]{1,64})$/));
 
 export type OwnerId = typeof OwnerId.Type;
@@ -46,6 +48,7 @@ export const RunTerminal = Schema.Struct({
   summary: Schema.NullOr(Schema.String),
   exitCode: Schema.NullOr(Schema.Int),
   finishedAt: Schema.String,
+  usage: Schema.optionalKey(Usage),
 });
 
 export type RunTerminal = typeof RunTerminal.Type;

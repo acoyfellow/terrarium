@@ -1,7 +1,10 @@
 import { Sandbox as SdkSandbox, getSandbox } from "@cloudflare/sandbox";
+import type { OutboundHandlerContext } from "@cloudflare/containers";
 import { Context, Effect, Layer, Option } from "effect";
 
 import { detectProof } from "./default-proof.ts";
+import { ZERO_USAGE, addCall } from "./usage.ts";
+import type { CallTokens, Usage } from "./usage.ts";
 import { answerModel, isModelRoute, modelError } from "./model-route.ts";
 import type { SandboxResult } from "./sandbox-result.ts";
 import { Upstream } from "./shared.ts";
@@ -18,7 +21,11 @@ export interface SandboxJob {
 
 export class Sandbox extends Context.Service<Sandbox, { readonly run: (job: SandboxJob) => Effect.Effect<SandboxResult, Upstream> }>()("terrarium/Sandbox") {}
 
-export type ModelEnv = Cloudflare.Env & { readonly TERRARIUM_MODEL_HOST: string };
+export interface ModelEnv {
+  readonly AI: Ai;
+  readonly TERRARIUM_MODEL_HOST: string;
+  readonly TERRARIUM_SANDBOX: DurableObjectNamespace<TerrariumSandbox>;
+}
 
 export interface SandboxEnv {
   readonly TERRARIUM_SANDBOX: DurableObjectNamespace<TerrariumSandbox>;
@@ -33,13 +40,44 @@ const MAX_PROOF_OUTPUT = 4000;
 
 export const WORKSPACE = "/workspace";
 
-const outbound = (request: Request, env: ModelEnv): Promise<Response> =>
-  isModelRoute(request, env.TERRARIUM_MODEL_HOST) ? Effect.runPromise(answerModel(request, env.AI)) : Promise.resolve(modelError(403, "egress denied"));
+const USAGE_KEY = "terrarium-usage";
+
+interface DeployedEnv extends Env {
+  readonly TERRARIUM_MODEL_HOST: string;
+}
+
+const isDeployed = (env: Env): env is DeployedEnv => "TERRARIUM_MODEL_HOST" in env;
+
+const withModelHost = (env: Env): ModelEnv => {
+  const host = isDeployed(env) ? env.TERRARIUM_MODEL_HOST : "";
+
+  return { AI: env.AI, TERRARIUM_MODEL_HOST: host, TERRARIUM_SANDBOX: env.TERRARIUM_SANDBOX };
+};
+
+const outbound = (request: Request, generated: Env, ctx: OutboundHandlerContext): Promise<Response> => {
+  const env = withModelHost(generated);
+
+  if (!isModelRoute(request, env.TERRARIUM_MODEL_HOST)) return Promise.resolve(modelError(403, "egress denied"));
+
+  const box = env.TERRARIUM_SANDBOX.get(env.TERRARIUM_SANDBOX.idFromString(ctx.containerId));
+
+  return Effect.runPromise(answerModel(request, env.AI, (tokens) => box.recordTokens(tokens)));
+};
 
 export class TerrariumSandbox extends SdkSandbox<ModelEnv> {
   override enableInternet = false;
 
   override interceptHttps = true;
+
+  async recordTokens(tokens: CallTokens): Promise<void> {
+    const total = (await this.ctx.storage.get<Usage>(USAGE_KEY)) ?? ZERO_USAGE;
+
+    await this.ctx.storage.put(USAGE_KEY, addCall(total, tokens));
+  }
+
+  async readUsage(): Promise<Usage> {
+    return (await this.ctx.storage.get<Usage>(USAGE_KEY)) ?? ZERO_USAGE;
+  }
 }
 
 TerrariumSandbox.outbound = outbound;
@@ -96,7 +134,9 @@ export const sandboxLayer = (env: SandboxEnv) => Layer.succeed(Sandbox, Sandbox.
     const result = yield* sandboxCall(() => box.exec("/usr/local/bin/terrarium-runner", { timeout: RUN_TIMEOUT_MS, cwd: WORKSPACE, env: containerEnv(env.TERRARIUM_MODEL_HOST) }));
     const proofResult = Option.getOrNull(yield* chooseProof(box, proof));
     const timing = timingLine({ startMs, boxReadyMs, endMs: Date.now(), runnerOutput: result.stdout });
+    const stub = env.TERRARIUM_SANDBOX.get(env.TERRARIUM_SANDBOX.idFromName(contract.runId));
+    const usage = yield* Effect.tryPromise(() => stub.readUsage()).pipe(Effect.orElseSucceed(() => ZERO_USAGE));
 
-    return { output: [result.stdout, labelStderr(result.stderr), timing].filter((part) => part.length > 0).join("\n"), exitCode: result.exitCode, proof: proofResult };
+    return { output: [result.stdout, labelStderr(result.stderr), timing].filter((part) => part.length > 0).join("\n"), exitCode: result.exitCode, proof: proofResult, usage };
   }).pipe(Effect.ensuring(Effect.ignore(sandboxCall(() => getSandbox(env.TERRARIUM_SANDBOX, contract.runId).destroy())))),
 }));

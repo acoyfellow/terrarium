@@ -6,7 +6,7 @@ interface __BaseEnv_Env {
 	AI: Ai;
 	ASSETS: Fetcher;
 	OWNER: DurableObjectNamespace /* OwnerDO */;
-	TERRARIUM_SANDBOX: DurableObjectNamespace /* TerrariumSandbox */;
+	TERRARIUM_SANDBOX: DurableObjectNamespace<import("./sandbox").TerrariumSandbox>;
 	RUN_WORKFLOW: Workflow /* RunWorkflow */;
 	LOOP_WORKFLOW: Workflow /* LoopWorkflow */;
 }

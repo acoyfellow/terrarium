@@ -1,0 +1,36 @@
+{
+  "item": 2,
+  "checkedAt": "2026-10-15T03:02:26.749Z",
+  "title": "cost: model calls, tokens and an estimated price per run and per loop",
+  "seconds": 230,
+  "runId": "ter_mv8y8yut_ed7bedd159da",
+  "loopId": "loop_fe67667f36aa489c9b29e80b5db6796b",
+  "ok": true,
+  "results": [
+    {
+      "name": "a run with real work reports model calls and tokens",
+      "ok": true,
+      "note": "{\"modelCalls\":3,\"promptTokens\":4784,\"completionTokens\":88,\"estimatedUsd\":0.001585,\"priceBasis\":\"workers-ai llama-3.3-70b-fp8-fast list price: $0.29/M in, $2.25/M out\"}"
+    },
+    {
+      "name": "the run reports an estimated price with its basis",
+      "ok": true,
+      "note": "$0.001585"
+    },
+    {
+      "name": "a loop was admitted",
+      "ok": true,
+      "note": "202 loop_fe67667f36aa489c9b29e80b5db6796b"
+    },
+    {
+      "name": "each loop attempt reports its own usage",
+      "ok": true,
+      "note": "[3132,6453]"
+    },
+    {
+      "name": "the loop total is the sum of its attempts",
+      "ok": true,
+      "note": "9585 = 9585"
+    }
+  ]
+}

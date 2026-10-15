@@ -1,5 +1,7 @@
 import { Effect, Schema } from "effect";
 
+import { Usage } from "./usage.ts";
+
 const field = (maxLength: number) => Schema.Trim.check(Schema.isNonEmpty(), Schema.isMaxLength(maxLength));
 
 export const LoopContract = Schema.Struct({
@@ -22,6 +24,7 @@ export const RecordedAttempt = Schema.Struct({
   fromThisRun: Schema.Boolean,
   proofExit: Schema.optionalKey(Schema.NullOr(Schema.Int)),
   summary: Schema.optionalKey(Schema.NullOr(Schema.String)),
+  usage: Schema.optionalKey(Usage),
   logs: Schema.String,
 });
 
