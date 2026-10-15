@@ -1,0 +1,15 @@
+{
+  "checkedAt": "2026-10-15T03:00:00Z",
+  "finding": "The old src/pi-extension.js 1.5 s setInterval is not loaded on this machine; ~/.pi/agent/extensions/terrarium points at the Effect pi-extension, which polls only after a background terrarium_spawn.",
+  "axTraffic": {
+    "source": "httpRequestsAdaptiveGroups, host: the team AX instance",
+    "burst2026-10-12T01to03": { "POST /claim": 39893, "HEAD /": 39466, "cause": "old extensions calling /claim; fixed earlier by switching to status polling" },
+    "2026-10-14T00to2026-10-15T04": { "HEAD /": 3857, "GET /api/runs/ter_mv6yzlcn_76629a7202ba/status": 3248 },
+    "steadyStatusPollsPerHour": "203-231 from 2026-10-14T17 to 2026-10-15T01, user agent undici, one finished run",
+    "cause": "a session watched ter_mv6yzlcn which returned a terminal shape the old extension could not decode (contractStatus renamed to provenance), so its loop never ended: 4 sessions x 1 poll per 15 s = 240 per hour"
+  },
+  "fix": "fda769a: watches stop after 160 polls (40 min) or 8 consecutive failures, tell the session, and a run is watched once per session",
+  "tests": ["idle session makes 0 fetch calls", "non-background tool results start no watch", "finished run delivered after one interval", "poll cap", "failure cap", "failure then success still delivers"],
+  "after": "pending: measure the same status path per hour after Pi sessions reload",
+  "ok": false
+}

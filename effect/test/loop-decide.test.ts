@@ -93,3 +93,17 @@ test("proof and expect together need both", () => {
   assert.equal(gateAttempt(both, withProof(0, "391")).passed, true);
   assert.equal(gateAttempt(both, withProof(2, "391")).passed, false);
 });
+
+test("with tools on, the answer may live only in the validated receipt summary", () => {
+  const toolsOnLogs = 'TASK_RECEIVED\nTERRARIUM_TIMING runner_start_ms=1 agent_end_ms=2\nTASK_ENDED\nTERRARIUM_RESULT={"nonce":"n","summary":"391"}\nTERRARIUM_PHASES box_ms=1';
+  const fromThisRun: RecordedAttempt = { runId: null, status: "done", fromThisRun: true, summary: "391", logs: toolsOnLogs };
+  const forged: RecordedAttempt = { ...fromThisRun, fromThisRun: false };
+
+  assert.equal(gateAttempt(contract, fromThisRun).passed, true);
+  assert.equal(gateAttempt(contract, forged).passed, false);
+  assert.equal(gateAttempt(contract, { ...fromThisRun, summary: "401" }).passed, false);
+});
+
+test("timing and phase lines never count as the answer", () => {
+  assert.equal(answerText("TERRARIUM_TIMING runner_start_ms=391\nTERRARIUM_PHASES total_ms=391"), "");
+});

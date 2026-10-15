@@ -21,6 +21,7 @@ export const RecordedAttempt = Schema.Struct({
   status: AttemptStatus,
   fromThisRun: Schema.Boolean,
   proofExit: Schema.optionalKey(Schema.NullOr(Schema.Int)),
+  summary: Schema.optionalKey(Schema.NullOr(Schema.String)),
   logs: Schema.String,
 });
 
@@ -42,7 +43,10 @@ export type Decision =
 const harnessLine = /^(TASK_RECEIVED|TASK_ENDED|TERRARIUM_RESULT=.*|\[terrarium:[^\]]*\].*)$/;
 
 export const answerText = (logs: string): string =>
-  logs.split("\n").filter((line) => !harnessLine.test(line.trim())).join("\n");
+  logs.split("\n").filter((line) => !harnessLine.test(line.trim()) && !line.startsWith("TERRARIUM_")).join("\n");
+
+const verifiedAnswer = (attempt: RecordedAttempt): string =>
+  [attempt.fromThisRun ? (attempt.summary ?? "") : "", answerText(attempt.logs)].join("\n");
 
 const proofGate = (contract: LoopContract, attempt: RecordedAttempt): Gate | null => {
   if (contract.proof === undefined) return null;
@@ -64,7 +68,7 @@ export const gateAttempt = (contract: LoopContract, attempt: RecordedAttempt): G
 
   if (!attempt.fromThisRun) return { passed: false, reason: "answer did not come from this run" };
 
-  if (contract.expect !== undefined && !answerText(attempt.logs).includes(contract.expect)) return { passed: false, reason: "answer does not contain the expected text" };
+  if (contract.expect !== undefined && !verifiedAnswer(attempt).includes(contract.expect)) return { passed: false, reason: "answer does not contain the expected text" };
 
   return { passed: true, reason: `from this run, ${passReason(contract)}` };
 };

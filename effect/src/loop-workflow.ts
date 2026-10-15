@@ -23,7 +23,7 @@ const pollLimit = 180;
 const toAttempt = (run: RunRecord): RecordedAttempt | null =>
   run.terminal === null
     ? null
-    : { runId: run.runId, status: run.terminal.status, fromThisRun: run.terminal.provenance === "this-run", proofExit: run.terminal.proof?.exitCode ?? null, logs: run.logs };
+    : { runId: run.runId, status: run.terminal.status, fromThisRun: run.terminal.provenance === "this-run", proofExit: run.terminal.proof?.exitCode ?? null, summary: run.terminal.summary, logs: run.logs };
 
 const admitAttempt = (contract: LoopContract, loopId: string, n: number) =>
   Effect.gen(function* () {
