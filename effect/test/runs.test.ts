@@ -223,3 +223,39 @@ test("an oversized proof is BadRequest and starts nothing", async () => {
   assert.match(failureTag(await h.run("alice", admitWithProof("p3", "x".repeat(12_001)))), /BadRequest/);
   assert.equal(h.started.length, 0);
 });
+
+const admitResuming = (task: string, resumeFrom: string) => Effect.flatMap(Runs, (runs) => runs.admit({ task, channel: null, resumeFrom, idempotencyKey: `key-${task}-resume` }));
+
+const snapshot = { id: "bk_1", dir: "/workspace", localBucket: true, savedAt: "2026-01-01T00:00:01.000Z" };
+
+test("resuming from an unknown run is BadRequest", async () => {
+  const h = harness();
+
+  assert.match(failureTag(await h.run("alice", admitResuming("r1", "ter_abcdef_ffffffffffff"))), /no run/);
+});
+
+test("resuming from a run with no saved workspace is BadRequest", async () => {
+  const h = harness();
+  const prior = value(await h.run("alice", admit("first")));
+  await h.finish("alice", prior.runId, done);
+
+  assert.match(failureTag(await h.run("alice", admitResuming("r2", prior.runId))), /no saved workspace/);
+});
+
+test("resuming hands the saved workspace to the new run's workflow", async () => {
+  const h = harness();
+  const prior = value(await h.run("alice", admit("first")));
+  await h.finish("alice", prior.runId, { ...done, workspace: snapshot });
+  const resumed = value(await h.run("alice", admitResuming("r3", prior.runId)));
+
+  assert.equal(resumed.resumeFrom, prior.runId);
+  assert.deepEqual(h.started.at(-1)?.resume, snapshot);
+});
+
+test("another owner cannot resume my run's workspace", async () => {
+  const h = harness();
+  const prior = value(await h.run("alice", admit("first")));
+  await h.finish("alice", prior.runId, { ...done, workspace: snapshot });
+
+  assert.match(failureTag(await h.run("bob", admitResuming("r4", prior.runId))), /no run/);
+});

@@ -11,7 +11,7 @@ import type { CallTokens, Usage } from "./usage.ts";
 import { answerModel, isModelRoute, modelError } from "./model-route.ts";
 import type { SandboxResult } from "./sandbox-result.ts";
 import { Upstream } from "./shared.ts";
-import type { ProofResult, RunContract } from "./shared.ts";
+import type { ProofResult, RunContract, WorkspaceSnapshot } from "./shared.ts";
 import { timingLine } from "./timing.ts";
 
 export type { SandboxResult } from "./sandbox-result.ts";
@@ -142,10 +142,28 @@ const chooseProof = (box: Box, proof: string | null): Effect.Effect<Option.Optio
   );
 };
 
+const SNAPSHOT_TTL_SECONDS = 7 * 24 * 60 * 60;
+
+const saveWorkspace = (box: Box, runId: string): Effect.Effect<WorkspaceSnapshot | null> =>
+  sandboxCall(() => box.createBackup({ dir: WORKSPACE, name: runId, ttl: SNAPSHOT_TTL_SECONDS, localBucket: true, excludes: ["terrarium-task.txt", "terrarium-contract.json"] })).pipe(
+    Effect.map((backup): WorkspaceSnapshot => ({ id: backup.id, dir: backup.dir, localBucket: true, savedAt: new Date().toISOString() })),
+    Effect.orElseSucceed(() => null),
+  );
+
+const restoreInto = (box: Box, snapshot: WorkspaceSnapshot | null): Effect.Effect<string> => {
+  if (snapshot === null) return Effect.succeed("");
+
+  return sandboxCall(() => box.restoreBackup({ id: snapshot.id, dir: snapshot.dir, localBucket: true })).pipe(
+    Effect.map(() => `[terrarium:resume] restored workspace saved at ${snapshot.savedAt}`),
+    Effect.catch((error) => Effect.succeed(`[terrarium:resume] restore failed: ${error.detail}`)),
+  );
+};
+
 export const sandboxLayer = (env: SandboxEnv) => Layer.succeed(Sandbox, Sandbox.of({
-  run: ({ task, contract, proof }) => Effect.gen(function* () {
+  run: ({ task, contract, proof, resume }) => Effect.gen(function* () {
     const box = getSandbox(env.TERRARIUM_SANDBOX, contract.runId);
     const startMs = Date.now();
+    const restoreLine = yield* restoreInto(box, resume ?? null);
     yield* sandboxCall(() => box.writeFile(`${WORKSPACE}/terrarium-task.txt`, task));
     const boxReadyMs = Date.now();
     yield* sandboxCall(() => box.writeFile(`${WORKSPACE}/terrarium-contract.json`, JSON.stringify(contract)));
@@ -157,7 +175,8 @@ export const sandboxLayer = (env: SandboxEnv) => Layer.succeed(Sandbox, Sandbox.
     const proofResult = result.exitCode === STALLED_EXIT ? null : Option.getOrNull(yield* chooseProof(box, proof));
     const timing = timingLine({ startMs, boxReadyMs, endMs: Date.now(), runnerOutput: result.stdout });
     const usage = yield* Effect.tryPromise(() => stub.readUsage()).pipe(Effect.orElseSucceed(() => ZERO_USAGE));
+    const workspace = yield* saveWorkspace(box, contract.runId);
 
-    return { output: [result.stdout, labelStderr(result.stderr), timing].filter((part) => part.length > 0).join("\n"), exitCode: result.exitCode, proof: proofResult, usage };
+    return { output: [restoreLine, result.stdout, labelStderr(result.stderr), timing].filter((part) => part.length > 0).join("\n"), exitCode: result.exitCode, proof: proofResult, usage, workspace };
   }).pipe(Effect.ensuring(Effect.ignore(sandboxCall(() => getSandbox(env.TERRARIUM_SANDBOX, contract.runId).destroy())))),
 }));

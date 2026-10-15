@@ -1,0 +1,48 @@
+{
+  "item": 4,
+  "checkedAt": "2026-10-15T03:39:05.720Z",
+  "title": "pause and resume: a finished run's workspace is saved, its box is freed, and a later run can resume from it",
+  "seconds": 97,
+  "pausedSeconds": 79,
+  "runs": [
+    "ter_mv8zmy8s_34357d4f9131",
+    "ter_mv8znqyj_dd1e6b3fcbfc",
+    "ter_mv8zo3k9_969ffa209387"
+  ],
+  "ok": true,
+  "results": [
+    {
+      "name": "a finished run saves its workspace and its box is destroyed",
+      "ok": true,
+      "note": "{\"id\":\"d411f636-348f-42d4-b2b3-0f8e7c18a612\",\"dir\":\"/workspace\",\"localBucket\":true,\"savedAt\":\"2026-10-15T03:37:42.902Z\"}"
+    },
+    {
+      "name": "resuming restores the saved files into a new box",
+      "ok": true,
+      "note": "[terrarium:resume] restored workspace saved at 2026-10-15T03:37:42.902Z proof=0"
+    },
+    {
+      "name": "the resumed agent read the same file content",
+      "ok": true,
+      "note": "kumquat-26931 -> kumquat-26931"
+    },
+    {
+      "name": "a run without resumeFrom starts empty",
+      "ok": true,
+      "note": "fresh proof exit 1"
+    },
+    {
+      "name": "resuming from an unknown run is refused",
+      "ok": true,
+      "note": "400"
+    }
+  ],
+  "cost": {
+    "note": "saving the workspace adds about 4 s per run: small runs took 14-16 s admit-to-finish vs about 10 s of in-box phases",
+    "examples": {
+      "ter_mv8zmy8s_34357d4f9131": "14 s total, phases 9.95 s",
+      "ter_mv8znqyj_dd1e6b3fcbfc": "16 s total, phases 10.8 s (includes restore)"
+    },
+    "storage": "R2 bucket terrarium-workspaces, snapshots expire after 7 days"
+  }
+}

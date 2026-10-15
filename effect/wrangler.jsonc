@@ -31,5 +31,8 @@
     { "name": "terrarium-effect-run", "binding": "RUN_WORKFLOW", "class_name": "RunWorkflow" },
     { "name": "terrarium-effect-loop", "binding": "LOOP_WORKFLOW", "class_name": "LoopWorkflow" }
   ],
+  "r2_buckets": [
+    { "binding": "BACKUP_BUCKET", "bucket_name": "terrarium-workspaces" }
+  ],
   "kv_namespaces": [{ "binding": "LOOPS_KV", "id": "SET-IN-YOUR-LOCAL-CONFIG" }]
 }

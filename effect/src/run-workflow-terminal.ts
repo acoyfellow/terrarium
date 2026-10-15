@@ -15,7 +15,9 @@ export const terminalOf = (result: SandboxResult, contract: RunContract, finishe
 
   const terminal: RunTerminal = { status: done ? "done" : "failed", provenance: verdict.provenance, proof: result.proof, summary: verdict.summary, exitCode: result.exitCode, finishedAt };
 
-  return { terminal: result.usage === undefined ? terminal : { ...terminal, usage: result.usage }, logs: result.output };
+  const withUsage = result.usage === undefined ? terminal : { ...terminal, usage: result.usage };
+
+  return { terminal: result.workspace === undefined ? withUsage : { ...withUsage, workspace: result.workspace }, logs: result.output };
 };
 
 export const failedOutcome = (error: Upstream, finishedAt: string): Outcome => ({

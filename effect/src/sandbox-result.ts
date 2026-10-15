@@ -1,4 +1,4 @@
-import type { ProofResult, RunContract } from "./shared.ts";
+import type { ProofResult, RunContract, WorkspaceSnapshot } from "./shared.ts";
 import type { Usage } from "./usage.ts";
 
 export interface SandboxResult {
@@ -6,10 +6,13 @@ export interface SandboxResult {
   readonly exitCode: number;
   readonly proof: ProofResult | null;
   readonly usage?: Usage;
+  readonly workspace?: WorkspaceSnapshot | null;
+  readonly restored?: boolean;
 }
 
 export interface SandboxJob {
   readonly task: string;
   readonly contract: RunContract;
   readonly proof: string | null;
+  readonly resume?: WorkspaceSnapshot | null;
 }

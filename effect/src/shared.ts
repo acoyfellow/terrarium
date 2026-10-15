@@ -41,6 +41,10 @@ export const RunContract = Schema.Struct({
 
 export type RunContract = typeof RunContract.Type;
 
+export const WorkspaceSnapshot = Schema.Struct({ id: Schema.String, dir: Schema.String, localBucket: Schema.optionalKey(Schema.Boolean), savedAt: Schema.String });
+
+export type WorkspaceSnapshot = typeof WorkspaceSnapshot.Type;
+
 export const RunTerminal = Schema.Struct({
   status: TerminalStatus,
   provenance: Provenance,
@@ -49,6 +53,7 @@ export const RunTerminal = Schema.Struct({
   exitCode: Schema.NullOr(Schema.Int),
   finishedAt: Schema.String,
   usage: Schema.optionalKey(Usage),
+  workspace: Schema.optionalKey(Schema.NullOr(WorkspaceSnapshot)),
 });
 
 export type RunTerminal = typeof RunTerminal.Type;
@@ -59,6 +64,7 @@ export const RunRecord = Schema.Struct({
   task: Schema.String,
   proof: Schema.optionalKey(Schema.NullOr(Schema.String)),
   channel: Schema.NullOr(Schema.String),
+  resumeFrom: Schema.optionalKey(Schema.NullOr(Schema.String)),
   contract: RunContract,
   createdAt: Schema.String,
   terminal: Schema.NullOr(RunTerminal),
@@ -93,6 +99,7 @@ export const AdmitInput = Schema.Struct({
   proof: Schema.optionalKey(Schema.NullOr(Schema.String)),
   channel: Schema.NullOr(Schema.String),
   idempotencyKey: Schema.String,
+  resumeFrom: Schema.optionalKey(Schema.NullOr(Schema.String)),
 });
 
 export type AdmitInput = typeof AdmitInput.Type;
