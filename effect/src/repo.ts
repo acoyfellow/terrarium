@@ -1,5 +1,7 @@
 import { Option, Schema } from "effect";
 
+import { BaseInfo } from "./warm-base.ts";
+
 const OWNER_OR_NAME = /^[A-Za-z0-9_.-]{1,100}$/;
 
 const REF = /^[A-Za-z0-9_./-]{1,200}$/;
@@ -7,6 +9,7 @@ const REF = /^[A-Za-z0-9_./-]{1,200}$/;
 export const RepoSpec = Schema.Struct({
   github: Schema.String.check(Schema.isPattern(/^[A-Za-z0-9_.-]{1,100}\/[A-Za-z0-9_.-]{1,100}$/)),
   ref: Schema.optionalKey(Schema.String.check(Schema.isPattern(REF))),
+  setup: Schema.optionalKey(Schema.Trim.check(Schema.isNonEmpty(), Schema.isMaxLength(500))),
 });
 
 export type RepoSpec = typeof RepoSpec.Type;
@@ -32,6 +35,7 @@ export const unpackCommand = (runId: string) =>
     `rm -f ${ARCHIVE_PATH}`,
     "cd /workspace",
     "git init -q -b base",
+    "printf 'node_modules/\\n' >> .git/info/exclude",
     "git -c user.name=terrarium -c user.email=terrarium@localhost add -A",
     "git -c user.name=terrarium -c user.email=terrarium@localhost commit -q -m base --no-verify",
     `git checkout -q -b ${sessionBranch(runId)}`,
@@ -49,6 +53,7 @@ export const RepoResult = Schema.Struct({
   baseCommit: Schema.String,
   diff: Schema.String,
   diffTruncated: Schema.Boolean,
+  base: Schema.optionalKey(Schema.NullOr(BaseInfo)),
 });
 
 export type RepoResult = typeof RepoResult.Type;

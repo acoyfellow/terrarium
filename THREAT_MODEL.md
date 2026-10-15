@@ -20,6 +20,11 @@
 
 The container has `enableInternet = false` and `interceptHttps = true`. Every request goes to the Worker's `outbound` handler, which answers only a POST to the model path and sends everything else a 403. `GET /api/egress-probe` starts a fresh box, runs a fixed list of requests and records the codes. The gate fails if `effect/receipts/egress.json` is missing, failing, or more than 7 days old.
 
+Two exceptions, both decided by the Worker, never by the box:
+
+- **Repo checkout.** When a run asks for `repo: {github}`, the Worker downloads the GitHub archive and writes it into the box. The box itself still can't reach GitHub (checked live: `git ls-remote` gets 403).
+- **Setup window.** When a run asks for `repo.setup` and no warm base exists, the box may make HTTPS `GET`/`HEAD` requests to `registry.npmjs.org` while the setup command runs, and only then. The window is a flag in the box's own Durable Object, set before setup and cleared after, even on failure. During the agent's turn the registry gets a 403 again (checked live). A malicious package's install script could run during setup; pass `--ignore-scripts` if that matters.
+
 Isolation between containers is provided by Cloudflare Containers. Terrarium doesn't claim more than that.
 
 ## What a result proves
@@ -33,6 +38,7 @@ Isolation between containers is provided by Cloudflare Containers. Terrarium doe
 - A proof that tests too little lets a bad result through. Write proofs that would fail on the wrong answer.
 - The agent has bash inside the box. A container escape would be a Cloudflare Containers issue; we have not tested for one.
 - Access tokens on the laptop are as safe as the laptop.
+- A warm base is keyed by owner, repo, ref and setup command. It is not keyed by the dependency versions the registry served that day; a base can be up to 7 days stale.
 - Loops run on the owner's identity. Anyone with your Access session can start runs as you.
 
 ## Reporting

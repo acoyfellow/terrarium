@@ -1,0 +1,48 @@
+{
+  "item": 8,
+  "checkedAt": "2026-10-15T04:08:14.729Z",
+  "title": "warm repo bases: checkout plus setup is snapshotted once per owner/repo/ref/setup; later runs restore it",
+  "seconds": 255,
+  "repo": {
+    "github": "jonschlinkert/is-odd",
+    "ref": "master",
+    "setup": "npm install --no-package-lock --ignore-scripts && echo 5c2498c0 > /dev/null"
+  },
+  "runs": [
+    "ter_mv90l1tc_8be2a153f935",
+    "ter_mv90nnix_ea39fcae622b",
+    "ter_mv90ossr_ed51b12140fa"
+  ],
+  "timings": {
+    "coldSeconds": 122,
+    "warmSeconds": 53
+  },
+  "ok": true,
+  "results": [
+    {
+      "name": "first run builds the base: checkout, setup with registry access, snapshot",
+      "ok": true,
+      "note": "122s setup=59421ms [terrarium:setup] 'npm install --no-package-lock --ignore-scripts && echo 5c2498c0 > /dev/null' took 59421 ms; warm base base:efbeeb5051a59c4e32835848f5e16bb0 saved"
+    },
+    {
+      "name": "second run starts from the warm base with dependencies already installed",
+      "ok": true,
+      "note": "53s [terrarium:repo] jonschlinkert/is-odd@master from warm base base:efbeeb5051a59c4e32835848f5e16bb0 on branch terrarium/ter_mv90nnix_ea39fcae622b"
+    },
+    {
+      "name": "the warm start is faster than the cold build",
+      "ok": true,
+      "note": "cold 122s vs warm 53s"
+    },
+    {
+      "name": "the registry is closed again while the agent works",
+      "ok": true,
+      "note": "agent saw 403"
+    },
+    {
+      "name": "the diff excludes installed dependencies",
+      "ok": true,
+      "note": ""
+    }
+  ]
+}

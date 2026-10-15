@@ -18,4 +18,5 @@ export interface SandboxJob {
   readonly proof: string | null;
   readonly resume?: WorkspaceSnapshot | null;
   readonly repo?: RepoSpec | null;
+  readonly ownerId?: string;
 }

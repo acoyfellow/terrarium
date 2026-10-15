@@ -1,10 +1,12 @@
 import { Sandbox as SdkSandbox, getSandbox } from "@cloudflare/sandbox";
 import type { OutboundHandlerContext } from "@cloudflare/containers";
-import { Effect, Layer, Option } from "effect";
+import { Effect, Layer, Option, Schema } from "effect";
 
 import { Sandbox } from "./run-once.ts";
 
 import { detectProof } from "./default-proof.ts";
+import { SETUP_ENV, SETUP_TIMEOUT_MS, baseKey, commitSetupCommand, isSetupRequest, sessionFromBaseCommand } from "./warm-base.ts";
+import type { BaseInfo } from "./warm-base.ts";
 import { ARCHIVE_PATH, MAX_ARCHIVE_BYTES, archiveUrl, clippedDiff, diffCommand, sessionBranch, unpackCommand } from "./repo.ts";
 import type { RepoResult, RepoSpec } from "./repo.ts";
 import { DEFAULT_STALL, stallMessage, watchStall } from "./stall.ts";
@@ -12,7 +14,7 @@ import { ZERO_USAGE, addCall } from "./usage.ts";
 import type { CallTokens, Usage } from "./usage.ts";
 import { answerModel, isModelRoute, modelError } from "./model-route.ts";
 import type { SandboxResult } from "./sandbox-result.ts";
-import { Upstream } from "./shared.ts";
+import { Upstream, WorkspaceSnapshot as WorkspaceSnapshotSchema } from "./shared.ts";
 import type { ProofResult, RunContract, WorkspaceSnapshot } from "./shared.ts";
 import { timingLine } from "./timing.ts";
 
@@ -30,6 +32,7 @@ export interface SandboxEnv {
   readonly TERRARIUM_SANDBOX: DurableObjectNamespace<TerrariumSandbox>;
   readonly TERRARIUM_MODEL_HOST: string;
   readonly TERRARIUM_STALL_MS?: string;
+  readonly LOOPS_KV: KVNamespace;
 }
 
 const STALLED_EXIT = 124;
@@ -52,6 +55,8 @@ const USAGE_KEY = "terrarium-usage";
 
 const ACTIVE_KEY = "terrarium-last-active";
 
+const SETUP_KEY = "terrarium-setup-open";
+
 interface DeployedEnv extends Env {
   readonly TERRARIUM_MODEL_HOST: string;
 }
@@ -64,12 +69,20 @@ const withModelHost = (env: Env): ModelEnv => {
   return { AI: env.AI, TERRARIUM_MODEL_HOST: host, TERRARIUM_SANDBOX: env.TERRARIUM_SANDBOX };
 };
 
+const setupFetch = async (box: DurableObjectStub<TerrariumSandbox>, request: Request): Promise<Response> => {
+  if (!isSetupRequest(request)) return modelError(403, "egress denied");
+
+  const open = await box.setupOpen().catch(() => false);
+
+  return open ? fetch(request) : modelError(403, "egress denied");
+};
+
 const outbound = (request: Request, generated: Env, ctx: OutboundHandlerContext): Promise<Response> => {
   const env = withModelHost(generated);
 
-  if (!isModelRoute(request, env.TERRARIUM_MODEL_HOST)) return Promise.resolve(modelError(403, "egress denied"));
-
   const box = env.TERRARIUM_SANDBOX.get(env.TERRARIUM_SANDBOX.idFromString(ctx.containerId));
+
+  if (!isModelRoute(request, env.TERRARIUM_MODEL_HOST)) return setupFetch(box, request);
 
   const answer = answerModel(request, env.AI, (tokens) => box.recordTokens(tokens));
 
@@ -89,6 +102,18 @@ export class TerrariumSandbox extends SdkSandbox<ModelEnv> {
 
   async markActive(nowMs: number): Promise<void> {
     await this.ctx.storage.put(ACTIVE_KEY, nowMs);
+  }
+
+  async openSetup(): Promise<void> {
+    await this.ctx.storage.put(SETUP_KEY, true);
+  }
+
+  async closeSetup(): Promise<void> {
+    await this.ctx.storage.delete(SETUP_KEY);
+  }
+
+  async setupOpen(): Promise<boolean> {
+    return (await this.ctx.storage.get<boolean>(SETUP_KEY)) === true;
   }
 
   async lastActive(): Promise<number | null> {
@@ -148,9 +173,10 @@ interface Checkout {
   readonly line: string;
   readonly spec: RepoSpec | null;
   readonly baseCommit: string | null;
+  readonly base: BaseInfo | null;
 }
 
-const NO_CHECKOUT: Checkout = { line: "", spec: null, baseCommit: null };
+const NO_CHECKOUT: Checkout = { line: "", spec: null, baseCommit: null, base: null };
 
 const fetchArchive = (url: string) =>
   Effect.tryPromise({ try: () => fetch(url, { redirect: "follow" }), catch: (cause) => new Upstream({ service: "repo", detail: String(cause) }) }).pipe(
@@ -184,7 +210,7 @@ const checkoutRepo = (box: Box, spec: RepoSpec | null, runId: string): Effect.Ef
       Effect.flatMap((encoded) => sandboxCall(() => box.writeFile(ARCHIVE_PATH, encoded, { encoding: "base64" }))),
       Effect.flatMap(() => sandboxCall(() => box.exec(unpackCommand(runId), { timeout: 120_000, cwd: "/" }))),
       Effect.flatMap((unpacked) => (unpacked.exitCode === 0 ? Effect.succeed(unpacked.stdout.trim().split("\n").at(-1) ?? "") : Effect.fail(new Upstream({ service: "repo", detail: unpacked.stderr.slice(-400) })))),
-      Effect.map((baseCommit): Checkout => ({ spec, baseCommit, line: `[terrarium:repo] ${spec.github}@${spec.ref ?? "HEAD"} on branch ${sessionBranch(runId)} (base ${baseCommit.slice(0, 12)})` })),
+      Effect.map((baseCommit): Checkout => ({ spec, baseCommit, base: null, line: `[terrarium:repo] ${spec.github}@${spec.ref ?? "HEAD"} on branch ${sessionBranch(runId)} (base ${baseCommit.slice(0, 12)})` })),
       Effect.catch((error) => Effect.succeed({ ...NO_CHECKOUT, line: `[terrarium:repo] checkout failed: ${error.detail}` })),
     ),
   });
@@ -195,10 +221,79 @@ const repoOutcome = (box: Box, checkout: Checkout, runId: string): Effect.Effect
 
   if (spec === null || baseCommit === null) return Effect.succeed(null);
 
-  return readOrEmpty(box, diffCommand).pipe(Effect.map((diff) => ({ github: spec.github, ref: spec.ref ?? "HEAD", branch: sessionBranch(runId), baseCommit, ...clippedDiff(diff) })));
+  return readOrEmpty(box, diffCommand).pipe(Effect.map((diff) => ({ github: spec.github, ref: spec.ref ?? "HEAD", branch: sessionBranch(runId), baseCommit, ...clippedDiff(diff), base: checkout.base })));
 };
 
 const SNAPSHOT_TTL_SECONDS = 7 * 24 * 60 * 60;
+
+interface PrepareJob {
+  readonly env: SandboxEnv;
+  readonly box: Box;
+  readonly stub: DurableObjectStub<TerrariumSandbox>;
+  readonly spec: RepoSpec | null;
+  readonly runId: string;
+  readonly ownerId: string;
+}
+
+const lastLine = (text: string) => text.trim().split("\n").at(-1) ?? "";
+
+const execOk = (box: Box, command: string, timeout: number, envVars: Record<string, string> = {}) =>
+  sandboxCall(() => box.exec(command, { timeout, cwd: WORKSPACE, env: envVars })).pipe(
+    Effect.flatMap((result) => (result.exitCode === 0 ? Effect.succeed(result) : Effect.fail(new Upstream({ service: "setup", detail: `exit ${result.exitCode}: ${result.stderr.slice(-400)}` })))),
+  );
+
+const BaseSnapshot = Schema.fromJsonString(WorkspaceSnapshotSchema);
+
+const fromBase = (job: PrepareJob, spec: RepoSpec, key: string, snapshot: WorkspaceSnapshot): Effect.Effect<Checkout, Upstream> =>
+  sandboxCall(() => job.box.restoreBackup({ id: snapshot.id, dir: snapshot.dir, localBucket: true })).pipe(
+    Effect.andThen(execOk(job.box, sessionFromBaseCommand(sessionBranch(job.runId)), 30_000)),
+    Effect.map((result): Checkout => ({ spec, baseCommit: lastLine(result.stdout), base: { key, hit: true, setupMs: null, setupExit: null }, line: `[terrarium:repo] ${spec.github}@${spec.ref ?? "HEAD"} from warm base ${key} on branch ${sessionBranch(job.runId)}` })),
+  );
+
+const buildBase = (job: PrepareJob, spec: RepoSpec, key: string, setup: string): Effect.Effect<Checkout, Upstream> =>
+  Effect.gen(function* () {
+    const cold = yield* checkoutRepo(job.box, spec, job.runId);
+
+    if (cold.baseCommit === null) return cold;
+
+    yield* execOk(job.box, "cd /workspace && git checkout -q base", 30_000);
+    yield* Effect.tryPromise({ try: () => job.stub.openSetup(), catch: (cause) => new Upstream({ service: "setup", detail: String(cause) }) });
+    const setupStart = Date.now();
+    const ran = yield* sandboxCall(() => job.box.exec(setup, { timeout: SETUP_TIMEOUT_MS, cwd: WORKSPACE, env: SETUP_ENV })).pipe(Effect.ensuring(Effect.ignore(Effect.tryPromise(() => job.stub.closeSetup()))));
+    const setupMs = Date.now() - setupStart;
+    const info: BaseInfo = { key, hit: false, setupMs, setupExit: ran.exitCode };
+
+    if (ran.exitCode !== 0) return { ...cold, base: info, line: `${cold.line}\n[terrarium:setup] '${setup}' exited ${ran.exitCode} after ${setupMs} ms; no warm base saved\n${ran.stderr.slice(-600)}` };
+
+    const committed = yield* execOk(job.box, commitSetupCommand, 60_000);
+    const backup = yield* sandboxCall(() => job.box.createBackup({ dir: WORKSPACE, name: key, ttl: SNAPSHOT_TTL_SECONDS, localBucket: true }));
+    const snapshot: WorkspaceSnapshot = { id: backup.id, dir: backup.dir, localBucket: true, savedAt: new Date().toISOString() };
+    yield* Effect.tryPromise({ try: () => job.env.LOOPS_KV.put(key, JSON.stringify(snapshot), { expirationTtl: SNAPSHOT_TTL_SECONDS - 3600 }), catch: (cause) => new Upstream({ service: "kv", detail: String(cause) }) });
+    yield* execOk(job.box, `cd /workspace && git checkout -q -B ${sessionBranch(job.runId)}`, 30_000);
+
+    return { spec, baseCommit: lastLine(committed.stdout), base: info, line: `${cold.line}\n[terrarium:setup] '${setup}' took ${setupMs} ms; warm base ${key} saved` };
+  });
+
+const prepareRepo = (job: PrepareJob): Effect.Effect<Checkout> => {
+  const { spec } = job;
+
+  if (spec === null) return Effect.succeed(NO_CHECKOUT);
+
+  const setup = spec.setup;
+
+  if (setup === undefined) return checkoutRepo(job.box, spec, job.runId);
+
+  return Effect.gen(function* () {
+    const key = yield* Effect.promise(() => baseKey(job.ownerId, spec.github, spec.ref ?? "HEAD", setup));
+    const stored = yield* Effect.tryPromise(() => job.env.LOOPS_KV.get(key)).pipe(Effect.orElseSucceed(() => null));
+    const snapshot = stored === null ? Option.none<WorkspaceSnapshot>() : Schema.decodeUnknownOption(BaseSnapshot)(stored);
+
+    return yield* Option.match(snapshot, {
+      onNone: () => buildBase(job, spec, key, setup),
+      onSome: (hit) => fromBase(job, spec, key, hit).pipe(Effect.catch(() => buildBase(job, spec, key, setup))),
+    });
+  }).pipe(Effect.catch((error) => Effect.succeed({ ...NO_CHECKOUT, line: `[terrarium:repo] prepare failed: ${error.detail}` })));
+};
 
 const saveWorkspace = (box: Box, runId: string): Effect.Effect<WorkspaceSnapshot | null> =>
   sandboxCall(() => box.createBackup({ dir: WORKSPACE, name: runId, ttl: SNAPSHOT_TTL_SECONDS, localBucket: true, excludes: ["terrarium-task.txt", "terrarium-contract.json"] })).pipe(
@@ -216,11 +311,12 @@ const restoreInto = (box: Box, snapshot: WorkspaceSnapshot | null): Effect.Effec
 };
 
 export const sandboxLayer = (env: SandboxEnv) => Layer.succeed(Sandbox, Sandbox.of({
-  run: ({ task, contract, proof, resume, repo }) => Effect.gen(function* () {
+  run: ({ task, contract, proof, resume, repo, ownerId }) => Effect.gen(function* () {
     const box = getSandbox(env.TERRARIUM_SANDBOX, contract.runId);
     const startMs = Date.now();
     const restoreLine = yield* restoreInto(box, resume ?? null);
-    const checkout = yield* checkoutRepo(box, repo ?? null, contract.runId);
+    const stubForSetup = env.TERRARIUM_SANDBOX.get(env.TERRARIUM_SANDBOX.idFromName(contract.runId));
+    const checkout = yield* prepareRepo({ env, box, stub: stubForSetup, spec: repo ?? null, runId: contract.runId, ownerId: ownerId ?? "" });
     yield* sandboxCall(() => box.writeFile(`${WORKSPACE}/terrarium-task.txt`, task));
     const boxReadyMs = Date.now();
     yield* sandboxCall(() => box.writeFile(`${WORKSPACE}/terrarium-contract.json`, JSON.stringify(contract)));

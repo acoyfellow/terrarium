@@ -1,5 +1,5 @@
 {
-  "at": "2026-10-15T02:30:12.526Z",
+  "at": "2026-10-15T04:08:54.491Z",
   "ok": true,
   "checks": [
     {
@@ -38,6 +38,6 @@
     "http://example.com/": "403",
     "model-host": "200"
   },
-  "piStartupMs": 3417,
-  "totalMs": 8151
+  "piStartupMs": 2063,
+  "totalMs": 5910
 }
