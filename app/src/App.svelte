@@ -1,5 +1,7 @@
 <script>
   import Loops from './Loops.svelte';
+  import Threads from './Threads.svelte';
+  const PUBLIC_SITE = import.meta.env.VITE_PUBLIC_SITE === '1';
   import Architecture from './Architecture.svelte';
   import Terraloop from './Terraloop.svelte';
   import Explainer from './Explainer.svelte';
@@ -31,7 +33,7 @@
   let hash = $state(location.hash);
   let selectedDoc = $state(new URLSearchParams(location.search).get('page') || 'tutorial');
 
-  const route = () => path === '/docs' ? 'docs' : path === '/loops' ? 'loops' : path === '/how-it-works' ? 'arch' : path === '/terraloop' ? 'terraloop' : path === '/compare' ? 'compare' : 'home';
+  const route = () => path === '/docs' ? 'docs' : path === '/loops' ? 'loops' : path === '/threads' ? 'threads' : path === '/how-it-works' ? 'arch' : path === '/terraloop' ? 'terraloop' : path === '/compare' ? 'compare' : 'home';
 
   const currentDoc = () => docs.find((d) => d.id === selectedDoc) || docs[0];
 
@@ -99,6 +101,7 @@
       <a href="/terraloop" aria-current={path === '/terraloop' ? 'page' : undefined} onclick={(e) => navigate('/terraloop', e)}>Terraloop</a>
       <a href="/compare" aria-current={path === '/compare' ? 'page' : undefined} onclick={(e) => navigate('/compare', e)}>Compare</a>
       <a href="/loops" aria-current={path === '/loops' ? 'page' : undefined} onclick={(e) => navigate('/loops', e)}>Loops</a>
+      {#if !PUBLIC_SITE}<a href="/threads" aria-current={path === '/threads' ? 'page' : undefined} onclick={(e) => navigate('/threads', e)}>Threads</a>{/if}
       <a href="https://github.com/acoyfellow/terrarium">GitHub</a>
       <button class="theme-toggle" type="button" onclick={cycleTheme} aria-label={themeLabel()} title={themeLabel()}>
         {#if themeChoice === 'light'}
@@ -168,6 +171,8 @@
 
   {:else if route() === 'loops'}
     <Loops />
+  {:else if route() === 'threads'}
+    <Threads />
   {:else if route() === 'arch'}
     <Architecture />
   {:else if route() === 'terraloop'}

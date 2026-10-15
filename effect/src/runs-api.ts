@@ -33,7 +33,7 @@ const decodeWith = <S extends Schema.Decoder<unknown>>(schema: S, input: string 
 const bodyOf = <S extends Schema.Decoder<unknown>>(request: Request, schema: S) =>
   Effect.tryPromise({ try: () => request.json(), catch: () => new BadRequest({ problems: ["body must be JSON"] }) }).pipe(Effect.flatMap((input) => Schema.decodeUnknownEffect(schema)(input).pipe(Effect.mapError(asBadRequest))));
 
-const runView = (record: RunRecord) => ({ ok: true, runId: record.runId, channel: record.channel, createdAt: record.createdAt, status: record.terminal?.status ?? "running", terminal: record.terminal, startAttempts: record.startAttempts ?? 0 });
+const runView = (record: RunRecord) => ({ ok: true, runId: record.runId, channel: record.channel, task: record.task.slice(0, 2000), proof: record.proof ?? null, createdAt: record.createdAt, status: record.terminal?.status ?? "running", terminal: record.terminal, startAttempts: record.startAttempts ?? 0 });
 
 const admitRun = (request: Request) => Effect.gen(function* () {
   const idempotencyKey = yield* decodeWith(IdempotencyKey, request.headers.get("idempotency-key"));

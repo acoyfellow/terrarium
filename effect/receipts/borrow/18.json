@@ -1,0 +1,35 @@
+{
+  "item": 18,
+  "checkedAt": "2026-10-15T08:11:46.192Z",
+  "title": "thread UI over runs: /threads groups runs by channel as conversations (task, tool steps, receipt) with a composer",
+  "runId": "ter_mv99b9no_59eae756f690",
+  "screenshot": "receipts/borrow/18-threads.png",
+  "ok": true,
+  "results": [
+    {
+      "name": "prod serves the /threads page with the Threads view in its bundle",
+      "ok": true,
+      "note": "status=200 bundle=assets/index-BY2GtdFV.js"
+    },
+    {
+      "name": "the run list carries task and proof for the thread view",
+      "ok": true,
+      "note": "{\"task\":\"Use bash to run: echo thr263358 > t.txt && cat t.txt . Reply with the word.\",\"proof\":\"grep -qx thr263358 t.txt\"}"
+    },
+    {
+      "name": "the run started from the composer joined the selected thread's channel",
+      "ok": true,
+      "note": "channel=borrow-11"
+    },
+    {
+      "name": "its tool steps were recorded for the thread view",
+      "ok": true,
+      "note": "[\"bash echo thr263358 > t.txt && cat t.txt\",\"TERRARIUM_RESULT=<receipt>\"]"
+    },
+    {
+      "name": "it finished done with this run's receipt and proof exit 0",
+      "ok": true,
+      "note": "ter_mv99b9no_59eae756f690 done/this-run"
+    }
+  ]
+}
