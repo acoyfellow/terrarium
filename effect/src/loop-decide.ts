@@ -1,5 +1,6 @@
 import { Effect, Schema } from "effect";
 
+import { CheckResult, NamedChecks, checksCommand } from "./loop-checks.ts";
 import { Usage } from "./usage.ts";
 
 const field = (maxLength: number) => Schema.Trim.check(Schema.isNonEmpty(), Schema.isMaxLength(maxLength));
@@ -9,12 +10,19 @@ export const LoopContract = Schema.Struct({
   task: field(8000),
   expect: Schema.optionalKey(field(500)),
   proof: Schema.optionalKey(field(2000)),
+  checks: Schema.optionalKey(NamedChecks),
   maxAttempts: Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 5 })).pipe(Schema.withDecodingDefaultKey(Effect.succeed(3))),
 });
 
 export type LoopContract = typeof LoopContract.Type;
 
-export const hasCheck = (contract: LoopContract): boolean => contract.expect !== undefined || contract.proof !== undefined;
+export const hasCheck = (contract: LoopContract): boolean => contract.expect !== undefined || contract.proof !== undefined || contract.checks !== undefined;
+
+export const runProofOf = (contract: LoopContract): string | null => {
+  if (contract.checks !== undefined) return checksCommand(contract.checks, contract.proof);
+
+  return contract.proof ?? null;
+};
 
 export const AttemptStatus = Schema.Literals(["done", "failed", "cancelled", "timeout"]);
 
@@ -25,6 +33,8 @@ export const RecordedAttempt = Schema.Struct({
   proofExit: Schema.optionalKey(Schema.NullOr(Schema.Int)),
   summary: Schema.optionalKey(Schema.NullOr(Schema.String)),
   usage: Schema.optionalKey(Usage),
+  proofOutput: Schema.optionalKey(Schema.NullOr(Schema.String)),
+  checks: Schema.optionalKey(Schema.Array(CheckResult)),
   logs: Schema.String,
 });
 
@@ -52,15 +62,19 @@ const verifiedAnswer = (attempt: RecordedAttempt): string =>
   [attempt.fromThisRun ? (attempt.summary ?? "") : "", answerText(attempt.logs)].join("\n");
 
 const proofGate = (contract: LoopContract, attempt: RecordedAttempt): Gate | null => {
-  if (contract.proof === undefined) return null;
+  if (runProofOf(contract) === null) return null;
 
   if (attempt.proofExit === 0) return null;
+
+  const failing = (attempt.checks ?? []).filter((check) => check.state !== "passed").map((check) => check.name);
+
+  if (failing.length > 0) return { passed: false, reason: `checks not passing: ${failing.join(", ")}` };
 
   return { passed: false, reason: attempt.proofExit === undefined || attempt.proofExit === null ? "proof did not run" : `proof exited ${attempt.proofExit}` };
 };
 
 const passReason = (contract: LoopContract): string =>
-  [contract.proof === undefined ? null : "proof exited 0", contract.expect === undefined ? null : "contains the expected text"].filter((part) => part !== null).join(" and ");
+  [contract.proof === undefined ? null : "proof exited 0", contract.checks === undefined ? null : `all ${contract.checks.length} checks passed`, contract.expect === undefined ? null : "contains the expected text"].filter((part) => part !== null).join(" and ");
 
 export const gateAttempt = (contract: LoopContract, attempt: RecordedAttempt): Gate => {
   const failedProof = proofGate(contract, attempt);

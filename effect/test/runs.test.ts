@@ -220,6 +220,6 @@ test("a blank proof is no proof", async () => {
 test("an oversized proof is BadRequest and starts nothing", async () => {
   const h = harness();
 
-  assert.match(failureTag(await h.run("alice", admitWithProof("p3", "x".repeat(2001)))), /BadRequest/);
+  assert.match(failureTag(await h.run("alice", admitWithProof("p3", "x".repeat(12_001)))), /BadRequest/);
   assert.equal(h.started.length, 0);
 });

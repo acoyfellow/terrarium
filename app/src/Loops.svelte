@@ -51,6 +51,9 @@
     return loop.output?.decision?.outcome ?? loop.status ?? 'unknown';
   };
   const attemptsOf = (loop) => loop.output?.attempts ?? [];
+  const checkSymbol = { passed: '✓', failed: '✗', 'not-run': '○' };
+  const scoreOf = (checks) => ['passed', 'not-run', 'failed'].map((state) => `${checks.filter((c) => c.state === state).length}${checkSymbol[state]}`).join(' ');
+  const lastChecks = (loop) => attemptsOf(loop).at(-1)?.checks ?? null;
   const cleanAnswer = (text) => String(text ?? '').split('\n').filter((l) => !/^(TASK_RECEIVED|TASK_ENDED|TERRARIUM_|\[stderr\])/.test(l.trim())).join('\n').trim();
   const ago = (iso) => {
     const s = Math.max(0, Math.round((now - Date.parse(iso)) / 1000));
@@ -245,6 +248,7 @@
                     <span class="cp-pip" data-state={i < attempts.length ? (attempts[i].gate?.passed ? 'passed' : 'exhausted') : (state === 'running' && i === attempts.length ? 'running' : 'empty')}></span>
                   {/each}
                 </span>
+                {#if lastChecks(loop)}<span class="cp-score" title="named checks on the last attempt">{scoreOf(lastChecks(loop))}</span>{/if}
                 <span class="cp-badge" data-state={state}>{state}</span>
                 <span class="cp-row-age">{ago(loop.createdAt)}</span>
               </button>
@@ -276,7 +280,9 @@
         </header>
         <dl class="cp-contract">
           <dt>Task</dt><dd>{selected.contract.task}</dd>
-          <dt>Passes when the answer contains</dt><dd><code>{selected.contract.expect}</code></dd>
+          {#if selected.contract.expect}<dt>Passes when the answer contains</dt><dd><code>{selected.contract.expect}</code></dd>{/if}
+          {#if selected.contract.proof}<dt>Proof</dt><dd><code>{selected.contract.proof}</code></dd>{/if}
+          {#if selected.contract.checks}<dt>Checks</dt><dd>{selected.contract.checks.map((c) => c.name).join(' · ')}</dd>{/if}
           <dt>Attempts</dt><dd>{attemptsOf(selected).length} of {selected.contract.maxAttempts}</dd>
           <dt>Started</dt><dd>{new Date(selected.createdAt).toLocaleString()} · {ago(selected.createdAt)}</dd>
           {#if selected.output?.decision?.reason}<dt>Why it stopped</dt><dd>{selected.output.decision.reason}</dd>{/if}
@@ -290,6 +296,12 @@
               <div>
                 <strong>Attempt {i + 1} · {a.gate?.passed ? 'passed' : 'did not pass'}</strong>
                 <span class="cp-tl-meta">{a.gate?.reason} · {(a.fromThisRun ?? a.verified) ? "from this run" : "not from this run"} · <code>{a.runId}</code></span>
+                {#if a.checks}
+                  <ul class="cp-checks" aria-label={`checks ${scoreOf(a.checks)}`}>
+                    {#each a.checks as c}<li data-state={c.state}><span aria-hidden="true">{checkSymbol[c.state]}</span> {c.name}</li>{/each}
+                  </ul>
+                {/if}
+                {#if a.usage}<span class="cp-tl-meta">{a.usage.modelCalls} model calls · {a.usage.promptTokens + a.usage.completionTokens} tokens · ~${a.usage.estimatedUsd.toFixed(4)}</span>{/if}
                 {#if cleanAnswer(a.logs)}<pre>{cleanAnswer(a.logs)}</pre>{/if}
               </div>
             </li>

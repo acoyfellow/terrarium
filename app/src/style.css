@@ -740,6 +740,11 @@ img { max-width: 100%; display: block; }
 .cp-timeline li[data-state="running"] .cp-tl-dot { background: var(--layer); }
 .cp-timeline strong { font-size: .85rem; display: block; }
 .cp-tl-meta { font-size: .74rem; color: var(--muted); }
+.cp-score { font: 600 .72rem/1 var(--font-mono); color: var(--muted); white-space: nowrap; }
+.cp-checks { list-style: none; margin: .4rem 0; padding: 0; display: grid; gap: .2rem; font: .76rem/1.4 var(--font-mono); }
+.cp-checks li { color: var(--idle); }
+.cp-checks li[data-state="passed"] { color: var(--ok); }
+.cp-checks li[data-state="failed"] { color: var(--bad); }
 .cp-timeline pre { margin: .45rem 0 0; padding: .55rem .7rem; background: var(--code); border: 1px solid var(--border); border-radius: var(--radius-sm); font-size: .78rem; white-space: pre-wrap; max-height: 9rem; overflow: auto; }
 .cp-detail-actions { display: flex; gap: .5rem; flex-wrap: wrap; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--border); }
 .cp-btn-danger { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 50%, var(--border)); }

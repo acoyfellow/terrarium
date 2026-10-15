@@ -43,7 +43,7 @@ const admissionOnly = <A>(effect: Effect.Effect<A, StoreError | Upstream>): Effe
 
 const noStoreError = <A>(effect: Effect.Effect<A, StoreError | Upstream>): Effect.Effect<A, Upstream> => effect.pipe(Effect.catchTags({ BadRequest: (error) => Effect.fail(unexpected(error)), Conflict: (error) => Effect.fail(unexpected(error)), NotFound: (error) => Effect.fail(unexpected(error)), RateLimited: (error) => Effect.fail(unexpected(error)) }));
 
-const MAX_PROOF_LENGTH = 2000;
+const MAX_PROOF_LENGTH = 12_000;
 
 const normalizedProof = (proof: string | null | undefined): string | null => {
   const trimmed = proof?.trim() ?? "";

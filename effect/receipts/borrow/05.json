@@ -1,0 +1,33 @@
+{
+  "item": 5,
+  "checkedAt": "2026-10-15T03:18:38.032Z",
+  "title": "named acceptance checks: each scored per attempt, the gate names what fails, /loops shows 2✓ 0○ 1✗",
+  "seconds": 61,
+  "loops": [
+    "loop_a6ecf030a27c4bc8b90efce7dfe785b7",
+    "loop_2da76ae939574a51a0dfcd0d206f837c"
+  ],
+  "ok": true,
+  "results": [
+    {
+      "name": "partial work: each named check is scored on its own",
+      "ok": true,
+      "note": "greet.js exists:passed | greet says hello:passed | a README mentions greet:failed"
+    },
+    {
+      "name": "partial work: the gate names the failing check and the loop does not pass",
+      "ok": true,
+      "note": "checks not passing: a README mentions greet"
+    },
+    {
+      "name": "full work: all checks pass and the loop passes",
+      "ok": true,
+      "note": "greet.js exists:passed | greet says hello:passed | a README mentions greet:passed -> passed"
+    },
+    {
+      "name": "an empty check list is refused",
+      "ok": true,
+      "note": "400"
+    }
+  ]
+}

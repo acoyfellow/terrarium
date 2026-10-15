@@ -3,7 +3,8 @@ import type { WorkflowEvent, WorkflowStep } from "cloudflare:workers";
 import { Effect, Layer } from "effect";
 import { Owner, Runs } from "./shared.ts";
 import type { OwnerId, RunRecord, RunTerminal } from "./shared.ts";
-import { decideNext, gateAttempt } from "./loop-decide.ts";
+import { checkResults } from "./loop-checks.ts";
+import { decideNext, gateAttempt, runProofOf } from "./loop-decide.ts";
 import { runsLayer } from "./app.ts";
 import type { Decision, Gate, LoopContract, RecordedAttempt } from "./loop-decide.ts";
 import { sumUsage } from "./usage.ts";
@@ -28,12 +29,12 @@ const pollLimit = 180;
 const toAttempt = (run: RunRecord): RecordedAttempt | null =>
   run.terminal === null
     ? null
-    : { runId: run.runId, status: run.terminal.status, fromThisRun: run.terminal.provenance === "this-run", proofExit: run.terminal.proof?.exitCode ?? null, summary: run.terminal.summary, ...usageOf(run.terminal), logs: run.logs };
+    : { runId: run.runId, status: run.terminal.status, fromThisRun: run.terminal.provenance === "this-run", proofExit: run.terminal.proof?.exitCode ?? null, summary: run.terminal.summary, ...usageOf(run.terminal), proofOutput: run.terminal.proof?.output ?? null, logs: run.logs };
 
 const admitAttempt = (contract: LoopContract, loopId: string, n: number) =>
   Effect.gen(function* () {
     const runs = yield* Runs;
-    const run = yield* runs.admit({ task: contract.task, proof: contract.proof ?? null, channel: `loop:${loopId}`, idempotencyKey: `loop-${loopId}-attempt-${n}` });
+    const run = yield* runs.admit({ task: contract.task, proof: runProofOf(contract), channel: `loop:${loopId}`, idempotencyKey: `loop-${loopId}-attempt-${n}` });
 
     return run.runId;
   });
@@ -64,7 +65,9 @@ export const makeLoopWorkflow = <E>(runsLayer: (env: E) => Layer.Layer<Runs>) =>
           exec(admitAttempt(contract, loopId, n)));
 
         const attempt = await this.waitFor(step, n, runId, exec);
-        attempts.push({ ...attempt, gate: gateAttempt(contract, attempt) });
+        const scored = contract.checks === undefined ? attempt : { ...attempt, checks: checkResults(contract.checks, contract.proof, attempt.proofOutput ?? null) };
+
+        attempts.push({ ...scored, gate: gateAttempt(contract, scored) });
       }
     }
 
