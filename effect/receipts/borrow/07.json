@@ -1,0 +1,47 @@
+{
+  "item": 7,
+  "checkedAt": "2026-10-15T03:55:56.483Z",
+  "title": "repo in the box: the Worker fetches a GitHub archive, the box gets a git checkout on a session branch, the result carries the diff",
+  "seconds": 54,
+  "repo": {
+    "github": "jonschlinkert/is-odd",
+    "ref": "master"
+  },
+  "runs": [
+    "ter_mv909iuw_0a94eda86b50",
+    "ter_mv90a3nv_dea424582ec2"
+  ],
+  "ok": true,
+  "results": [
+    {
+      "name": "the repo was checked out into the box on a session branch",
+      "ok": true,
+      "note": "[terrarium:repo] jonschlinkert/is-odd@master on branch terrarium/ter_mv909iuw_0a94eda86b50 (base 261534896f31)"
+    },
+    {
+      "name": "the run result names the branch and base commit",
+      "ok": true,
+      "note": "terrarium/ter_mv909iuw_0a94eda86b50 261534896f319452c2d4958f10350a74fbc38a00"
+    },
+    {
+      "name": "the agent edited the real file and the proof checked it",
+      "ok": true,
+      "note": "done proof=0"
+    },
+    {
+      "name": "the result carries the diff against the base",
+      "ok": true,
+      "note": " README.md | 2 ++ |  1 file changed, 2 insertions(+) | diff --git a/README.md b/README.md"
+    },
+    {
+      "name": "the box with a repo is still sealed: git cannot reach GitHub",
+      "ok": true,
+      "note": "proof=0 fatal: unable to access 'https://github.com/jonschlinkert/is-odd/': The requested URL returned error: 403\nexit=128\n"
+    },
+    {
+      "name": "a repo spec that is not owner/name is refused",
+      "ok": true,
+      "note": "400"
+    }
+  ]
+}

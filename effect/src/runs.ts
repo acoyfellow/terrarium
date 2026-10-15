@@ -1,11 +1,12 @@
 import { Context, Effect, Layer, Schema } from "effect";
 
 import { fromReply } from "./owner-store.ts";
+import { RepoSpec } from "./repo.ts";
 import type { Admission, AdmitReservation, CallbackEvent, ClaimRequest, Reply, StartLease, StoreError } from "./owner-store.ts";
 import { BadRequest, Clock, Ids, NotFound, Owner, Runs, Upstream, WorkspaceSnapshot } from "./shared.ts";
 import type { AdmitInput, Conflict, OwnerId, RateLimited, RunContract, RunId, RunRecord, RunTerminal } from "./shared.ts";
 
-export const RunParams = Schema.Struct({ ownerId: Schema.String, runId: Schema.String, task: Schema.String, proof: Schema.optionalKey(Schema.NullOr(Schema.String)), resume: Schema.optionalKey(Schema.NullOr(WorkspaceSnapshot)), contract: Schema.Struct({ runId: Schema.String, taskFingerprint: Schema.String, nonce: Schema.String }) });
+export const RunParams = Schema.Struct({ ownerId: Schema.String, runId: Schema.String, task: Schema.String, proof: Schema.optionalKey(Schema.NullOr(Schema.String)), resume: Schema.optionalKey(Schema.NullOr(WorkspaceSnapshot)), repo: Schema.optionalKey(Schema.NullOr(RepoSpec)), contract: Schema.Struct({ runId: Schema.String, taskFingerprint: Schema.String, nonce: Schema.String }) });
 
 export type RunParams = typeof RunParams.Type;
 
@@ -107,13 +108,15 @@ export const RunsLive = Layer.effect(Runs, Effect.gen(function* () {
     const contract: RunContract = { runId, taskFingerprint: yield* sha256(input.task), nonce: yield* ids.nonce };
     const resumeFrom = input.resumeFrom ?? null;
     const fresh: RunRecord = { runId, ownerId: owner.id, task: input.task, proof, channel: input.channel, contract, createdAt: new Date(nowMs).toISOString(), terminal: null, logs: "" };
-    const record: RunRecord = resumeFrom === null ? fresh : { ...fresh, resumeFrom };
-    const request = yield* sha256(JSON.stringify([input.task, input.channel, proof, resumeFrom]));
+    const repo = input.repo ?? null;
+    const resumed: RunRecord = resumeFrom === null ? fresh : { ...fresh, resumeFrom };
+    const record: RunRecord = repo === null ? resumed : { ...resumed, repo };
+    const request = yield* sha256(JSON.stringify([input.task, input.channel, proof, resumeFrom, repo]));
     const admission = yield* admissionOnly(store.admitReserve({ idempotencyKey: input.idempotencyKey, request, record, nowMs, maxLive: limits.maxLive, perMinute: limits.perMinute }));
 
     if (!admission.created) return admission.record;
 
-    yield* workflows.start({ ownerId: owner.id, runId, task: input.task, proof, resume, contract }).pipe(Effect.catch((error) => failStart(nowIso, store, record, error)));
+    yield* workflows.start({ ownerId: owner.id, runId, task: input.task, proof, resume, repo, contract }).pipe(Effect.catch((error) => failStart(nowIso, store, record, error)));
 
     return admission.record;
   });

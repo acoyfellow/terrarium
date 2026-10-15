@@ -10,7 +10,7 @@ export class Sandbox extends Context.Service<Sandbox, { readonly run: (job: Sand
 
 export const executeRun = (params: RunParams) => Effect.gen(function* () {
   const sandbox = yield* Sandbox;
-  const result = yield* Effect.result(sandbox.run({ task: params.task, contract: params.contract, proof: params.proof ?? null, resume: params.resume ?? null }));
+  const result = yield* Effect.result(sandbox.run({ task: params.task, contract: params.contract, proof: params.proof ?? null, resume: params.resume ?? null, repo: params.repo ?? null }));
   const finishedAt = new Date().toISOString();
 
   return Result.match(result, { onSuccess: (success) => terminalOf(success, params.contract, finishedAt), onFailure: (failure) => failedOutcome(failure, finishedAt) });

@@ -5,6 +5,8 @@ import { Effect, Layer, Option } from "effect";
 import { Sandbox } from "./run-once.ts";
 
 import { detectProof } from "./default-proof.ts";
+import { ARCHIVE_PATH, MAX_ARCHIVE_BYTES, archiveUrl, clippedDiff, diffCommand, sessionBranch, unpackCommand } from "./repo.ts";
+import type { RepoResult, RepoSpec } from "./repo.ts";
 import { DEFAULT_STALL, stallMessage, watchStall } from "./stall.ts";
 import { ZERO_USAGE, addCall } from "./usage.ts";
 import type { CallTokens, Usage } from "./usage.ts";
@@ -142,6 +144,60 @@ const chooseProof = (box: Box, proof: string | null): Effect.Effect<Option.Optio
   );
 };
 
+interface Checkout {
+  readonly line: string;
+  readonly spec: RepoSpec | null;
+  readonly baseCommit: string | null;
+}
+
+const NO_CHECKOUT: Checkout = { line: "", spec: null, baseCommit: null };
+
+const fetchArchive = (url: string) =>
+  Effect.tryPromise({ try: () => fetch(url, { redirect: "follow" }), catch: (cause) => new Upstream({ service: "repo", detail: String(cause) }) }).pipe(
+    Effect.flatMap((response) => {
+      const size = Number(response.headers.get("content-length") ?? 0);
+
+      if (!response.ok) return Effect.fail(new Upstream({ service: "repo", detail: `archive ${response.status}` }));
+
+      if (size > MAX_ARCHIVE_BYTES) return Effect.fail(new Upstream({ service: "repo", detail: `archive is ${size} bytes, over ${MAX_ARCHIVE_BYTES}` }));
+
+      return Effect.tryPromise({ try: () => response.arrayBuffer(), catch: (cause) => new Upstream({ service: "repo", detail: String(cause) }) });
+    }),
+    Effect.flatMap((bytes) => (bytes.byteLength > MAX_ARCHIVE_BYTES ? Effect.fail(new Upstream({ service: "repo", detail: `archive is ${bytes.byteLength} bytes, over ${MAX_ARCHIVE_BYTES}` })) : Effect.succeed(base64Of(bytes)))),
+  );
+
+const base64Of = (bytes: ArrayBuffer): string => {
+  const view = new Uint8Array(bytes);
+  const chunks: Array<string> = [];
+
+  for (let start = 0; start < view.length; start += 0x8000) chunks.push(String.fromCharCode(...view.subarray(start, start + 0x8000)));
+
+  return btoa(chunks.join(""));
+};
+
+const checkoutRepo = (box: Box, spec: RepoSpec | null, runId: string): Effect.Effect<Checkout> => {
+  if (spec === null) return Effect.succeed(NO_CHECKOUT);
+
+  return Option.match(archiveUrl(spec), {
+    onNone: () => Effect.succeed({ ...NO_CHECKOUT, line: `[terrarium:repo] refused ${spec.github}` }),
+    onSome: (url) => fetchArchive(url).pipe(
+      Effect.flatMap((encoded) => sandboxCall(() => box.writeFile(ARCHIVE_PATH, encoded, { encoding: "base64" }))),
+      Effect.flatMap(() => sandboxCall(() => box.exec(unpackCommand(runId), { timeout: 120_000, cwd: "/" }))),
+      Effect.flatMap((unpacked) => (unpacked.exitCode === 0 ? Effect.succeed(unpacked.stdout.trim().split("\n").at(-1) ?? "") : Effect.fail(new Upstream({ service: "repo", detail: unpacked.stderr.slice(-400) })))),
+      Effect.map((baseCommit): Checkout => ({ spec, baseCommit, line: `[terrarium:repo] ${spec.github}@${spec.ref ?? "HEAD"} on branch ${sessionBranch(runId)} (base ${baseCommit.slice(0, 12)})` })),
+      Effect.catch((error) => Effect.succeed({ ...NO_CHECKOUT, line: `[terrarium:repo] checkout failed: ${error.detail}` })),
+    ),
+  });
+};
+
+const repoOutcome = (box: Box, checkout: Checkout, runId: string): Effect.Effect<RepoResult | null> => {
+  const { spec, baseCommit } = checkout;
+
+  if (spec === null || baseCommit === null) return Effect.succeed(null);
+
+  return readOrEmpty(box, diffCommand).pipe(Effect.map((diff) => ({ github: spec.github, ref: spec.ref ?? "HEAD", branch: sessionBranch(runId), baseCommit, ...clippedDiff(diff) })));
+};
+
 const SNAPSHOT_TTL_SECONDS = 7 * 24 * 60 * 60;
 
 const saveWorkspace = (box: Box, runId: string): Effect.Effect<WorkspaceSnapshot | null> =>
@@ -160,10 +216,11 @@ const restoreInto = (box: Box, snapshot: WorkspaceSnapshot | null): Effect.Effec
 };
 
 export const sandboxLayer = (env: SandboxEnv) => Layer.succeed(Sandbox, Sandbox.of({
-  run: ({ task, contract, proof, resume }) => Effect.gen(function* () {
+  run: ({ task, contract, proof, resume, repo }) => Effect.gen(function* () {
     const box = getSandbox(env.TERRARIUM_SANDBOX, contract.runId);
     const startMs = Date.now();
     const restoreLine = yield* restoreInto(box, resume ?? null);
+    const checkout = yield* checkoutRepo(box, repo ?? null, contract.runId);
     yield* sandboxCall(() => box.writeFile(`${WORKSPACE}/terrarium-task.txt`, task));
     const boxReadyMs = Date.now();
     yield* sandboxCall(() => box.writeFile(`${WORKSPACE}/terrarium-contract.json`, JSON.stringify(contract)));
@@ -175,8 +232,9 @@ export const sandboxLayer = (env: SandboxEnv) => Layer.succeed(Sandbox, Sandbox.
     const proofResult = result.exitCode === STALLED_EXIT ? null : Option.getOrNull(yield* chooseProof(box, proof));
     const timing = timingLine({ startMs, boxReadyMs, endMs: Date.now(), runnerOutput: result.stdout });
     const usage = yield* Effect.tryPromise(() => stub.readUsage()).pipe(Effect.orElseSucceed(() => ZERO_USAGE));
+    const repoResult = yield* repoOutcome(box, checkout, contract.runId);
     const workspace = yield* saveWorkspace(box, contract.runId);
 
-    return { output: [restoreLine, result.stdout, labelStderr(result.stderr), timing].filter((part) => part.length > 0).join("\n"), exitCode: result.exitCode, proof: proofResult, usage, workspace };
+    return { repo: repoResult, output: [restoreLine, checkout.line, result.stdout, labelStderr(result.stderr), timing].filter((part) => part.length > 0).join("\n"), exitCode: result.exitCode, proof: proofResult, usage, workspace };
   }).pipe(Effect.ensuring(Effect.ignore(sandboxCall(() => getSandbox(env.TERRARIUM_SANDBOX, contract.runId).destroy())))),
 }));

@@ -1,5 +1,6 @@
 import { Context, Effect, Schema } from "effect";
 
+import { RepoResult, RepoSpec } from "./repo.ts";
 import { Usage } from "./usage.ts";
 
 export const OwnerId = Schema.String.check(Schema.isPattern(/^(user:[^:\s]+:[^:\s]+|[A-Za-z0-9._-]{1,64})$/));
@@ -54,6 +55,7 @@ export const RunTerminal = Schema.Struct({
   finishedAt: Schema.String,
   usage: Schema.optionalKey(Usage),
   workspace: Schema.optionalKey(Schema.NullOr(WorkspaceSnapshot)),
+  repo: Schema.optionalKey(Schema.NullOr(RepoResult)),
 });
 
 export type RunTerminal = typeof RunTerminal.Type;
@@ -65,6 +67,7 @@ export const RunRecord = Schema.Struct({
   proof: Schema.optionalKey(Schema.NullOr(Schema.String)),
   channel: Schema.NullOr(Schema.String),
   resumeFrom: Schema.optionalKey(Schema.NullOr(Schema.String)),
+  repo: Schema.optionalKey(Schema.NullOr(RepoSpec)),
   contract: RunContract,
   createdAt: Schema.String,
   terminal: Schema.NullOr(RunTerminal),
@@ -100,6 +103,7 @@ export const AdmitInput = Schema.Struct({
   channel: Schema.NullOr(Schema.String),
   idempotencyKey: Schema.String,
   resumeFrom: Schema.optionalKey(Schema.NullOr(Schema.String)),
+  repo: Schema.optionalKey(Schema.NullOr(RepoSpec)),
 });
 
 export type AdmitInput = typeof AdmitInput.Type;

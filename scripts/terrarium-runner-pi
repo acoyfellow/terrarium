@@ -115,7 +115,7 @@ if [ -z "$AGENT_BIN" ]; then
 fi
 
 # Isolated ephemeral home so no ambient config/extensions/skills/auth leak in.
-CELL_HOME="${TERRARIUM_CELL_HOME:-/workspace/.pi-home}"
+CELL_HOME="${TERRARIUM_CELL_HOME:-/tmp/terrarium-pi-home}"
 mkdir -p "$CELL_HOME"
 
 PROMPT_FILE="$(mktemp)"
