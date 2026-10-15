@@ -1,0 +1,28 @@
+{
+  "item": 6,
+  "checkedAt": "2026-10-15T03:31:57.435Z",
+  "title": "no-progress wake: a run with no model activity for 180 s is stopped and says why, before the hard timeout",
+  "seconds": 201,
+  "runs": [
+    "ter_mv8zbjii_9cfd6426c6c5",
+    "ter_mv8zbk4w_0a47fb1351b0"
+  ],
+  "ok": true,
+  "results": [
+    {
+      "name": "a run that hangs with no model activity is stopped by the no-progress wake",
+      "ok": true,
+      "note": "[stderr] terrarium: stopped after 192s with no model activity (no-progress wake)"
+    },
+    {
+      "name": "it stopped well before the 600 s hard timeout",
+      "ok": true,
+      "note": "199s from admit to finish"
+    },
+    {
+      "name": "a run that keeps working is not stopped",
+      "ok": true,
+      "note": "done/this-run"
+    }
+  ]
+}

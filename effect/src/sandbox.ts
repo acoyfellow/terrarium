@@ -5,6 +5,7 @@ import { Effect, Layer, Option } from "effect";
 import { Sandbox } from "./run-once.ts";
 
 import { detectProof } from "./default-proof.ts";
+import { DEFAULT_STALL, stallMessage, watchStall } from "./stall.ts";
 import { ZERO_USAGE, addCall } from "./usage.ts";
 import type { CallTokens, Usage } from "./usage.ts";
 import { answerModel, isModelRoute, modelError } from "./model-route.ts";
@@ -26,7 +27,16 @@ export interface ModelEnv {
 export interface SandboxEnv {
   readonly TERRARIUM_SANDBOX: DurableObjectNamespace<TerrariumSandbox>;
   readonly TERRARIUM_MODEL_HOST: string;
+  readonly TERRARIUM_STALL_MS?: string;
 }
+
+const STALLED_EXIT = 124;
+
+const stallPolicy = (env: SandboxEnv) => {
+  const windowMs = Number(env.TERRARIUM_STALL_MS ?? DEFAULT_STALL.windowMs);
+
+  return Number.isFinite(windowMs) && windowMs >= 30_000 ? { ...DEFAULT_STALL, windowMs } : DEFAULT_STALL;
+};
 
 const RUN_TIMEOUT_MS = 600_000;
 
@@ -37,6 +47,8 @@ const MAX_PROOF_OUTPUT = 4000;
 export const WORKSPACE = "/workspace";
 
 const USAGE_KEY = "terrarium-usage";
+
+const ACTIVE_KEY = "terrarium-last-active";
 
 interface DeployedEnv extends Env {
   readonly TERRARIUM_MODEL_HOST: string;
@@ -57,7 +69,9 @@ const outbound = (request: Request, generated: Env, ctx: OutboundHandlerContext)
 
   const box = env.TERRARIUM_SANDBOX.get(env.TERRARIUM_SANDBOX.idFromString(ctx.containerId));
 
-  return Effect.runPromise(answerModel(request, env.AI, (tokens) => box.recordTokens(tokens)));
+  const answer = answerModel(request, env.AI, (tokens) => box.recordTokens(tokens));
+
+  return box.markActive(Date.now()).then(() => Effect.runPromise(answer), () => Effect.runPromise(answer));
 };
 
 export class TerrariumSandbox extends SdkSandbox<ModelEnv> {
@@ -69,6 +83,14 @@ export class TerrariumSandbox extends SdkSandbox<ModelEnv> {
     const total = (await this.ctx.storage.get<Usage>(USAGE_KEY)) ?? ZERO_USAGE;
 
     await this.ctx.storage.put(USAGE_KEY, addCall(total, tokens));
+  }
+
+  async markActive(nowMs: number): Promise<void> {
+    await this.ctx.storage.put(ACTIVE_KEY, nowMs);
+  }
+
+  async lastActive(): Promise<number | null> {
+    return (await this.ctx.storage.get<number>(ACTIVE_KEY)) ?? null;
   }
 
   async readUsage(): Promise<Usage> {
@@ -127,10 +149,13 @@ export const sandboxLayer = (env: SandboxEnv) => Layer.succeed(Sandbox, Sandbox.
     yield* sandboxCall(() => box.writeFile(`${WORKSPACE}/terrarium-task.txt`, task));
     const boxReadyMs = Date.now();
     yield* sandboxCall(() => box.writeFile(`${WORKSPACE}/terrarium-contract.json`, JSON.stringify(contract)));
-    const result = yield* sandboxCall(() => box.exec("/usr/local/bin/terrarium-runner", { timeout: RUN_TIMEOUT_MS, cwd: WORKSPACE, env: containerEnv(env.TERRARIUM_MODEL_HOST) }));
-    const proofResult = Option.getOrNull(yield* chooseProof(box, proof));
-    const timing = timingLine({ startMs, boxReadyMs, endMs: Date.now(), runnerOutput: result.stdout });
     const stub = env.TERRARIUM_SANDBOX.get(env.TERRARIUM_SANDBOX.idFromName(contract.runId));
+    const agent = sandboxCall(() => box.exec("/usr/local/bin/terrarium-runner", { timeout: RUN_TIMEOUT_MS, cwd: WORKSPACE, env: containerEnv(env.TERRARIUM_MODEL_HOST) }));
+    const lastActive = Effect.tryPromise(() => stub.lastActive()).pipe(Effect.orElseSucceed(() => null));
+    const stall = watchStall(lastActive, Date.now(), stallPolicy(env)).pipe(Effect.map((stalled) => ({ stdout: "", stderr: stallMessage(stalled), exitCode: STALLED_EXIT })));
+    const result = yield* Effect.raceFirst(agent, stall);
+    const proofResult = result.exitCode === STALLED_EXIT ? null : Option.getOrNull(yield* chooseProof(box, proof));
+    const timing = timingLine({ startMs, boxReadyMs, endMs: Date.now(), runnerOutput: result.stdout });
     const usage = yield* Effect.tryPromise(() => stub.readUsage()).pipe(Effect.orElseSucceed(() => ZERO_USAGE));
 
     return { output: [result.stdout, labelStderr(result.stderr), timing].filter((part) => part.length > 0).join("\n"), exitCode: result.exitCode, proof: proofResult, usage };
