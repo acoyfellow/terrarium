@@ -172,7 +172,7 @@ export const completion = (answer: ModelAnswer, stream: boolean): Response => {
   return new Response(body, { headers: { "content-type": "text/event-stream", "cache-control": "no-store" } });
 };
 
-export const answerModel = (request: Request, ai: Ai, onTokens: (tokens: CallTokens) => Promise<void> = () => Promise.resolve()): Effect.Effect<Response> =>
+export const answerModel = (request: Request, ai: Ai, onTokens: (tokens: CallTokens) => Promise<void> = () => Promise.resolve(), onAnswer: (answer: ModelAnswer) => Promise<void> = () => Promise.resolve()): Effect.Effect<Response> =>
   Effect.tryPromise({ try: () => request.json(), catch: () => "body must be JSON" }).pipe(
     Effect.flatMap((body) => Schema.decodeUnknownEffect(ChatRequest)(body).pipe(Effect.mapError(() => "invalid messages"))),
     Effect.flatMap((chat) =>
@@ -181,6 +181,7 @@ export const answerModel = (request: Request, ai: Ai, onTokens: (tokens: CallTok
         Effect.tap(([duration]) => Effect.logInfo(`terrarium model_ms=${Duration.toMillis(duration)}`)),
         Effect.tap(([, output]) => Option.match(tokensOf(output), { onNone: () => Effect.void, onSome: (tokens) => Effect.ignore(Effect.tryPromise(() => onTokens(tokens))) })),
         Effect.flatMap(([, output]) => Option.match(decodeModelOutput(output), { onNone: () => Effect.fail("unsupported model output"), onSome: (decoded) => Effect.succeed(answerOf(decoded)) })),
+        Effect.tap((answer) => Effect.ignore(Effect.tryPromise(() => onAnswer(answer)))),
         Effect.map((answer) => completion(answer, chat.stream === true)),
         Effect.mapError((message) => modelError(502, message)),
       )),

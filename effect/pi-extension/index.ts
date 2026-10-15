@@ -1,6 +1,8 @@
 import { Effect } from "effect";
 
 import { cloudUrl, followUp, runIdsIn, terminalOf } from "./cloud.ts";
+import { liveWidget } from "./live.ts";
+import type { WidgetSink } from "./live.ts";
 import { watchRun } from "./watch.ts";
 import type { WatchOutcome } from "./watch.ts";
 
@@ -10,8 +12,12 @@ interface ToolResultEvent {
   readonly content: ReadonlyArray<{ readonly type: string; readonly text?: string }>;
 }
 
+interface HandlerContext {
+  readonly ui?: WidgetSink;
+}
+
 interface Pi {
-  readonly on: (event: "tool_result", handler: (event: ToolResultEvent) => void) => void;
+  readonly on: (event: "tool_result", handler: (event: ToolResultEvent, ctx?: HandlerContext) => void) => void;
   readonly sendUserMessage: (content: string, options: { readonly deliverAs: "followUp" }) => void;
 }
 
@@ -27,15 +33,17 @@ const deliver = (pi: Pi, runId: string, outcome: WatchOutcome) =>
     pi.sendUserMessage(message, { deliverAs: "followUp" });
   });
 
-const awaitRun = (pi: Pi, url: string, runId: string) => {
+const awaitRun = (pi: Pi, url: string, runId: string, ui: WidgetSink | undefined) => {
   if (watching.has(runId)) return;
 
   watching.add(runId);
   Effect.runFork(watchRun(terminalOf(url, runId)).pipe(Effect.flatMap((outcome) => deliver(pi, runId, outcome))));
+
+  if (ui !== undefined) Effect.runFork(liveWidget(url, runId, ui));
 };
 
 export default function terrariumEffect(pi: Pi) {
-  pi.on("tool_result", (event) => {
+  pi.on("tool_result", (event, ctx) => {
     if (!isSpawnTool(event.toolName) || event.input.background !== true) return;
 
     const url = cloudUrl();
@@ -43,6 +51,6 @@ export default function terrariumEffect(pi: Pi) {
 
     if (url.length === 0) return;
 
-    new Set(runIdsIn(text)).forEach((runId) => awaitRun(pi, url, runId));
+    new Set(runIdsIn(text)).forEach((runId) => awaitRun(pi, url, runId, ctx?.ui));
   });
 }

@@ -11,7 +11,9 @@ const [alice, bob] = principals;
 
 const probeBox: ProbeBox = { exec: () => Promise.resolve({ stdout: "reach https://example.com/ 520\nreach https://m/_terrarium_model/v1/models 404\npistartms 1200\n", exitCode: 0 }), destroy: () => Promise.resolve() };
 
-const probeBoxes = { modelHost: "m", fresh: () => probeBox };
+const activityLog = [{ at: 1000, kind: "tool" as const, detail: "bash ls" }, { at: 2000, kind: "text" as const, detail: "done" }];
+
+const probeBoxes = { modelHost: "m", fresh: () => probeBox, activity: (_runId: string, afterMs: number) => Promise.resolve(activityLog.filter((event) => event.at > afterMs)) };
 
 const call = (env: ReturnType<typeof fakeEnv>, path: string, init: RequestInit = {}) => handleRequest(new Request(`https://t${path}`, init), env, probeBoxes);
 
@@ -64,4 +66,24 @@ test("a loop can be created, cancelled and deleted by its owner only", async () 
   assert.equal((await call(env, `/api/loops/${loopId}/cancel`, { method: "POST", headers: bearer(alice.token) })).status, 200);
   assert.equal((await call(env, `/api/loops/${loopId}`, { method: "DELETE", headers: bearer(alice.token) })).status, 200);
   assert.equal((await call(env, `/api/loops/${loopId}`, { headers: bearer(alice.token) })).status, 404);
+});
+
+test("run activity is readable by its owner, filtered by after", async () => {
+  const env = fakeEnv();
+  const admitted = await call(env, "/api/runs", { method: "POST", headers: bearer(principals[0].token, { "content-type": "application/json", "idempotency-key": "act-key-0001" }), body: JSON.stringify({ task: "t" }) });
+  const { runId } = Schema.decodeUnknownSync(Admitted)(await admitted.json());
+  const Events = Schema.Struct({ events: Schema.Array(Schema.Struct({ detail: Schema.String })) });
+  const all = Schema.decodeUnknownSync(Events)(await (await call(env, `/api/runs/${runId}/activity`, { headers: bearer(principals[0].token) })).json());
+  const newer = Schema.decodeUnknownSync(Events)(await (await call(env, `/api/runs/${runId}/activity?after=1500`, { headers: bearer(principals[0].token) })).json());
+
+  assert.equal(all.events.length, 2);
+  assert.deepEqual(newer.events.map((event) => event.detail), ["done"]);
+});
+
+test("another owner cannot read my run's activity", async () => {
+  const env = fakeEnv();
+  const admitted = await call(env, "/api/runs", { method: "POST", headers: bearer(principals[0].token, { "content-type": "application/json", "idempotency-key": "act-key-0002" }), body: JSON.stringify({ task: "t" }) });
+  const { runId } = Schema.decodeUnknownSync(Admitted)(await admitted.json());
+
+  assert.equal((await call(env, `/api/runs/${runId}/activity`, { headers: bearer(principals[1].token) })).status, 404);
 });

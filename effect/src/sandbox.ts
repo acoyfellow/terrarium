@@ -4,6 +4,8 @@ import { Effect, Layer, Option, Schema } from "effect";
 
 import { Sandbox } from "./run-once.ts";
 
+import { appendCapped, eventsOf, since } from "./activity.ts";
+import type { ActivityEvent } from "./activity.ts";
 import { detectProof } from "./default-proof.ts";
 import { SETUP_ENV, SETUP_TIMEOUT_MS, baseKey, commitSetupCommand, isSetupRequest, sessionFromBaseCommand } from "./warm-base.ts";
 import type { BaseInfo } from "./warm-base.ts";
@@ -57,6 +59,8 @@ const ACTIVE_KEY = "terrarium-last-active";
 
 const SETUP_KEY = "terrarium-setup-open";
 
+const ACTIVITY_KEY = "terrarium-activity";
+
 interface DeployedEnv extends Env {
   readonly TERRARIUM_MODEL_HOST: string;
 }
@@ -82,7 +86,7 @@ const outbound = (request: Request, generated: Env, ctx: OutboundHandlerContext)
 
   if (!isModelRoute(request, env.TERRARIUM_MODEL_HOST)) return setupFetch(box, request);
 
-  const answer = answerModel(request, env.AI, (tokens) => box.recordTokens(tokens));
+  const answer = answerModel(request, env.AI, (tokens) => box.recordTokens(tokens), (reply) => box.recordActivity(eventsOf(reply, Date.now())));
 
   return box.markActive(Date.now()).then(() => Effect.runPromise(answer), () => Effect.runPromise(answer));
 };
@@ -116,6 +120,18 @@ export class TerrariumSandbox extends SdkSandbox<ModelEnv> {
 
   async lastActive(): Promise<number | null> {
     return (await this.ctx.storage.get<number>(ACTIVE_KEY)) ?? null;
+  }
+
+  async recordActivity(events: ReadonlyArray<ActivityEvent>): Promise<void> {
+    if (events.length === 0) return;
+
+    const log = (await this.ctx.storage.get<ReadonlyArray<ActivityEvent>>(ACTIVITY_KEY)) ?? [];
+
+    await this.ctx.storage.put(ACTIVITY_KEY, appendCapped(log, events));
+  }
+
+  async readActivity(afterMs: number): Promise<ReadonlyArray<ActivityEvent>> {
+    return since((await this.ctx.storage.get<ReadonlyArray<ActivityEvent>>(ACTIVITY_KEY)) ?? [], afterMs);
   }
 
   async readUsage(): Promise<Usage> {
@@ -332,3 +348,6 @@ export const sandboxLayer = (env: SandboxEnv) => Layer.succeed(Sandbox, Sandbox.
     return { repo: repoResult, output: [restoreLine, checkout.line, result.stdout, labelStderr(result.stderr), timing].filter((part) => part.length > 0).join("\n"), exitCode: result.exitCode, proof: proofResult, usage, workspace };
   }).pipe(Effect.ensuring(Effect.ignore(sandboxCall(() => getSandbox(env.TERRARIUM_SANDBOX, contract.runId).destroy())))),
 }));
+
+export const activityOf = (namespace: DurableObjectNamespace<TerrariumSandbox>, runId: string, afterMs: number): Promise<ReadonlyArray<ActivityEvent>> =>
+  namespace.get(namespace.idFromName(runId)).readActivity(afterMs);

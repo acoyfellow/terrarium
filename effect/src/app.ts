@@ -7,7 +7,7 @@ import type { LoopsEnv } from "./loops-api.ts";
 import { CallbacksLive, RunsLive, cloudflareLayer } from "./runs.ts";
 import type { RunsEnv } from "./runs.ts";
 import { errorResponse, handleRuns } from "./runs-api.ts";
-import { Clock, Ids, NotFound, Owner, Upstream } from "./shared.ts";
+import { Clock, Ids, NotFound, Owner, Runs, Upstream } from "./shared.ts";
 import type { HttpFailure } from "./shared.ts";
 
 export interface AppEnv extends RunsEnv, LoopsEnv {
@@ -59,10 +59,24 @@ const route = (request: Request, env: AppEnv): Effect.Effect<Response, HttpFailu
 
   if (request.method === "DELETE" && /^\/api\/loops\/[^/]+$/.test(url.pathname)) return deleteLoop(request, env);
 
+  const activityPath = /^\/api\/runs\/([^/]+)\/activity$/.exec(url.pathname);
+
+  if (request.method === "GET" && activityPath !== null) return runActivity(activityPath[1], Number(url.searchParams.get("after") ?? 0)).pipe(Effect.provide(runsLayer(env)));
+
   if (url.pathname.startsWith("/api/runs") || key === "POST /claim" || key === "POST /ack") return handleRuns(request).pipe(Effect.provide(runsLayer(env)));
 
   return Effect.fail(new NotFound({ what: "route" }));
 };
+
+const runActivity = (runId: string, afterMs: number): Effect.Effect<Response, HttpFailure, Owner | ProbeBoxes | Runs> =>
+  Effect.gen(function* () {
+    const runs = yield* Runs;
+    const boxes = yield* ProbeBoxes;
+    const record = yield* runs.get(runId);
+    const events = yield* Effect.tryPromise({ try: () => boxes.activity(record.runId, Number.isFinite(afterMs) ? afterMs : 0), catch: (cause) => new Upstream({ service: "sandbox", detail: String(cause) }) });
+
+    return Response.json({ ok: true, runId: record.runId, status: record.terminal?.status ?? "running", createdAt: record.createdAt, events });
+  });
 
 const authenticated = (request: Request, env: AppEnv): Effect.Effect<Response, HttpFailure, ProbeBoxes> =>
   Effect.gen(function* () {

@@ -1,3 +1,4 @@
+import type { ActivityEvent } from "./activity.ts";
 import { Context, Effect } from "effect";
 
 import { Upstream } from "./shared.ts";
@@ -42,7 +43,7 @@ export interface ProbeBox {
   readonly destroy: () => Promise<void>;
 }
 
-export class ProbeBoxes extends Context.Service<ProbeBoxes, { readonly fresh: () => ProbeBox; readonly modelHost: string }>()("terrarium/ProbeBoxes") {}
+export class ProbeBoxes extends Context.Service<ProbeBoxes, { readonly fresh: () => ProbeBox; readonly modelHost: string; readonly activity: (runId: string, afterMs: number) => Promise<ReadonlyArray<ActivityEvent>> }>()("terrarium/ProbeBoxes") {}
 
 const call = <A>(run: () => Promise<A>) => Effect.tryPromise({ try: run, catch: (cause) => new Upstream({ service: "sandbox", detail: String(cause) }) });
 

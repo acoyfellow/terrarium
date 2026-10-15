@@ -1,0 +1,30 @@
+{
+  "item": 10,
+  "checkedAt": "2026-10-15T04:57:57.463Z",
+  "title": "live run view: each model reply's tool calls are recorded per run and readable as they happen; the Pi extension shows them in a widget",
+  "seconds": 39,
+  "runId": "ter_mv92hlg9_8a4afd7b469e",
+  "ok": true,
+  "results": [
+    {
+      "name": "steps are visible while the run is still running",
+      "ok": true,
+      "note": "[{\"t\":8,\"status\":\"running\",\"newEvents\":2},{\"t\":33,\"status\":\"running\",\"newEvents\":2},{\"t\":36,\"status\":\"running\",\"newEvents\":1}]"
+    },
+    {
+      "name": "the log shows the agent's real tool calls in order",
+      "ok": true,
+      "note": "bash echo one > a.txt | bash sleep 20 | bash echo two >> a.txt && cat a.txt | bash echo DONE | TERRARIUM_RESULT=<receipt>"
+    },
+    {
+      "name": "after= returns only newer steps (no duplicates when polling)",
+      "ok": true,
+      "note": "5 incremental vs 5 total"
+    },
+    {
+      "name": "another run id that is not mine is 404",
+      "ok": true,
+      "note": "404"
+    }
+  ]
+}
