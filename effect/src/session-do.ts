@@ -16,7 +16,28 @@ const INSTRUCTIONS = "You are a Terrarium worker. Your files are in /workspace i
 
 const BOX_KEY = "terrarium-session-box";
 
+export interface SteerResult {
+  readonly steered: boolean;
+  readonly reason: string;
+}
+
+interface LiveTurn {
+  readonly submit: (text: string) => Promise<void>;
+}
+
 export class SessionDO extends DurableObject<Env> {
+  private live: LiveTurn | null = null;
+
+  async steer(text: string): Promise<SteerResult> {
+    const live = this.live;
+
+    if (live === null) return { steered: false, reason: "no turn is running" };
+
+    await live.submit(text);
+
+    return { steered: true, reason: "queued as a steering message for the running turn" };
+  }
+
   private boxCalls(boxName: string): BoxCalls {
     const box = getSandbox(this.env.TERRARIUM_SANDBOX, boxName);
 
@@ -64,11 +85,15 @@ export class SessionDO extends DurableObject<Env> {
 
     harness.resume();
 
+    this.live = { submit: (steerText) => conversation.submit({ type: "input", content: steerText, whenBusy: "steer" }, BACKGROUND_CONTEXT).then(() => undefined) };
+
     const before = (await conversation.entries({}, 500, undefined, BACKGROUND_CONTEXT)).items.flatMap((entry) => entry.model ?? []).length;
     const submission = await conversation.submit({ type: "input", content: text }, BACKGROUND_CONTEXT);
 
     await submission.wait(BACKGROUND_CONTEXT);
-    await conversation.waitForIdle(BACKGROUND_CONTEXT);
+    await conversation.waitForIdle(BACKGROUND_CONTEXT).finally(() => {
+      this.live = null;
+    });
 
     const page = await conversation.entries({}, 500, undefined, BACKGROUND_CONTEXT);
 

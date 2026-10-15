@@ -1,0 +1,35 @@
+{
+  "item": 14,
+  "checkedAt": "2026-10-15T07:37:01.727Z",
+  "title": "steer a running session turn: POST /api/sessions/:name/steer queues a steering message into the live pi-durable turn",
+  "session": "b14-mv986al6",
+  "word": "heron4404",
+  "ok": true,
+  "results": [
+    {
+      "name": "steering an idle session is refused (409)",
+      "ok": true,
+      "note": "status=409"
+    },
+    {
+      "name": "steering while the turn ran was accepted (202)",
+      "ok": true,
+      "note": "status=202 {\"ok\":true,\"session\":\"b14-mv986al6\",\"steered\":true,\"reason\":\"queued as a steering message for the running turn\"}"
+    },
+    {
+      "name": "the running turn acted on the steer: it wrote steered.txt",
+      "ok": true,
+      "note": "[\"bash {\\\"command\\\":\\\"sleep 25 && echo slept > slept.txt\\\"}\",\"write {\\\"path\\\":\\\"/workspace/steered.txt\\\",\\\"content\\\":\\\"heron4404\\\"}\",\"bash {\\\"command\\\":\\\"ls /workspace\\\"}\"]"
+    },
+    {
+      "name": "the turn finished its original work too",
+      "ok": true,
+      "note": "turn status=200 answer=The files in /workspace are slept.txt and steered.txt."
+    },
+    {
+      "name": "the steered file is in the box with the word",
+      "ok": true,
+      "note": "heron4404"
+    }
+  ]
+}

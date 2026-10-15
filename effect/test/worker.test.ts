@@ -13,7 +13,7 @@ const probeBox: ProbeBox = { exec: () => Promise.resolve({ stdout: "reach https:
 
 const activityLog = [{ at: 1000, kind: "tool" as const, detail: "bash ls" }, { at: 2000, kind: "text" as const, detail: "done" }];
 
-const probeBoxes = { modelHost: "m", fresh: () => probeBox, activity: (_runId: string, afterMs: number) => Promise.resolve(activityLog.filter((event) => event.at > afterMs)), session: (key: string) => ({ turn: (text: string) => Promise.resolve({ box: `box-${key}`, entries: 2, answer: `echo ${text}`, toolCalls: [], userTurns: 1, stop: "stop", error: "", roles: [] }), replaceBox: () => Promise.resolve({ old: `box-${key}`, fresh: `box2-${key}` }) }) };
+const probeBoxes = { modelHost: "m", fresh: () => probeBox, activity: (_runId: string, afterMs: number) => Promise.resolve(activityLog.filter((event) => event.at > afterMs)), session: (key: string) => ({ turn: (text: string) => Promise.resolve({ box: `box-${key}`, entries: 2, answer: `echo ${text}`, toolCalls: [], userTurns: 1, stop: "stop", error: "", roles: [] }), replaceBox: () => Promise.resolve({ old: `box-${key}`, fresh: `box2-${key}` }), steer: (text: string) => Promise.resolve(text === "idle" ? { steered: false, reason: "no turn is running" } : { steered: true, reason: "queued" }) }) };
 
 const call = (env: ReturnType<typeof fakeEnv>, path: string, init: RequestInit = {}) => handleRequest(new Request(`https://t${path}`, init), env, probeBoxes);
 
@@ -107,4 +107,9 @@ test("replace-box swaps the session's box", async () => {
   const body = Schema.decodeUnknownSync(Schema.Struct({ old: Schema.String, fresh: Schema.String }))(await (await call(fakeEnv(), "/api/sessions/s1/replace-box", { method: "POST", headers: bearer(alice.token) })).json());
 
   assert.notEqual(body.old, body.fresh);
+});
+
+test("steer is 202 while a turn runs and 409 when idle", async () => {
+  assert.equal((await call(fakeEnv(), "/api/sessions/s1/steer", { method: "POST", headers: bearer(alice.token), body: JSON.stringify({ text: "also do x" }) })).status, 202);
+  assert.equal((await call(fakeEnv(), "/api/sessions/s1/steer", { method: "POST", headers: bearer(alice.token), body: JSON.stringify({ text: "idle" }) })).status, 409);
 });

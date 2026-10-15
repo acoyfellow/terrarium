@@ -47,6 +47,7 @@ export interface ProbeBox {
 export interface SessionStub {
   readonly turn: (text: string) => Promise<SessionTurn>;
   readonly replaceBox: () => Promise<{ readonly old: string; readonly fresh: string }>;
+  readonly steer: (text: string) => Promise<{ readonly steered: boolean; readonly reason: string }>;
 }
 
 export class ProbeBoxes extends Context.Service<ProbeBoxes, { readonly fresh: () => ProbeBox; readonly modelHost: string; readonly activity: (runId: string, afterMs: number) => Promise<ReadonlyArray<ActivityEvent>>; readonly session: (key: string) => SessionStub }>()("terrarium/ProbeBoxes") {}

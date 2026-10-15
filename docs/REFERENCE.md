@@ -24,6 +24,7 @@ Every route except `/health` needs one of these, checked in this order:
 | `POST /api/loops` | Start a loop. Body `{ goal, task, expect?, proof?, maxAttempts? }`; give `expect`, `proof` or both. An attempt passes when the proof exits 0 (if given) and the answer contains `expect` (if given). `maxAttempts` is 1 to 5, default 3. |
 | `GET /api/loops` | Your loops, with what each Workflow recorded. |
 | `POST /api/sessions/:name/turn` | Send one turn to your durable Pi session `:name`. Body `{ text }`. The conversation is stored in a Durable Object; tools run in the session's box. |
+| `POST /api/sessions/:name/steer` | Body `{ text }`. While a turn is running, add a message the agent reads before its next step. Returns 202, or 409 when no turn is running. |
 | `POST /api/sessions/:name/replace-box` | Destroy the session's box and give it a new one. The conversation stays. |
 | `GET /api/whoami` | `{ owner, method }`. |
 | `POST /claim`, `POST /ack` | Completion events: `{ subscriberId, limit? }` and `{ subscriberId, eventId }`. |

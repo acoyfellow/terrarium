@@ -6,7 +6,7 @@ import { cancelLoop, createLoop, deleteLoop, getLoop, hookWake, listLoops, wakeL
 import type { LoopsEnv } from "./loops-api.ts";
 import { CallbacksLive, RunsLive, cloudflareLayer } from "./runs.ts";
 import type { RunsEnv } from "./runs.ts";
-import { sessionReplaceBox, sessionTurn } from "./sessions-api.ts";
+import { sessionReplaceBox, sessionSteer, sessionTurn } from "./sessions-api.ts";
 import { errorResponse, handleRuns } from "./runs-api.ts";
 import { Clock, Ids, NotFound, Owner, Runs, Upstream } from "./shared.ts";
 import type { HttpFailure } from "./shared.ts";
@@ -38,6 +38,8 @@ const accessLayer = (env: AppEnv) =>
     Effect.map((principals) => accessConfigLayer({ teamDomain: env.TERRARIUM_ACCESS_TEAM_DOMAIN, aud: env.TERRARIUM_ACCESS_AUD, principals, fetchCerts: fetchJwks })),
   );
 
+const SESSION_ROUTES = new Map([["turn", sessionTurn], ["steer", sessionSteer], ["replace-box", (_request: Request, name: string) => sessionReplaceBox(name)]]);
+
 const whoami = Effect.map(Owner, (owner) => Response.json({ ok: true, method: owner.method, owner: owner.id, email: owner.email ?? undefined }));
 
 const route = (request: Request, env: AppEnv): Effect.Effect<Response, HttpFailure, Owner | ProbeBoxes> => {
@@ -60,9 +62,9 @@ const route = (request: Request, env: AppEnv): Effect.Effect<Response, HttpFailu
 
   if (request.method === "DELETE" && /^\/api\/loops\/[^/]+$/.test(url.pathname)) return deleteLoop(request, env);
 
-  const sessionPath = new RegExp("^/api/sessions/([^/]+)/(turn|replace-box)$").exec(url.pathname);
+  const sessionPath = new RegExp("^/api/sessions/([^/]+)/(turn|steer|replace-box)$").exec(url.pathname);
 
-  if (request.method === "POST" && sessionPath !== null) return sessionPath[2] === "turn" ? sessionTurn(request, sessionPath[1]) : sessionReplaceBox(sessionPath[1]);
+  if (request.method === "POST" && sessionPath !== null) return SESSION_ROUTES.get(sessionPath[2])?.(request, sessionPath[1]) ?? Effect.fail(new NotFound({ what: "route" }));
 
   const activityPath = /^\/api\/runs\/([^/]+)\/activity$/.exec(url.pathname);
 
