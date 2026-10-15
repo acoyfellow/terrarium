@@ -1,7 +1,7 @@
 {
   "base": "<deployed effect worker>",
-  "at": "2026-10-15T02:32:19.000Z",
-  "ok": false,
+  "at": "2026-10-15T02:42:48.322Z",
+  "ok": true,
   "checks": [
     {
       "name": "health answers",
@@ -30,15 +30,15 @@
       "pass": true,
       "detail": {
         "status": 202,
-        "runId": "ter_mv8x96wm_2121d5fc15aa"
+        "runId": "ter_mv8xmqvn_b3870b435e7f"
       }
     },
     {
       "name": "same key returns same run",
       "pass": true,
       "detail": {
-        "first": "ter_mv8x96wm_2121d5fc15aa",
-        "second": "ter_mv8x96wm_2121d5fc15aa"
+        "first": "ter_mv8xmqvn_b3870b435e7f",
+        "second": "ter_mv8xmqvn_b3870b435e7f"
       }
     },
     {
@@ -59,18 +59,18 @@
     },
     {
       "name": "loop that should pass passes",
-      "pass": false,
+      "pass": true,
       "detail": {
-        "loopId": "loop_b8e56a6fb797417e9b753cb43d5d688e",
+        "loopId": "loop_b94fc9f7156748ca84a4227c61d672dc",
         "status": 202,
-        "outcome": "exhausted"
+        "outcome": "passed"
       }
     },
     {
       "name": "loop that cannot pass gives up",
       "pass": true,
       "detail": {
-        "loopId": "loop_107346c3775543ec975fa0e37e5a8eb5",
+        "loopId": "loop_5d5d81de52cd42bf9b88d07af243ce57",
         "outcome": "exhausted"
       }
     },
