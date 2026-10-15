@@ -2,7 +2,7 @@ import { Effect, Layer, Schema } from "effect";
 
 import { ProbeBoxes, runProbe } from "./egress.ts";
 import { accessConfigLayer, authenticate, fetchJwks } from "./identity.ts";
-import { cancelLoop, createLoop, deleteLoop, getLoop, listLoops } from "./loops-api.ts";
+import { cancelLoop, createLoop, deleteLoop, getLoop, hookWake, listLoops, wakeLoop } from "./loops-api.ts";
 import type { LoopsEnv } from "./loops-api.ts";
 import { CallbacksLive, RunsLive, cloudflareLayer } from "./runs.ts";
 import type { RunsEnv } from "./runs.ts";
@@ -55,6 +55,8 @@ const route = (request: Request, env: AppEnv): Effect.Effect<Response, HttpFailu
 
   if (request.method === "POST" && /^\/api\/loops\/[^/]+\/cancel$/.test(url.pathname)) return cancelLoop(request, env);
 
+  if (request.method === "POST" && /^\/api\/loops\/[^/]+\/wake$/.test(url.pathname)) return wakeLoop(request, env);
+
   if (request.method === "DELETE" && /^\/api\/loops\/[^/]+$/.test(url.pathname)) return deleteLoop(request, env);
 
   if (url.pathname.startsWith("/api/runs") || key === "POST /claim" || key === "POST /ack") return handleRuns(request).pipe(Effect.provide(runsLayer(env)));
@@ -76,6 +78,8 @@ export const handleRequest = (request: Request, env: AppEnv, probeBoxes: typeof 
   const { pathname } = new URL(request.url);
 
   if (pathname === "/health") return Promise.resolve(Response.json({ ok: true }));
+
+  if (request.method === "POST" && /^\/hooks\/loops\/[^/]+\/wake$/.test(pathname)) return Effect.runPromise(hookWake(request, env).pipe(Effect.catch((error) => Effect.succeed(errorResponse(error)))));
 
   if (!isApiPath(pathname)) return env.ASSETS.fetch(request);
 

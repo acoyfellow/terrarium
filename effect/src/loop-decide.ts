@@ -2,6 +2,7 @@ import { Effect, Schema } from "effect";
 
 import { CheckResult, NamedChecks, checksCommand } from "./loop-checks.ts";
 import { Usage } from "./usage.ts";
+import { Wake } from "./wake.ts";
 
 const field = (maxLength: number) => Schema.Trim.check(Schema.isNonEmpty(), Schema.isMaxLength(maxLength));
 
@@ -11,6 +12,7 @@ export const LoopContract = Schema.Struct({
   expect: Schema.optionalKey(field(500)),
   proof: Schema.optionalKey(field(2000)),
   checks: Schema.optionalKey(NamedChecks),
+  wake: Schema.optionalKey(Wake),
   maxAttempts: Schema.Int.check(Schema.isBetween({ minimum: 1, maximum: 5 })).pipe(Schema.withDecodingDefaultKey(Effect.succeed(3))),
 });
 

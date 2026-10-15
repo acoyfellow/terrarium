@@ -1,0 +1,44 @@
+{
+  "item": 9,
+  "checkedAt": "2026-10-15T04:46:33.323Z",
+  "hookStatus": {
+    "path": "/hooks/loops/loop_92bfd88a6101443eaaf24e7eac9e20d9/wake?sig=<redacted>",
+    "unauthenticatedStatus": 302,
+    "blockedBy": "Cloudflare Access covers every path; /hooks/* needs an Access bypass policy (owner decision)"
+  },
+  "title": "event wakes: a loop sleeps in Workflows (waitForEvent or a timer) and a signed hook or the owner wakes it with a note",
+  "seconds": 408,
+  "loops": [
+    "loop_92bfd88a6101443eaaf24e7eac9e20d9",
+    "loop_8cffeabc03904325bad9089ffb9c6475"
+  ],
+  "ok": true,
+  "results": [
+    {
+      "name": "an event-wake loop sleeps after a failed attempt instead of retrying",
+      "ok": true,
+      "note": "status while asleep: running; first attempt: answer does not contain the expected text"
+    },
+    {
+      "name": "the owner (or CI with an Access service token) wakes it with a note",
+      "ok": true,
+      "note": "wake 202"
+    },
+    {
+      "name": "waking a loop you do not own is refused",
+      "ok": true,
+      "note": "other 404"
+    },
+    {
+      "name": "the woken attempt received the wake note and passed",
+      "ok": true,
+      "note": "passed in 16s after the hook; wakes=[{\"source\":\"ci\",\"note\":\"the secret word is ostrich-3159\"}]"
+    },
+    {
+      "name": "a timer-wake loop sleeps its interval between attempts",
+      "ok": true,
+      "note": "attempts=2 wakes=[null]"
+    }
+  ],
+  "firstAttemptsSeen": 0
+}

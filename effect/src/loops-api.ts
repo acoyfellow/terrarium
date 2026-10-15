@@ -2,6 +2,8 @@ import { Effect, Schema } from "effect";
 import { BadRequest, NotFound, Owner, Upstream } from "./shared.ts";
 import type { HttpFailure } from "./shared.ts";
 import { LoopContract, hasCheck } from "./loop-decide.ts";
+import { MAX_NOTE, WAKE_EVENT, hookSignature, sameText } from "./wake.ts";
+import type { WakePayload } from "./wake.ts";
 
 export interface LoopsKv {
   readonly get: (key: string) => Promise<string | null>;
@@ -16,12 +18,13 @@ export interface LoopInstanceStatus {
 
 export interface LoopWorkflowBinding {
   readonly create: (options: { readonly id: string; readonly params: { readonly loopId: string; readonly ownerId: string; readonly contract: LoopContract } }) => Promise<{ readonly id: string }>;
-  readonly get: (id: string) => Promise<{ readonly status: () => Promise<LoopInstanceStatus>; readonly terminate: () => Promise<void> }>;
+  readonly get: (id: string) => Promise<{ readonly status: () => Promise<LoopInstanceStatus>; readonly terminate: () => Promise<void>; readonly sendEvent: (event: { readonly type: string; readonly payload: WakePayload }) => Promise<void> }>;
 }
 
 export interface LoopsEnv {
   readonly LOOPS_KV: LoopsKv;
   readonly LOOP_WORKFLOW: LoopWorkflowBinding;
+  readonly TERRARIUM_HOOK_SECRET?: string;
 }
 
 const LoopRecord = Schema.Struct({ loopId: Schema.String, contract: LoopContract, createdAt: Schema.String });
@@ -60,7 +63,9 @@ export const createLoop = (request: Request, env: LoopsEnv): Effect.Effect<Respo
     const encoded = yield* Schema.encodeEffect(LoopIndex)([record, ...loops]).pipe(Effect.mapError(upstream("kv")));
     yield* Effect.tryPromise({ try: () => env.LOOPS_KV.put(indexKey(owner.id), encoded), catch: upstream("kv") });
 
-    return json({ loopId, contract }, 202);
+    const hook = yield* hookFor(env, loopId);
+
+    return json(hook === null ? { loopId, contract } : { loopId, contract, hook }, 202);
   });
 
 export const listLoops = (_request: Request, env: LoopsEnv): Effect.Effect<Response, HttpFailure, Owner> =>
@@ -113,4 +118,53 @@ export const deleteLoop = (request: Request, env: LoopsEnv): Effect.Effect<Respo
     yield* Effect.tryPromise({ try: () => env.LOOPS_KV.put(indexKey(owner.id), encoded), catch: upstream("kv") });
 
     return json({ ok: true, loopId: loop.loopId });
+  });
+
+const WakeBody = Schema.Struct({ source: Schema.optionalKey(Schema.Trim.check(Schema.isMaxLength(80))), note: Schema.optionalKey(Schema.String.check(Schema.isMaxLength(MAX_NOTE))) });
+
+const wakeBodyOf = (request: Request) =>
+  Effect.tryPromise({ try: () => request.text(), catch: () => new BadRequest({ problems: ["unreadable body"] }) }).pipe(
+    Effect.flatMap((text) => Schema.decodeUnknownEffect(Schema.fromJsonString(WakeBody))(text.length === 0 ? "{}" : text).pipe(Effect.mapError((error) => new BadRequest({ problems: [error.message] })))),
+  );
+
+const sendWake = (env: LoopsEnv, loopId: string, payload: WakePayload) =>
+  Effect.tryPromise({ try: () => env.LOOP_WORKFLOW.get(loopId).then((instance) => instance.sendEvent({ type: WAKE_EVENT, payload })), catch: upstream("workflow") });
+
+const hookFor = (env: LoopsEnv, loopId: string) => {
+  const secret = env.TERRARIUM_HOOK_SECRET ?? "";
+
+  if (secret.length === 0) return Effect.succeed(null);
+
+  return Effect.promise(() => hookSignature(secret, loopId)).pipe(Effect.map((sig) => `/hooks/loops/${loopId}/wake?sig=${sig}`));
+};
+
+export const wakeLoop = (request: Request, env: LoopsEnv): Effect.Effect<Response, HttpFailure, Owner> =>
+  Effect.gen(function* () {
+    const owner = yield* Owner;
+    const { loop } = yield* ownedLoop(request, env, owner.id);
+    const body = yield* wakeBodyOf(request);
+    const payload: WakePayload = { source: body.source ?? `owner:${owner.id}`, note: body.note ?? "" };
+    yield* sendWake(env, loop.loopId, payload);
+
+    return json({ ok: true, loopId: loop.loopId, woke: payload }, 202);
+  });
+
+export const hookWake = (request: Request, env: LoopsEnv): Effect.Effect<Response, HttpFailure> =>
+  Effect.gen(function* () {
+    const url = new URL(request.url);
+    const loopId = url.pathname.split("/")[3] ?? "";
+    const secret = env.TERRARIUM_HOOK_SECRET ?? "";
+    const given = url.searchParams.get("sig") ?? "";
+
+    if (secret.length === 0 || !/^loop_[0-9a-f]{32}$/.test(loopId)) return yield* new NotFound({ what: "hook" });
+
+    const expected = yield* Effect.promise(() => hookSignature(secret, loopId));
+
+    if (!sameText(given, expected)) return yield* new NotFound({ what: "hook" });
+
+    const body = yield* wakeBodyOf(request);
+    const payload: WakePayload = { source: body.source ?? "hook", note: body.note ?? "" };
+    yield* sendWake(env, loopId, payload);
+
+    return json({ ok: true, loopId, woke: payload }, 202);
   });
