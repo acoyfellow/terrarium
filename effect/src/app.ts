@@ -6,6 +6,7 @@ import { cancelLoop, createLoop, deleteLoop, getLoop, hookWake, listLoops, wakeL
 import type { LoopsEnv } from "./loops-api.ts";
 import { CallbacksLive, RunsLive, cloudflareLayer } from "./runs.ts";
 import type { RunsEnv } from "./runs.ts";
+import { sessionReplaceBox, sessionTurn } from "./sessions-api.ts";
 import { errorResponse, handleRuns } from "./runs-api.ts";
 import { Clock, Ids, NotFound, Owner, Runs, Upstream } from "./shared.ts";
 import type { HttpFailure } from "./shared.ts";
@@ -58,6 +59,10 @@ const route = (request: Request, env: AppEnv): Effect.Effect<Response, HttpFailu
   if (request.method === "POST" && /^\/api\/loops\/[^/]+\/wake$/.test(url.pathname)) return wakeLoop(request, env);
 
   if (request.method === "DELETE" && /^\/api\/loops\/[^/]+$/.test(url.pathname)) return deleteLoop(request, env);
+
+  const sessionPath = new RegExp("^/api/sessions/([^/]+)/(turn|replace-box)$").exec(url.pathname);
+
+  if (request.method === "POST" && sessionPath !== null) return sessionPath[2] === "turn" ? sessionTurn(request, sessionPath[1]) : sessionReplaceBox(sessionPath[1]);
 
   const activityPath = /^\/api\/runs\/([^/]+)\/activity$/.exec(url.pathname);
 

@@ -43,7 +43,11 @@ const ChatRequest = Schema.Struct({
   stream: Schema.optional(Schema.Boolean),
 });
 
-type ChatRequest = typeof ChatRequest.Type;
+export type ChatRequest = typeof ChatRequest.Type;
+
+export const decodeChatRequest = Schema.decodeUnknownOption(ChatRequest);
+
+export const runModel = (ai: Ai, chat: ChatRequest) => ai.run(MODEL, modelInput(chat));
 
 const LegacyReply = Schema.Struct({ response: Schema.String });
 

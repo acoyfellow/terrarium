@@ -51,7 +51,7 @@ step("2c all tests pass", () => {
 });
 
 step("2d no async/await or try/catch in business logic", () => {
-  const boundary = new Set(["src/worker.ts", "src/owner-do.ts", "src/sandbox.ts", "src/run-workflow.ts", "src/loop-workflow.ts", "src/worker-configuration.d.ts"]);
+  const boundary = new Set(["src/worker.ts", "src/owner-do.ts", "src/sandbox.ts", "src/run-workflow.ts", "src/loop-workflow.ts", "src/session-do.ts", "src/worker-configuration.d.ts"]);
   const offenders = sh("grep -lnE '\\basync\\b|\\bawait\\b|\\btry\\s*\\{' src/*.ts || true").trim().split("\n").filter((f) => f && !boundary.has(f));
 
   if (offenders.length) throw new Error(`async/try in ${offenders.join(", ")}`);

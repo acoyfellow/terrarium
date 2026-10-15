@@ -1,0 +1,44 @@
+{
+  "item": 16,
+  "checkedAt": "2026-10-15T06:09:45.629Z",
+  "title": "durable pi session in a DO, tools in the box",
+  "session": "b16-mv952jha",
+  "word": "kestrel9145",
+  "ms": {
+    "first": 6524,
+    "second": 3622
+  },
+  "ok": true,
+  "results": [
+    {
+      "name": "turn 1 ran tools in a Terrarium box",
+      "ok": true,
+      "note": "box=ses-1c0abc12ea0e4faf03b8-mv952jvb tools=[\"write {\\\"content\\\":\\\"kestrel9145\\\",\\\"path\\\":\\\"/workspace/secret.txt\\\"}\",\"bash {\\\"command\\\":\\\"cat /workspace/secret.txt\\\"}\"]"
+    },
+    {
+      "name": "turn 1 answer has the word",
+      "ok": true,
+      "note": "kestrel9145"
+    },
+    {
+      "name": "the box was destroyed and replaced",
+      "ok": true,
+      "note": "ses-1c0abc12ea0e4faf03b8-mv952jvb -> ses-1c0abc12ea0e4faf03b8-mv952oy0"
+    },
+    {
+      "name": "turn 2 ran in the new box",
+      "ok": true,
+      "note": "box=ses-1c0abc12ea0e4faf03b8-mv952oy0 tools=[\"bash {\\\"command\\\":\\\"cat /workspace/secret.txt\\\"}\",\"bash {\\\"command\\\":\\\"ls /workspace\\\"}\"]"
+    },
+    {
+      "name": "turn 2 recalls turn 1 from the DO session, not the box",
+      "ok": true,
+      "note": "userTurns=2 answer=The word was kestrel9145. secret.txt does not exist."
+    },
+    {
+      "name": "a bad session name is refused",
+      "ok": true,
+      "note": "status=400"
+    }
+  ]
+}

@@ -13,7 +13,7 @@ const probeBox: ProbeBox = { exec: () => Promise.resolve({ stdout: "reach https:
 
 const activityLog = [{ at: 1000, kind: "tool" as const, detail: "bash ls" }, { at: 2000, kind: "text" as const, detail: "done" }];
 
-const probeBoxes = { modelHost: "m", fresh: () => probeBox, activity: (_runId: string, afterMs: number) => Promise.resolve(activityLog.filter((event) => event.at > afterMs)) };
+const probeBoxes = { modelHost: "m", fresh: () => probeBox, activity: (_runId: string, afterMs: number) => Promise.resolve(activityLog.filter((event) => event.at > afterMs)), session: (key: string) => ({ turn: (text: string) => Promise.resolve({ box: `box-${key}`, entries: 2, answer: `echo ${text}`, toolCalls: [], userTurns: 1, stop: "stop", error: "", roles: [] }), replaceBox: () => Promise.resolve({ old: `box-${key}`, fresh: `box2-${key}` }) }) };
 
 const call = (env: ReturnType<typeof fakeEnv>, path: string, init: RequestInit = {}) => handleRequest(new Request(`https://t${path}`, init), env, probeBoxes);
 
@@ -86,4 +86,25 @@ test("another owner cannot read my run's activity", async () => {
   const { runId } = Schema.decodeUnknownSync(Admitted)(await admitted.json());
 
   assert.equal((await call(env, `/api/runs/${runId}/activity`, { headers: bearer(principals[1].token) })).status, 404);
+});
+
+test("a session turn is keyed by the caller's owner id", async () => {
+  const response = await call(fakeEnv(), "/api/sessions/s1/turn", { method: "POST", headers: bearer(alice.token), body: JSON.stringify({ text: "hi" }) });
+  const body = Schema.decodeUnknownSync(Schema.Struct({ ok: Schema.Boolean, box: Schema.String, answer: Schema.String }))(await response.json());
+
+  assert.equal(response.status, 200);
+  assert.equal(body.box, `box-${alice.id}::s1`);
+  assert.equal(body.answer, "echo hi");
+});
+
+test("a session rejects a bad name, an empty text and no credentials", async () => {
+  assert.equal((await call(fakeEnv(), "/api/sessions/bad.name/turn", { method: "POST", headers: bearer(alice.token), body: JSON.stringify({ text: "hi" }) })).status, 400);
+  assert.equal((await call(fakeEnv(), "/api/sessions/s1/turn", { method: "POST", headers: bearer(alice.token), body: JSON.stringify({ text: "" }) })).status, 400);
+  assert.equal((await call(fakeEnv(), "/api/sessions/s1/turn", { method: "POST", body: JSON.stringify({ text: "hi" }) })).status, 401);
+});
+
+test("replace-box swaps the session's box", async () => {
+  const body = Schema.decodeUnknownSync(Schema.Struct({ old: Schema.String, fresh: Schema.String }))(await (await call(fakeEnv(), "/api/sessions/s1/replace-box", { method: "POST", headers: bearer(alice.token) })).json());
+
+  assert.notEqual(body.old, body.fresh);
 });

@@ -15,6 +15,7 @@
   "durable_objects": {
     "bindings": [
       { "name": "OWNER", "class_name": "OwnerDO" },
+      { "name": "SESSION", "class_name": "SessionDO" },
       { "name": "TERRARIUM_SANDBOX", "class_name": "TerrariumSandbox" }
     ]
   },
@@ -26,7 +27,7 @@
       "max_instances": 20
     }
   ],
-  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["OwnerDO", "TerrariumSandbox"] }],
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["OwnerDO", "TerrariumSandbox"] }, { "tag": "v4", "new_sqlite_classes": ["SessionDO"] }],
   "workflows": [
     { "name": "terrarium-effect-run", "binding": "RUN_WORKFLOW", "class_name": "RunWorkflow" },
     { "name": "terrarium-effect-loop", "binding": "LOOP_WORKFLOW", "class_name": "LoopWorkflow" }

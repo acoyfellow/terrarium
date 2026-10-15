@@ -9,7 +9,10 @@
   },
   "dependencies": {
     "@cloudflare/sandbox": "^0.12.3",
-    "effect": "4.0.3"
+    "effect": "4.0.3",
+    "@earendil-works/pi-durable": "1.2.0",
+    "@earendil-works/pi-ai": "1.2.0",
+    "@earendil-works/chord": "1.2.0"
   },
   "devDependencies": {
     "@oxlint/plugins": "1.87.0",
