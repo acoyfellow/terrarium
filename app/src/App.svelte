@@ -183,6 +183,7 @@
     <nav class="topbar-nav">
       <a href="/docs" onclick={(e) => navigate('/docs', e)}>Docs</a>
       <a href="/how-it-works" onclick={(e) => navigate('/how-it-works', e)}>How it works</a>
+      <a href="https://deja.coey.dev">Deja</a>
       <a href="https://github.com/acoyfellow/terrarium">GitHub</a>
       <button class="theme-toggle" type="button" onclick={cycleTheme} aria-label={themeLabel()} title={themeLabel()}>
         {#if themeChoice === 'light'}
@@ -252,6 +253,7 @@
     <section class="closing">
       <div class="closing-inner" data-reveal>
         <p><strong>Setup takes about two minutes:</strong> install, <code>terra login</code>, reload your agent.</p>
+        <p class="pairs">Works with <a href="https://deja.coey.dev">Deja</a>: Deja remembers what earlier sessions learned, Terrarium runs the work. Your agent starts with memory, sends tasks out here, and leaves a handoff for the next session.</p>
         <div class="hero-actions">
           <a class="btn btn-primary" href="/docs?page=team" onclick={(e) => navigate('/docs?page=team', e)}>Try it</a>
           <a class="btn" href="https://github.com/acoyfellow/terrarium">Read the code</a>
@@ -293,5 +295,6 @@
     <span>Terrarium</span>
     <a href="https://github.com/acoyfellow/terrarium">GitHub</a>
     <a href="/docs" onclick={(e) => navigate('/docs', e)}>Docs</a>
+    <a href="https://deja.coey.dev">Deja · memory</a>
   </footer>
 </div>

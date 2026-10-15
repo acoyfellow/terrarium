@@ -148,6 +148,8 @@ img { max-width: 100%; display: block; }
 .closing p { margin: 0 0 1.6rem; font-size: clamp(1.3rem, 3vw, 2rem); line-height: 1.2; letter-spacing: -.03em; font-weight: 700; }
 .closing strong { color: var(--mint); }
 .closing .hero-actions { justify-content: center; margin-top: 0; }
+.closing p.pairs { font-size: 1rem; font-weight: 400; letter-spacing: 0; line-height: 1.55; color: var(--muted, inherit); max-width: 36rem; margin: 0 auto 1.6rem; }
+.closing p.pairs a { color: var(--mint); }
 
 /* ============================================================ docs */
 .docs-shell { max-width: var(--page-max); margin: 0 auto; padding: clamp(2rem, 4vw, 3.5rem) clamp(1.25rem, 5vw, 5rem); }
