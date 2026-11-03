@@ -74,3 +74,24 @@ test("another owner gets 404 and an empty list", async () => {
   assert.ok(listed instanceof Response);
   assert.deepEqual(await read(Listed, listed), { loops: [] });
 });
+
+test("a loop whose workflow instance is gone does not break the list", async () => {
+  const env = makeEnv();
+  const first = await respond(createLoop(post(JSON.stringify(contract)), env), "alice");
+
+  assert.ok(first instanceof Response);
+
+  const kept = await read(Created, first);
+  const goneEnv: LoopsEnv = { ...env, LOOP_WORKFLOW: { ...env.LOOP_WORKFLOW, get: (id) => (id === kept.loopId ? Promise.reject(new Error("(instance.not_found) Instance not found")) : env.LOOP_WORKFLOW.get(id)) } };
+  await respond(createLoop(post(JSON.stringify({ ...contract, goal: "second" })), goneEnv), "alice");
+  const listed = await respond(listLoops(new Request("https://t/api/loops"), goneEnv), "alice");
+
+  assert.ok(listed instanceof Response);
+  assert.equal(listed.status, 200);
+
+  const list = await read(Listed, listed);
+  const statuses = new Map(list.loops.map((loop) => [loop.loopId, loop.status]));
+
+  assert.equal(list.loops.length, 2);
+  assert.equal(statuses.get(kept.loopId), "expired");
+});

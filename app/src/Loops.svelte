@@ -48,6 +48,7 @@
     if (loop.pendingApproval && ACTIVE.has(loop.status)) return 'awaiting you';
     if (loop.status === 'terminated') return 'cancelled';
     if (loop.status === 'errored') return 'errored';
+    if (loop.status === 'expired') return 'expired';
     if (ACTIVE.has(loop.status)) return 'running';
     return loop.output?.decision?.outcome ?? loop.status ?? 'unknown';
   };

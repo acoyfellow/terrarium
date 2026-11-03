@@ -54,8 +54,17 @@ const pendingOf = (env: LoopsEnv, loop: LoopRecord) =>
         Effect.orElseSucceed(() => null),
       );
 
+const INSTANCE_GONE = new RegExp("instance\\.not_found|not found|no instance", "i");
+
+const EXPIRED: LoopInstanceStatus = { status: "expired" };
+
+const instanceStatus = (env: LoopsEnv, loopId: string) =>
+  Effect.tryPromise({ try: () => env.LOOP_WORKFLOW.get(loopId).then((instance) => instance.status()), catch: (cause) => cause }).pipe(
+    Effect.catch((cause) => (INSTANCE_GONE.test(String(cause)) ? Effect.succeed(EXPIRED) : Effect.fail(upstream("workflow")(cause)))),
+  );
+
 const witness = (env: LoopsEnv, loop: LoopRecord) =>
-  Effect.tryPromise({ try: () => env.LOOP_WORKFLOW.get(loop.loopId).then((instance) => instance.status()), catch: upstream("workflow") }).pipe(
+  instanceStatus(env, loop.loopId).pipe(
     Effect.zip(pendingOf(env, loop)),
     Effect.map(([instance, pending]) => ({ ...loop, status: instance.status, output: instance.output ?? null, error: instance.error ?? null, pendingApproval: pending })),
   );
