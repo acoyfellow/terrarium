@@ -8,7 +8,7 @@ export function createOAuthWorker<Env extends OAuthEnv>(deps: OAuthDeps<Env>, pu
   const authorize = authorizeHandler(deps);
 
   return new OAuthProvider<Env>({
-    resourceMetadata: { resource: new URL(MCP_PATH, publicOrigin).toString(), resource_name: "Terrarium" },
+    resourceMetadata: { resource: new URL(publicOrigin).origin, resource_name: "Terrarium" },
     apiRoute: MCP_PATH,
     apiHandler: {
       fetch: async (request: Request, env: Env, ctx: ExecutionContext) => {
