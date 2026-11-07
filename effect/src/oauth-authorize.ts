@@ -37,6 +37,8 @@ export const identityFromProps = (props: ExecutionContext["props"]): Identity | 
     onSome: (grant): Identity => ({ id: grant.id, method: "access-user", email: grant.email }),
   });
 
+export const grantUserId = (ownerId: string) => encodeURIComponent(ownerId).replaceAll(":", "%3A");
+
 const escapeHtml = (value: string) => value.replace(/[&<>"']/g, (char) => `&#${char.charCodeAt(0)};`);
 
 function consentPage(handle: string, clientName: string, redirectHost: string, email: string, headers: Headers): Response {
@@ -80,7 +82,7 @@ export function authorizeHandler<Env extends OAuthEnv>(deps: OAuthDeps<Env>) {
 
     const approved = await oauth.approveConsent(request, handle, { scope: [MCP_SCOPE] });
     const props: McpProps = { id: identity.id, email: identity.email };
-    const { redirectTo } = await oauth.completeAuthorization({ request: approved.request, userId: identity.id, metadata: { email: identity.email }, scope: [MCP_SCOPE], props });
+    const { redirectTo } = await oauth.completeAuthorization({ request: approved.request, userId: grantUserId(identity.id), metadata: { email: identity.email }, scope: [MCP_SCOPE], props });
     approved.headers.set("location", redirectTo);
 
     return new Response(null, { status: 302, headers: approved.headers });

@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { Schema } from "effect";
 
 import { handleMcp, REMOTE_TOOLS, toolRequest } from "../src/remote-mcp.ts";
-import { authorizeHandler, identityFromProps } from "../src/oauth-authorize.ts";
+import { authorizeHandler, grantUserId, identityFromProps } from "../src/oauth-authorize.ts";
 import type { ConsentFlow } from "../src/oauth-authorize.ts";
 import type { Identity } from "../src/identity.ts";
 import type { AuthRequest } from "@cloudflare/workers-oauth-provider";
@@ -108,4 +108,9 @@ test("the consent page escapes a client-chosen name", async () => {
   const html = await response.text();
   assert.doesNotMatch(html, /<script>x<\/script>/);
   assert.match(html, /evil\.example/);
+});
+
+test("the grant user id has no colon, as the OAuth library requires", () => {
+  assert.equal(grantUserId("user:ada:example.com"), "user%3Aada%3Aexample.com");
+  assert.doesNotMatch(grantUserId("user:ada:example.com"), /:/);
 });
