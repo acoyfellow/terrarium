@@ -2,6 +2,7 @@ import { Effect, Layer, Schema } from "effect";
 
 import { ProbeBoxes, runProbe } from "./egress.ts";
 import { accessConfigLayer, authenticate, fetchJwks } from "./identity.ts";
+import type { Identity } from "./identity.ts";
 import { approveLoop, cancelLoop, createLoop, deleteLoop, getLoop, hookWake, listLoops, wakeLoop } from "./loops-api.ts";
 import type { LoopsEnv } from "./loops-api.ts";
 import { CallbacksLive, RunsLive, cloudflareLayer } from "./runs.ts";
@@ -94,6 +95,20 @@ const authenticated = (request: Request, env: AppEnv): Effect.Effect<Response, H
 
     return yield* route(request, env).pipe(Effect.provideService(Owner, Owner.of(identity)));
   });
+
+export const accessIdentity = (request: Request, env: AppEnv): Promise<Identity | null> =>
+  Effect.runPromise(accessLayer(env).pipe(
+    Effect.flatMap((access) => authenticate(request).pipe(Effect.provide(access))),
+    Effect.map((identity): Identity | null => (identity.method === "access-user" ? identity : null)),
+    Effect.catch(() => Effect.succeed(null)),
+  ));
+
+export const handleAsOwner = (request: Request, env: AppEnv, probeBoxes: typeof ProbeBoxes.Service, identity: Identity): Promise<Response> =>
+  Effect.runPromise(route(request, env).pipe(
+    Effect.provideService(Owner, Owner.of(identity)),
+    Effect.provideService(ProbeBoxes, probeBoxes),
+    Effect.catch((error) => Effect.succeed(errorResponse(error))),
+  ));
 
 const isApiPath = (pathname: string) => pathname.startsWith("/api/") || pathname === "/claim" || pathname === "/ack";
 
