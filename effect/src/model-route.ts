@@ -1,11 +1,11 @@
 import { Duration, Effect, Option, Schema } from "effect";
 
+import { DEFAULT_MODEL, routeOf } from "./models.ts";
+import type { ModelRoute } from "./models.ts";
 import { tokensOf } from "./usage.ts";
 import type { CallTokens } from "./usage.ts";
 
 export const MODEL_PATH = "/_terrarium_model/v1/chat/completions";
-
-const MODEL = "@cf/meta/llama-3.3-70b-instruct-fp8-fast";
 
 const Part = Schema.Union([Schema.String, Schema.Struct({ text: Schema.optional(Schema.String) })]);
 
@@ -47,7 +47,85 @@ export type ChatRequest = typeof ChatRequest.Type;
 
 export const decodeChatRequest = Schema.decodeUnknownOption(ChatRequest);
 
-export const runModel = (ai: Ai, chat: ChatRequest) => ai.run(MODEL, modelInput(chat));
+// Where a box's model calls go. The box only ever sees the Terrarium model route;
+// the Worker picks the backend from the model recorded for the run. Each backend
+// parses its reply at the boundary, so callers get an answer and token counts.
+export interface ModelReply {
+  readonly answer: ModelAnswer;
+  readonly tokens: Option.Option<CallTokens>;
+}
+
+export interface ModelBackend {
+  readonly id: string;
+  readonly run: (input: ModelInput) => Promise<ModelReply>;
+}
+
+const replyOf = (output: ReturnType<typeof JSON.parse>): Promise<ModelReply> =>
+  Option.match(decodeModelOutput(output), {
+    onNone: () => Promise.reject(new Error("unsupported model output")),
+    onSome: (decoded) => Promise.resolve({ answer: answerOf(decoded), tokens: tokensOf(output) }),
+  });
+
+// routeOf only admits @cf/ and @hf/ catalog ids; Workers AI itself rejects an id it does not serve.
+const isCatalogModel = (id: string): id is Extract<keyof AiModels, string> => Option.isSome(routeOf(id)) && id.startsWith("@");
+
+export const workersAiBackend = (ai: Ai, id: string = DEFAULT_MODEL): ModelBackend => ({
+  id,
+  run: (input) => (isCatalogModel(id) ? ai.run(id, input).then(replyOf) : Promise.reject(new Error(`${id} is not a Workers AI model`))),
+});
+
+// AI Gateway's OpenAI-compatible unified endpoint, for example
+// https://gateway.ai.cloudflare.com/v1/<account>/<gateway>/compat. Provider keys
+// live in the gateway (stored keys); the Worker holds only the gateway token.
+export interface GatewayConfig {
+  readonly url: string;
+  readonly token: string;
+}
+
+export interface GatewayEnv {
+  readonly TERRARIUM_GATEWAY_URL?: string;
+  readonly TERRARIUM_GATEWAY_TOKEN?: string;
+}
+
+// Both values are needed; either one alone means no gateway.
+export const gatewayOf = (env: GatewayEnv): GatewayConfig | null => {
+  const url = env.TERRARIUM_GATEWAY_URL?.trim() ?? "";
+  const token = env.TERRARIUM_GATEWAY_TOKEN?.trim() ?? "";
+
+  return url.startsWith("https://") && token.length > 0 ? { url, token } : null;
+};
+
+const GATEWAY_ERROR_CHARS = 300;
+
+export type Fetcher = (url: string, init: RequestInit) => Promise<Response>;
+
+const globalFetch: Fetcher = (url, init) => fetch(url, init);
+
+export const gatewayBackend = (config: GatewayConfig, id: string, fetcher: Fetcher = globalFetch): ModelBackend => ({
+  id,
+  run: (input) =>
+    fetcher(`${config.url.replace(/\/+$/, "")}/chat/completions`, {
+      method: "POST",
+      headers: { "content-type": "application/json", "cf-aig-authorization": `Bearer ${config.token}` },
+      body: JSON.stringify({ model: id, ...input, stream: false }),
+    }).then((response) => (response.ok ? response.json().then(replyOf) : response.text().then((body) => Promise.reject(new Error(`gateway ${response.status}: ${body.slice(0, GATEWAY_ERROR_CHARS)}`))))),
+});
+
+const unavailable = (id: string, reason: string): ModelBackend => ({ id, run: () => Promise.reject(new Error(reason)) });
+
+export interface Backends {
+  readonly workersAi: (id: string) => ModelBackend;
+  readonly gateway: GatewayConfig | null;
+  readonly fetcher?: Fetcher;
+}
+
+export const backendFor = (route: ModelRoute, backends: Backends): ModelBackend => {
+  if (route.kind === "workers-ai") return backends.workersAi(route.id);
+
+  return backends.gateway === null ? unavailable(route.id, `${route.id} needs AI Gateway, and this Terrarium has no TERRARIUM_GATEWAY_URL and TERRARIUM_GATEWAY_TOKEN`) : gatewayBackend(backends.gateway, route.id, backends.fetcher);
+};
+
+export const runModel = (ai: Ai, chat: ChatRequest): Promise<ModelReply> => workersAiBackend(ai).run(modelInput(chat));
 
 const LegacyReply = Schema.Struct({ response: Schema.String });
 
@@ -92,7 +170,7 @@ interface ModelMessage {
   tool_call_id?: string;
 }
 
-interface ModelInput {
+export interface ModelInput {
   messages: Array<ModelMessage>;
   tools?: Array<ReturnType<typeof toolFor>>;
 }
@@ -161,32 +239,32 @@ const firstDelta = (answer: ModelAnswer): StreamDelta => {
   return delta;
 };
 
-export const completion = (answer: ModelAnswer, stream: boolean): Response => {
+export const completion = (answer: ModelAnswer, stream: boolean, model: string = DEFAULT_MODEL): Response => {
   const id = `chatcmpl-${crypto.randomUUID()}`;
   const created = Math.floor(Date.now() / 1000);
   const finishReason = answer.toolCalls.length > 0 ? "tool_calls" : "stop";
 
-  if (!stream) return Response.json({ id, object: "chat.completion", created, model: MODEL, choices: [{ index: 0, message: assistantMessage(answer), finish_reason: finishReason }] });
+  if (!stream) return Response.json({ id, object: "chat.completion", created, model, choices: [{ index: 0, message: assistantMessage(answer), finish_reason: finishReason }] });
 
   const chunk = (delta: StreamDelta, reason: string | null) =>
-    `data: ${JSON.stringify({ id, object: "chat.completion.chunk", created, model: MODEL, choices: [{ index: 0, delta, finish_reason: reason }] })}\n\n`;
+    `data: ${JSON.stringify({ id, object: "chat.completion.chunk", created, model, choices: [{ index: 0, delta, finish_reason: reason }] })}\n\n`;
 
   const body = `${chunk(firstDelta(answer), null)}${chunk({}, finishReason)}data: [DONE]\n\n`;
 
   return new Response(body, { headers: { "content-type": "text/event-stream", "cache-control": "no-store" } });
 };
 
-export const answerModel = (request: Request, ai: Ai, onTokens: (tokens: CallTokens) => Promise<void> = () => Promise.resolve(), onAnswer: (answer: ModelAnswer) => Promise<void> = () => Promise.resolve()): Effect.Effect<Response> =>
+export const answerModel = (request: Request, backend: ModelBackend, onTokens: (tokens: CallTokens) => Promise<void> = () => Promise.resolve(), onAnswer: (answer: ModelAnswer) => Promise<void> = () => Promise.resolve()): Effect.Effect<Response> =>
   Effect.tryPromise({ try: () => request.json(), catch: () => "body must be JSON" }).pipe(
     Effect.flatMap((body) => Schema.decodeUnknownEffect(ChatRequest)(body).pipe(Effect.mapError(() => "invalid messages"))),
     Effect.flatMap((chat) =>
-      Effect.tryPromise({ try: () => ai.run(MODEL, modelInput(chat)), catch: () => "model request failed" }).pipe(
+      Effect.tryPromise({ try: () => backend.run(modelInput(chat)), catch: (cause) => `model request failed: ${cause instanceof Error ? cause.message : String(cause)}`.slice(0, 400) }).pipe(
         Effect.timed,
-        Effect.tap(([duration]) => Effect.logInfo(`terrarium model_ms=${Duration.toMillis(duration)}`)),
-        Effect.tap(([, output]) => Option.match(tokensOf(output), { onNone: () => Effect.void, onSome: (tokens) => Effect.ignore(Effect.tryPromise(() => onTokens(tokens))) })),
-        Effect.flatMap(([, output]) => Option.match(decodeModelOutput(output), { onNone: () => Effect.fail("unsupported model output"), onSome: (decoded) => Effect.succeed(answerOf(decoded)) })),
+        Effect.tap(([duration]) => Effect.logInfo(`terrarium model=${backend.id} model_ms=${Duration.toMillis(duration)}`)),
+        Effect.tap(([, reply]) => Option.match(reply.tokens, { onNone: () => Effect.void, onSome: (tokens) => Effect.ignore(Effect.tryPromise(() => onTokens(tokens))) })),
+        Effect.map(([, reply]) => reply.answer),
         Effect.tap((answer) => Effect.ignore(Effect.tryPromise(() => onAnswer(answer)))),
-        Effect.map((answer) => completion(answer, chat.stream === true)),
+        Effect.map((answer) => completion(answer, chat.stream === true, backend.id)),
         Effect.mapError((message) => modelError(502, message)),
       )),
     Effect.catch((failure) => Effect.succeed(Schema.is(Schema.String)(failure) ? modelError(400, failure) : failure)),

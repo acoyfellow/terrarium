@@ -14,7 +14,9 @@ import type { RepoResult, RepoSpec } from "./repo.ts";
 import { DEFAULT_STALL, stallMessage, watchStall } from "./stall.ts";
 import { ZERO_USAGE, addCall } from "./usage.ts";
 import type { CallTokens, Usage } from "./usage.ts";
-import { answerModel, isModelRoute, modelError } from "./model-route.ts";
+import { answerModel, backendFor, gatewayOf, isModelRoute, modelError, workersAiBackend } from "./model-route.ts";
+import type { GatewayConfig, GatewayEnv } from "./model-route.ts";
+import { DEFAULT_MODEL, routeOf } from "./models.ts";
 import type { SandboxResult } from "./sandbox-result.ts";
 import { Upstream, WorkspaceSnapshot as WorkspaceSnapshotSchema } from "./shared.ts";
 import type { ProofResult, RunContract, WorkspaceSnapshot } from "./shared.ts";
@@ -30,6 +32,7 @@ export interface ModelEnv {
   readonly AI: Ai;
   readonly TERRARIUM_MODEL_HOST: string;
   readonly TERRARIUM_SANDBOX: DurableObjectNamespace<TerrariumSandbox>;
+  readonly gateway: GatewayConfig | null;
 }
 
 export interface SandboxEnv {
@@ -61,6 +64,8 @@ const ACTIVE_KEY = "terrarium-last-active";
 
 const SETUP_KEY = "terrarium-setup-open";
 
+const MODEL_KEY = "terrarium-model";
+
 const ACTIVITY_KEY = "terrarium-activity";
 
 interface DeployedEnv extends Env {
@@ -69,10 +74,16 @@ interface DeployedEnv extends Env {
 
 const isDeployed = (env: Env): env is DeployedEnv => "TERRARIUM_MODEL_HOST" in env;
 
+// Gateway settings are optional secrets, so they are not part of the generated Env type.
+const gatewayEnv = (env: Env): GatewayEnv => ({
+  TERRARIUM_GATEWAY_URL: "TERRARIUM_GATEWAY_URL" in env ? String(env.TERRARIUM_GATEWAY_URL) : "",
+  TERRARIUM_GATEWAY_TOKEN: "TERRARIUM_GATEWAY_TOKEN" in env ? String(env.TERRARIUM_GATEWAY_TOKEN) : "",
+});
+
 const withModelHost = (env: Env): ModelEnv => {
   const host = isDeployed(env) ? env.TERRARIUM_MODEL_HOST : "";
 
-  return { AI: env.AI, TERRARIUM_MODEL_HOST: host, TERRARIUM_SANDBOX: env.TERRARIUM_SANDBOX };
+  return { AI: env.AI, TERRARIUM_MODEL_HOST: host, TERRARIUM_SANDBOX: env.TERRARIUM_SANDBOX, gateway: gatewayOf(gatewayEnv(env)) };
 };
 
 const setupFetch = (box: DurableObjectStub<TerrariumSandbox>, request: Request): Promise<Response> => {
@@ -88,9 +99,14 @@ const outbound = (request: Request, generated: Env, ctx: OutboundHandlerContext)
 
   if (!isModelRoute(request, env.TERRARIUM_MODEL_HOST)) return setupFetch(box, request);
 
-  const answer = answerModel(request, env.AI, (tokens) => box.recordTokens(tokens), (reply) => box.recordActivity(eventsOf(reply, Date.now())));
+  // The run's model comes from the box's Durable Object, never from the request.
+  const answerWith = (model: string) => {
+    const backend = backendFor(Option.getOrElse(routeOf(model), () => ({ kind: "workers-ai" as const, id: DEFAULT_MODEL })), { workersAi: (id) => workersAiBackend(env.AI, id), gateway: env.gateway });
 
-  return box.markActive(Date.now()).then(() => Effect.runPromise(answer), () => Effect.runPromise(answer));
+    return Effect.runPromise(answerModel(request, backend, (tokens) => box.recordTokens(tokens), (reply) => box.recordActivity(eventsOf(reply, Date.now()))));
+  };
+
+  return box.markActive(Date.now()).catch(() => undefined).then(() => box.model().catch(() => DEFAULT_MODEL)).then(answerWith);
 };
 
 export class TerrariumSandbox extends SdkSandbox<ModelEnv> {
@@ -101,7 +117,15 @@ export class TerrariumSandbox extends SdkSandbox<ModelEnv> {
   async recordTokens(tokens: CallTokens): Promise<void> {
     const total = (await this.ctx.storage.get<Usage>(USAGE_KEY)) ?? ZERO_USAGE;
 
-    await this.ctx.storage.put(USAGE_KEY, addCall(total, tokens));
+    await this.ctx.storage.put(USAGE_KEY, addCall(total, tokens, await this.model()));
+  }
+
+  async setModel(model: string): Promise<void> {
+    await this.ctx.storage.put(MODEL_KEY, model);
+  }
+
+  async model(): Promise<string> {
+    return (await this.ctx.storage.get<string>(MODEL_KEY)) ?? DEFAULT_MODEL;
   }
 
   async markActive(nowMs: number): Promise<void> {
@@ -332,7 +356,7 @@ const restoreInto = (box: Box, snapshot: WorkspaceSnapshot | null): Effect.Effec
 };
 
 export const sandboxLayer = (env: SandboxEnv) => Layer.succeed(Sandbox, Sandbox.of({
-  run: ({ task, contract, proof, resume, repo, ownerId, plugins = [] }) => Effect.gen(function* () {
+  run: ({ task, contract, proof, resume, repo, ownerId, plugins = [], model }) => Effect.gen(function* () {
     const box = getSandbox(env.TERRARIUM_SANDBOX, contract.runId);
     const startMs = Date.now();
     const restoreLine = yield* restoreInto(box, resume ?? null);
@@ -343,6 +367,8 @@ export const sandboxLayer = (env: SandboxEnv) => Layer.succeed(Sandbox, Sandbox.
     const boxReadyMs = Date.now();
     yield* sandboxCall(() => box.writeFile(`${WORKSPACE}/terrarium-contract.json`, JSON.stringify(contract)));
     const stub = env.TERRARIUM_SANDBOX.get(env.TERRARIUM_SANDBOX.idFromName(contract.runId));
+    const runModel = model ?? DEFAULT_MODEL;
+    yield* sandboxCall(() => stub.setModel(runModel));
     const agent = sandboxCall(() => box.exec("/usr/local/bin/terrarium-runner", { timeout: RUN_TIMEOUT_MS, cwd: WORKSPACE, env: { ...containerEnv(env.TERRARIUM_MODEL_HOST), TERRARIUM_PLUGINS: pluginEnv(plugins), TERRARIUM_AGENT_TOOLS: agentTools(plugins) } }));
     const lastActive = Effect.tryPromise(() => stub.lastActive()).pipe(Effect.orElseSucceed(() => null));
     const stall = watchStall(lastActive, Date.now(), stallPolicy(env)).pipe(Effect.map((stalled) => ({ stdout: "", stderr: stallMessage(stalled), exitCode: STALLED_EXIT })));
@@ -353,7 +379,9 @@ export const sandboxLayer = (env: SandboxEnv) => Layer.succeed(Sandbox, Sandbox.
     const repoResult = yield* repoOutcome(box, checkout, contract.runId);
     const workspace = yield* saveWorkspace(box, contract.runId);
 
-    return { repo: repoResult, output: [restoreLine, checkout.line, pluginLine(plugins), result.stdout, labelStderr(result.stderr), timing].filter((part) => part.length > 0).join("\n"), exitCode: result.exitCode, proof: proofResult, usage, workspace };
+    const modelLine = runModel === DEFAULT_MODEL ? "" : `[terrarium:model] ${runModel}`;
+
+    return { repo: repoResult, output: [restoreLine, checkout.line, pluginLine(plugins), modelLine, result.stdout, labelStderr(result.stderr), timing].filter((part) => part.length > 0).join("\n"), exitCode: result.exitCode, proof: proofResult, usage, workspace };
   }).pipe(Effect.ensuring(Effect.ignore(sandboxCall(() => getSandbox(env.TERRARIUM_SANDBOX, contract.runId).destroy())))),
 }));
 

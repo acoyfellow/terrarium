@@ -259,3 +259,36 @@ test("another owner cannot resume my run's workspace", async () => {
 
   assert.match(failureTag(await h.run("bob", admitResuming("r4", prior.runId))), /no run/);
 });
+
+
+const admitWithModel = (task: string, model: string | null) => Effect.flatMap(Runs, (runs) => runs.admit({ task, model, channel: null, idempotencyKey: `key-${task}-model` }));
+
+test("a run's model is stored on the record and passed to the workflow", async () => {
+  const h = harness();
+  const record = value(await h.run("alice", admitWithModel("m1", " anthropic/claude-haiku-4-5 ")));
+
+  assert.equal(record.model, "anthropic/claude-haiku-4-5");
+  assert.equal(h.started[0].model, "anthropic/claude-haiku-4-5");
+});
+
+test("no model means the default model and the same record as before", async () => {
+  const h = harness();
+  const record = value(await h.run("alice", admitWithModel("m2", null)));
+
+  assert.equal("model" in record, false);
+  assert.equal("model" in h.started[0], false);
+});
+
+test("a model that is not a Workers AI or AI Gateway id is BadRequest and starts nothing", async () => {
+  const h = harness();
+
+  assert.match(failureTag(await h.run("alice", admitWithModel("m3", "https://evil.example/v1"))), /BadRequest/);
+  assert.equal(h.started.length, 0);
+});
+
+test("the same idempotency key with a different model is Conflict", async () => {
+  const h = harness();
+
+  value(await h.run("alice", admitWithModel("m4", "anthropic/claude-haiku-4-5")));
+  assert.match(failureTag(await h.run("alice", admitWithModel("m4", "anthropic/claude-sonnet-4-5"))), /Conflict/);
+});
