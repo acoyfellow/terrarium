@@ -26,10 +26,18 @@ export type OwnerFetch = (request: Request) => Promise<Response>;
 
 const text = { type: "string" };
 
-const tool = (name: string, description: string, properties: Record<string, { readonly type: string }>, required: ReadonlyArray<string>) => ({ name, description, inputSchema: { type: "object", properties, required } });
+const tool = (name: string, description: string, properties: Record<string, { readonly type: string; readonly description?: string }>, required: ReadonlyArray<string>) => ({ name, description, inputSchema: { type: "object", properties, required } });
 
 export const REMOTE_TOOLS = [
-  tool("terrarium_spawn", "Run one task in a sealed Terrarium cloud box. Returns the runId right away; poll terrarium_status. Optional proof is a shell command that must exit 0 in /workspace.", { task: text, proof: text, channel: text }, ["task"]),
+  tool("terrarium_spawn", "Run one task in a sealed Terrarium cloud box. Returns the runId right away; poll terrarium_status. Optional proof is a shell command that must exit 0 in /workspace.", {
+    task: text,
+    proof: text,
+    channel: text,
+    model: { type: "string", description: "Model for this run: a Workers AI id like @cf/meta/llama-3.3-70b-instruct-fp8-fast (the default) or an AI Gateway id like anthropic/claude-haiku-4-5." },
+    resumeFrom: { type: "string", description: "runId of an earlier run whose saved /workspace this run starts from." },
+    repo: { type: "object", description: "Check out a public GitHub repo into /workspace: { github: 'owner/name', ref?, setup? }." },
+    plugins: { type: "array", description: "Up to 4 Pi extensions: [{ name, source }]." },
+  }, ["task"]),
   tool("terrarium_status", "Status of one run.", { runId: text }, ["runId"]),
   tool("terrarium_read", "Logs of one run.", { runId: text }, ["runId"]),
   tool("terrarium_cancel", "Cancel one run.", { runId: text }, ["runId"]),
@@ -48,6 +56,19 @@ const RUN_ACTIONS = new Map([
 
 type RouteBody = Readonly<Record<string, Schema.Json>>;
 
+// Optional run fields pass through only when present; the runs route validates their contents.
+const SpawnExtras = Schema.Struct({
+  model: Schema.optionalKey(Schema.NonEmptyString),
+  resumeFrom: Schema.optionalKey(Schema.NonEmptyString),
+  repo: Schema.optionalKey(Schema.Record(Schema.String, Schema.Json)),
+  plugins: Schema.optionalKey(Schema.Array(Schema.Json)),
+});
+
+const decodeSpawnExtras = Schema.decodeUnknownOption(SpawnExtras);
+
+const spawnBody = (task: string, args: ToolArgs) =>
+  Option.map(decodeSpawnExtras(args), (extras) => ({ ...extras, task, proof: Option.getOrNull(textArg(args, "proof")), channel: Option.getOrNull(textArg(args, "channel")) }));
+
 export function toolRequest(origin: string, name: string, args: ToolArgs): Request | null {
   const json = (method: string, path: string, body?: RouteBody, headers: Record<string, string> = {}) =>
     new Request(new URL(path, origin), { method, headers: { "content-type": "application/json", ...headers }, body: body === undefined ? undefined : JSON.stringify(body) });
@@ -62,9 +83,9 @@ export function toolRequest(origin: string, name: string, args: ToolArgs): Reque
   }
 
   if (name === "terrarium_spawn") {
-    return Option.match(textArg(args, "task"), {
+    return Option.match(Option.flatMap(textArg(args, "task"), (task) => spawnBody(task, args)), {
       onNone: () => null,
-      onSome: (task) => json("POST", "/api/runs", { task, proof: Option.getOrNull(textArg(args, "proof")), channel: Option.getOrNull(textArg(args, "channel")) }, { "idempotency-key": crypto.randomUUID() }),
+      onSome: (body) => json("POST", "/api/runs", body, { "idempotency-key": crypto.randomUUID() }),
     });
   }
 
