@@ -13,8 +13,17 @@ export type CallbackEvent = typeof CallbackEvent.Type;
 
 export class CloudError extends Schema.TaggedError<CloudError>()("CloudError", { detail: Schema.String }) {}
 
+const readConfig = (): string => {
+  try {
+    return readFileSync(join(homedir(), ".terrarium", "effect-config.json"), "utf8");
+  } catch {
+    // No ~/.terrarium yet means no cloud configured, not a crash on load.
+    return "";
+  }
+};
+
 export const cloudUrl = () =>
-  process.env.TERRARIUM_URL ?? Schema.decodeUnknownOption(Config)(readFileSync(join(homedir(), ".terrarium", "effect-config.json"), { encoding: "utf8", flag: "a+" })).pipe(Option.match({ onNone: () => "", onSome: (config) => config.cloudUrl }));
+  process.env.TERRARIUM_URL ?? Schema.decodeUnknownOption(Config)(readConfig()).pipe(Option.match({ onNone: () => "", onSome: (config) => config.cloudUrl }));
 
 const authHeader = (url: string) => {
   const bearer = process.env.TERRARIUM_TOKEN ?? "";

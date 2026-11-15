@@ -129,11 +129,14 @@ const reserveNew = (sql: Sql, reservation: AdmitReservation): Effect.Effect<Admi
 };
 
 export const admitReserve = (sql: Sql, reservation: AdmitReservation): Effect.Effect<Admission, Conflict | RateLimited> => {
-  const prior = sql.rows("select request || char(0) || run_id as v from idem where key = ?", reservation.idempotencyKey)[0]?.v;
+  // Read the two columns separately, not as one string joined by char(0):
+  // node:sqlite reads text up to the first NUL, which dropped the run id.
+  const priorRunId = single(sql, "select run_id as v from idem where key = ?", reservation.idempotencyKey);
 
-  if (prior === undefined || prior === null) return reserveNew(sql, reservation);
+  if (priorRunId === undefined || priorRunId === null) return reserveNew(sql, reservation);
 
-  const [request, runId] = String(prior).split("\u0000");
+  const request = String(single(sql, "select request as v from idem where key = ?", reservation.idempotencyKey));
+  const runId = String(priorRunId);
 
   if (request !== reservation.request) return Effect.fail(new Conflict({ reason: "idempotency key reused with a different body" }));
 
