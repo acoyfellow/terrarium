@@ -70,6 +70,7 @@ export const RunRecord = Schema.Struct({
   resumeFrom: Schema.optionalKey(Schema.NullOr(Schema.String)),
   repo: Schema.optionalKey(Schema.NullOr(RepoSpec)),
   plugins: Schema.optionalKey(Plugins),
+  model: Schema.optionalKey(Schema.String),
   contract: RunContract,
   createdAt: Schema.String,
   terminal: Schema.NullOr(RunTerminal),
@@ -107,6 +108,7 @@ export const AdmitInput = Schema.Struct({
   resumeFrom: Schema.optionalKey(Schema.NullOr(Schema.String)),
   repo: Schema.optionalKey(Schema.NullOr(RepoSpec)),
   plugins: Schema.optionalKey(Plugins),
+  model: Schema.optionalKey(Schema.NullOr(Schema.String)),
 });
 
 export type AdmitInput = typeof AdmitInput.Type;

@@ -2,7 +2,7 @@ import { createAssistantMessageEventStream, createProvider } from "@earendil-wor
 import { Option } from "effect";
 import type { AssistantMessage, Message, Model, TranscriptContext, Tool } from "@earendil-works/pi-ai";
 
-import { answerOf, decodeChatRequest, decodeModelOutput, runModel } from "./model-route.ts";
+import { decodeChatRequest, runModel } from "./model-route.ts";
 import type { ModelAnswer } from "./model-route.ts";
 
 export const WORKERS_AI_PROVIDER = "terrarium-workers-ai";
@@ -79,9 +79,8 @@ export const workersAiProvider = (ai: Ai) => {
     const call = Option.match(chat, { onNone: () => Promise.reject(new Error("could not build a model request")), onSome: (request) => runModel(ai, request) });
 
     call.then(
-      (output) => {
-        const decoded = decodeModelOutput(output);
-        const message = Option.match(decoded, { onNone: () => failed("unsupported model output", model.id), onSome: (value) => assistantFrom(answerOf(value), model.id) });
+      (reply) => {
+        const message = assistantFrom(reply.answer, model.id);
 
         out.push({ type: "start", partial: message });
         out.push(message.stopReason === "error" ? { type: "error", reason: "error", error: message } : { type: "done", reason: message.stopReason === "toolUse" ? "toolUse" : "stop", message });

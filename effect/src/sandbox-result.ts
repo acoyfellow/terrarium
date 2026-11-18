@@ -21,4 +21,5 @@ export interface SandboxJob {
   readonly repo?: RepoSpec | null;
   readonly ownerId?: string;
   readonly plugins?: ReadonlyArray<Plugin>;
+  readonly model?: string | null;
 }

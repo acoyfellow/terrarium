@@ -2,12 +2,13 @@ import { Effect, Match, Schema } from "effect";
 
 import { RepoSpec } from "./repo.ts";
 import { Plugins } from "./plugins.ts";
+import { DEFAULT_MODEL } from "./models.ts";
 
 import { Callbacks } from "./runs.ts";
 import { BadRequest, IdempotencyKey, NotFound, Owner, Runs, RunId, TerminalStatus } from "./shared.ts";
 import type { HttpFailure, RunRecord } from "./shared.ts";
 
-const RunBody = Schema.Struct({ task: Schema.String, proof: Schema.optional(Schema.NullOr(Schema.String)), channel: Schema.optional(Schema.NullOr(Schema.String)), resumeFrom: Schema.optional(Schema.NullOr(Schema.String)), repo: Schema.optional(Schema.NullOr(RepoSpec)), plugins: Schema.optional(Plugins) });
+const RunBody = Schema.Struct({ task: Schema.String, proof: Schema.optional(Schema.NullOr(Schema.String)), channel: Schema.optional(Schema.NullOr(Schema.String)), resumeFrom: Schema.optional(Schema.NullOr(Schema.String)), repo: Schema.optional(Schema.NullOr(RepoSpec)), plugins: Schema.optional(Plugins), model: Schema.optional(Schema.NullOr(Schema.String)) });
 
 const ClaimBody = Schema.Struct({ subscriberId: Schema.String, limit: Schema.optional(Schema.Int) });
 
@@ -33,13 +34,13 @@ const decodeWith = <S extends Schema.Decoder<unknown>>(schema: S, input: string 
 const bodyOf = <S extends Schema.Decoder<unknown>>(request: Request, schema: S) =>
   Effect.tryPromise({ try: () => request.json(), catch: () => new BadRequest({ problems: ["body must be JSON"] }) }).pipe(Effect.flatMap((input) => Schema.decodeUnknownEffect(schema)(input).pipe(Effect.mapError(asBadRequest))));
 
-const runView = (record: RunRecord) => ({ ok: true, runId: record.runId, channel: record.channel, task: record.task.slice(0, 2000), proof: record.proof ?? null, createdAt: record.createdAt, status: record.terminal?.status ?? "running", terminal: record.terminal, startAttempts: record.startAttempts ?? 0 });
+const runView = (record: RunRecord) => ({ ok: true, runId: record.runId, channel: record.channel, task: record.task.slice(0, 2000), proof: record.proof ?? null, createdAt: record.createdAt, status: record.terminal?.status ?? "running", terminal: record.terminal, startAttempts: record.startAttempts ?? 0, model: record.model ?? DEFAULT_MODEL });
 
 const admitRun = (request: Request) => Effect.gen(function* () {
   const idempotencyKey = yield* decodeWith(IdempotencyKey, request.headers.get("idempotency-key"));
   const body = yield* bodyOf(request, RunBody);
   const runs = yield* Runs;
-  const record = yield* runs.admit({ task: body.task, proof: body.proof ?? null, channel: body.channel ?? null, resumeFrom: body.resumeFrom ?? null, repo: body.repo ?? null, plugins: body.plugins ?? [], idempotencyKey });
+  const record = yield* runs.admit({ task: body.task, proof: body.proof ?? null, channel: body.channel ?? null, resumeFrom: body.resumeFrom ?? null, repo: body.repo ?? null, plugins: body.plugins ?? [], model: body.model ?? null, idempotencyKey });
 
   return json(202, { ok: true, runId: record.runId, contract: record.contract });
 });
